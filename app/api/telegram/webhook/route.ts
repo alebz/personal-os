@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createServerClient } from '@/lib/supabase'
 import {
   classifyCapture,
@@ -280,27 +281,33 @@ export async function POST(req: NextRequest) {
   const fromId =
     update.message?.from?.id ?? update.callback_query?.from?.id
   if (!allowedUserId || String(fromId) !== allowedUserId) {
-    // Acknowledge so Telegram stops retrying, but do nothing.
     return NextResponse.json({ ok: true })
   }
 
-  // 3. Dispatch. Errors are logged but still acked, so Telegram doesn't retry-storm.
-  try {
-    if (update.callback_query) {
-      await handleCallbackQuery(update.callback_query)
-    } else if (update.message) {
-      await handleMessage(update.message)
-    }
-  } catch (err) {
-    console.error('telegram webhook: handler error', err)
-    const chatId =
-      update.message?.chat.id ?? update.callback_query?.message?.chat.id
-    if (chatId) {
-      await sendMessage(chatId, '⚠️ Something went wrong processing that.').catch(
-        () => {}
-      )
-    }
-  }
+  // 3. Return 200 to Telegram immediately so it never retries, then do all
+  //    the heavy work (Whisper transcription, Claude classification, DB writes)
+  //    in the background using Vercel's waitUntil. This keeps the handler well
+  //    within Telegram's 5-second webhook deadline on any plan.
+  waitUntil(
+    (async () => {
+      try {
+        if (update.callback_query) {
+          await handleCallbackQuery(update.callback_query)
+        } else if (update.message) {
+          await handleMessage(update.message)
+        }
+      } catch (err) {
+        console.error('telegram webhook: handler error', err)
+        const chatId =
+          update.message?.chat.id ?? update.callback_query?.message?.chat.id
+        if (chatId) {
+          await sendMessage(chatId, '⚠️ Something went wrong processing that.').catch(
+            () => {}
+          )
+        }
+      }
+    })()
+  )
 
   return NextResponse.json({ ok: true })
 }
