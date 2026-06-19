@@ -8,7 +8,23 @@
       "Bash(git init *)",
       "Bash(git add *)",
       "Bash(git config *)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(npx tsc *)",
+      "Bash(echo \"tsc exit: $?\")",
+      "Skill(claude-api)",
+      "Bash(npx next *)",
+      "Bash(curl *)",
+      "Bash(npx supabase *)",
+      "Bash(dig +short db.axnhwbdkpltnneonoify.supabase.co)",
+      "Bash(nslookup db.axnhwbdkpltnneonoify.supabase.co)",
+      "Bash(node *)",
+      "Bash(gh repo *)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f['path']\\) for f in data.get\\('tree',[]\\) if f['type']=='blob']\")",
+      "Bash(python3 -c ' *)",
+      "Read(//mnt/user-data/**)",
+      "Bash(ls /mnt/)",
+      "Read(//private/tmp/**)",
+      "Read(//Users/alexmateo/Library/Application Support/Claude/blob_storage/7489170c-1eb0-4141-83c9-6479490a3d2e/**)"
     ]
   }
 }
