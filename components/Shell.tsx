@@ -16,6 +16,9 @@ const GLOWS = {
   uptown:
     'radial-gradient(60rem 40rem at 20% -5%, oklch(0.78 0.16 55 / 0.14), transparent 60%),' +
     'radial-gradient(50rem 35rem at 90% 35%, oklch(0.70 0.14 30 / 0.08), transparent 55%)',
+  contactos:
+    'radial-gradient(60rem 40rem at 80% -5%, oklch(0.72 0.16 300 / 0.14), transparent 60%),' +
+    'radial-gradient(50rem 35rem at 10% 40%, oklch(0.70 0.14 330 / 0.08), transparent 55%)',
 } as const
 
 export default function Shell({

@@ -3,6 +3,7 @@ import Shell from '@/components/Shell'
 import HabitTracker from '@/components/HabitTracker'
 import GoalsCard from '@/components/GoalsCard'
 import SessionCard from '@/components/SessionCard'
+import CumpleanosCard from '@/components/CumpleanosCard'
 
 export default function DashboardPage() {
   return (
@@ -38,9 +39,7 @@ export default function DashboardPage() {
             <Panel title="Upcoming">
               <p className="text-sm text-ink-3">Calendar and reminders placeholder.</p>
             </Panel>
-            <Panel title="Signals">
-              <p className="text-sm text-ink-3">Metrics and notifications placeholder.</p>
-            </Panel>
+            <CumpleanosCard />
           </div>
         </div>
       </main>

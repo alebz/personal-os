@@ -6,7 +6,8 @@ import Clock from '@/components/Clock'
 
 const TABS = [
   { label: 'Home', href: '/' },
-  { label: 'CRM', href: '/crm' },
+  { label: 'Tareas', href: '/crm' },
+  { label: 'Contactos', href: '/contactos' },
   { label: 'Brain', href: '/brain' },
   { label: 'Finance', href: '/finance' },
   { label: 'Uptown', href: '/uptown' },

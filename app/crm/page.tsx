@@ -876,7 +876,7 @@ export default function CRMPage() {
       <div className="mx-auto max-w-7xl px-6 pb-4 pt-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-ink-4">CRM</h1>
+            <h1 className="text-xl font-semibold text-ink-4">Tareas</h1>
             <p className="mt-0.5 text-xs text-ink-3">
               {loading ? 'Loading…' : `${openCount} open task${openCount === 1 ? '' : 's'}`}
             </p>
