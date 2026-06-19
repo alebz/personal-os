@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/supabase'
 import {
   classifyCapture,
   isTaskKind,
+  isContactKind,
   ENTITIES,
   URGENCIES,
   type Urgency,
@@ -93,6 +94,17 @@ async function resolveEntityId(
   return inserted?.id ?? null
 }
 
+// --- Helpers -----------------------------------------------------------------
+
+function fmtBirthday(date: string): string {
+  const [, m, d] = date.split('-').map(Number)
+  const months = [
+    'enero','febrero','marzo','abril','mayo','junio',
+    'julio','agosto','septiembre','octubre','noviembre','diciembre',
+  ]
+  return `${d} de ${months[m - 1]}`
+}
+
 // --- Capture flow ------------------------------------------------------------
 
 async function handleMessage(message: TgMessage): Promise<void> {
@@ -139,7 +151,67 @@ async function handleMessage(message: TgMessage): Promise<void> {
     .single()
   const captureId = capture?.id ?? null
 
-  // 2. Route to the right downstream table.
+  // 2a. Contact route — saves directly to the contacts table.
+  if (isContactKind(classification.kind)) {
+    const cf = classification.contact_fields
+
+    if (!cf.name) {
+      await sendMessage(
+        chatId,
+        '🤔 No pude identificar el nombre.\nIntenta: "guarda contacto: [nombre], [categoría]"'
+      )
+      return
+    }
+
+    const { data: contact } = await supabase
+      .from('contacts')
+      .insert({
+        name:           cf.name,
+        category:       cf.category ?? 'Círculo extendido',
+        birthday:       cf.birthday ?? null,
+        notes:          cf.notes   ?? null,
+        company:        cf.company ?? null,
+        last_contacted: null,
+      })
+      .select('id')
+      .single()
+
+    const contactId = contact?.id ?? null
+
+    // Embed best-effort so the contact is searchable.
+    try {
+      const embedding = await embed(text)
+      await supabase.from('memory_chunks').insert({
+        entity_id: null,
+        content:   text,
+        embedding,
+        metadata:  { kind: 'contact', contact_id: contactId, name: cf.name, source_capture_id: captureId },
+      })
+    } catch (err) {
+      console.error('telegram webhook: contact embedding failed', err)
+    }
+
+    await supabase.from('audit_log').insert({
+      actor:      'telegram',
+      action:     'contact.created',
+      table_name: 'contacts',
+      record_id:  contactId,
+      data:       { capture_id: captureId, contact_fields: cf },
+    })
+
+    const replyLines = [
+      '✅ Contacto guardado',
+      `👤 ${cf.name}`,
+      `🏷️ ${cf.category ?? 'Círculo extendido'}`,
+      cf.birthday ? `🎂 ${fmtBirthday(cf.birthday)}` : null,
+      cf.company  ? `🏢 ${cf.company}` : null,
+      cf.notes    ? `📝 ${cf.notes.slice(0, 80)}${cf.notes.length > 80 ? '…' : ''}` : null,
+    ].filter(Boolean)
+    await sendMessage(chatId, replyLines.join('\n'))
+    return
+  }
+
+  // 2b. Task / log route.
   const routedToTasks = isTaskKind(classification.kind)
   let recordId: string | null = null
   if (routedToTasks) {
