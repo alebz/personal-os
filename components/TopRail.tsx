@@ -21,10 +21,14 @@ export default function TopRail() {
   return (
     <header className="sticky top-0 z-20 border-b border-ink-4/10 bg-ink-0/60 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-6">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_12px_var(--color-accent)]" />
-          <span className="text-sm font-semibold tracking-tight text-ink-4">Personal OS</span>
-        </div>
+        <Link href="/" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="Alex Mateo"
+            style={{ height: 76, width: 'auto', mixBlendMode: 'screen' }}
+          />
+        </Link>
 
         <nav className="hidden items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/40 p-1 backdrop-blur-xl md:flex">
           {TABS.map(({ label, href }) => {

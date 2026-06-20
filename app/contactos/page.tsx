@@ -34,6 +34,7 @@ interface ContactForm {
 }
 
 type Drawer = { mode: 'create' } | { mode: 'edit'; contact: Contact }
+type Sort   = 'alpha' | 'bday' | 'tipo'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,12 @@ const CAT_CLS: Record<Category, string> = {
   'Proveedores':       'text-warn border-warn/25 bg-warn/10',
   'Clientes':          'text-ok border-ok/15 bg-ok/5',
   'Enemigos':          'text-danger border-danger/25 bg-danger/10',
+}
+
+const SORT_LABELS: Record<Sort, string> = {
+  alpha: 'A–Z',
+  bday:  'Cumpleaños',
+  tipo:  'Tipo',
 }
 
 const CAT_EMOJI: Record<Category, string> = {
@@ -92,6 +99,24 @@ function relativeDate(date: string): string {
   if (days < 365) return `Hace ${Math.round(days / 30)} mes.`
   const y = Math.round(days / 365)
   return `Hace ${y} año${y > 1 ? 's' : ''}`
+}
+
+// Days until next birthday from today, wrapping to next year if already passed.
+// Returns Infinity for contacts without a birthday.
+function daysUntilBirthday(birthday: string | null): number {
+  if (!birthday) return Infinity
+  const today   = new Date()
+  const todayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const [, bm, bd] = birthday.split('-').map(Number)
+  const thisYear = new Date(today.getFullYear(), bm - 1, bd).getTime()
+  const nextOccurrence = thisYear >= todayMs ? thisYear : new Date(today.getFullYear() + 1, bm - 1, bd).getTime()
+  return Math.round((nextOccurrence - todayMs) / 86400000)
+}
+
+function groupByType(contacts: Contact[]): { cat: Category; items: Contact[] }[] {
+  return CATEGORIES
+    .map(cat => ({ cat, items: contacts.filter(c => c.category === cat) }))
+    .filter(g => g.items.length > 0)
 }
 
 function emptyForm(): ContactForm {
@@ -403,6 +428,13 @@ export default function ContactosPage() {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<Category | null>(null)
   const [drawer, setDrawer] = useState<Drawer | null>(null)
+  const [sort, setSort] = useState<Sort>(() => {
+    try { return (localStorage.getItem('contacts:sort') as Sort) ?? 'alpha' } catch { return 'alpha' }
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem('contacts:sort', sort) } catch {}
+  }, [sort])
 
   const load = useCallback(async () => {
     setError(null)
@@ -423,12 +455,19 @@ export default function ContactosPage() {
     .filter(c => {
       if (!search) return true
       const q = search.toLowerCase()
-      return (
-        c.name.toLowerCase().includes(q) ||
-        (c.company ?? '').toLowerCase().includes(q)
-      )
+      return c.name.toLowerCase().includes(q) || (c.company ?? '').toLowerCase().includes(q)
     })
-    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+    .sort((a, b) => {
+      if (sort === 'bday') {
+        const diff = daysUntilBirthday(a.birthday) - daysUntilBirthday(b.birthday)
+        if (diff !== 0) return diff
+      }
+      if (sort === 'tipo') {
+        const diff = CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category)
+        if (diff !== 0) return diff
+      }
+      return a.name.localeCompare(b.name, 'es')
+    })
 
   async function handleCreate(form: ContactForm) {
     const data = await apiPost({
@@ -480,7 +519,7 @@ export default function ContactosPage() {
           </button>
         </div>
 
-        {/* Search + category filter */}
+        {/* Search + category filter + sort */}
         <div className="mb-4 space-y-3">
           <input
             value={search}
@@ -488,30 +527,50 @@ export default function ContactosPage() {
             placeholder="Buscar por nombre o empresa…"
             className="w-full rounded-xl border border-ink-4/10 bg-ink-1/40 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
           />
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => setCatFilter(null)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                catFilter === null
-                  ? 'border-accent/30 bg-accent/10 text-accent'
-                  : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
-              }`}
-            >
-              Todos
-            </button>
-            {CATEGORIES.map(cat => (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Category pills */}
+            <div className="flex flex-wrap gap-1.5">
               <button
-                key={cat}
-                onClick={() => setCatFilter(prev => (prev === cat ? null : cat))}
+                onClick={() => setCatFilter(null)}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  catFilter === cat
-                    ? CAT_CLS[cat]
+                  catFilter === null
+                    ? 'border-accent/30 bg-accent/10 text-accent'
                     : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
                 }`}
               >
-                {CAT_EMOJI[cat]} {cat}
+                Todos
               </button>
-            ))}
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setCatFilter(prev => (prev === cat ? null : cat))}
+                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                    catFilter === cat
+                      ? CAT_CLS[cat]
+                      : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+                  }`}
+                >
+                  {CAT_EMOJI[cat]} {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Sort control */}
+            <div className="flex shrink-0 items-center gap-1">
+              {(Object.keys(SORT_LABELS) as Sort[]).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSort(s)}
+                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    sort === s
+                      ? 'border-accent/30 bg-accent/10 text-accent'
+                      : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+                  }`}
+                >
+                  {SORT_LABELS[s]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -537,13 +596,31 @@ export default function ContactosPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
-            {filtered.map(c => (
-              <ContactRow
-                key={c.id}
-                contact={c}
-                onClick={() => setDrawer({ mode: 'edit', contact: c })}
-              />
-            ))}
+            {sort === 'tipo'
+              ? groupByType(filtered).map(({ cat, items }) => (
+                  <div key={cat}>
+                    <div className="border-t border-ink-4/5 bg-ink-0/50 px-5 py-2 first:border-t-0">
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-3">
+                        {CAT_EMOJI[cat]} {cat}
+                      </span>
+                    </div>
+                    {items.map(c => (
+                      <ContactRow
+                        key={c.id}
+                        contact={c}
+                        onClick={() => setDrawer({ mode: 'edit', contact: c })}
+                      />
+                    ))}
+                  </div>
+                ))
+              : filtered.map(c => (
+                  <ContactRow
+                    key={c.id}
+                    contact={c}
+                    onClick={() => setDrawer({ mode: 'edit', contact: c })}
+                  />
+                ))
+            }
           </div>
         )}
       </main>
