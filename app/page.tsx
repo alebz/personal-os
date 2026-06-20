@@ -1,4 +1,3 @@
-import Panel from '@/components/Panel'
 import Shell from '@/components/Shell'
 import HabitTracker from '@/components/HabitTracker'
 import GoalsCard from '@/components/GoalsCard'
@@ -6,6 +5,7 @@ import SessionCard from '@/components/SessionCard'
 import CumpleanosCard from '@/components/CumpleanosCard'
 import NutritionCard from '@/components/NutritionCard'
 import CalendarCard from '@/components/CalendarCard'
+import DailyQuoteCard from '@/components/DailyQuoteCard'
 
 export default function DashboardPage() {
   return (
@@ -15,18 +15,14 @@ export default function DashboardPage() {
 
           {/* Left rail */}
           <div className="flex flex-col gap-5 lg:col-span-3">
+            <DailyQuoteCard />
             <HabitTracker />
-            <GoalsCard />
-            <Panel title="Quick Capture">
-              <p className="text-sm text-ink-3">
-                Drop a thought, task, or note. Placeholder for the inbox.
-              </p>
-            </Panel>
           </div>
 
           {/* Center stage */}
           <div className="flex flex-col gap-5 lg:col-span-6">
             <SessionCard />
+            <GoalsCard />
           </div>
 
           {/* Right rail */}

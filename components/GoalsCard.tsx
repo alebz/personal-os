@@ -190,7 +190,7 @@ export default function GoalsCard() {
 
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">Goals</h2>
+      <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">🏆 Goals</h2>
 
       <div className="space-y-5">
         <GoalSection title="This Week" items={week} onChange={handleWeekChange} />
