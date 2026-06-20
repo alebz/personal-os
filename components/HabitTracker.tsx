@@ -2,14 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface Habit {
-  id:    string
-  label: string
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────────
+interface Habit { id: string; label: string }
 
 const DEFAULT_HABITS: Habit[] = [
   { id: 'ejercicio',  label: 'Ejercicio' },
@@ -20,27 +13,11 @@ const DEFAULT_HABITS: Habit[] = [
 ]
 
 const MAX_HABITS = 8
-const LABEL_W    = 72   // px — left label column
-const COL_W      = 14   // px — per-day column (10px dot + 4px breathing room)
-const DOT        = 10   // px dot diameter
-
 const LS_CONFIG  = 'habits:config'
 const LS_DATA    = 'habits:'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function localDateKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-// All days of the current month (YYYY-MM-DD), day 1 → last day
-function buildMonthDates(todayStr: string): string[] {
-  const [year, month] = todayStr.split('-').map(Number)
-  const daysInMonth   = new Date(year, month, 0).getDate()
-  return Array.from({ length: daysInMonth }, (_, i) => {
-    const d = String(i + 1).padStart(2, '0')
-    return `${year}-${String(month).padStart(2, '0')}-${d}`
-  })
 }
 
 function loadConfig(): Habit[] {
@@ -69,73 +46,52 @@ function saveDone(date: string, done: string[]) {
 
 async function syncToServer(date: string, done: string[], total: number) {
   await fetch(`/api/habits/${date}`, {
-    method:  'POST',
+    method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body:    JSON.stringify({ done, total }),
+    body: JSON.stringify({ done, total }),
   }).catch(() => {})
 }
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function HabitTracker() {
   const [today,    setToday]    = useState('')
   const [habits,   setHabits]   = useState<Habit[]>([])
-  const [doneMap,  setDoneMap]  = useState<Record<string, string[]>>({})
+  const [done,     setDone]     = useState<string[]>([])
   const [editMode, setEditMode] = useState(false)
   const [editList, setEditList] = useState<Habit[]>([])
   const [newLabel, setNewLabel] = useState('')
-  const syncTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  const scrollRef  = useRef<HTMLDivElement>(null)
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     const t = localDateKey()
     setToday(t)
-    setHabits(loadConfig())
-    setDoneMap({ [t]: loadDone(t) })
-  }, [])
+    const cfg = loadConfig()
+    setHabits(cfg)
+    setDone(loadDone(t))
 
-  // Fetch server data (current month's days) and merge with localStorage
-  useEffect(() => {
-    if (!today) return
-    const dayOfMonth = new Date(today + 'T12:00:00').getDate()
-    fetch(`/api/habits?days=${dayOfMonth}&today=${today}`)
+    // Merge server data
+    fetch(`/api/habits?days=1&today=${t}`)
       .then(r => r.json())
       .then((rows: { date: string; habits: { done: string[] } }[]) => {
-        setDoneMap(prev => {
-          const next = { ...prev }
-          for (const row of rows) {
-            if (!row.habits?.done) continue
-            const local  = loadDone(row.date)
-            const merged = Array.from(new Set([...row.habits.done, ...local]))
-            next[row.date] = merged
-            if (row.date === today) saveDone(today, merged)
-          }
-          return next
-        })
+        const row = rows.find(r => r.date === t)
+        if (row?.habits?.done) {
+          setDone(prev => {
+            const merged = Array.from(new Set([...row.habits.done, ...prev]))
+            saveDone(t, merged)
+            return merged
+          })
+        }
       })
       .catch(() => {})
-  }, [today])
+  }, [])
 
-  // Auto-scroll so today's column is visible
-  useEffect(() => {
-    if (!today || !scrollRef.current) return
-    const monthDates = buildMonthDates(today)
-    const idx = monthDates.findIndex(d => d === today)
-    if (idx < 0) return
-    // Show today near the right edge; leave a couple of columns before it
-    const target = Math.max(0, LABEL_W + idx * COL_W - scrollRef.current.clientWidth + COL_W * 3)
-    scrollRef.current.scrollLeft = target
-  }, [today])
-
-  function toggle(habitId: string) {
+  function toggle(id: string) {
     if (!today) return
-    setDoneMap(prev => {
-      const cur  = prev[today] ?? []
-      const next = cur.includes(habitId) ? cur.filter(h => h !== habitId) : [...cur, habitId]
+    setDone(prev => {
+      const next = prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]
       saveDone(today, next)
-      clearTimeout(syncTimers.current[today])
-      syncTimers.current[today] = setTimeout(() => syncToServer(today, next, habits.length), 400)
-      return { ...prev, [today]: next }
+      clearTimeout(syncTimer.current)
+      syncTimer.current = setTimeout(() => syncToServer(today, next, habits.length), 400)
+      return next
     })
   }
 
@@ -159,15 +115,20 @@ export default function HabitTracker() {
     setNewLabel('')
   }
 
-  const monthDates  = today ? buildMonthDates(today) : []
-  const todayIdx    = monthDates.findIndex(d => d === today)
-  const gridWidth   = LABEL_W + monthDates.length * COL_W
+  const count = done.filter(id => habits.some(h => h.id === id)).length
 
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-4">Hábitos</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold tracking-wide text-ink-4">Hábitos</h2>
+          {!editMode && (
+            <span className="text-xs text-ink-3">
+              {count}/{habits.length} hoy
+            </span>
+          )}
+        </div>
         {editMode ? (
           <button
             onClick={saveEdit}
@@ -189,7 +150,6 @@ export default function HabitTracker() {
       </div>
 
       {editMode ? (
-        /* ── Edit panel ── */
         <div className="space-y-2">
           {editList.map(h => (
             <div key={h.id} className="flex items-center gap-2">
@@ -201,7 +161,6 @@ export default function HabitTracker() {
               <button
                 onClick={() => setEditList(prev => prev.filter(x => x.id !== h.id))}
                 className="shrink-0 rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
-                aria-label="Eliminar"
               >
                 <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.5}>
                   <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
@@ -209,7 +168,6 @@ export default function HabitTracker() {
               </button>
             </div>
           ))}
-
           {editList.length < MAX_HABITS && (
             <div className="flex items-center gap-2 pt-1">
               <input
@@ -222,7 +180,6 @@ export default function HabitTracker() {
               <button
                 onClick={addHabit}
                 className="shrink-0 rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-accent/10 hover:text-accent"
-                aria-label="Agregar hábito"
               >
                 <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.8}>
                   <path d="M8 3v10M3 8h10" strokeLinecap="round" />
@@ -232,92 +189,50 @@ export default function HabitTracker() {
           )}
         </div>
       ) : (
-        /* ── Dot grid ── */
-        <div ref={scrollRef} className="overflow-x-auto">
-          <div className="relative" style={{ minWidth: gridWidth }}>
-
-            {/* Today column vertical highlight */}
-            {todayIdx >= 0 && (
-              <div
-                className="pointer-events-none absolute inset-y-0 rounded-sm bg-accent/10"
-                style={{ left: LABEL_W + todayIdx * COL_W, width: COL_W }}
-              />
-            )}
-
-            {/* Day-number header row */}
-            <div className="mb-2 flex items-end">
-              {/* Sticky corner above labels */}
-              <div
-                className="sticky left-0 z-10 shrink-0 bg-ink-1/80 backdrop-blur-sm"
-                style={{ width: LABEL_W }}
-              />
-              {monthDates.map((date, i) => {
-                const isToday = date === today
-                return (
-                  <div
-                    key={date}
-                    className={`shrink-0 text-center text-[8px] tabular-nums leading-none ${
-                      isToday ? 'font-bold text-accent' : 'text-ink-3/50'
-                    }`}
-                    style={{ width: COL_W }}
-                  >
-                    {i + 1}
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* One row per habit */}
-            {habits.map(h => (
-              <div key={h.id} className="mb-[4px] flex items-center">
-                {/* Sticky habit label */}
-                <div
-                  className="sticky left-0 z-10 shrink-0 truncate bg-ink-1/80 pr-2 text-[11px] text-ink-3 backdrop-blur-sm"
-                  style={{ width: LABEL_W }}
-                  title={h.label}
+        <>
+        <ul className="space-y-0.5">
+          {habits.map(h => {
+            const checked = done.includes(h.id)
+            return (
+              <li key={h.id}>
+                <button
+                  onClick={() => toggle(h.id)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-ink-4/5"
                 >
-                  {h.label.length > 10 ? h.label.slice(0, 9) + '…' : h.label}
-                </div>
+                  <span
+                    className={[
+                      'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+                      checked ? 'border-accent bg-accent' : 'border-ink-3/40 bg-transparent',
+                    ].join(' ')}
+                  >
+                    {checked && (
+                      <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5" stroke="currentColor" strokeWidth={1.8}>
+                        <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className={[
+                    'text-sm transition-colors',
+                    checked ? 'text-ink-3 line-through' : 'text-ink-4',
+                  ].join(' ')}>
+                    {h.label}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
 
-                {/* Dots */}
-                {monthDates.map(date => {
-                  const isToday  = date === today
-                  const isFuture = date > today
-                  const isDone   = (doneMap[date] ?? []).includes(h.id)
-
-                  return (
-                    <div
-                      key={date}
-                      className="flex shrink-0 items-center justify-center"
-                      style={{ width: COL_W }}
-                    >
-                      <button
-                        disabled={!isToday}
-                        onClick={() => toggle(h.id)}
-                        className={[
-                          'rounded-full transition-all duration-150 disabled:cursor-default',
-                          isDone
-                            ? 'bg-accent'
-                            : isFuture
-                              ? 'bg-ink-4/10'
-                              : 'bg-ink-4/20',
-                          isToday && !isDone ? 'hover:bg-ink-4/40 cursor-pointer' : '',
-                          isToday &&  isDone ? 'hover:opacity-75 cursor-pointer' : '',
-                        ].join(' ')}
-                        style={{
-                          width:     DOT,
-                          height:    DOT,
-                          boxShadow: isDone ? '0 0 6px 1px var(--color-accent)' : 'none',
-                        }}
-                        aria-label={isToday ? `Toggle ${h.label}` : undefined}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
+        {/* Progress bar */}
+        <div className="mt-4">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-4/10">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-500"
+              style={{ width: habits.length > 0 ? `${(count / habits.length) * 100}%` : '0%' }}
+            />
           </div>
         </div>
+        </>
       )}
     </div>
   )

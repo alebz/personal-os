@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react'
 import TopRail from '@/components/TopRail'
-import FloatingCapture from '@/components/FloatingCapture'
 
 const GLOWS = {
   home:
@@ -47,7 +46,6 @@ export default function Shell({
       />
       <TopRail />
       {children}
-      <FloatingCapture />
     </div>
   )
 }

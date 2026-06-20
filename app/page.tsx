@@ -12,6 +12,7 @@ export default function DashboardPage() {
     <Shell glow="home">
       <main className="mx-auto max-w-7xl px-6 py-6">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+
           {/* Left rail */}
           <div className="flex flex-col gap-5 lg:col-span-3">
             <HabitTracker />
@@ -34,6 +35,7 @@ export default function DashboardPage() {
             <CumpleanosCard />
             <NutritionCard />
           </div>
+
         </div>
       </main>
     </Shell>

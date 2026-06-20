@@ -4,57 +4,49 @@ import { createServerClient } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
+// GET /api/journal?limit=100  — returns all entries, newest first
 export async function GET(req: NextRequest) {
-  const date = req.nextUrl.searchParams.get('date')
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return NextResponse.json({ error: 'date required (YYYY-MM-DD)' }, { status: 400 })
-  }
+  const limit = Math.min(
+    parseInt(req.nextUrl.searchParams.get('limit') ?? '100', 10),
+    500
+  )
 
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('journal_entries')
     .select('*')
-    .eq('entry_date', date)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
+    .limit(limit)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  return NextResponse.json(data ?? [])
 }
 
+// POST /api/journal — creates a new entry
 export async function POST(req: NextRequest) {
-  let body: {
-    date: string
-    content?: string
-    mood?: string | null
-    summary?: string
-    insights?: string[]
-  }
+  let body: { entry_date?: string; content?: string; mood?: string | null }
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { date, content, mood, summary, insights } = body
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return NextResponse.json({ error: 'date required (YYYY-MM-DD)' }, { status: 400 })
+  const { entry_date, content = '', mood = null } = body
+  if (!entry_date || !/^\d{4}-\d{2}-\d{2}$/.test(entry_date)) {
+    return NextResponse.json({ error: 'entry_date required (YYYY-MM-DD)' }, { status: 400 })
   }
 
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('journal_entries')
-    .upsert(
-      {
-        entry_date: date,
-        content:    content    ?? null,
-        mood:       mood       ?? null,
-        summary:    summary    ?? null,
-        insights:   insights   ?? [],
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'entry_date' }
-    )
+    .insert({
+      entry_date,
+      content:  content ?? null,
+      mood:     mood    ?? null,
+      summary:  null,
+      insights: [],
+    })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data, { status: 200 })
+  return NextResponse.json(data, { status: 201 })
 }
