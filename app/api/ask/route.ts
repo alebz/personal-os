@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient()
   const { data: chunks, error } = await supabase.rpc('match_memory_chunks', {
-    query_embedding: queryEmbedding,
-    match_count: 20,
-    match_threshold: 0.1,
+    query_embedding: `[${queryEmbedding.join(',')}]`,
+    match_count:     20,
+    match_threshold: 0.0,
   })
   if (error) return new Response(error.message, { status: 500 })
 

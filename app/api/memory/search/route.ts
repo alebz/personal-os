@@ -20,10 +20,12 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServerClient()
+  // Pass embedding as a formatted text string — PostgreSQL can cast text → vector
+  // but has no implicit JSON-array → vector cast (PostgREST sends number[] as JSON).
   const { data, error } = await supabase.rpc('match_memory_chunks', {
-    query_embedding: queryEmbedding,
-    match_count: Math.min(limit, 50),
-    match_threshold: 0.1,
+    query_embedding: `[${queryEmbedding.join(',')}]`,
+    match_count:     Math.min(limit, 50),
+    match_threshold: 0.0,
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
