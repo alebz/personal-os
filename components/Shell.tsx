@@ -23,6 +23,9 @@ const GLOWS = {
   brain:
     'radial-gradient(60rem 40rem at 50% -5%, oklch(0.70 0.20 280 / 0.18), transparent 60%),' +
     'radial-gradient(50rem 35rem at 85% 40%, oklch(0.68 0.18 260 / 0.10), transparent 55%)',
+  journal:
+    'radial-gradient(60rem 40rem at 75% -8%, oklch(0.80 0.14 60 / 0.15), transparent 60%),' +
+    'radial-gradient(50rem 35rem at 10% 45%, oklch(0.76 0.12 40 / 0.08), transparent 55%)',
 } as const
 
 export default function Shell({
