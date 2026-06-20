@@ -5,14 +5,14 @@ import { usePathname } from 'next/navigation'
 import Clock from '@/components/Clock'
 
 const TABS = [
-  { label: 'Home', href: '/' },
-  { label: 'Tareas', href: '/crm' },
-  { label: 'Contactos', href: '/contactos' },
-  { label: 'Brain', href: '/brain' },
-  { label: 'Finance', href: '/finance' },
-  { label: 'Uptown', href: '/uptown' },
-  { label: 'Journal', href: '/journal' },
-  { label: 'Health', href: '/health' },
+  { label: '🏠 Home',      href: '/' },
+  { label: '✅ Tareas',    href: '/crm' },
+  { label: '👥 Contactos', href: '/contactos' },
+  { label: '🧠 Brain',     href: '/brain' },
+  { label: '💰 Finance',   href: '/finance' },
+  { label: '🏢 Uptown',    href: '/uptown' },
+  { label: '📓 Journal',   href: '/journal' },
+  { label: '❤️ Health',    href: '/health' },
 ]
 
 export default function TopRail() {

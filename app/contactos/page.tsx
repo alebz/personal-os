@@ -55,6 +55,15 @@ const CAT_CLS: Record<Category, string> = {
   'Enemigos':          'text-danger border-danger/25 bg-danger/10',
 }
 
+const CAT_EMOJI: Record<Category, string> = {
+  'Familia':           '👨‍👩‍👧',
+  'Círculo cercano':   '🤝',
+  'Círculo extendido': '🌐',
+  'Proveedores':       '🔧',
+  'Clientes':          '💼',
+  'Enemigos':          '⚔️',
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function initials(name: string): string {
@@ -160,7 +169,7 @@ function ContactRow({ contact, onClick }: { contact: Contact; onClick: () => voi
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium text-ink-4">{contact.name}</span>
           <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${CAT_CLS[contact.category]}`}>
-            {contact.category}
+            {CAT_EMOJI[contact.category]} {contact.category}
           </span>
         </div>
         {contact.company && (
@@ -311,7 +320,7 @@ function ContactDrawer({
                   className={`${inputCls} appearance-none`}
                 >
                   {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>{CAT_EMOJI[c]} {c}</option>
                   ))}
                 </select>
               </div>
@@ -500,7 +509,7 @@ export default function ContactosPage() {
                     : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
                 }`}
               >
-                {cat}
+                {CAT_EMOJI[cat]} {cat}
               </button>
             ))}
           </div>

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import TopRail from '@/components/TopRail'
+import FloatingCapture from '@/components/FloatingCapture'
 
 const GLOWS = {
   home:
@@ -19,6 +20,9 @@ const GLOWS = {
   contactos:
     'radial-gradient(60rem 40rem at 80% -5%, oklch(0.72 0.16 300 / 0.14), transparent 60%),' +
     'radial-gradient(50rem 35rem at 10% 40%, oklch(0.70 0.14 330 / 0.08), transparent 55%)',
+  brain:
+    'radial-gradient(60rem 40rem at 50% -5%, oklch(0.70 0.20 280 / 0.18), transparent 60%),' +
+    'radial-gradient(50rem 35rem at 85% 40%, oklch(0.68 0.18 260 / 0.10), transparent 55%)',
 } as const
 
 export default function Shell({
@@ -37,6 +41,7 @@ export default function Shell({
       />
       <TopRail />
       {children}
+      <FloatingCapture />
     </div>
   )
 }

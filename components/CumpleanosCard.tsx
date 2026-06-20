@@ -53,7 +53,7 @@ export default function CumpleanosCard() {
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-4">Cumpleaños</h2>
+        <h2 className="text-sm font-semibold tracking-wide text-ink-4">🎂 Cumpleaños</h2>
         <Link
           href="/contactos"
           className="text-xs text-ink-3 transition-colors hover:text-accent"
