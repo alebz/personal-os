@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.105.0",
     "@supabase/supabase-js": "^2.108.2",
     "@vercel/functions": "^3.7.1",
+    "ical.js": "^2.2.1",
     "next": "^15.3.0",
     "openai": "^6.44.0",
     "react": "^19.1.0",

@@ -5,6 +5,7 @@ import GoalsCard from '@/components/GoalsCard'
 import SessionCard from '@/components/SessionCard'
 import CumpleanosCard from '@/components/CumpleanosCard'
 import NutritionCard from '@/components/NutritionCard'
+import CalendarCard from '@/components/CalendarCard'
 
 export default function DashboardPage() {
   return (
@@ -29,9 +30,7 @@ export default function DashboardPage() {
 
           {/* Right rail */}
           <div className="flex flex-col gap-5 lg:col-span-3">
-            <Panel title="Upcoming">
-              <p className="text-sm text-ink-3">Calendar and reminders placeholder.</p>
-            </Panel>
+            <CalendarCard />
             <CumpleanosCard />
             <NutritionCard />
           </div>
