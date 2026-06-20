@@ -3,9 +3,8 @@ import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 
-const anthropic = new Anthropic()
-
 export async function POST(req: NextRequest) {
+  const anthropic = new Anthropic()
   let body: { query?: string }
   try {
     body = await req.json()
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
     .join('\n')
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6',
     max_tokens: 512,
     messages: [
       {

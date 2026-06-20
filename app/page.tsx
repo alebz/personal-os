@@ -4,6 +4,7 @@ import HabitTracker from '@/components/HabitTracker'
 import GoalsCard from '@/components/GoalsCard'
 import SessionCard from '@/components/SessionCard'
 import CumpleanosCard from '@/components/CumpleanosCard'
+import NutritionCard from '@/components/NutritionCard'
 
 export default function DashboardPage() {
   return (
@@ -24,14 +25,6 @@ export default function DashboardPage() {
           {/* Center stage */}
           <div className="flex flex-col gap-5 lg:col-span-6">
             <SessionCard />
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <Panel title="Tasks">
-                <p className="text-sm text-ink-3">No tasks yet.</p>
-              </Panel>
-              <Panel title="Recent Activity">
-                <p className="text-sm text-ink-3">Nothing recent.</p>
-              </Panel>
-            </div>
           </div>
 
           {/* Right rail */}
@@ -40,6 +33,7 @@ export default function DashboardPage() {
               <p className="text-sm text-ink-3">Calendar and reminders placeholder.</p>
             </Panel>
             <CumpleanosCard />
+            <NutritionCard />
           </div>
         </div>
       </main>

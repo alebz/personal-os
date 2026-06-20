@@ -184,7 +184,7 @@ async function classifyWithClaude(text: string): Promise<CaptureClassification> 
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set')
   const client = new Anthropic()
   const response = await client.messages.create({
-    model: 'claude-opus-4-8',
+    model: process.env.ANTHROPIC_MODEL ?? 'claude-opus-4-8',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
     output_config: {

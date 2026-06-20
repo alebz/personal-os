@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   // 3. Stream from Claude
   const anthropic = new Anthropic()
   const stream = anthropic.messages.stream({
-    model: 'claude-sonnet-4-6',
+    model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6',
     max_tokens: 2048,
     system: [
       'Eres el asistente personal de Alex. Responde ÚNICAMENTE usando el contexto numerado que se te proporciona.',

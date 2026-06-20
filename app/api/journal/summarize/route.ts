@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic()
   const response = await client.messages.create({
-    model:      'claude-sonnet-4-6',
+    model:      process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6',
     max_tokens: 1024,
     system:     SYSTEM_PROMPT,
     output_config: {
