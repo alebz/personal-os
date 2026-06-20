@@ -26,6 +26,9 @@ const GLOWS = {
   journal:
     'radial-gradient(60rem 40rem at 75% -8%, oklch(0.80 0.14 60 / 0.15), transparent 60%),' +
     'radial-gradient(50rem 35rem at 10% 45%, oklch(0.76 0.12 40 / 0.08), transparent 55%)',
+  health:
+    'radial-gradient(60rem 40rem at 85% -8%, oklch(0.72 0.18 10 / 0.16), transparent 60%),' +
+    'radial-gradient(50rem 35rem at 5% 45%, oklch(0.68 0.16 350 / 0.08), transparent 55%)',
 } as const
 
 export default function Shell({
