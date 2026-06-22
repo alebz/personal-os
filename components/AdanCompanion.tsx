@@ -248,6 +248,7 @@ export default function AdanCompanion() {
   const faceClickTimer   = useRef<ReturnType<typeof setTimeout>|null>(null)
   const interactionCount = useRef(0)             // rainbow at 10 interactions
   const providerRef      = useRef('anthropic')   // mirrors currentProvider for callbacks
+  const osContextRef     = useRef('')            // live OS context injected into preamble
   useEffect(()=>{ busyRef.current    = busy           },[busy])
   useEffect(()=>{ modeRef.current   = mode          },[mode])
   useEffect(()=>{ typingRef.current = bubble.typing },[bubble.typing])
@@ -348,9 +349,11 @@ export default function AdanCompanion() {
 
   // ── Preamble ─────────────────────────────────────────────────────────────────
 
-  const getPreamble = useCallback(()=>
-    `Eres Adán, un mentor filósofo sabio y cálido, y compañero de escritorio. Apareces como una figura dorada e imposiblemente musculosa que solo lleva una hoja de parra, pero te conduces con calma, dignidad y buen humor. ${PREAMBLE[currentPersona]||PREAMBLE['Stoic Sage']} Responde siempre en español. Máximo 1 frase corta. Sé alentador y algo profundo, usando metáforas sutiles de la fuerza, el cuerpo, el crecimiento y el descanso. Nunca uses emojis ni markdown. Mantente completamente en personaje y nunca menciones ser una IA o un programa.`,
-  [currentPersona])
+  const getPreamble = useCallback(()=>{
+    const ctx = osContextRef.current
+    const ctxBlock = ctx ? `\n\nCONTEXTO DEL OS (úsalo para responder como gestor personal si es relevante):\n${ctx}` : ''
+    return `Eres Adán, un mentor filósofo sabio y cálido, y gestor personal de escritorio. Apareces como una figura dorada e imposiblemente musculosa que solo lleva una hoja de parra, pero te conduces con calma, dignidad y buen humor. ${PREAMBLE[currentPersona]||PREAMBLE['Stoic Sage']} Tienes acceso al estado actual del OS del usuario y puedes comentar sobre hábitos, metas, tareas y finanzas cuando sea relevante. Responde siempre en español. Máximo 1 frase corta. Sé alentador y algo profundo, usando metáforas sutiles de la fuerza, el cuerpo, el crecimiento y el descanso. Nunca uses emojis ni markdown. Mantente completamente en personaje y nunca menciones ser una IA o un programa.${ctxBlock}`
+  },[currentPersona])
 
   // ── Timer helpers ────────────────────────────────────────────────────────────
 
@@ -555,6 +558,11 @@ export default function AdanCompanion() {
     // Preload all sprites so frame swaps are instant
     ALL_SPRITES.forEach(src=>{ const i=new Image(); i.src=src })
 
+    // Fetch OS context and refresh every 5 minutes
+    const fetchCtx = ()=> fetch('/api/companion/context').then(r=>r.json()).then(d=>{ if(d.context) osContextRef.current=d.context }).catch(()=>{})
+    fetchCtx()
+    const ctxTimer = setInterval(fetchCtx, 5*60*1000)
+
     let lastHour = new Date().getHours()
     const clockTimer = setInterval(()=>{
       setTime(fmtClock())
@@ -633,7 +641,7 @@ export default function AdanCompanion() {
 
     return ()=>{
       clearInterval(clockTimer); clearInterval(blinkTimer); clearTimeout(greetTimer)
-      clearInterval(stanceTimer); clearInterval(rainbowCheckTimer)
+      clearInterval(stanceTimer); clearInterval(rainbowCheckTimer); clearInterval(ctxTimer)
       if(idleTimer.current) clearTimeout(idleTimer.current)
       if(typeTimer.current) clearInterval(typeTimer.current)
       if(talkFrameTimer.current) clearInterval(talkFrameTimer.current)
