@@ -15,10 +15,12 @@ export async function PATCH(
   }
 
   const allowed: Record<string, unknown> = {}
-  if (body.name !== undefined) allowed.name = body.name
-  if (body.amount !== undefined) allowed.amount = body.amount
-  if (body.active !== undefined) allowed.active = body.active
+  if (body.name       !== undefined) allowed.name       = body.name
+  if (body.amount     !== undefined) allowed.amount     = body.amount
+  if (body.active     !== undefined) allowed.active     = body.active
   if (body.sort_order !== undefined) allowed.sort_order = body.sort_order
+  if (body.meses      !== undefined) allowed.meses      = body.meses
+  if (body.metodo     !== undefined) allowed.metodo     = body.metodo
 
   const supabase = createServerClient()
   const { data, error } = await supabase

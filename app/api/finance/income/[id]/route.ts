@@ -14,13 +14,15 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
   const allowed: Record<string, unknown> = {}
-  if (body.description !== undefined) allowed.description = body.description
-  if (body.amount      !== undefined) allowed.amount      = body.amount
-  if (body.metodo      !== undefined) allowed.metodo      = body.metodo
+  if (body.nombre    !== undefined) allowed.nombre     = body.nombre
+  if (body.monto     !== undefined) allowed.monto      = body.monto
+  if (body.metodo    !== undefined) allowed.metodo     = body.metodo
+  if (body.active    !== undefined) allowed.active     = body.active
+  if (body.sort_order !== undefined) allowed.sort_order = body.sort_order
 
   const supabase = createServerClient()
   const { data, error } = await supabase
-    .from('finance_movements')
+    .from('finance_income_items')
     .update(allowed)
     .eq('id', id)
     .select()
@@ -35,7 +37,7 @@ export async function DELETE(
 ) {
   const { id } = await params
   const supabase = createServerClient()
-  const { error } = await supabase.from('finance_movements').delete().eq('id', id)
+  const { error } = await supabase.from('finance_income_items').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return new NextResponse(null, { status: 204 })
 }

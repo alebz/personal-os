@@ -1,22 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Shell from '@/components/Shell'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Category =
-  | 'Familia'
-  | 'Círculo cercano'
-  | 'Círculo extendido'
-  | 'Proveedores'
-  | 'Clientes'
-  | 'Enemigos'
-
 interface Contact {
   id: string
   name: string
-  category: Category
+  category: string
   birthday: string | null
   notes: string | null
   company: string | null
@@ -26,35 +18,31 @@ interface Contact {
 
 interface ContactForm {
   name: string
-  category: Category
+  category: string
   company: string
   birthday: string
   last_contacted: string
   notes: string
 }
 
+interface ContactCategory {
+  id: string
+  name: string
+}
+
 type Drawer = { mode: 'create' } | { mode: 'edit'; contact: Contact }
 type Sort   = 'alpha' | 'bday' | 'tipo'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Styling maps ──────────────────────────────────────────────────────────────
 
-const CATEGORIES: Category[] = [
-  'Familia',
-  'Círculo cercano',
-  'Círculo extendido',
-  'Proveedores',
-  'Clientes',
-  'Enemigos',
-]
-
-const CAT_CLS: Record<Category, string> = {
+const CAT_CLS: Record<string, string> = {
   'Familia':           'text-accent border-accent/25 bg-accent/10',
   'Círculo cercano':   'text-ok border-ok/25 bg-ok/10',
   'Círculo extendido': 'text-ink-3 border-ink-4/15 bg-ink-1/30',
   'Proveedores':       'text-warn border-warn/25 bg-warn/10',
   'Clientes':          'text-ok border-ok/15 bg-ok/5',
-  'Enemigos':          'text-danger border-danger/25 bg-danger/10',
 }
+const CAT_CLS_DEFAULT = 'text-ink-3 border-ink-4/15 bg-ink-1/30'
 
 const SORT_LABELS: Record<Sort, string> = {
   alpha: 'A–Z',
@@ -62,24 +50,21 @@ const SORT_LABELS: Record<Sort, string> = {
   tipo:  'Tipo',
 }
 
-const CAT_EMOJI: Record<Category, string> = {
+const CAT_EMOJI: Record<string, string> = {
   'Familia':           '👨‍👩‍👧',
   'Círculo cercano':   '🤝',
   'Círculo extendido': '🌐',
   'Proveedores':       '🔧',
   'Clientes':          '💼',
-  'Enemigos':          '⚔️',
 }
+
+function catCls(cat: string)   { return CAT_CLS[cat]   ?? CAT_CLS_DEFAULT }
+function catEmoji(cat: string) { return CAT_EMOJI[cat] ?? '🏷️' }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function initials(name: string): string {
-  return name
-    .split(' ')
-    .map(w => w[0] ?? '')
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  return name.split(' ').map(w => w[0] ?? '').slice(0, 2).join('').toUpperCase()
 }
 
 function formatBirthday(date: string): string {
@@ -101,8 +86,6 @@ function relativeDate(date: string): string {
   return `Hace ${y} año${y > 1 ? 's' : ''}`
 }
 
-// Days until next birthday from today, wrapping to next year if already passed.
-// Returns Infinity for contacts without a birthday.
 function daysUntilBirthday(birthday: string | null): number {
   if (!birthday) return Infinity
   const today   = new Date()
@@ -113,21 +96,18 @@ function daysUntilBirthday(birthday: string | null): number {
   return Math.round((nextOccurrence - todayMs) / 86400000)
 }
 
-function groupByType(contacts: Contact[]): { cat: Category; items: Contact[] }[] {
-  return CATEGORIES
+function groupByType(contacts: Contact[], catNames: string[]): { cat: string; items: Contact[] }[] {
+  const ordered = [...catNames]
+  for (const c of contacts) {
+    if (!ordered.includes(c.category)) ordered.push(c.category)
+  }
+  return ordered
     .map(cat => ({ cat, items: contacts.filter(c => c.category === cat) }))
     .filter(g => g.items.length > 0)
 }
 
 function emptyForm(): ContactForm {
-  return {
-    name: '',
-    category: 'Círculo extendido',
-    company: '',
-    birthday: '',
-    last_contacted: '',
-    notes: '',
-  }
+  return { name: '', category: 'Círculo extendido', company: '', birthday: '', last_contacted: '', notes: '' }
 }
 
 function formFromContact(c: Contact): ContactForm {
@@ -173,6 +153,150 @@ async function apiDelete(id: string): Promise<void> {
   await fetch(`/api/contacts/${id}`, { method: 'DELETE' })
 }
 
+async function apiGetCategories(): Promise<ContactCategory[]> {
+  const r = await fetch('/api/contact-categories')
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+
+async function apiAddCategory(name: string): Promise<ContactCategory> {
+  const r = await fetch('/api/contact-categories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+
+async function apiDeleteCategory(id: string): Promise<void> {
+  const r = await fetch(`/api/contact-categories/${id}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
+}
+
+// ── CategoryManagerModal ──────────────────────────────────────────────────────
+
+function CategoryManagerModal({
+  categories,
+  onClose,
+  onAdd,
+  onDelete,
+}: {
+  categories: ContactCategory[]
+  onClose: () => void
+  onAdd: (name: string) => Promise<void>
+  onDelete: (id: string, name: string) => Promise<void>
+}) {
+  const [newName, setNewName]       = useState('')
+  const [adding, setAdding]         = useState(false)
+  const [addError, setAddError]     = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  async function handleAdd() {
+    const name = newName.trim()
+    if (!name || adding) return
+    setAdding(true); setAddError(null)
+    try {
+      await onAdd(name)
+      setNewName('')
+    } catch (e) {
+      setAddError(String(e).replace(/^Error:\s*/, ''))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`¿Eliminar la categoría "${name}"?\n\nLos contactos con esta categoría no se eliminarán, pero quedarán sin categoría reconocida.`)) return
+    setDeletingId(id)
+    try { await onDelete(id, name) } finally { setDeletingId(null) }
+  }
+
+  return (
+    <>
+      <div
+        aria-hidden
+        onClick={onClose}
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]"
+      />
+      <div
+        role="dialog"
+        aria-modal
+        aria-label="Gestionar categorías"
+        className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-ink-4/10 bg-ink-0 shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-ink-4/10 px-5 py-4">
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+            Gestionar categorías
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Category list */}
+        <div className="max-h-64 overflow-y-auto p-2">
+          {categories.length === 0 && (
+            <p className="py-6 text-center text-sm italic text-ink-3/50">Sin categorías aún</p>
+          )}
+          {categories.map(cat => (
+            <div
+              key={cat.id}
+              className="group flex items-center gap-3 rounded-xl px-3 py-2 transition-colors hover:bg-ink-2/20"
+            >
+              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${catCls(cat.name)}`}>
+                {catEmoji(cat.name)} {cat.name}
+              </span>
+              <span className="flex-1 truncate text-sm text-ink-4">{cat.name}</span>
+              <button
+                onClick={() => handleDelete(cat.id, cat.name)}
+                disabled={deletingId === cat.id}
+                className="shrink-0 rounded-lg px-2 py-0.5 text-[10px] text-ink-3/40 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100 disabled:opacity-30"
+              >
+                {deletingId === cat.id ? '…' : 'Eliminar'}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add new */}
+        <div className="border-t border-ink-4/10 p-3 space-y-2">
+          {addError && (
+            <p className="text-xs text-danger">{addError}</p>
+          )}
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              value={newName}
+              onChange={e => { setNewName(e.target.value); setAddError(null) }}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              placeholder="Nueva categoría…"
+              className="flex-1 rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={!newName.trim() || adding}
+              className="rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {adding ? '…' : '+ Agregar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── ContactRow ────────────────────────────────────────────────────────────────
 
 function ContactRow({ contact, onClick }: { contact: Contact; onClick: () => void }) {
@@ -182,27 +306,20 @@ function ContactRow({ contact, onClick }: { contact: Contact; onClick: () => voi
       onClick={onClick}
       className="group flex w-full items-center gap-4 border-t border-ink-4/5 px-5 py-3.5 text-left transition-colors hover:bg-ink-2/10 first:border-t-0"
     >
-      {/* Avatar */}
-      <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${CAT_CLS[contact.category]}`}
-      >
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${catCls(contact.category)}`}>
         {ini}
       </div>
-
-      {/* Main info */}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium text-ink-4">{contact.name}</span>
-          <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${CAT_CLS[contact.category]}`}>
-            {CAT_EMOJI[contact.category]} {contact.category}
+          <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${catCls(contact.category)}`}>
+            {catEmoji(contact.category)} {contact.category}
           </span>
         </div>
         {contact.company && (
           <p className="truncate text-xs text-ink-3">{contact.company}</p>
         )}
       </div>
-
-      {/* Meta */}
       <div className="shrink-0 text-right">
         {contact.last_contacted && (
           <p className="text-xs text-ink-3">{relativeDate(contact.last_contacted)}</p>
@@ -219,12 +336,14 @@ function ContactRow({ contact, onClick }: { contact: Contact; onClick: () => voi
 
 function ContactDrawer({
   drawer,
+  categoryNames,
   onClose,
   onCreate,
   onUpdate,
   onDelete,
 }: {
   drawer: Drawer | null
+  categoryNames: string[]
   onClose: () => void
   onCreate: (form: ContactForm) => Promise<void>
   onUpdate: (id: string, form: ContactForm) => Promise<void>
@@ -235,11 +354,7 @@ function ContactDrawer({
   const [deleting, setDeleting] = useState(false)
 
   const drawerKey =
-    !drawer
-      ? 'closed'
-      : drawer.mode === 'edit'
-      ? drawer.contact.id
-      : 'create'
+    !drawer ? 'closed' : drawer.mode === 'edit' ? drawer.contact.id : 'create'
 
   useEffect(() => {
     if (!drawer) return
@@ -259,7 +374,7 @@ function ContactDrawer({
       else if (drawer?.mode === 'edit') await onUpdate(drawer.contact.id, form)
       onClose()
     } catch {
-      // error is surfaced in the parent
+      // error surfaced in parent
     } finally {
       setSaving(false)
     }
@@ -269,23 +384,22 @@ function ContactDrawer({
     if (drawer?.mode !== 'edit' || deleting) return
     if (!confirm(`¿Eliminar a ${drawer.contact.name}?`)) return
     setDeleting(true)
-    try {
-      await onDelete(drawer.contact.id)
-      onClose()
-    } finally {
-      setDeleting(false)
-    }
+    try { await onDelete(drawer.contact.id); onClose() }
+    finally { setDeleting(false) }
   }
 
   const isOpen = !!drawer
-
   const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-ink-3'
   const inputCls =
     'w-full rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 backdrop-blur-xl'
 
+  // Always include the contact's current category as an option even if it was deleted from the list
+  const selectOptions = categoryNames.includes(form.category)
+    ? categoryNames
+    : [...categoryNames, form.category]
+
   return (
     <>
-      {/* Backdrop */}
       <div
         aria-hidden
         onClick={onClose}
@@ -293,8 +407,6 @@ function ContactDrawer({
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       />
-
-      {/* Drawer */}
       <aside
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-ink-4/10 bg-ink-0 shadow-2xl transition-transform duration-300 ease-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
@@ -302,7 +414,6 @@ function ContactDrawer({
       >
         {drawer && (
           <>
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-ink-4/10 px-6 py-4">
               <span className="text-xs font-medium uppercase tracking-wider text-ink-3">
                 {drawer.mode === 'create' ? 'Nuevo contacto' : 'Editar contacto'}
@@ -313,16 +424,11 @@ function ContactDrawer({
                 className="rounded-lg p-1 text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4"
               >
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path
-                    fillRule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
             </div>
 
-            {/* Fields */}
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
               <div>
                 <label className={labelCls}>Nombre</label>
@@ -339,15 +445,23 @@ function ContactDrawer({
 
               <div>
                 <label className={labelCls}>Categoría</label>
-                <select
-                  value={form.category}
-                  onChange={e => set('category', e.target.value)}
-                  className={`${inputCls} appearance-none`}
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{CAT_EMOJI[c]} {c}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={form.category}
+                    onChange={e => set('category', e.target.value)}
+                    className={`${inputCls} appearance-none cursor-pointer pr-9`}
+                  >
+                    {selectOptions.map(name => (
+                      <option key={name} value={name}>{catEmoji(name)} {name}</option>
+                    ))}
+                  </select>
+                  <svg
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3"
+                    viewBox="0 0 20 20" fill="currentColor" aria-hidden
+                  >
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </div>
               </div>
 
               <div>
@@ -393,7 +507,6 @@ function ContactDrawer({
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center gap-3 border-t border-ink-4/10 px-6 py-4">
               <button
                 onClick={handleSave}
@@ -422,12 +535,14 @@ function ContactDrawer({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ContactosPage() {
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [catFilter, setCatFilter] = useState<Category | null>(null)
-  const [drawer, setDrawer] = useState<Drawer | null>(null)
+  const [contacts, setContacts]       = useState<Contact[]>([])
+  const [categories, setCategories]   = useState<ContactCategory[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [search, setSearch]           = useState('')
+  const [catFilter, setCatFilter]     = useState<string | null>(null)
+  const [drawer, setDrawer]           = useState<Drawer | null>(null)
+  const [showCatMgr, setShowCatMgr]  = useState(false)
   const [sort, setSort] = useState<Sort>(() => {
     try { return (localStorage.getItem('contacts:sort') as Sort) ?? 'alpha' } catch { return 'alpha' }
   })
@@ -439,8 +554,12 @@ export default function ContactosPage() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const data = await apiGet()
-      setContacts(data)
+      const [contactsData, catsData] = await Promise.all([
+        apiGet(),
+        apiGetCategories(),
+      ])
+      setContacts(contactsData)
+      setCategories(catsData)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -449,6 +568,8 @@ export default function ContactosPage() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+
+  const catNames = categories.map(c => c.name)
 
   const filtered = contacts
     .filter(c => !catFilter || c.category === catFilter)
@@ -463,7 +584,9 @@ export default function ContactosPage() {
         if (diff !== 0) return diff
       }
       if (sort === 'tipo') {
-        const diff = CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category)
+        const ai = catNames.indexOf(a.category)
+        const bi = catNames.indexOf(b.category)
+        const diff = (ai === -1 ? catNames.length : ai) - (bi === -1 ? catNames.length : bi)
         if (diff !== 0) return diff
       }
       return a.name.localeCompare(b.name, 'es')
@@ -498,6 +621,21 @@ export default function ContactosPage() {
     setContacts(prev => prev.filter(c => c.id !== id))
   }
 
+  async function handleAddCategory(name: string) {
+    const cat = await apiAddCategory(name)
+    setCategories(prev => [...prev, cat])
+  }
+
+  async function handleDeleteCategory(id: string) {
+    await apiDeleteCategory(id)
+    setCategories(prev => prev.filter(c => c.id !== id))
+    // Clear filter if the deleted category was active
+    setCatFilter(prev => {
+      const cat = categories.find(c => c.id === id)
+      return cat && prev === cat.name ? null : prev
+    })
+  }
+
   return (
     <Shell glow="contactos">
       <main className="mx-auto max-w-3xl px-6 py-6">
@@ -519,7 +657,7 @@ export default function ContactosPage() {
           </button>
         </div>
 
-        {/* Search + category filter + sort */}
+        {/* Search + filters + sort */}
         <div className="mb-4 space-y-3">
           <input
             value={search}
@@ -528,8 +666,8 @@ export default function ContactosPage() {
             className="w-full rounded-xl border border-ink-4/10 bg-ink-1/40 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            {/* Category pills */}
-            <div className="flex flex-wrap gap-1.5">
+            {/* Category pills + manage button */}
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 onClick={() => setCatFilter(null)}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
@@ -540,19 +678,26 @@ export default function ContactosPage() {
               >
                 Todos
               </button>
-              {CATEGORIES.map(cat => (
+              {catNames.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setCatFilter(prev => (prev === cat ? null : cat))}
                   className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                     catFilter === cat
-                      ? CAT_CLS[cat]
+                      ? catCls(cat)
                       : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
                   }`}
                 >
-                  {CAT_EMOJI[cat]} {cat}
+                  {catEmoji(cat)} {cat}
                 </button>
               ))}
+              <button
+                onClick={() => setShowCatMgr(true)}
+                className="rounded-full border border-ink-4/10 px-2.5 py-1 text-[10px] text-ink-3 transition-colors hover:border-ink-4/20 hover:text-ink-4"
+                title="Gestionar categorías"
+              >
+                ⚙ Categorías
+              </button>
             </div>
 
             {/* Sort control */}
@@ -582,43 +727,31 @@ export default function ContactosPage() {
         ) : error ? (
           <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
             {error}{' '}
-            <button onClick={load} className="underline">
-              Reintentar
-            </button>
+            <button onClick={load} className="underline">Reintentar</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-20 text-center">
             <p className="text-sm italic text-ink-3/60">
-              {search || catFilter
-                ? 'Sin resultados.'
-                : '¡Agrega tu primer contacto!'}
+              {search || catFilter ? 'Sin resultados.' : '¡Agrega tu primer contacto!'}
             </p>
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
             {sort === 'tipo'
-              ? groupByType(filtered).map(({ cat, items }) => (
+              ? groupByType(filtered, catNames).map(({ cat, items }) => (
                   <div key={cat}>
                     <div className="border-t border-ink-4/5 bg-ink-0/50 px-5 py-2 first:border-t-0">
                       <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-3">
-                        {CAT_EMOJI[cat]} {cat}
+                        {catEmoji(cat)} {cat}
                       </span>
                     </div>
                     {items.map(c => (
-                      <ContactRow
-                        key={c.id}
-                        contact={c}
-                        onClick={() => setDrawer({ mode: 'edit', contact: c })}
-                      />
+                      <ContactRow key={c.id} contact={c} onClick={() => setDrawer({ mode: 'edit', contact: c })} />
                     ))}
                   </div>
                 ))
               : filtered.map(c => (
-                  <ContactRow
-                    key={c.id}
-                    contact={c}
-                    onClick={() => setDrawer({ mode: 'edit', contact: c })}
-                  />
+                  <ContactRow key={c.id} contact={c} onClick={() => setDrawer({ mode: 'edit', contact: c })} />
                 ))
             }
           </div>
@@ -627,11 +760,21 @@ export default function ContactosPage() {
 
       <ContactDrawer
         drawer={drawer}
+        categoryNames={catNames}
         onClose={() => setDrawer(null)}
         onCreate={handleCreate}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
       />
+
+      {showCatMgr && (
+        <CategoryManagerModal
+          categories={categories}
+          onClose={() => setShowCatMgr(false)}
+          onAdd={handleAddCategory}
+          onDelete={handleDeleteCategory}
+        />
+      )}
     </Shell>
   )
 }

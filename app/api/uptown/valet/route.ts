@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const [configRes, paymentsRes] = await Promise.all([
     supabase
       .from('uptown_valet_config')
-      .select('num_weeks,week1_date,nu_balance,provider_paid')
+      .select('num_weeks,week1_date,nu_balance,provider_paid,price_per_point')
       .eq('month', month)
       .maybeSingle(),
     supabase

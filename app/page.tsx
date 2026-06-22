@@ -6,6 +6,8 @@ import CumpleanosCard from '@/components/CumpleanosCard'
 import NutritionCard from '@/components/NutritionCard'
 import CalendarCard from '@/components/CalendarCard'
 import DailyQuoteCard from '@/components/DailyQuoteCard'
+import QuickCaptureCard from '@/components/QuickCaptureCard'
+import AdanCompanion from '@/components/AdanCompanion'
 
 export default function DashboardPage() {
   return (
@@ -17,6 +19,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-5 lg:col-span-3">
             <DailyQuoteCard />
             <HabitTracker />
+            <QuickCaptureCard />
           </div>
 
           {/* Center stage */}
@@ -34,6 +37,7 @@ export default function DashboardPage() {
 
         </div>
       </main>
+      <AdanCompanion />
     </Shell>
   )
 }

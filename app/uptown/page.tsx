@@ -29,16 +29,16 @@ const FONDO_META = 50_000
 // ─── Valet constants ──────────────────────────────────────────────────────────
 
 const VALET_TENANTS = [
-  { id: 'publico_gourmet', name: 'Público Gourmet', pts: 3, amount: 529 },
-  { id: 'barbajan',        name: 'Barbaján',         pts: 3, amount: 529 },
-  { id: 'maison_zozoaga',  name: 'Maison Zozoaga',   pts: 3, amount: 529 },
-  { id: 'maricel',         name: "Maricel's Room",   pts: 3, amount: 529 },
-  { id: 'arko',            name: 'Arko',             pts: 2, amount: 353 },
-  { id: 'connect',         name: 'Connect',          pts: 2, amount: 353 },
-  { id: 'east_garden',     name: 'The East Garden',  pts: 1, amount: 176 },
+  { id: 'publico_gourmet', name: 'Público Gourmet', pts: 3 },
+  { id: 'barbajan',        name: 'Barbaján',         pts: 3 },
+  { id: 'maison_zozoaga',  name: 'Maison Zozoaga',   pts: 3 },
+  { id: 'maricel',         name: "Maricel's Room",   pts: 3 },
+  { id: 'arko',            name: 'Arko',             pts: 2 },
+  { id: 'connect',         name: 'Connect',          pts: 2 },
+  { id: 'east_garden',     name: 'The East Garden',  pts: 1 },
 ] as const
 
-const VALET_TOTAL_WEEK    = 3_000
+const VALET_TOTAL_PTS     = VALET_TENANTS.reduce((s, t) => s + t.pts, 0)
 const VALET_PROVIDER_WEEK = 2_800
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,11 +49,9 @@ interface NominaRow  { week_num: number; amount: number; paid: boolean }
 interface ExtraItem  { id: string; description: string; amount: number }
 interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
 
-type ValetStatus = 'pending' | 'paid' | 'advance'
-interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[] }
+type ValetStatus = 'pending' | 'paid'
+interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; price_per_point: number }
 interface ValetPayment { week_num: number; tenant_id: string; status: ValetStatus }
-
-const VALET_NEXT: Record<ValetStatus, ValetStatus> = { pending: 'paid', paid: 'advance', advance: 'pending' }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -580,18 +578,22 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
 // ─── ValetWeekCard ────────────────────────────────────────────────────────────
 
 function ValetWeekCard({
-  weekNum, weekLabel, payments, providerPaid, onTenantToggle, onProviderToggle,
+  weekNum, weekLabel, payments, providerPaid, pricePerPoint, onTenantToggle, onProviderToggle,
 }: {
   weekNum: number; weekLabel: string; payments: ValetPayment[]
   providerPaid: boolean
-  onTenantToggle: (tenantId: string, next: ValetStatus) => void
+  pricePerPoint: number
+  onTenantToggle: (tenantId: string, paid: boolean) => void
   onProviderToggle: (paid: boolean) => void
 }) {
-  function st(tid: string): ValetStatus {
-    return payments.find(p => p.tenant_id === tid)?.status ?? 'pending'
+  function isPaid(tid: string): boolean {
+    const s = payments.find(p => p.tenant_id === tid)?.status
+    return s === 'paid' || s === 'advance'
   }
-  const cobrado = VALET_TENANTS.reduce((s, t) => st(t.id) !== 'pending' ? s + t.amount : s, 0)
-  const complete = VALET_TENANTS.every(t => st(t.id) !== 'pending')
+  const tenantAmt = (pts: number) => Math.round(pts * pricePerPoint)
+  const totalWeek = VALET_TOTAL_PTS * pricePerPoint
+  const cobrado = VALET_TENANTS.reduce((s, t) => isPaid(t.id) ? s + tenantAmt(t.pts) : s, 0)
+  const complete = VALET_TENANTS.every(t => isPaid(t.id))
 
   return (
     <div className={`rounded-xl border px-3 pt-3 pb-2 transition-colors ${
@@ -601,7 +603,7 @@ function ValetWeekCard({
         <span className="text-xs font-bold text-ink-4">Semana {weekNum}</span>
         <span className="text-[10px] text-ink-3">{weekLabel}</span>
         <span className="flex-1 text-right text-[10px] tabular-nums text-ink-3">
-          {mxn(cobrado)} / {mxn(VALET_TOTAL_WEEK)}
+          {mxn(cobrado)} / {mxn(totalWeek)}
         </span>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-ink-3">Proveedor</span>
@@ -610,27 +612,16 @@ function ValetWeekCard({
       </div>
 
       {VALET_TENANTS.map(t => {
-        const status = st(t.id)
-        const clr =
-          status === 'paid'    ? 'border-ok/40 bg-ok/10 text-ok' :
-          status === 'advance' ? 'border-accent/40 bg-accent/10 text-accent' :
-                                 'border-ink-3/20 text-ink-3/40'
-        const lbl = status === 'paid' ? '✓' : status === 'advance' ? 'A' : '—'
+        const paid = isPaid(t.id)
         return (
           <div key={t.id} className="flex items-center gap-2 border-t border-ink-4/5 py-1 first:border-0">
-            <button
-              onClick={() => onTenantToggle(t.id, VALET_NEXT[status])}
-              title={status === 'advance' ? 'Adelanto' : status === 'paid' ? 'Pagado' : 'Pendiente'}
-              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border text-[11px] font-bold transition-colors ${clr}`}
-            >
-              {lbl}
-            </button>
-            <span className={`flex-1 text-sm ${status !== 'pending' ? 'text-ink-3/70' : 'text-ink-4'}`}>
+            <PaidToggle paid={paid} onChange={v => onTenantToggle(t.id, v)} />
+            <span className={`flex-1 text-sm ${paid ? 'text-ink-3/70' : 'text-ink-4'}`}>
               {t.name}
             </span>
             <span className="text-[10px] text-ink-3/40">{t.pts}pt</span>
-            <span className={`text-xs tabular-nums font-medium ${status !== 'pending' ? 'text-ok' : 'text-ink-3/30'}`}>
-              {mxn(t.amount)}
+            <span className={`text-xs tabular-nums font-medium ${paid ? 'text-ok' : 'text-ink-3/30'}`}>
+              {mxn(tenantAmt(t.pts))}
             </span>
           </div>
         )
@@ -642,11 +633,12 @@ function ValetWeekCard({
 // ─── ValetTab ─────────────────────────────────────────────────────────────────
 
 function ValetTab({ month }: { month: string }) {
-  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, nu_balance: 0, provider_paid: [] })
+  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, nu_balance: 0, provider_paid: [], price_per_point: 176 })
   const [payments, setPayments] = useState<ValetPayment[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
   const [nuDraft,  setNuDraft]  = useState('0')
+  const [pptDraft, setPptDraft] = useState('176')
 
   useEffect(() => {
     setLoading(true); setError(null)
@@ -655,13 +647,15 @@ function ValetTab({ month }: { month: string }) {
       .then((data: { config: ValetConfig | null; payments: ValetPayment[]; error?: string }) => {
         if (data.error) throw new Error(data.error)
         const cfg: ValetConfig = {
-          num_weeks:    data.config?.num_weeks ?? 4,
-          week1_date:   data.config?.week1_date ?? firstSaturdayOfMonth(month),
-          nu_balance:   Number(data.config?.nu_balance ?? 0),
-          provider_paid: Array.isArray(data.config?.provider_paid) ? data.config!.provider_paid : [],
+          num_weeks:      data.config?.num_weeks ?? 4,
+          week1_date:     data.config?.week1_date ?? firstSaturdayOfMonth(month),
+          nu_balance:     Number(data.config?.nu_balance ?? 0),
+          provider_paid:  Array.isArray(data.config?.provider_paid) ? data.config!.provider_paid : [],
+          price_per_point: Number(data.config?.price_per_point ?? 176),
         }
         setConfig(cfg)
         setNuDraft(String(cfg.nu_balance))
+        setPptDraft(String(cfg.price_per_point))
         setPayments(data.payments ?? [])
       })
       .catch(e => setError(String(e)))
@@ -674,20 +668,15 @@ function ValetTab({ month }: { month: string }) {
     await post('/api/uptown/valet/config', { month, ...next })
   }
 
-  async function toggleTenant(weekNum: number, tenantId: string, next: ValetStatus) {
-    const numWeeks = config.num_weeks
+  async function toggleTenant(weekNum: number, tenantId: string, paid: boolean) {
+    const status: ValetStatus = paid ? 'paid' : 'pending'
     setPayments(prev => {
-      const entries: ValetPayment[] = [{ week_num: weekNum, tenant_id: tenantId, status: next }]
-      if (next === 'advance') {
-        for (let w = weekNum + 1; w <= numWeeks; w++) {
-          entries.push({ week_num: w, tenant_id: tenantId, status: 'paid' })
-        }
-      }
-      const replace = new Set(entries.map(e => `${e.week_num}:${e.tenant_id}`))
-      return [...prev.filter(p => !replace.has(`${p.week_num}:${p.tenant_id}`)), ...entries]
+      const key = `${weekNum}:${tenantId}`
+      return [...prev.filter(p => `${p.week_num}:${p.tenant_id}` !== key),
+              { week_num: weekNum, tenant_id: tenantId, status }]
     })
     await post('/api/uptown/valet/payment', {
-      month, week_num: weekNum, tenant_id: tenantId, status: next, num_weeks: config.num_weeks,
+      month, week_num: weekNum, tenant_id: tenantId, status,
     })
   }
 
@@ -705,8 +694,9 @@ function ValetTab({ month }: { month: string }) {
     return `Sáb ${d.getDate()}`
   }
 
-  const cobrado         = payments.filter(p => p.status !== 'pending').reduce((s, p) => s + (VALET_TENANTS.find(t => t.id === p.tenant_id)?.amount ?? 0), 0)
-  const esperado        = config.num_weeks * VALET_TOTAL_WEEK
+  const ppt             = config.price_per_point
+  const cobrado         = payments.filter(p => p.status !== 'pending').reduce((s, p) => s + Math.round((VALET_TENANTS.find(t => t.id === p.tenant_id)?.pts ?? 0) * ppt), 0)
+  const esperado        = config.num_weeks * VALET_TOTAL_PTS * ppt
   const proveedorPagado = (config.provider_paid as boolean[]).filter(Boolean).length * VALET_PROVIDER_WEEK
   const proveedorTotal  = config.num_weeks * VALET_PROVIDER_WEEK
 
@@ -745,14 +735,38 @@ function ValetTab({ month }: { month: string }) {
                 style={{ width: `${proveedorTotal ? Math.min(proveedorPagado / proveedorTotal * 100, 100) : 0}%` }} />
             </div>
           </div>
-          <div className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${config.nu_balance >= VALET_PROVIDER_WEEK ? 'bg-ok/10' : 'bg-warn/10'}`}>
-            <span className={config.nu_balance >= VALET_PROVIDER_WEEK ? 'text-ok' : 'text-warn'}>
-              Cuenta NU · mínimo {mxn(VALET_PROVIDER_WEEK)}
-            </span>
-            <span className={`font-bold tabular-nums ${config.nu_balance >= VALET_PROVIDER_WEEK ? 'text-ok' : 'text-warn'}`}>
-              {mxn(config.nu_balance)}
-            </span>
-          </div>
+          {(() => {
+            const nuEsperado = cobrado - proveedorPagado
+            const diferencia = nuEsperado - config.nu_balance
+            return (
+              <div className="space-y-1.5 rounded-lg border border-ink-4/10 bg-ink-1/10 px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Cuenta NU · real vs esperado</p>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-ink-3">Saldo real</span>
+                  <input
+                    type="number"
+                    value={nuDraft}
+                    onChange={e => setNuDraft(e.target.value)}
+                    onBlur={() => {
+                      const val = parseFloat(nuDraft) || 0
+                      if (val !== config.nu_balance) void saveConfig({ nu_balance: val })
+                      else setNuDraft(String(config.nu_balance))
+                    }}
+                    onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right tabular-nums font-bold text-ink-4 outline-none hover:border-ink-4/10 focus:border-accent/50 focus:bg-ink-2/20"
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-ink-3">Saldo esperado</span>
+                  <span className="tabular-nums text-ink-4">{mxn(nuEsperado)}</span>
+                </div>
+                <div className={`flex items-center justify-between border-t border-ink-4/10 pt-1 text-xs font-bold ${diferencia <= 0 ? 'text-ok' : 'text-danger'}`}>
+                  <span>Diferencia</span>
+                  <span className="tabular-nums">{mxn(diferencia)}</span>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -790,6 +804,19 @@ function ValetTab({ month }: { month: string }) {
             onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
             className="w-28 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-0.5 text-right text-xs tabular-nums text-ink-4 outline-none focus:border-accent/50" />
         </div>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-ink-3">Monto/pt:</span>
+          <input type="number" value={pptDraft}
+            onChange={e => setPptDraft(e.target.value)}
+            onBlur={() => {
+              const val = parseFloat(pptDraft)
+              if (!isNaN(val) && val > 0 && val !== config.price_per_point) void saveConfig({ price_per_point: val })
+              else setPptDraft(String(config.price_per_point))
+            }}
+            onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            className="w-20 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-0.5 text-right text-xs tabular-nums text-ink-4 outline-none focus:border-accent/50" />
+        </div>
       </div>
 
       {/* Semanas */}
@@ -800,7 +827,8 @@ function ValetTab({ month }: { month: string }) {
           weekLabel={weekLabel(w)}
           payments={payments.filter(p => p.week_num === w)}
           providerPaid={(config.provider_paid as boolean[])[w - 1] ?? false}
-          onTenantToggle={(tid, next) => void toggleTenant(w, tid, next)}
+          pricePerPoint={ppt}
+          onTenantToggle={(tid, paid) => void toggleTenant(w, tid, paid)}
           onProviderToggle={paid => toggleProvider(w - 1, paid)}
         />
       ))}

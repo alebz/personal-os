@@ -227,16 +227,39 @@ function NewTaskInput({
     }
   }
 
+  const [open, setOpen] = useState(false)
+
+  function handleBlur() {
+    if (!value.trim()) setOpen(false)
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0) }}
+        className="mb-2 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-ink-4/15 px-2.5 py-1.5 text-xs text-ink-2 transition-colors hover:border-ink-4/30 hover:text-ink-3"
+      >
+        <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3 shrink-0" stroke="currentColor" strokeWidth={1.8}>
+          <path d="M6 2v8M2 6h8" strokeLinecap="round" />
+        </svg>
+        Nueva tarea
+      </button>
+    )
+  }
+
   return (
     <form onSubmit={handleSubmit} className="mb-2">
       <input
         ref={inputRef}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="+ Add task…"
+        onBlur={handleBlur}
+        placeholder="Nombre de la tarea…"
         disabled={adding}
-        className={`w-full border-b bg-transparent py-1 text-sm text-ink-3 placeholder:text-ink-2/50 transition-colors focus:text-ink-4 focus:outline-none disabled:opacity-40 ${
-          errored ? 'border-danger/60 text-danger placeholder:text-danger/40' : 'border-transparent focus:border-ink-4/20'
+        className={`w-full rounded-lg border bg-ink-0/40 px-2.5 py-1.5 text-sm text-ink-4 placeholder:text-ink-2/50 transition-colors focus:outline-none focus:ring-1 disabled:opacity-40 ${
+          errored
+            ? 'border-danger/40 focus:ring-danger/20'
+            : 'border-accent/30 focus:ring-accent/20'
         }`}
       />
       {errored && <p className="mt-0.5 text-[10px] text-danger">Failed to save — check console</p>}
@@ -660,28 +683,34 @@ function fromDrawerForm(form: DrawerForm): Partial<Task> {
   }
 }
 
+const EMPTY_FORM: DrawerForm = {
+  title: '',
+  description: '',
+  urgency: 'someday',
+  key: '',
+  priority_score: '',
+  tags: '',
+  entity_name: '',
+}
+
 function TaskDrawer({
   task,
+  creating,
   entities,
   onClose,
   onSave,
+  onCreate,
   onDelete,
 }: {
   task: Task | null
+  creating: boolean
   entities: Entity[]
   onClose: () => void
   onSave: (id: string, data: Partial<Task>) => Promise<void>
+  onCreate: (data: Partial<Task>) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
-  const [form, setForm] = useState<DrawerForm>({
-    title: '',
-    description: '',
-    urgency: 'someday',
-    key: '',
-    priority_score: '',
-    tags: '',
-    entity_name: '',
-  })
+  const [form, setForm] = useState<DrawerForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -689,15 +718,23 @@ function TaskDrawer({
     if (task) setForm(toDrawerForm(task))
   }, [task?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (creating) setForm(EMPTY_FORM)
+  }, [creating])
+
   function set(key: keyof DrawerForm, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
   async function handleSave() {
-    if (!task || saving || !form.title.trim()) return
+    if (saving || !form.title.trim()) return
     setSaving(true)
     try {
-      await onSave(task.id, fromDrawerForm(form))
+      if (creating) {
+        await onCreate(fromDrawerForm(form))
+      } else if (task) {
+        await onSave(task.id, fromDrawerForm(form))
+      }
       onClose()
     } finally {
       setSaving(false)
@@ -715,7 +752,7 @@ function TaskDrawer({
     }
   }
 
-  const isOpen = !!task
+  const isOpen = !!task || creating
   const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-ink-3'
   const inputCls = 'w-full rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20'
 
@@ -730,15 +767,17 @@ function TaskDrawer({
       />
 
       <aside
-        aria-label="Edit task"
+        aria-label={creating ? 'Nueva tarea' : 'Edit task'}
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-ink-4/10 bg-ink-0 shadow-2xl transition-transform duration-300 ease-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {task && (
+        {isOpen && (
           <>
             <div className="flex items-center justify-between border-b border-ink-4/10 px-6 py-4">
-              <span className="text-xs font-medium uppercase tracking-wider text-ink-3">Edit Task</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-ink-3">
+                {creating ? 'Nueva tarea' : 'Editar tarea'}
+              </span>
               <button onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -749,7 +788,7 @@ function TaskDrawer({
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
               <div>
                 <label className={labelCls}>Title</label>
-                <input value={form.title} onChange={(e) => set('title', e.target.value)} className={inputCls} placeholder="Task title" />
+                <input autoFocus={creating} value={form.title} onChange={(e) => set('title', e.target.value)} className={inputCls} placeholder="Nombre de la tarea" />
               </div>
 
               <div>
@@ -796,11 +835,13 @@ function TaskDrawer({
 
             <div className="flex items-center gap-3 border-t border-ink-4/10 px-6 py-4">
               <button onClick={handleSave} disabled={saving || !form.title.trim()} className="flex-1 rounded-xl border border-accent/20 bg-accent/10 py-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40">
-                {saving ? 'Saving…' : 'Save changes'}
+                {saving ? 'Guardando…' : creating ? 'Crear tarea' : 'Guardar cambios'}
               </button>
-              <button onClick={handleDelete} disabled={deleting} className="rounded-xl border border-danger/20 px-4 py-2.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
-                {deleting ? '…' : 'Delete'}
-              </button>
+              {!creating && (
+                <button onClick={handleDelete} disabled={deleting} className="rounded-xl border border-danger/20 px-4 py-2.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
+                  {deleting ? '…' : 'Eliminar'}
+                </button>
+              )}
             </div>
           </>
         )}
@@ -818,6 +859,7 @@ export default function CRMPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [view, setView] = useState<View>('kanban')
   const [drawerTask, setDrawerTask] = useState<Task | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const loadAll = useCallback(async () => {
     setLoadError(null)
@@ -879,6 +921,20 @@ export default function CRMPage() {
     )
   }
 
+  async function handleCreateTask(data: Partial<Task>) {
+    const task = await apiPost<Task>('/api/tasks', {
+      title: data.title,
+      description: data.description ?? null,
+      urgency: data.urgency ?? 'someday',
+      key: data.key ?? null,
+      priority_score: data.priority_score ?? null,
+      tags: data.tags ?? [],
+      entity_name: data.entity_name ?? null,
+      entity_id: entities.find((e) => e.name === data.entity_name)?.id ?? null,
+    })
+    setTasks((prev) => [task, ...prev])
+  }
+
   async function handleDeleteEntity(id: string) {
     await apiDelete(`/api/entities/${id}`)
     setEntities((prev) => prev.filter((e) => e.id !== id))
@@ -904,6 +960,17 @@ export default function CRMPage() {
             </p>
           </div>
 
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setCreating(true); setDrawerTask(null) }}
+              className="flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+            >
+              <svg viewBox="0 0 12 12" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={2}>
+                <path d="M6 2v8M2 6h8" strokeLinecap="round" />
+              </svg>
+              Nueva tarea
+            </button>
+
           <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/40 p-1 backdrop-blur-xl">
             {VIEWS.map((v) => (
               <button
@@ -917,6 +984,7 @@ export default function CRMPage() {
               </button>
             ))}
           </nav>
+          </div>
         </div>
 
         {!loading && (
@@ -959,8 +1027,10 @@ export default function CRMPage() {
 
       <TaskDrawer
         task={drawerTask}
+        creating={creating}
         entities={entities}
-        onClose={() => setDrawerTask(null)}
+        onClose={() => { setDrawerTask(null); setCreating(false) }}
+        onCreate={handleCreateTask}
         onSave={handleSave}
         onDelete={handleDelete}
       />

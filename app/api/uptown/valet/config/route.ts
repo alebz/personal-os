@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
     week1_date?: string | null
     nu_balance?: number
     provider_paid?: boolean[]
+    price_per_point?: number
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
@@ -22,7 +23,8 @@ export async function POST(req: NextRequest) {
   if (fields.num_weeks     !== undefined) record.num_weeks     = fields.num_weeks
   if (fields.week1_date    !== undefined) record.week1_date    = fields.week1_date ?? null
   if (fields.nu_balance    !== undefined) record.nu_balance    = fields.nu_balance
-  if (fields.provider_paid !== undefined) record.provider_paid = fields.provider_paid
+  if (fields.provider_paid   !== undefined) record.provider_paid   = fields.provider_paid
+  if (fields.price_per_point !== undefined) record.price_per_point = fields.price_per_point
 
   const { error } = await supabase
     .from('uptown_valet_config')

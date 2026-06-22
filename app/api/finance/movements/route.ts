@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const {
     month, date, description, amount, flow, category,
-    commitment_id = null, envelope_id = null,
+    commitment_id = null, envelope_id = null, metodo = null,
   } = body
 
   if (!month || !date || !description || !amount || !flow || !category) {
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('finance_movements')
-    .insert({ month, date, description, amount, flow, category, commitment_id, envelope_id })
+    .insert({ month, date, description, amount, flow, category, commitment_id, envelope_id, metodo })
     .select()
     .single()
 

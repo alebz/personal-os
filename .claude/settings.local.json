@@ -25,7 +25,28 @@
       "Bash(ls /mnt/)",
       "Read(//private/tmp/**)",
       "Read(//Users/alexmateo/Library/Application Support/Claude/blob_storage/7489170c-1eb0-4141-83c9-6479490a3d2e/**)",
-      "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\('main:', p.get\\('main'\\)\\); print\\('types:', p.get\\('types'\\)\\); print\\('exports:', list\\(p.get\\('exports',{}\\).keys\\(\\)\\)[:5]\\)\")"
+      "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\('main:', p.get\\('main'\\)\\); print\\('types:', p.get\\('types'\\)\\); print\\('exports:', list\\(p.get\\('exports',{}\\).keys\\(\\)\\)[:5]\\)\")",
+      "Read(//Users/alexmateo/**)",
+      "Read(//Users/alexmateo/Documents/**)",
+      "Bash(pkill -f \"next dev\")",
+      "Read(//tmp/**)",
+      "Bash(grep -v \"^$\")",
+      "Bash(supabase projects *)",
+      "Bash(security find-generic-password *)",
+      "Bash(security find-internet-password *)",
+      "Bash(npm config *)",
+      "Bash(npm --version)",
+      "Read(//usr/local/lib/node_modules/@anthropic-ai/claude-code/bin/**)",
+      "Read(//usr/local/lib/node_modules/**)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('name:', d.get\\('name'\\)\\); print\\('scripts:', list\\(d.get\\('scripts',{}\\).keys\\(\\)\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k not in \\('dependencies','devDependencies','optionalDependencies'\\)}, indent=2\\)\\)\")",
+      "Bash(git *)",
+      "Skill(design-sync)",
+      "Bash(python3)",
+      "Bash(python3 *)",
+      "Bash(echo \"Server PID: $!\")",
+      "Bash(pip3 install *)",
+      "Bash(kill 65527)"
     ]
   }
 }
