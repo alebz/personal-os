@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { StarsBackground } from "@/components/StarsBackground";
 
 export const metadata: Metadata = {
   title: "personal-os",
@@ -12,8 +13,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-ink-0 text-ink-4 antialiased">{children}</body>
+    <html lang="es" className="dark">
+      <body className="bg-ink-0 text-ink-4 antialiased">
+        <StarsBackground />
+        <div className="relative" style={{ zIndex: 1 }}>
+          {children}
+        </div>
+      </body>
     </html>
   );
 }

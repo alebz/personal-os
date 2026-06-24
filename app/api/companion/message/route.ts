@@ -20,7 +20,7 @@ export async function POST() {
     model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
     max_tokens: 80,
     system:
-      'Eres Adán, el companion personal de Alex. Hablas directo, con personalidad y un poco de humor. Máximo una oración. Sin emojis. En español.',
+      'Eres Adán, el companion personal de Alex. Conoces su nombre y lo usas cuando es natural. Hablas directo, con personalidad y un poco de humor. Máximo una oración. Sin emojis. En español.',
     messages: [
       {
         role: 'user',

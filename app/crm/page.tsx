@@ -39,28 +39,28 @@ const TIERS: {
 }[] = [
   {
     id: 'today',
-    label: 'Today',
+    label: 'Hoy',
     dotCls: 'bg-danger',
     badgeCls: 'text-danger border-danger/30',
     borderCls: 'border-danger/20',
   },
   {
     id: 'this_week',
-    label: 'This Week',
+    label: 'Esta Semana',
     dotCls: 'bg-warn',
     badgeCls: 'text-warn border-warn/30',
     borderCls: 'border-warn/20',
   },
   {
     id: 'this_month',
-    label: 'This Month',
+    label: 'Este Mes',
     dotCls: 'bg-accent',
     badgeCls: 'text-accent border-accent/30',
     borderCls: 'border-accent/20',
   },
   {
     id: 'someday',
-    label: 'Someday',
+    label: 'Algún Día',
     dotCls: 'bg-ink-3',
     badgeCls: 'text-ink-3 border-ink-4/10',
     borderCls: 'border-ink-4/10',
@@ -262,7 +262,7 @@ function NewTaskInput({
             : 'border-accent/30 focus:ring-accent/20'
         }`}
       />
-      {errored && <p className="mt-0.5 text-[10px] text-danger">Failed to save — check console</p>}
+      {errored && <p className="mt-0.5 text-[10px] text-danger">Error al guardar — revisar consola</p>}
     </form>
   )
 }
@@ -299,7 +299,7 @@ function KanbanColumn({
       <NewTaskInput urgency={tier.id} onAdd={onAdd} />
 
       <div className="flex flex-col gap-2">
-        {open.length === 0 && <p className="py-6 text-center text-xs text-ink-2">No open tasks</p>}
+        {open.length === 0 && <p className="py-6 text-center text-xs text-ink-2">Sin tareas abiertas</p>}
         {open.map((task) => (
           <TaskCard key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />
         ))}
@@ -308,7 +308,7 @@ function KanbanColumn({
       {done.length > 0 && (
         <div className="mt-2">
           <button onClick={() => setShowDone((v) => !v)} className="text-[10px] text-ink-2 transition-colors hover:text-ink-3">
-            {showDone ? '▾' : '▸'} {done.length} completed
+            {showDone ? '▾' : '▸'} {done.length} completadas
           </button>
           {showDone && (
             <div className="mt-2 flex flex-col gap-2 opacity-50">
@@ -381,7 +381,7 @@ function SmartView({
       const matched = await apiPost<Task[]>('/api/tasks/smart', { query: q })
       setMatchedIds(matched.map((t) => t.id))
     } catch {
-      setError('Search failed — check your connection and try again.')
+      setError('Error al buscar — revisa tu conexión e intenta de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -397,8 +397,8 @@ function SmartView({
             </svg>
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-ink-4">Smart Search</h3>
-            <p className="text-xs text-ink-3">Claude interprets natural language to find tasks</p>
+            <h3 className="text-sm font-semibold text-ink-4">Búsqueda Inteligente</h3>
+            <p className="text-xs text-ink-3">Claude interpreta lenguaje natural para encontrar tareas</p>
           </div>
         </div>
 
@@ -406,7 +406,7 @@ function SmartView({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. 'urgent client follow-ups' or 'design tasks this week'"
+            placeholder="ej. 'seguimiento urgente de clientes' o 'tareas de diseño esta semana'"
             className="flex-1 rounded-xl border border-ink-4/10 bg-ink-0/60 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20"
           />
           <button
@@ -414,7 +414,7 @@ function SmartView({
             disabled={loading || !query.trim()}
             className="shrink-0 rounded-xl border border-accent/20 bg-accent/10 px-4 py-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {loading ? '…' : 'Search'}
+            {loading ? '…' : 'Buscar'}
           </button>
         </form>
 
@@ -423,14 +423,14 @@ function SmartView({
         {loading && (
           <div className="flex flex-col items-center gap-3 py-10 text-center">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent" />
-            <p className="text-sm text-ink-3">Claude is searching…</p>
+            <p className="text-sm text-ink-3">Claude está buscando…</p>
           </div>
         )}
 
         {!loading && results !== null && (
           <div>
             <p className="mb-3 text-xs text-ink-3">
-              {results.length === 0 ? 'No matching tasks found.' : `${results.length} task${results.length === 1 ? '' : 's'} matched`}
+              {results.length === 0 ? 'Sin tareas coincidentes.' : `${results.length} tarea${results.length === 1 ? '' : 's'} encontrada${results.length === 1 ? '' : 's'}`}
             </p>
             <div className="flex flex-col gap-2">
               {results.map((task) => (
@@ -443,7 +443,7 @@ function SmartView({
         {!loading && results === null && (
           <div className="py-8 text-center">
             <p className="text-xs leading-relaxed text-ink-2">
-              Try: &ldquo;all tasks for a client&rdquo; · &ldquo;high priority items this week&rdquo; · &ldquo;anything tagged design&rdquo;
+              Intenta: &ldquo;todas las tareas de un cliente&rdquo; · &ldquo;prioridades de esta semana&rdquo; · &ldquo;cualquier cosa etiquetada diseño&rdquo;
             </p>
           </div>
         )}
@@ -470,11 +470,11 @@ function CategoryView({
   const entityNames = entities.map((e) => e.name)
   const groups = [
     ...entities.map((e) => ({ id: e.id as string | null, name: e.name })),
-    { id: null, name: 'Uncategorized' },
+    { id: null, name: 'Sin categoría' },
   ].map((g) => ({
     ...g,
     tasks: tasks.filter((t) =>
-      g.name === 'Uncategorized'
+      g.name === 'Sin categoría'
         ? !t.entity_name || !entityNames.includes(t.entity_name)
         : t.entity_name === g.name
     ),
@@ -516,7 +516,7 @@ function CategoryView({
                 </div>
               )}
               {open.length === 0 && done.length === 0 && (
-                <p className="py-3 text-xs text-ink-2">No tasks yet.</p>
+                <p className="py-3 text-xs text-ink-2">Sin tareas aún.</p>
               )}
             </div>
           </div>
@@ -787,17 +787,17 @@ function TaskDrawer({
 
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
               <div>
-                <label className={labelCls}>Title</label>
+                <label className={labelCls}>Título</label>
                 <input autoFocus={creating} value={form.title} onChange={(e) => set('title', e.target.value)} className={inputCls} placeholder="Nombre de la tarea" />
               </div>
 
               <div>
-                <label className={labelCls}>Description</label>
-                <textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="Optional details…" />
+                <label className={labelCls}>Descripción</label>
+                <textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="Detalles opcionales…" />
               </div>
 
               <div>
-                <label className={labelCls}>Urgency</label>
+                <label className={labelCls}>Urgencia</label>
                 <select value={form.urgency} onChange={(e) => set('urgency', e.target.value)} className={`${inputCls} appearance-none`}>
                   {TIERS.map((t) => (
                     <option key={t.id} value={t.id}>{t.label}</option>
@@ -806,9 +806,9 @@ function TaskDrawer({
               </div>
 
               <div>
-                <label className={labelCls}>Entity</label>
+                <label className={labelCls}>Entidad</label>
                 <select value={form.entity_name} onChange={(e) => set('entity_name', e.target.value)} className={`${inputCls} appearance-none`}>
-                  <option value="">— None —</option>
+                  <option value="">— Ninguno —</option>
                   {entities.map((e) => (
                     <option key={e.id} value={e.name}>{e.name}</option>
                   ))}
@@ -821,15 +821,15 @@ function TaskDrawer({
                   <input value={form.key} onChange={(e) => set('key', e.target.value)} className={`${inputCls} font-mono`} placeholder="CRM-01" />
                 </div>
                 <div>
-                  <label className={labelCls}>Priority</label>
+                  <label className={labelCls}>Prioridad</label>
                   <input type="number" min={0} max={100} value={form.priority_score} onChange={(e) => set('priority_score', e.target.value)} className={inputCls} placeholder="0–100" />
                 </div>
               </div>
 
               <div>
-                <label className={labelCls}>Tags</label>
-                <input value={form.tags} onChange={(e) => set('tags', e.target.value)} className={inputCls} placeholder="design, client, urgent" />
-                <p className="mt-1 text-[10px] text-ink-2">Comma-separated</p>
+                <label className={labelCls}>Etiquetas</label>
+                <input value={form.tags} onChange={(e) => set('tags', e.target.value)} className={inputCls} placeholder="diseño, cliente, urgente" />
+                <p className="mt-1 text-[10px] text-ink-2">Separadas por coma</p>
               </div>
             </div>
 
@@ -872,7 +872,7 @@ export default function CRMPage() {
       setEntities(entitiesData)
     } catch (err) {
       console.error('[CRMPage] load failed:', err)
-      setLoadError(err instanceof Error ? err.message : 'Failed to load')
+      setLoadError(err instanceof Error ? err.message : 'Error al cargar')
     } finally {
       setLoading(false)
     }
@@ -1002,7 +1002,7 @@ export default function CRMPage() {
           <div className="mb-4 flex items-center gap-3 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3">
             <span className="text-sm text-danger">{loadError}</span>
             <button onClick={loadAll} className="ml-auto shrink-0 text-xs font-medium text-danger underline-offset-2 hover:underline">
-              Retry
+              Reintentar
             </button>
           </div>
         )}

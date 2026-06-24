@@ -37,3 +37,8 @@ body {
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+@keyframes star-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}

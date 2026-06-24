@@ -121,12 +121,12 @@ export default function SessionCard() {
     <section className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       {/* Card header */}
       <div className="mb-5 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-4">⚡ Daily Briefing</h2>
+        <h2 className="text-sm font-semibold tracking-wide text-ink-4">⚡ Resumen del Día</h2>
         <Link
           href="/crm"
           className="text-xs text-ink-3 transition-colors hover:text-accent"
         >
-          Open CRM →
+          Abrir CRM →
         </Link>
       </div>
 
@@ -148,16 +148,16 @@ export default function SessionCard() {
       ) : (
         <div className="space-y-6">
           <Section
-            label="Today's Focus"
+            label="Enfoque de Hoy"
             tasks={todayTasks}
-            emptyText="Nothing urgent today — good time to get ahead."
+            emptyText="Sin urgencias hoy — buen momento para adelantar."
             onDone={removeDone}
           />
           <div className="border-t border-ink-4/10" />
           <Section
-            label="This Week"
+            label="Esta Semana"
             tasks={weekTasks}
-            emptyText="No tasks queued for this week yet."
+            emptyText="Sin tareas programadas para esta semana."
             onDone={removeDone}
           />
         </div>

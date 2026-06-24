@@ -36,12 +36,12 @@ const BUTTON_COLORS: [string, string][] = [
   ['#1a1a16', 'ONYX'],
 ]
 const DISTRESS_LEVELS = [
-  { label:'NEW',      value:0    },
-  { label:'MINT',     value:0.18 },
-  { label:'GOOD',     value:0.36 },
-  { label:'WORN',     value:0.54 },
-  { label:'BATTERED', value:0.72 },
-  { label:'RELIC',    value:1.0  },
+  { label:'NUEVO',    value:0    },
+  { label:'MENTA',    value:0.18 },
+  { label:'BUENO',    value:0.36 },
+  { label:'GASTADO',  value:0.54 },
+  { label:'DAÑADO',   value:0.72 },
+  { label:'RELIQUIA', value:1.0  },
 ]
 
 const GREETINGS = [
@@ -103,10 +103,10 @@ function deriveTemperament(ctx: string, prev: TemperamentState): TemperamentStat
 }
 
 const MENU = [
-  { key: 'wisdom',   label: 'WISDOM',  short: 'WIS'  },
-  { key: 'reflect',  label: 'REFLECT', short: 'REFL' },
-  { key: 'pose',     label: 'POSE',    short: 'POSE' },
-  { key: 'settings', label: 'SETUP',   short: 'SET'  },
+  { key: 'wisdom',   label: 'SABIDURÍA', short: 'SAB'  },
+  { key: 'reflect',  label: 'REFLEXIÓN', short: 'REFL' },
+  { key: 'pose',     label: 'POSE',      short: 'POSE' },
+  { key: 'settings', label: 'CONFIG',    short: 'CFG'  },
 ]
 const SETTINGS_KEYS = ['theme', 'color', 'btnColor', 'scanlines', 'distress', 'provider'] as const
 const PROVIDERS: [string, string][] = [['anthropic','CLAUDE'], ['openai','GPT-4o']]
@@ -831,12 +831,12 @@ export default function AdanCompanion() {
   const shellSwatch = isCrystal ? crystalSwatch : deviceColor
   const currentBtnSwatch = btnColorOverride ?? T.btn
   const settingsRowData: {key:string;label:string;value:string;isColor:boolean;swatch:string;readonly?:boolean}[] = [
-    {key:'theme',    label:'SCREEN',   value:currentThemeName.toUpperCase(), isColor:false, swatch:''},
-    {key:'color',    label:'SHELL',    value:C?C[1]:'CUSTOM', isColor:true, swatch:shellSwatch},
-    {key:'btnColor', label:'BUTTONS',  value:BtnC?BtnC[1]:'CUSTOM', isColor:true, swatch:currentBtnSwatch},
-    {key:'scanlines',label:'SCANLINES',value:scanlinesOn?'ON':'OFF', isColor:false, swatch:''},
-    {key:'distress', label:'WEAR',     value:D.label, isColor:false, swatch:''},
-    {key:'provider', label:'AI',       value:providerLabel, isColor:false, swatch:''},
+    {key:'theme',    label:'PANTALLA',  value:currentThemeName.toUpperCase(), isColor:false, swatch:''},
+    {key:'color',    label:'CARCASA',   value:C?C[1]:'CUSTOM', isColor:true, swatch:shellSwatch},
+    {key:'btnColor', label:'BOTONES',   value:BtnC?BtnC[1]:'CUSTOM', isColor:true, swatch:currentBtnSwatch},
+    {key:'scanlines',label:'RASTREO',   value:scanlinesOn?'SÍ':'NO', isColor:false, swatch:''},
+    {key:'distress', label:'DESGASTE',  value:D.label, isColor:false, swatch:''},
+    {key:'provider', label:'IA',        value:providerLabel, isColor:false, swatch:''},
   ]
 
   // Button styles — all use var(--btn) so they shift with device color
@@ -1285,7 +1285,7 @@ export default function AdanCompanion() {
                 {mode==='settings' && (
                   <div style={{position:'absolute',top:62,left:12,right:12,bottom:12,zIndex:16,background:'var(--lcd)',border:'3px solid var(--ink)',borderRadius:2,padding:'14px 14px 12px',boxShadow:'inset 2px 2px 0 rgba(255,255,255,.5),inset -2px -2px 0 rgba(0,0,0,.1),5px 5px 0 color-mix(in srgb, var(--ink) 20%, transparent)',display:'flex',flexDirection:'column',gap:8,animation:'adanBox .24s ease'}}>
                     <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',borderBottom:`2px solid color-mix(in srgb, var(--ink) 30%, transparent)`,paddingBottom:8}}>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,letterSpacing:1,color:'var(--ink)'}}>SETUP</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,letterSpacing:1,color:'var(--ink)'}}>CONFIG</span>
                       <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:'var(--ink)',opacity:.55,letterSpacing:.5}}>SEL ► ENT</span>
                     </div>
                     {settingsRowData.map((row,i)=>{

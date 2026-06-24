@@ -133,7 +133,7 @@ function GoalSection({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKey}
-          placeholder="Add goal…"
+          placeholder="Agregar meta…"
           className="flex-1 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2.5 py-1.5 text-xs text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50 focus:bg-ink-2/30"
         />
         <button
@@ -190,12 +190,12 @@ export default function GoalsCard() {
 
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">🏆 Goals</h2>
+      <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">🏆 Metas</h2>
 
       <div className="space-y-5">
-        <GoalSection title="This Week" items={week} onChange={handleWeekChange} />
+        <GoalSection title="Esta Semana" items={week} onChange={handleWeekChange} />
         <div className="border-t border-ink-4/10" />
-        <GoalSection title="This Month" items={month} onChange={handleMonthChange} />
+        <GoalSection title="Este Mes" items={month} onChange={handleMonthChange} />
       </div>
     </div>
   )

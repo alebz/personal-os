@@ -189,7 +189,7 @@ export default function BrainPage() {
       <main className="mx-auto max-w-3xl px-6 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight text-ink-4">🧠 Brain</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ink-4">🧠 Cerebro</h1>
           <p className="mt-1 text-sm text-ink-3">Busca en tu memoria semántica o pregunta algo</p>
         </div>
 
