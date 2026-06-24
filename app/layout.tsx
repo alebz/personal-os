@@ -16,9 +16,7 @@ export default function RootLayout({
     <html lang="es" className="dark">
       <body className="bg-ink-0 text-ink-4 antialiased">
         <StarsBackground />
-        <div className="relative" style={{ zIndex: 1 }}>
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   );

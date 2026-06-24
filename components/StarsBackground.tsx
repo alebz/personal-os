@@ -30,7 +30,7 @@ export function StarsBackground() {
   return (
     <div
       aria-hidden="true"
-      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }}
+      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999, mixBlendMode: 'screen' }}
     >
       {stars.map((s, i) => (
         <div key={i} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, opacity: s.maxOpacity }}>
