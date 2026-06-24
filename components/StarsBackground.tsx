@@ -180,14 +180,16 @@ useEffect(() => {
             {/* inner div: vertical offset — CSS var drives the dy so it's set per-element */}
             <div
               style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
                 animation: 'plane-y 60s linear 1 forwards',
                 ['--plane-dy' as string]: `${planeEvent.dy}vh`,
               } as React.CSSProperties}
             >
-              <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: planeEvent.rtl ? '#40ff80' : '#ff4040', animation: 'plane-blink-red 1.15s infinite' }} />
-              <div style={{ width: '2px', height: '2px', borderRadius: '50%', background: 'white',   animation: 'plane-blink-white 3s 1.5s infinite' }} />
-              <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: planeEvent.rtl ? '#ff4040' : '#40ff80', animation: 'plane-blink-red 1.15s 0.58s infinite' }} />
+              {/* rotate wrapper: keeps rotation independent from the translation animation */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', transform: 'rotate(90deg)' }}>
+                <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: planeEvent.rtl ? '#40ff80' : '#ff4040', animation: 'plane-blink-red 1.15s infinite' }} />
+                <div style={{ width: '2px', height: '2px', borderRadius: '50%', background: 'white',   animation: 'plane-blink-white 3s 1.5s infinite' }} />
+                <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: planeEvent.rtl ? '#ff4040' : '#40ff80', animation: 'plane-blink-red 1.15s 0.58s infinite' }} />
+              </div>
             </div>
           </div>
         )}
