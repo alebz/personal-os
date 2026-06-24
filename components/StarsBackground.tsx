@@ -4,19 +4,7 @@ import { useMemo } from 'react'
 
 const STAR_COUNT = 300
 
-const STAR_COLORS = [
-  '#ffffff', // white (majority)
-  '#ffffff',
-  '#ffffff',
-  '#ffffff',
-  '#ff4466', // red
-  '#ff8800', // orange
-  '#ffee00', // yellow
-  '#44ff66', // green
-  '#00ccff', // cyan
-  '#4466ff', // blue
-  '#cc44ff', // violet
-]
+const RAINBOW = ['#ff4466', '#ff8800', '#ffee00', '#44ff66', '#00ccff', '#4466ff', '#cc44ff']
 
 function mulberry32(seed: number) {
   let s = seed
@@ -38,7 +26,7 @@ export function StarsBackground() {
         x: rand() * 100,
         y: rand() * 100,
         size,
-        color: STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)],
+        color: rand() < 0.5 ? '#ffffff' : RAINBOW[Math.floor(rand() * RAINBOW.length)],
         maxOpacity: 0.35 + rand() * 0.55,
         duration: 1.5 + rand() * 4.5,
         delay: rand() * 10,
