@@ -118,7 +118,7 @@ export default function HabitTracker() {
   const count = done.filter(id => habits.some(h => h.id === id)).length
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

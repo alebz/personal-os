@@ -108,7 +108,7 @@ export default function HealthPage() {
 
         {/* Loading */}
         {loading && (
-          <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-8 text-center backdrop-blur-xl">
+          <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-8 text-center backdrop-blur-xl">
             <p className="animate-pulse text-sm text-ink-3">Cargando datos…</p>
           </div>
         )}
@@ -122,7 +122,7 @@ export default function HealthPage() {
 
         {/* Empty */}
         {!loading && !error && logged.length === 0 && (
-          <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-10 text-center backdrop-blur-xl">
+          <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-10 text-center backdrop-blur-xl">
             <p className="text-sm italic text-ink-3/60">
               Sin datos de nutrición en los últimos 30 días.
             </p>
@@ -135,7 +135,7 @@ export default function HealthPage() {
         {!loading && !error && logged.length > 0 && (
           <>
             {/* Averages card */}
-            <div className="mb-5 rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+            <div className="mb-5 rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
               <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-ink-3">
                 Promedio · {logged.length} día{logged.length !== 1 ? 's' : ''} con registro
               </p>
@@ -148,7 +148,7 @@ export default function HealthPage() {
             </div>
 
             {/* Table card */}
-            <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl overflow-hidden">
+            <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[540px]">
                   <thead>

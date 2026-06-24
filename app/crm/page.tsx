@@ -339,7 +339,7 @@ function KanbanView({
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {TIERS.map((tier) => (
-        <div key={tier.id} className={`rounded-2xl border bg-ink-1/60 p-4 shadow-xl shadow-black/20 backdrop-blur-xl ${tier.borderCls}`}>
+        <div key={tier.id} className={`rounded-2xl border bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl ${tier.borderCls}`}>
           <KanbanColumn
             tier={tier}
             tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
@@ -389,7 +389,7 @@ function SmartView({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-6 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-6 shadow-xl shadow-black/20 backdrop-blur-xl">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -487,7 +487,7 @@ function CategoryView({
         const done = group.tasks.filter((t) => t.completed_at)
 
         return (
-          <div key={group.name} className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div key={group.name} className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
             <div className="mb-4 flex items-center gap-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">{group.name}</h3>
               {open.length > 0 && (
@@ -586,11 +586,11 @@ function EntityManager({
               if (ev.key === 'Enter') handleRename(e.id)
               if (ev.key === 'Escape') setEditingId(null)
             }}
-            className="rounded-full border border-accent/30 bg-ink-1/60 px-3 py-0.5 text-xs text-ink-4 outline-none focus:ring-1 focus:ring-accent/30"
+            className="rounded-full border border-accent/30 bg-ink-1/85 px-3 py-0.5 text-xs text-ink-4 outline-none focus:ring-1 focus:ring-accent/30"
             style={{ width: Math.max(80, editingName.length * 8 + 28) }}
           />
         ) : (
-          <div key={e.id} className="group flex items-center gap-0.5 rounded-full border border-ink-4/10 bg-ink-1/60 py-0.5 pl-2.5 pr-1">
+          <div key={e.id} className="group flex items-center gap-0.5 rounded-full border border-ink-4/10 bg-ink-1/85 py-0.5 pl-2.5 pr-1">
             <span className="text-xs text-ink-3">{e.name}</span>
             <button
               onClick={() => { setEditingId(e.id); setEditingName(e.name) }}
@@ -754,7 +754,7 @@ function TaskDrawer({
 
   const isOpen = !!task || creating
   const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-ink-3'
-  const inputCls = 'w-full rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20'
+  const inputCls = 'w-full rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20'
 
   return (
     <>
@@ -971,7 +971,7 @@ export default function CRMPage() {
               Nueva tarea
             </button>
 
-          <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/60 p-1 backdrop-blur-xl">
+          <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
             {VIEWS.map((v) => (
               <button
                 key={v.id}

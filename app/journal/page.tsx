@@ -204,7 +204,7 @@ function EntryCard({
   return (
     <div className={`rounded-2xl border transition-colors ${
       expanded
-        ? 'border-accent/20 bg-ink-1/60'
+        ? 'border-accent/20 bg-ink-1/85'
         : 'border-ink-4/8 bg-ink-1/30 hover:border-ink-4/15 hover:bg-ink-1/50'
     } shadow-lg shadow-black/10 backdrop-blur-xl`}>
 
@@ -287,7 +287,7 @@ function EntryCard({
             <button
               onClick={() => void handleSummarize()}
               disabled={content.trim().length < 30 || summarizing}
-              className="flex items-center gap-1.5 rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-1.5 text-xs font-medium text-ink-3 transition-colors hover:border-accent/20 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-1.5 text-xs font-medium text-ink-3 transition-colors hover:border-accent/20 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               <span>{summarizing ? '⏳' : '✨'}</span>
               <span>{summarizing ? 'Generando…' : 'Resumir con IA'}</span>

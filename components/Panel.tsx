@@ -14,7 +14,7 @@ export default function Panel({ title, children, className = '' }: PanelProps) {
   return (
     <section
       className={
-        'rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl ' +
+        'rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl ' +
         className
       }
     >

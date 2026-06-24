@@ -282,7 +282,7 @@ export default function NutritionCard() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       {/* Header */}
       <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">🥗 Nutrición</h2>
 

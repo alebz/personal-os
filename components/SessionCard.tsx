@@ -118,7 +118,7 @@ export default function SessionCard() {
   const weekTasks    = tasks.filter((t) => t.urgency === 'this_week').sort(byPriority).slice(0, 5)
 
   return (
-    <section className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <section className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       {/* Card header */}
       <div className="mb-5 flex items-baseline justify-between">
         <h2 className="text-sm font-semibold tracking-wide text-ink-4">⚡ Resumen del Día</h2>

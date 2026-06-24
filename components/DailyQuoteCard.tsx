@@ -46,7 +46,7 @@ export default function DailyQuoteCard() {
   const goldFaint = 'oklch(0.62 0.09 85)'
 
   return (
-    <div className="relative rounded-2xl border border-ink-4/10 bg-ink-1/60 px-5 py-8 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="relative rounded-2xl border border-ink-4/10 bg-ink-1/85 px-5 py-8 shadow-xl shadow-black/20 backdrop-blur-xl">
       <button
         onClick={() => fetchReading(true)}
         disabled={loading}

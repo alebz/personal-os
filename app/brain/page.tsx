@@ -64,7 +64,7 @@ function ChunkCard({
   const body = !expanded && long ? chunk.content.slice(0, 260) + '…' : chunk.content
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-lg shadow-black/10 backdrop-blur-xl">
+    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-lg shadow-black/10 backdrop-blur-xl">
       <div className="flex items-center gap-3 border-b border-ink-4/5 px-4 py-2.5">
         {index !== undefined && (
           <span className="min-w-[1.5rem] text-center text-xs font-mono text-ink-3/60">
@@ -222,7 +222,7 @@ export default function BrainPage() {
                   ? 'Busca algo en tu memoria… ej. "reunión con Carlos"'
                   : 'Pregunta algo… ej. "¿Qué sé sobre Barbaján?"'
               }
-              className="w-full rounded-2xl border border-ink-4/10 bg-ink-1/60 py-3.5 pl-5 pr-14 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+              className="w-full rounded-2xl border border-ink-4/10 bg-ink-1/85 py-3.5 pl-5 pr-14 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
             />
             <button
               type="submit"
@@ -251,7 +251,7 @@ export default function BrainPage() {
 
         {/* Ask mode — streaming answer */}
         {mode === 'ask' && hasAnswer && (
-          <div className="mb-8 overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="mb-8 overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
             <div className="border-b border-ink-4/5 px-5 py-3">
               <span className="text-xs font-medium text-accent">✨ Respuesta</span>
             </div>

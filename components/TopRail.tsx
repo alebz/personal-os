@@ -30,7 +30,7 @@ export default function TopRail() {
           />
         </Link>
 
-        <nav className="hidden items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/60 p-1 backdrop-blur-xl md:flex">
+        <nav className="hidden items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl md:flex">
           {TABS.map(({ label, href }) => {
             const active = pathname === href
             return (
