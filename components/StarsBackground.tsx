@@ -5,13 +5,17 @@ import { useMemo } from 'react'
 const STAR_COUNT = 300
 
 const STAR_COLORS = [
-  '#ddeeff', // cool blue-white (majority)
-  '#ddeeff',
-  '#ddeeff',
-  '#fff8dd', // warm gold
-  '#ffeedd', // amber
-  '#eeddff', // soft violet
-  '#ddfff4', // mint
+  '#ffffff', // white (majority)
+  '#ffffff',
+  '#ffffff',
+  '#ffffff',
+  '#ff4466', // red
+  '#ff8800', // orange
+  '#ffee00', // yellow
+  '#44ff66', // green
+  '#00ccff', // cyan
+  '#4466ff', // blue
+  '#cc44ff', // violet
 ]
 
 function mulberry32(seed: number) {
