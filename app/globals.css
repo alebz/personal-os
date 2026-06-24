@@ -38,7 +38,98 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * The entire star field rotates once every 60 min around the viewport centre,
+ * mimicking the apparent westward drift of the real night sky.
+ */
+@keyframes sky-rotate {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
+}
+
 @keyframes star-blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
+
+/* Colored stars cycle through the full hue wheel at varying speeds */
+@keyframes rainbow-cycle {
+  from { filter: hue-rotate(0deg);   }
+  to   { filter: hue-rotate(360deg); }
+}
+
+/*
+ * Shooting star — one-shot (2 s, linear).
+ * All translateX increments are 28 px per 10 % → perfectly uniform speed with
+ * linear timing. Opacity fades in 10–20 % and out 80–90 %, so the star appears
+ * already moving and vanishes while still in motion (no start/stop stutter).
+ */
+@keyframes shooting-star {
+  0%   { opacity: 0;    transform: translateX(0);    }
+  10%  { opacity: 0;    transform: translateX(28px); }
+  20%  { opacity: 0.95; transform: translateX(56px); }
+  80%  { opacity: 0.9;  transform: translateX(224px);}
+  90%  { opacity: 0;    transform: translateX(252px);}
+  100% { opacity: 0;    transform: translateX(280px);}
+}
+
+/* Plane one-shot crossings (60 s). Element is removed from DOM when not active. */
+@keyframes plane-cross {
+  from { transform: translateX(-20px);              }
+  to   { transform: translateX(calc(100vw + 20px)); }
+}
+@keyframes plane-cross-rtl {
+  from { transform: translateX(calc(100vw + 20px)); }
+  to   { transform: translateX(-20px);              }
+}
+/* Vertical drift on inner div — value comes from --plane-dy CSS custom property
+   set inline per element, giving each plane a unique diagonal angle. */
+@keyframes plane-y {
+  from { transform: translateY(0); }
+  to   { transform: translateY(var(--plane-dy, 0vh)); }
+}
+
+/* Nav lights: mostly on, brief off */
+@keyframes plane-blink-red {
+  0%, 100% { opacity: 0.9; }
+  48%, 52% { opacity: 0;   }
+}
+
+/* White strobe: quick double-flash, long silence */
+@keyframes plane-blink-white {
+  0%,  3%   { opacity: 0; }
+  4%,  7%   { opacity: 1; }
+  8%,  11%  { opacity: 0; }
+  12%, 15%  { opacity: 1; }
+  16%, 100% { opacity: 0; }
+}
+
+/*
+ * Satellite — two-div arc technique.
+ * sat-h (outer div): linear horizontal crossing in 90 s.
+ * sat-v (inner div): ease-in-out vertical arc of 60 px, applied independently.
+ * The combined path traces a shallow ellipse arc across the sky.
+ */
+@keyframes sat-h {
+  0%   { transform: translateX(-60px);              opacity: 0; }
+  6%   { opacity: 0.85; }
+  94%  { opacity: 0.85; }
+  100% { transform: translateX(calc(100vw + 60px)); opacity: 0; }
+}
+@keyframes sat-h-rtl {
+  0%   { transform: translateX(calc(100vw + 60px)); opacity: 0; }
+  6%   { opacity: 0.85; }
+  94%  { opacity: 0.85; }
+  100% { transform: translateX(-60px);              opacity: 0; }
+}
+@keyframes sat-v {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-60px); }
+}
+
+/* Slow brightness pulse simulating tumble / solar-panel reflection */
+@keyframes sat-glow {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1.0; }
+}
+

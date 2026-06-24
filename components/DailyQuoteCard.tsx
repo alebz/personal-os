@@ -8,7 +8,7 @@ function sixHourKey(): string {
   return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${block}`
 }
 
-const LS_KEY = 'leo-oracle:'
+const LS_KEY = 'marco-aurelio:'
 
 export default function DailyQuoteCard() {
   const [reading, setReading] = useState<string | null>(null)
@@ -50,7 +50,7 @@ export default function DailyQuoteCard() {
       <button
         onClick={() => fetchReading(true)}
         disabled={loading}
-        aria-label="Nueva lectura"
+        aria-label="Nueva meditación"
         className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-lg text-xs transition-colors hover:bg-ink-4/10 disabled:pointer-events-none disabled:opacity-0"
         style={{ color: goldFaint }}
       >
@@ -58,17 +58,17 @@ export default function DailyQuoteCard() {
       </button>
 
       <div className="flex flex-col items-center gap-2.5 text-center">
-        <span className="text-[11px] tracking-[0.32em] font-semibold" style={{ color: gold }}>ORÁCULO DIARIO</span>
+        <span className="text-[11px] tracking-[0.32em] font-semibold" style={{ color: gold }}>MARCO AURELIO</span>
 
         {loading ? (
           <div className="flex items-center gap-2 py-1">
             <div className="h-3 w-3 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent/60" />
-            <span className="text-[11px]" style={{ color: goldFaint }}>consultando los astros…</span>
+            <span className="text-[11px]" style={{ color: goldFaint }}>meditando…</span>
           </div>
         ) : reading ? (
           <p className="text-center text-[13px] italic leading-relaxed" style={{ color: gold }}>{reading}</p>
         ) : (
-          <p className="text-center text-[12px] italic" style={{ color: goldFaint }}>El cielo guarda silencio.</p>
+          <p className="text-center text-[12px] italic" style={{ color: goldFaint }}>La mente guarda silencio.</p>
         )}
       </div>
     </div>

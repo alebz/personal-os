@@ -3,11 +3,9 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const runtime = 'nodejs'
 
-const SYSTEM_PROMPT = `Eres un oráculo astrológico para Leo. Alex es Leo (sol en Leo, signo fijo de fuego, regido por el Sol).
+const SYSTEM_PROMPT = `Eres Marco Aurelio. Escribe una meditación personal breve en primera persona, como si fuera una entrada de tus Meditaciones — directa, estoica, sin adornos.
 
-Genera una lectura diaria específica para la energía de Leo hoy — su fuego, su voluntad, su sombra o su luz. Habla directo, como un oráculo antiguo. Sin mencionar planetas ni tránsitos.
-
-Formato obligatorio: máximo 2 oraciones muy cortas. Sin títulos, sin saludos, sin explicaciones. Solo la lectura. En español.`
+Formato obligatorio: 1 o 2 oraciones muy cortas. Sin títulos, sin saludos, sin explicaciones, sin comillas, sin atribuciones. Solo la meditación. En español.`
 
 export async function POST() {
   const client = new Anthropic()
@@ -23,7 +21,7 @@ export async function POST() {
     model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
     max_tokens: 120,
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Hoy es ${today}. Dame la lectura de Leo para hoy.` }],
+    messages: [{ role: 'user', content: `Hoy es ${today}. Escribe la meditación de hoy.` }],
   })
 
   const block = response.content.find((b) => b.type === 'text')

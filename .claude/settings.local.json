@@ -48,7 +48,12 @@
       "Bash(pip3 install *)",
       "Bash(kill 65527)",
       "Bash(xargs sed -i '' 's/bg-ink-1\\\\/40/bg-ink-1\\\\/60/g; s/bg-ink-0\\\\/60/bg-ink-0\\\\/80/g')",
-      "Bash(xargs sed -i '' 's/bg-ink-1\\\\/60/bg-ink-1\\\\/85/g')"
+      "Bash(xargs sed -i '' 's/bg-ink-1\\\\/60/bg-ink-1\\\\/85/g')",
+      "Bash(supabase status *)",
+      "Bash(awk '{print $6}')",
+      "Bash(awk '{print $3}')",
+      "Bash(xargs cat)",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')"
     ]
   }
 }

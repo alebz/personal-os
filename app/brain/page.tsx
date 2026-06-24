@@ -13,7 +13,48 @@ interface MemoryChunk {
   similarity: number
 }
 
-type Mode = 'search' | 'ask'
+type Mode = 'search' | 'ask' | 'patterns'
+
+interface Evidence {
+  type:  string
+  count: number
+  label: string
+}
+
+interface PatternInsight {
+  category:   'energy' | 'creative' | 'relationship' | 'financial' | 'recurring' | 'behavioral'
+  title:      string
+  insight:    string
+  confidence: number
+  evidence:   Evidence[]
+}
+
+interface PatternResult {
+  insights: PatternInsight[]
+  summary:  string
+  analyzed: { total: number; byKind: Record<string, number> }
+}
+
+const PATTERN_ICON: Record<string, string> = {
+  energy: '⚡', creative: '🎨', relationship: '👥',
+  financial: '💰', recurring: '🔁', behavioral: '🧠',
+}
+const PATTERN_LABEL: Record<string, string> = {
+  energy:       'Patrón de energía',
+  creative:     'Patrón creativo',
+  relationship: 'Patrón relacional',
+  financial:    'Patrón financiero',
+  recurring:    'Tema recurrente',
+  behavioral:   'Patrón conductual',
+}
+const PATTERN_COLOR: Record<string, string> = {
+  energy:       'text-warn',
+  creative:     'text-accent',
+  relationship: 'text-ok',
+  financial:    'text-danger',
+  recurring:    'text-ink-3',
+  behavioral:   'text-accent',
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +135,59 @@ function ChunkCard({
   )
 }
 
+// ── Pattern card ──────────────────────────────────────────────────────────────
+
+function PatternCard({ insight, index }: { insight: PatternInsight; index: number }) {
+  const icon  = PATTERN_ICON[insight.category]  ?? '🔹'
+  const label = PATTERN_LABEL[insight.category] ?? insight.category
+  const color = PATTERN_COLOR[insight.category] ?? 'text-ink-3'
+  const bar   = Math.max(0, Math.min(100, insight.confidence))
+
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-lg shadow-black/10 backdrop-blur-xl"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base leading-none">{icon}</span>
+          <span className={`text-[10px] font-semibold uppercase tracking-widest ${color}`}>
+            {label}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="font-mono text-[11px] text-ink-3">{bar}%</span>
+          <div className="h-1 w-14 overflow-hidden rounded-full bg-ink-4/10">
+            <div
+              className="h-full rounded-full bg-accent/70 transition-all"
+              style={{ width: `${bar}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Title + insight */}
+      <h3 className="mb-1.5 text-sm font-semibold text-ink-4">{insight.title}</h3>
+      <p className="mb-3 text-sm leading-relaxed text-ink-3">{insight.insight}</p>
+
+      {/* Evidence chips */}
+      {insight.evidence.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {insight.evidence.map((e, i) => (
+            <span
+              key={i}
+              className="rounded-full border border-ink-4/10 px-2 py-0.5 text-[10px] text-ink-3"
+            >
+              {e.count} {e.label}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function BrainPage() {
@@ -105,13 +199,36 @@ export default function BrainPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const [patterns, setPatterns]       = useState<PatternResult | null>(null)
+  const [hasAnalyzed, setHasAnalyzed] = useState(false)
   const inputRef  = useRef<HTMLInputElement>(null)
   const abortRef  = useRef<AbortController | null>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
+  async function loadPatterns() {
+    setLoading(true)
+    setError(null)
+    setPatterns(null)
+    setHasAnalyzed(true)
+    try {
+      const r = await fetch('/api/patterns', {
+        method:  'POST',
+        headers: { 'content-type': 'application/json' },
+        body:    JSON.stringify({ focus: query.trim() || undefined }),
+      })
+      if (!r.ok) throw new Error(await r.text())
+      setPatterns(await r.json())
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
+    if (mode === 'patterns') { loadPatterns(); return }
     if (!query.trim() || loading) return
 
     abortRef.current?.abort()
@@ -190,13 +307,21 @@ export default function BrainPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight text-ink-4">🧠 Cerebro</h1>
-          <p className="mt-1 text-sm text-ink-3">Busca en tu memoria semántica o pregunta algo</p>
+          <p className="mt-1 text-sm text-ink-3">
+            {mode === 'patterns'
+              ? 'Motor de detección de patrones — identifica tendencias en tu vida'
+              : 'Busca en tu memoria semántica o pregunta algo'}
+          </p>
         </div>
 
         {/* Mode toggle + search */}
         <form onSubmit={handleSubmit} className="mb-8 space-y-3">
           <div className="flex gap-2">
-            {(['search', 'ask'] as const).map(m => (
+            {([
+              ['search',   '🔍 Resultados'],
+              ['ask',      '✨ Preguntar'],
+              ['patterns', '🔮 Patrones'],
+            ] as const).map(([m, label]) => (
               <button
                 key={m}
                 type="button"
@@ -207,7 +332,7 @@ export default function BrainPage() {
                     : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
                 }`}
               >
-                {m === 'search' ? '🔍 Resultados' : '✨ Preguntar'}
+                {label}
               </button>
             ))}
           </div>
@@ -218,18 +343,18 @@ export default function BrainPage() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder={
-                mode === 'search'
-                  ? 'Busca algo en tu memoria… ej. "reunión con Carlos"'
-                  : 'Pregunta algo… ej. "¿Qué sé sobre Barbaján?"'
+                mode === 'search'   ? 'Busca algo en tu memoria… ej. "reunión con Carlos"' :
+                mode === 'patterns' ? 'Área de enfoque (opcional)… ej. "creatividad", "hábitos"' :
+                                     'Pregunta algo… ej. "¿Qué sé sobre Barbaján?"'
               }
-              className="w-full rounded-2xl border border-ink-4/10 bg-ink-1/85 py-3.5 pl-5 pr-14 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+              className="w-full rounded-2xl border border-ink-4/10 bg-ink-1/85 py-3.5 pl-5 pr-28 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
             />
             <button
               type="submit"
-              disabled={loading || !query.trim()}
+              disabled={loading || (mode !== 'patterns' && !query.trim())}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40"
             >
-              {loading ? '…' : '↵'}
+              {loading ? '…' : mode === 'patterns' ? 'Analizar' : '↵'}
             </button>
           </div>
         </form>
@@ -245,7 +370,9 @@ export default function BrainPage() {
         {loading && (
           <div className="flex items-center gap-3 py-8 text-sm text-ink-3">
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
-            {mode === 'search' ? 'Buscando en tu memoria…' : 'Consultando a tu OS…'}
+            {mode === 'patterns'
+              ? 'Analizando patrones en tu vida…'
+              : mode === 'search' ? 'Buscando en tu memoria…' : 'Consultando a tu OS…'}
           </div>
         )}
 
@@ -266,8 +393,8 @@ export default function BrainPage() {
           </div>
         )}
 
-        {/* Results / sources */}
-        {!loading && hasSearched && (
+        {/* Results / sources — search + ask modes only */}
+        {mode !== 'patterns' && !loading && hasSearched && (
           <>
             {hasResults ? (
               <div className="space-y-3">
@@ -289,13 +416,58 @@ export default function BrainPage() {
           </>
         )}
 
-        {/* Empty state (before first search) */}
-        {!hasSearched && !loading && (
+        {/* Patterns results */}
+        {mode === 'patterns' && !loading && hasAnalyzed && (
+          <>
+            {patterns ? (
+              <div className="space-y-4">
+                {/* Summary banner */}
+                {patterns.summary && (
+                  <div className="rounded-2xl border border-accent/15 bg-accent/5 px-5 py-4">
+                    <p className="text-sm leading-relaxed text-ink-4">{patterns.summary}</p>
+                    <p className="mt-2 text-[10px] text-ink-3">
+                      {patterns.analyzed.total} memorias analizadas ·{' '}
+                      {Object.entries(patterns.analyzed.byKind)
+                        .map(([k, n]) => `${n} ${k}`)
+                        .join(', ')}
+                    </p>
+                  </div>
+                )}
+
+                {/* Insight cards */}
+                {patterns.insights.map((insight, i) => (
+                  <PatternCard key={i} insight={insight} index={i} />
+                ))}
+              </div>
+            ) : (
+              <div className="py-16 text-center">
+                <p className="text-sm italic text-ink-3/60">No se detectaron patrones.</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Empty state (before first action) */}
+        {mode !== 'patterns' && !hasSearched && !loading && (
           <div className="py-20 text-center">
             <p className="text-4xl mb-3">🔮</p>
             <p className="text-sm text-ink-3">
               Todo lo que capturas — notas, tareas, contactos — vive aquí.<br />
               Busca o pregunta en lenguaje natural.
+            </p>
+          </div>
+        )}
+
+        {/* Patterns empty state */}
+        {mode === 'patterns' && !hasAnalyzed && !loading && (
+          <div className="py-20 text-center">
+            <p className="text-4xl mb-3">🔮</p>
+            <p className="text-sm text-ink-3">
+              El motor analiza tendencias, correlaciones y temas recurrentes<br />
+              a través de todas tus memorias — tareas, journal, hábitos y más.
+            </p>
+            <p className="mt-3 text-xs text-ink-3/50">
+              Opcionalmente enfoca el análisis con una palabra clave.
             </p>
           </div>
         )}

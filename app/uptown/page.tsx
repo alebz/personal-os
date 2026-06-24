@@ -50,7 +50,7 @@ interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 
 interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
 interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
 
-type ValetStatus = 'pending' | 'paid'
+type ValetStatus = 'pending' | 'paid' | 'advance'
 interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; price_per_point: number }
 interface ValetPayment { week_num: number; tenant_id: string; status: ValetStatus }
 

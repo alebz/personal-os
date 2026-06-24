@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const S        = 0.58
+const S        = 0.50
 const DEVICE_W = 420
 const DEVICE_H = 710
 
@@ -506,9 +506,21 @@ export default function AdanCompanion() {
       bump('spirit',3); interactionCount.current++
       askAndSay(getPreamble()+'\n\nRevisa el contexto del OS. Elige UN dato concreto que veas ahí — una tarea, un hábito, una cifra, algo del journal — y haz un comentario directo sobre eso. Sin filosofía. Sin consejos genéricos. Solo lo que ves.','pose_1')
     } else if(key==='reflect'){
-      // Pregunta poderosa: basada en datos reales, no monólogo genérico
       bump('serenity',3); interactionCount.current++
-      askAndSay(getPreamble()+'\n\nMira el contexto del OS. Formula UNA pregunta concreta sobre algo que veas ahí — no sobre la vida en general, sino sobre algo específico de hoy de Alex. Solo la pregunta, sin introducción.','pose_4')
+      const ctx = osContextRef.current
+      if(!ctx){ say('…',{settlePose:'idle',hold:3000}); return }
+      const id = ++reqId.current
+      if(idleTimer.current) clearTimeout(idleTimer.current)
+      if(typeTimer.current) clearInterval(typeTimer.current)
+      setBusy(true); setMode('home'); setPose('thinking')
+      setBubble({visible:true,text:'',typing:false})
+      fetch('/api/companion/reflect',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({context:ctx})
+      })
+        .then(r=>r.json())
+        .then(d=>{ if(id!==reqId.current) return; setNetOk(true); const t=(d.reflection||'').trim().slice(0,300); if(t) say(t,{settlePose:'pose_4',hold:12000}); else say('…',{settlePose:'idle',hold:4000}) })
+        .catch(()=>{ if(id!==reqId.current) return; setNetOk(false); say('…',{settlePose:'idle',hold:4000}) })
     } else if(key==='settings'){
       reqId.current++
       if(idleTimer.current) clearTimeout(idleTimer.current)
@@ -678,6 +690,22 @@ export default function AdanCompanion() {
           try { localStorage.setItem(TEMPERAMENT_KEY, JSON.stringify(next)) } catch {}
           return next
         })
+        // Auto-reflection: once per calendar day, 7s after first context load
+        const today = new Date().toISOString().slice(0,10)
+        const reflKey = 'adan_reflected_' + today
+        if(!sessionStorage.getItem(reflKey)){
+          sessionStorage.setItem(reflKey, '1')
+          setTimeout(()=>{
+            const ctx = osContextRef.current; if(!ctx) return
+            fetch('/api/companion/reflect',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({context:ctx})
+            })
+              .then(r=>r.json())
+              .then(d=>{ const t=(d.reflection||'').trim(); if(t) sayRef.current(t,{settlePose:'praying',hold:10000}) })
+              .catch(()=>{})
+          }, 7000)
+        }
       }
     }).catch(()=>{ setNetOk(false) })
     fetchCtx()
@@ -762,16 +790,6 @@ export default function AdanCompanion() {
     }
     window.addEventListener('adan-proud', habitHandler)
 
-    const keyHandler=(e:KeyboardEvent)=>{
-      if(document.activeElement===inputRef.current) return
-      const k=(e.key||'').toLowerCase()
-      if(k==='arrowdown'){ e.preventDefault(); onScrollDown(); return }
-      if(k==='a'||k==='arrowleft')                    { e.preventDefault(); onARef.current() }
-      else if(k==='b'||k==='enter'||k===' ')           { e.preventDefault(); onBRef.current() }
-      else if(k==='c'||k==='arrowright'||k==='escape') { e.preventDefault(); onCRef.current() }
-    }
-    window.addEventListener('keydown',keyHandler)
-
     const greetTimer = setTimeout(()=>{ sayRef.current(randItem(GREETINGS),{settlePose:'idle',hold:3200}) },650)
 
     return ()=>{
@@ -781,7 +799,6 @@ export default function AdanCompanion() {
       if(typeTimer.current) clearInterval(typeTimer.current)
       if(talkFrameTimer.current) clearInterval(talkFrameTimer.current)
       if(faceClickTimer.current) clearTimeout(faceClickTimer.current)
-      window.removeEventListener('keydown',keyHandler)
       window.removeEventListener('adan-proud', habitHandler)
       window.removeEventListener('online',  goOnline)
       window.removeEventListener('offline', goOffline)
