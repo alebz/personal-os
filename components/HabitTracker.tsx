@@ -122,7 +122,7 @@ export default function HabitTracker() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-4">Hábitos</h2>
+          <h2 className="text-sm font-semibold tracking-wide text-ink-4">🔥 Hábitos</h2>
           {!editMode && (
             <span className="text-xs text-ink-3">
               {count}/{habits.length} hoy

@@ -5,24 +5,25 @@ import Shell from '@/components/Shell'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
-const RENTER_DEFS = [
-  { id: 'maison_zozoaga',  name: 'Maison Zozoaga',  location: 'PB',          startMonth: null      },
-  { id: 'arko',            name: 'Arko',             location: 'Planta alta', startMonth: null      },
-  { id: 'maricel',         name: "Maricel's Room",   location: 'Planta alta', startMonth: null      },
-  { id: 'connect',         name: 'Connect',          location: 'Planta alta', startMonth: null      },
-  { id: 'barbajan',        name: 'Barbaján',         location: 'Sótano',      startMonth: '2026-07' },
-  { id: 'publico_gourmet', name: 'Público Gourmet',  location: 'PB',          startMonth: '2026-08' },
-] as const
+const RENTER_DEFS: { id: string; name: string; location: string; startMonth: string | null; defaultAmount?: number }[] = [
+  { id: 'maison_zozoaga',  name: 'Maison Zozoaga',  location: 'PB',          startMonth: null,       defaultAmount: 10_208 },
+  { id: 'arko',            name: 'Arko',             location: 'Planta alta', startMonth: null,       defaultAmount: 10_000 },
+  { id: 'maricel',         name: "Maricel's Room",   location: 'Planta alta', startMonth: null,       defaultAmount: 10_000 },
+  { id: 'connect',         name: 'Connect',          location: 'Planta alta', startMonth: null,       defaultAmount:  7_800 },
+  { id: 'barbajan',        name: 'Barbaján',         location: 'Sótano',      startMonth: '2026-07',  defaultAmount: 17_000 },
+  { id: 'publico_gourmet', name: 'Público Gourmet',  location: 'PB',          startMonth: '2026-08'  },
+  { id: 'naran_853',       name: 'Narán 853',        location: 'Torre Narán', startMonth: null,       defaultAmount: 11_500 },
+]
 
-const EXPENSE_DEFS = [
+const EXPENSE_DEFS: { id: string; name: string; note: string | null; startMonth: string | null; defaultAmount?: number }[] = [
   { id: 'cfe',        name: 'CFE',             note: 'bimestral', startMonth: null      },
   { id: 'sapal',      name: 'SAPAL',           note: null,        startMonth: null      },
   { id: 'internet',   name: 'Internet',        note: null,        startMonth: null      },
-  { id: 'martha',     name: 'Martha limpieza', note: null,        startMonth: null      },
+  { id: 'martha',     name: 'Martha limpieza', note: null,        startMonth: null,       defaultAmount: 2_000 },
   { id: 'garrafones', name: 'Garrafones',      note: null,        startMonth: null      },
   { id: 'predial',    name: 'Predial',         note: null,        startMonth: '2026-07' },
-  { id: 'fondo',      name: 'Fondo mto.',      note: 'meta $50k', startMonth: null      },
-] as const
+  { id: 'fondo',      name: 'Fondo mto.',      note: 'meta $50k', startMonth: null,      defaultAmount: 4_000 },
+]
 
 const FONDO_META = 50_000
 
@@ -43,10 +44,10 @@ const VALET_PROVIDER_WEEK = 2_800
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface RentRow    { renter: string;   amount: number; paid: boolean }
-interface ExpenseRow { category: string; amount: number; paid: boolean }
-interface NominaRow  { week_num: number; amount: number; paid: boolean }
-interface ExtraItem  { id: string; description: string; amount: number }
+interface RentRow    { renter: string;   amount: number; paid: boolean; method: 'cash' | 'card' }
+interface ExpenseRow { category: string; amount: number; paid: boolean; method: 'cash' | 'card' }
+interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 'cash' | 'card' }
+interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
 interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
 
 type ValetStatus = 'pending' | 'paid'
@@ -109,7 +110,7 @@ function activeExpenses(month: string) {
 }
 
 function mergeRents(db: RentRow[], month: string): RentRow[] {
-  return activeRenters(month).map(r => db.find(d => d.renter === r.id) ?? { renter: r.id, amount: 0, paid: false })
+  return activeRenters(month).map(r => db.find(d => d.renter === r.id) ?? { renter: r.id, amount: r.defaultAmount ?? 0, paid: false, method: 'cash' as const })
 }
 function mergeExpenses(db: ExpenseRow[], month: string): ExpenseRow[] {
   const sats = saturdaysInMonth(month)
@@ -118,17 +119,17 @@ function mergeExpenses(db: ExpenseRow[], month: string): ExpenseRow[] {
     if (def.id === 'martha') {
       for (const sat of sats) {
         const cat = `martha_${sat.num}`
-        rows.push(db.find(d => d.category === cat) ?? { category: cat, amount: 0, paid: false })
+        rows.push(db.find(d => d.category === cat) ?? { category: cat, amount: def.defaultAmount ?? 0, paid: false, method: 'cash' as const })
       }
     } else {
-      rows.push(db.find(d => d.category === def.id) ?? { category: def.id, amount: 0, paid: false })
+      rows.push(db.find(d => d.category === def.id) ?? { category: def.id, amount: def.defaultAmount ?? 0, paid: false, method: 'cash' as const })
     }
   }
   return rows
 }
 function mergeNomina(db: NominaRow[], month: string): NominaRow[] {
   const sats = saturdaysInMonth(month)
-  return sats.map(s => db.find(n => n.week_num === s.num) ?? { week_num: s.num, amount: 0, paid: false })
+  return sats.map(s => db.find(n => n.week_num === s.num) ?? { week_num: s.num, amount: 6_000, paid: false, method: 'cash' as const })
 }
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -170,22 +171,32 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
 function AmountInput({
   value, onSave, className = '',
 }: { value: number; onSave: (n: number) => void; className?: string }) {
-  const [v, setV] = useState(String(value))
-  useEffect(() => { setV(String(value)) }, [value])
+  const [v, setV]       = useState(String(value))
+  const [focused, setFocused] = useState(false)
+  useEffect(() => { if (!focused) setV(String(value)) }, [value, focused])
   function save() {
     const n = parseFloat(v)
     if (!isNaN(n) && n >= 0 && n !== value) onSave(n)
     else setV(String(value))
+    setFocused(false)
   }
-  return (
+  return focused ? (
     <input
       type="number"
       value={v}
+      autoFocus
       onChange={e => setV(e.target.value)}
       onBlur={save}
       onKeyDown={e => e.key === 'Enter' && save()}
-      className={`w-28 rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-sm tabular-nums text-ink-4 outline-none hover:border-ink-4/10 focus:border-accent/50 focus:bg-ink-2/20 ${className}`}
+      className={`w-28 rounded border border-accent/50 bg-ink-2/20 px-1 py-0.5 text-right text-sm tabular-nums text-ink-4 outline-none ${className}`}
     />
+  ) : (
+    <button
+      onClick={() => setFocused(true)}
+      className={`w-28 rounded border border-transparent px-1 py-0.5 text-right text-sm tabular-nums text-ink-4 hover:border-ink-4/10 ${className}`}
+    >
+      {mxn(value)}
+    </button>
   )
 }
 
@@ -210,28 +221,85 @@ function SectionCard({ title, note, total, colorClass = 'text-ink-3', children }
   )
 }
 
+// ─── MethodToggle ─────────────────────────────────────────────────────────────
+
+function MethodToggle({ method, onChange }: { method: 'cash' | 'card'; onChange: (m: 'cash' | 'card') => void }) {
+  return (
+    <button
+      onClick={() => onChange(method === 'cash' ? 'card' : 'cash')}
+      className="text-base leading-none opacity-60 hover:opacity-100 transition-opacity"
+      title={method === 'cash' ? 'Efectivo — click para cambiar a tarjeta' : 'Tarjeta — click para cambiar a efectivo'}
+    >
+      {method === 'cash' ? '💵' : '💳'}
+    </button>
+  )
+}
+
+// ─── PaidCountInput ───────────────────────────────────────────────────────────
+
+function PaidCountInput({ paid, total, onSave }: { paid: number; total: number; onSave: (paid: number, total: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [p, setP] = useState(String(paid))
+  const [t, setT] = useState(String(total))
+
+  useEffect(() => { if (!editing) { setP(String(paid)); setT(String(total)) } }, [paid, total, editing])
+
+  function save() {
+    const np = parseInt(p), nt = parseInt(t)
+    if (!isNaN(np) && !isNaN(nt) && np >= 0 && nt > 0) onSave(np, nt)
+    else { setP(String(paid)); setT(String(total)) }
+    setEditing(false)
+  }
+
+  if (editing) return (
+    <div className="flex items-center gap-0.5">
+      <input type="number" value={p} autoFocus
+        onChange={e => setP(e.target.value)}
+        onBlur={save} onKeyDown={e => e.key === 'Enter' && save()}
+        className="w-7 rounded border border-accent/50 bg-ink-2/20 px-0.5 text-center text-[10px] tabular-nums text-ink-3 outline-none" />
+      <span className="text-[10px] text-ink-3/40">/</span>
+      <input type="number" value={t}
+        onChange={e => setT(e.target.value)}
+        onBlur={save} onKeyDown={e => e.key === 'Enter' && save()}
+        className="w-7 rounded border border-accent/50 bg-ink-2/20 px-0.5 text-center text-[10px] tabular-nums text-ink-3 outline-none" />
+    </div>
+  )
+
+  return (
+    <button onClick={() => setEditing(true)} className="text-[10px] text-ink-3/40 hover:text-ink-3/70 tabular-nums">
+      {paid}/{total}
+    </button>
+  )
+}
+
 // ─── RentasSection ────────────────────────────────────────────────────────────
 
-function RentasSection({ rents, month, onToggle, onAmount }: {
+function RentasSection({ rents, month, onToggle, onAmount, onMethod, paidCounts, onCount }: {
   rents: RentRow[]
   month: string
   onToggle: (renter: string, paid: boolean) => void
   onAmount: (renter: string, amount: number) => void
+  onMethod: (renter: string, method: 'cash' | 'card') => void
+  paidCounts: Record<string, { paid: number; total: number }>
+  onCount: (renter: string, paid: number, total: number) => void
 }) {
   const defs = activeRenters(month)
-  const total = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
+  const total = rents.reduce((s, r) => s + r.amount, 0)
 
   return (
     <SectionCard title="Rentas" total={total} colorClass="text-ok">
       {defs.map(def => {
-        const row = rents.find(r => r.renter === def.id) ?? { renter: def.id, amount: 0, paid: false }
+        const row = rents.find(r => r.renter === def.id) ?? { renter: def.id, amount: 0, paid: false, method: 'cash' as const }
+        const counts = paidCounts[def.id] ?? { paid: 0, total: 12 }
         return (
           <div key={def.id} className="group flex items-center gap-2 border-t border-ink-4/5 py-1.5 first:border-0">
             <PaidToggle paid={row.paid} onChange={v => onToggle(def.id, v)} />
             <span className={`flex-1 truncate text-sm ${row.paid ? 'text-ink-3/60 line-through' : 'text-ink-4'}`}>
               {def.name}
             </span>
+            <PaidCountInput paid={counts.paid} total={counts.total} onSave={(p, t) => onCount(def.id, p, t)} />
             <span className="text-[10px] text-ink-3/50">{def.location}</span>
+            <MethodToggle method={row.method} onChange={m => onMethod(def.id, m)} />
             <AmountInput value={row.amount} onSave={n => onAmount(def.id, n)} />
           </div>
         )
@@ -242,11 +310,13 @@ function RentasSection({ rents, month, onToggle, onAmount }: {
 
 // ─── ExtraSection (income or expense) ────────────────────────────────────────
 
-function ExtraSection({ title, colorClass = 'text-ink-3', items, onAdd, onDelete }: {
+function ExtraSection({ title, colorClass = 'text-ink-3', items, onAdd, onDelete, onMethod, onAmount }: {
   title: string; colorClass?: string
   items: ExtraItem[]
   onAdd: (desc: string, amount: number) => void
   onDelete: (id: string) => void
+  onMethod: (id: string, method: 'cash' | 'card') => void
+  onAmount: (id: string, amount: number) => void
 }) {
   const [desc, setDesc] = useState('')
   const [amt, setAmt] = useState('')
@@ -265,10 +335,11 @@ function ExtraSection({ title, colorClass = 'text-ink-3', items, onAdd, onDelete
       {items.map(item => (
         <div key={item.id} className="group flex items-center gap-2 border-t border-ink-4/5 py-1.5 first:border-0">
           <span className="flex-1 truncate text-sm text-ink-4">{item.description}</span>
-          <span className="text-sm tabular-nums text-ink-4">{mxn(item.amount)}</span>
+          <MethodToggle method={item.method} onChange={m => onMethod(item.id, m)} />
+          <AmountInput value={item.amount} onSave={n => onAmount(item.id, n)} />
           <button
             onClick={() => onDelete(item.id)}
-            className="hidden text-base leading-none text-ink-3/40 hover:text-danger group-hover:block"
+            className="text-base leading-none text-ink-3/40 opacity-0 hover:text-danger group-hover:opacity-100"
           >×</button>
         </div>
       ))}
@@ -307,11 +378,12 @@ function ExtraSection({ title, colorClass = 'text-ink-3', items, onAdd, onDelete
 
 // ─── GastosFijosSection ───────────────────────────────────────────────────────
 
-function GastosFijosSection({ expenses, month, onToggle, onAmount }: {
+function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod }: {
   expenses: ExpenseRow[]
   month: string
   onToggle: (category: string, paid: boolean) => void
   onAmount: (category: string, amount: number) => void
+  onMethod: (category: string, method: 'cash' | 'card') => void
 }) {
   const sats = saturdaysInMonth(month)
   const total = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
@@ -336,6 +408,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount }: {
               {name}
             </span>
             {note && <span className="text-[9px] text-ink-3/50">{note}</span>}
+            <MethodToggle method={row.method} onChange={m => onMethod(row.category, m)} />
             <AmountInput value={row.amount} onSave={n => onAmount(row.category, n)} />
           </div>
         )
@@ -346,11 +419,12 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount }: {
 
 // ─── NominaSection ────────────────────────────────────────────────────────────
 
-function NominaSection({ nomina, month, onToggle, onAmount }: {
+function NominaSection({ nomina, month, onToggle, onAmount, onMethod }: {
   nomina: NominaRow[]
   month: string
   onToggle: (week: number, paid: boolean) => void
   onAmount: (week: number, amount: number) => void
+  onMethod: (week: number, method: 'cash' | 'card') => void
 }) {
   const sats = saturdaysInMonth(month)
   const total = nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
@@ -366,6 +440,7 @@ function NominaSection({ nomina, month, onToggle, onAmount }: {
               Semana {row.week_num}
             </span>
             {label && <span className="text-[9px] text-ink-3/50">{label}</span>}
+            <MethodToggle method={row.method} onChange={m => onMethod(row.week_num, m)} />
             <AmountInput value={row.amount} onSave={n => onAmount(row.week_num, n)} />
           </div>
         )
@@ -539,37 +614,30 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
   const faltan = Math.max(0, FONDO_META - fondoTotal)
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <div className="mb-4 flex items-start justify-between">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="mb-2 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Fondo Mantenimiento</p>
-          <p className="mt-0.5 text-xs text-ink-3">Meta: {mxn(FONDO_META)}</p>
+          <p className="text-[10px] text-ink-3">Meta: {mxn(FONDO_META)}</p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-black text-ok">{mxn(fondoTotal)}</p>
-          <p className="text-[10px] text-ink-3">acumulado</p>
+          <p className="text-lg font-black text-ok">{mxn(fondoTotal)}</p>
+          <p className="text-[10px] text-ink-3">{pct.toFixed(1)}% · Faltan {mxn(faltan)}</p>
         </div>
       </div>
 
-      <div className="mb-1 h-3 overflow-hidden rounded-full bg-ink-2/30">
-        <div
-          className="h-full rounded-full bg-ok transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="mb-4 flex justify-between text-[10px] text-ink-3">
-        <span>{pct.toFixed(1)}%</span>
-        <span>Faltan {mxn(faltan)}</span>
+      <div className="mb-2 h-2 overflow-hidden rounded-full bg-ink-2/30">
+        <div className="h-full rounded-full bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
 
       {currentMonthFondo && (
-        <div className={`rounded-lg px-3 py-2 text-xs ${currentMonthFondo.paid ? 'bg-ok/10 text-ok' : 'bg-ink-2/20 text-ink-3'}`}>
+        <p className={`text-[11px] ${currentMonthFondo.paid ? 'text-ok' : 'text-ink-3'}`}>
           {currentMonthFondo.paid
             ? `✓ Aportación este mes: ${mxn(currentMonthFondo.amount)}`
             : currentMonthFondo.amount > 0
               ? `Pendiente: ${mxn(currentMonthFondo.amount)}`
               : 'Sin aportación configurada este mes'}
-        </div>
+        </p>
       )}
     </div>
   )
@@ -847,6 +915,7 @@ export default function UptownPage() {
   const [extraExpenses, setExtraExp]  = useState<ExtraItem[]>([])
   const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
   const [fondoTotal, setFondoTotal]   = useState(0)
+  const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
   const [pageTab, setPageTab]         = useState<'finanzas' | 'valet'>('finanzas')
@@ -861,8 +930,16 @@ export default function UptownPage() {
       setNomina(mergeNomina(data.nomina, m))
       setExtraIncome(data.extra_income)
       setExtraExp(data.extra_expenses)
-      setBalance(data.balance)
       setFondoTotal(data.fondo_total)
+      setPaidCounts(data.paid_counts ?? {})
+      // Auto-fill starting balance from previous month when no balance record exists yet
+      if (!data.has_balance && m >= '2026-07' && data.prev_saldo != null && data.prev_saldo > 0) {
+        const autoBalance = { starting_balance: data.prev_saldo, cuenta_bancaria: 0, efectivo: 0 }
+        setBalance(autoBalance)
+        post('/api/uptown/balance', { month: m, ...autoBalance }).catch(() => {})
+      } else {
+        setBalance(data.balance)
+      }
     } catch (e) { setError(String(e)) }
     finally { setLoading(false) }
   }, [])
@@ -882,6 +959,17 @@ export default function UptownPage() {
     setRents(prev => prev.map(r => r.renter === renter ? { ...r, amount } : r))
     const row = rents.find(r => r.renter === renter)
     await post('/api/uptown/rent', { month, renter, amount, paid: row?.paid ?? false })
+  }
+
+  async function setRentMethod(renter: string, method: 'cash' | 'card') {
+    setRents(prev => prev.map(r => r.renter === renter ? { ...r, method } : r))
+    const row = rents.find(r => r.renter === renter)
+    await post('/api/uptown/rent', { month, renter, method, amount: row?.amount ?? 0, paid: row?.paid ?? false })
+  }
+
+  async function setRenterCount(renter: string, paid: number, total: number) {
+    setPaidCounts(prev => ({ ...prev, [renter]: { paid, total } }))
+    await post('/api/uptown/renter-counts', { renter, paid_count: paid, total_months: total })
   }
 
   // ── Expense handlers ──────────────────────────────────────────────────────
@@ -905,6 +993,12 @@ export default function UptownPage() {
       const data = await (await fetch(`/api/uptown?month=${month}`)).json()
       if (!data.error) setFondoTotal(data.fondo_total)
     }
+  }
+
+  async function setExpenseMethod(category: string, method: 'cash' | 'card') {
+    setExpenses(prev => prev.map(e => e.category === category ? { ...e, method } : e))
+    const row = expenses.find(e => e.category === category)
+    await post('/api/uptown/expense', { month, category, method, amount: row?.amount ?? 0, paid: row?.paid ?? false })
   }
 
   // ── Nomina handlers ───────────────────────────────────────────────────────
@@ -943,6 +1037,32 @@ export default function UptownPage() {
   async function deleteExtraExpense(id: string) {
     setExtraExp(prev => prev.filter(i => i.id !== id))
     await del(`/api/uptown/extra-expenses/${id}`)
+  }
+
+  async function setNominaMethod(week_num: number, method: 'cash' | 'card') {
+    setNomina(prev => prev.map(n => n.week_num === week_num ? { ...n, method } : n))
+    const row = nomina.find(n => n.week_num === week_num)
+    await post('/api/uptown/nomina', { month, week_num, method, amount: row?.amount ?? 0, paid: row?.paid ?? false })
+  }
+
+  async function setExtraIncomeMethod(id: string, method: 'cash' | 'card') {
+    setExtraIncome(prev => prev.map(i => i.id === id ? { ...i, method } : i))
+    await fetch(`/api/uptown/extra-income/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method }) })
+  }
+
+  async function setExtraIncomeAmount(id: string, amount: number) {
+    setExtraIncome(prev => prev.map(i => i.id === id ? { ...i, amount } : i))
+    await fetch(`/api/uptown/extra-income/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) })
+  }
+
+  async function setExtraExpMethod(id: string, method: 'cash' | 'card') {
+    setExtraExp(prev => prev.map(i => i.id === id ? { ...i, method } : i))
+    await fetch(`/api/uptown/extra-expenses/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method }) })
+  }
+
+  async function setExtraExpAmount(id: string, amount: number) {
+    setExtraExp(prev => prev.map(i => i.id === id ? { ...i, amount } : i))
+    await fetch(`/api/uptown/extra-expenses/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) })
   }
 
   // ── Balance handler ───────────────────────────────────────────────────────
@@ -1013,16 +1133,13 @@ export default function UptownPage() {
               extraIncome={extraIncome} extraExpenses={extraExpenses}
             />
 
-            {/* Balance + Fondo */}
-            <div className="grid gap-5 lg:grid-cols-2">
-              <BalanceCard
-                bal={balance} month={month}
-                rents={rents} expenses={expenses} nomina={nomina}
-                extraIncome={extraIncome} extraExpenses={extraExpenses}
-                onSave={saveBalance}
-              />
-              <FondoCard fondoTotal={fondoTotal} currentMonthFondo={currentFondo} />
-            </div>
+            {/* Balance */}
+            <BalanceCard
+              bal={balance} month={month}
+              rents={rents} expenses={expenses} nomina={nomina}
+              extraIncome={extraIncome} extraExpenses={extraExpenses}
+              onSave={saveBalance}
+            />
 
             {/* Main grid: income | expenses */}
             <div className="grid gap-5 lg:grid-cols-2">
@@ -1031,14 +1148,18 @@ export default function UptownPage() {
                 <p className="text-[10px] font-black uppercase tracking-widest text-ok">↑ Ingresos</p>
                 <RentasSection
                   rents={rents} month={month}
-                  onToggle={toggleRent} onAmount={setRentAmount}
+                  onToggle={toggleRent} onAmount={setRentAmount} onMethod={setRentMethod}
+                  paidCounts={paidCounts} onCount={setRenterCount}
                 />
                 <ExtraSection
                   title="Extra Ingresos" colorClass="text-ok"
                   items={extraIncome}
                   onAdd={addExtraIncome}
                   onDelete={deleteExtraIncome}
+                  onMethod={setExtraIncomeMethod}
+                  onAmount={setExtraIncomeAmount}
                 />
+                <FondoCard fondoTotal={fondoTotal} currentMonthFondo={currentFondo} />
               </div>
 
               {/* ── Egresos ── */}
@@ -1046,17 +1167,19 @@ export default function UptownPage() {
                 <p className="text-[10px] font-black uppercase tracking-widest text-danger">↓ Egresos</p>
                 <GastosFijosSection
                   expenses={expenses} month={month}
-                  onToggle={toggleExpense} onAmount={setExpenseAmount}
+                  onToggle={toggleExpense} onAmount={setExpenseAmount} onMethod={setExpenseMethod}
                 />
                 <NominaSection
                   nomina={nomina} month={month}
-                  onToggle={toggleNomina} onAmount={setNominaAmount}
+                  onToggle={toggleNomina} onAmount={setNominaAmount} onMethod={setNominaMethod}
                 />
                 <ExtraSection
                   title="Gastos Extra" colorClass="text-danger"
                   items={extraExpenses}
                   onAdd={addExtraExpense}
                   onDelete={deleteExtraExpense}
+                  onMethod={setExtraExpMethod}
+                  onAmount={setExtraExpAmount}
                 />
               </div>
             </div>

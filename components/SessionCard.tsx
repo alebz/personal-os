@@ -121,7 +121,7 @@ export default function SessionCard() {
     <section className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       {/* Card header */}
       <div className="mb-5 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-4">Daily Briefing</h2>
+        <h2 className="text-sm font-semibold tracking-wide text-ink-4">⚡ Daily Briefing</h2>
         <Link
           href="/crm"
           className="text-xs text-ink-3 transition-colors hover:text-accent"

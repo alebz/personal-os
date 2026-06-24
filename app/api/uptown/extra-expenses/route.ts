@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('uptown_extra_expenses')
-    .insert({ month, description, amount })
-    .select('id,description,amount')
+    .insert({ month, description, amount, method: 'cash' })
+    .select('id,description,amount,method')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -3,8 +3,11 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const runtime = 'nodejs'
 
-const SYSTEM_PROMPT =
-  'Eres el supraconsciente de Alex. Cada día generas un mensaje corto y poético para él — como una lectura del tarot o un susurro del universo. El mensaje debe sentirse personal, místico y sabio. Máximo 3 oraciones. Solo el mensaje, sin títulos ni explicaciones.'
+const SYSTEM_PROMPT = `Eres un oráculo astrológico para Leo. Alex es Leo (sol en Leo, signo fijo de fuego, regido por el Sol).
+
+Genera una lectura diaria específica para la energía de Leo hoy — su fuego, su voluntad, su sombra o su luz. Habla directo, como un oráculo antiguo. Sin mencionar planetas ni tránsitos.
+
+Formato obligatorio: máximo 2 oraciones muy cortas. Sin títulos, sin saludos, sin explicaciones. Solo la lectura. En español.`
 
 export async function POST() {
   const client = new Anthropic()
@@ -13,13 +16,14 @@ export async function POST() {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    year: 'numeric',
   })
 
   const response = await client.messages.create({
     model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
-    max_tokens: 256,
+    max_tokens: 120,
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Hoy es ${today}.` }],
+    messages: [{ role: 'user', content: `Hoy es ${today}. Dame la lectura de Leo para hoy.` }],
   })
 
   const block = response.content.find((b) => b.type === 'text')
