@@ -3,7 +3,6 @@ import HabitTracker from '@/components/HabitTracker'
 import GoalsCard from '@/components/GoalsCard'
 import SessionCard from '@/components/SessionCard'
 import CumpleanosCard from '@/components/CumpleanosCard'
-import NutritionCard from '@/components/NutritionCard'
 import CalendarCard from '@/components/CalendarCard'
 import DailyQuoteCard from '@/components/DailyQuoteCard'
 import QuickCaptureCard from '@/components/QuickCaptureCard'
@@ -32,7 +31,6 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-5 lg:col-span-3">
             <CalendarCard />
             <CumpleanosCard />
-            <NutritionCard />
           </div>
 
         </div>
