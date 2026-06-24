@@ -29,11 +29,11 @@ function mulberry32(seed: number) {
 
 export function StarsBackground() {
   // x/y/angle now random per event — no fixed positions
-  const [starEvent,  setStarEvent]  = useState<{ x: number; y: number; angle: number; key: number } | null>(null)
+  const [starEvent,  setStarEvent]  = useState<{ x: number; y: number; angle: number; key: string } | null>(null)
   // y1 = starting %, dy = vertical delta in vh (gives diagonal path)
-  const [planeEvent, setPlaneEvent] = useState<{ y1: number; dy: number; rtl: boolean; key: number } | null>(null)
+  const [planeEvent, setPlaneEvent] = useState<{ y1: number; dy: number; rtl: boolean; key: string } | null>(null)
   // rtl = true → right-to-left crossing
-  const [satEvent,   setSatEvent]   = useState<{ y: number; rtl: boolean; key: number } | null>(null)
+  const [satEvent,   setSatEvent]   = useState<{ y: number; rtl: boolean; key: string } | null>(null)
 useEffect(() => {
     let starFireTimer:   ReturnType<typeof setTimeout>
     let starClearTimer:  ReturnType<typeof setTimeout>
@@ -47,7 +47,7 @@ useEffect(() => {
         x:     10 + Math.random() * 70,  // anywhere 10–80 % horizontally
         y:     10 + Math.random() * 70,  // anywhere 10–80 % vertically
         angle: 18 + Math.random() * 44,  // 18–62 ° diagonal
-        key:   Date.now(),
+        key:   `star-${Date.now()}-${Math.random()}`,
       })
       starClearTimer = setTimeout(() => setStarEvent(null), 1400)
       starFireTimer  = setTimeout(fireStar, 5 * 60 * 1000)
@@ -59,7 +59,7 @@ useEffect(() => {
       const rawDy = (Math.random() - 0.5) * 80
       // clamp so endpoint stays on screen (−5 to 105 %)
       const y2    = Math.max(-5, Math.min(105, y1 + rawDy))
-      setPlaneEvent({ y1, dy: y2 - y1, rtl: Math.random() < 0.5, key: Date.now() })
+      setPlaneEvent({ y1, dy: y2 - y1, rtl: Math.random() < 0.5, key: `plane-${Date.now()}-${Math.random()}` })
       planeClearTimer = setTimeout(() => setPlaneEvent(null), 63_000)
       planeFireTimer  = setTimeout(firePlane, 5 * 60 * 1000)
     }
@@ -68,7 +68,7 @@ useEffect(() => {
       setSatEvent({
         y:   15 + Math.random() * 55,
         rtl: Math.random() < 0.5,
-        key: Date.now(),
+        key: `sat-${Date.now()}-${Math.random()}`,
       })
       satClearTimer = setTimeout(() => setSatEvent(null), 93_000)
       satFireTimer  = setTimeout(fireSat, 8 * 60 * 1000)
