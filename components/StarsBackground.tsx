@@ -2,7 +2,17 @@
 
 import { useMemo } from 'react'
 
-const STAR_COUNT = 100
+const STAR_COUNT = 300
+
+const STAR_COLORS = [
+  '#ddeeff', // cool blue-white (majority)
+  '#ddeeff',
+  '#ddeeff',
+  '#fff8dd', // warm gold
+  '#ffeedd', // amber
+  '#eeddff', // soft violet
+  '#ddfff4', // mint
+]
 
 function mulberry32(seed: number) {
   let s = seed
@@ -17,14 +27,19 @@ function mulberry32(seed: number) {
 export function StarsBackground() {
   const stars = useMemo(() => {
     const rand = mulberry32(0x5EED42)
-    return Array.from({ length: STAR_COUNT }, () => ({
-      x: rand() * 100,
-      y: rand() * 100,
-      size: rand() < 0.78 ? 1 : 2,
-      maxOpacity: 0.1 + rand() * 0.22,
-      duration: 1.8 + rand() * 4.5,
-      delay: rand() * 9,
-    }))
+    return Array.from({ length: STAR_COUNT }, () => {
+      const r = rand()
+      const size = r < 0.55 ? 1 : r < 0.85 ? 2 : 3
+      return {
+        x: rand() * 100,
+        y: rand() * 100,
+        size,
+        color: STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)],
+        maxOpacity: 0.35 + rand() * 0.55,
+        duration: 1.5 + rand() * 4.5,
+        delay: rand() * 10,
+      }
+    })
   }, [])
 
   return (
@@ -37,7 +52,7 @@ export function StarsBackground() {
           <div style={{
             width: `${s.size}px`,
             height: `${s.size}px`,
-            background: '#ddeeff',
+            background: s.color,
             animation: `star-blink ${s.duration}s ${s.delay}s infinite ease-in-out`,
           }} />
         </div>
