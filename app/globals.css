@@ -7,8 +7,8 @@
  */
 @theme {
   /* Neutral / ink ramp */
-  --color-ink-0: oklch(0.165 0.006 275);
-  --color-ink-1: oklch(0.225 0.008 275);
+  --color-ink-0: oklch(0.09 0.006 275);
+  --color-ink-1: oklch(0.155 0.008 275);
   --color-ink-2: oklch(0.32 0.01 275);
   --color-ink-3: oklch(0.62 0.012 275);
   --color-ink-4: oklch(0.955 0.004 275);
