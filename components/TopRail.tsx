@@ -19,7 +19,7 @@ export default function TopRail() {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-20 border-b border-ink-4/10 bg-ink-0/60 backdrop-blur-xl">
+    <header className="sticky top-0 z-20 border-b border-ink-4/10 bg-ink-0/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-6">
         <Link href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -30,7 +30,7 @@ export default function TopRail() {
           />
         </Link>
 
-        <nav className="hidden items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/40 p-1 backdrop-blur-xl md:flex">
+        <nav className="hidden items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/60 p-1 backdrop-blur-xl md:flex">
           {TABS.map(({ label, href }) => {
             const active = pathname === href
             return (

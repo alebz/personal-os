@@ -354,7 +354,7 @@ function SaldoCard({ label, saldo, inicio, onSetInicio }: {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
       <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-3">{label}</p>
       <p className={['text-3xl font-black tabular-nums', saldo >= 0 ? 'text-ok' : 'text-danger'].join(' ')}>{fmt(saldo)}</p>
       <div className="mt-2 flex items-center gap-1.5 text-[10px] text-ink-2">

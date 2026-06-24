@@ -400,7 +400,7 @@ function PanelVacPanel({
   const totalThisMonth = vacMvsThisMonth.reduce((s, m) => s + Number(m.amount), 0)
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-ink-4/5 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">Sobrecito Vacaciones</p>
         <span className="text-xs font-medium text-accent">{mxn(totalThisMonth)} este mes</span>
@@ -612,7 +612,7 @@ function PanelTab({
     label: string; value: number; cls: string; sub?: string
   }) {
     return (
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
         <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
         <p className={`mt-1 text-xl font-black tabular-nums ${cls}`}>{mxn(value)}</p>
         {sub && <p className="mt-0.5 text-[10px] text-ink-3">{sub}</p>}
@@ -644,7 +644,7 @@ function PanelTab({
         {/* ── LEFT: Ingresos ── */}
         <div className="space-y-4">
           {/* Ingresos previstos */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
             <SectionHeader title="Ingresos Previstos" total={totalInPrevistos} cls="text-ok" />
             {activeIncome.length === 0 ? (
               <p className="px-4 py-6 text-center text-xs italic text-ink-3">Sin ingresos previstos — configúralos en Config</p>
@@ -665,7 +665,7 @@ function PanelTab({
           </div>
 
           {/* Freelance / Extras */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
             <SectionHeader
               title="Freelance / Extras"
               total={freelanceMvs.reduce((s, m) => s + Number(m.amount), 0)}
@@ -689,7 +689,7 @@ function PanelTab({
         {/* ── RIGHT: Gastos ── */}
         <div className="space-y-4">
           {/* Gastos previstos */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
             <SectionHeader title="Gastos Previstos" total={totalGastoPrevistos} cls="text-danger" />
             {activeCosts.length === 0 ? (
               <p className="px-4 py-6 text-center text-xs italic text-ink-3">Sin compromisos activos</p>
@@ -706,7 +706,7 @@ function PanelTab({
           </div>
 
           {/* Gastos Extra */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
             <SectionHeader
               title="Gastos Extra"
               total={gxMvs.reduce((s, m) => s + Number(m.amount), 0)}
@@ -776,7 +776,7 @@ function HistorialTab({
         ].map(({ label, value, cls }) => (
           <div
             key={label}
-            className="rounded-xl border border-ink-4/10 bg-ink-1/40 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl"
+            className="rounded-xl border border-ink-4/10 bg-ink-1/60 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl"
           >
             <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
             <p className={`mt-1 text-base font-bold tabular-nums ${cls}`}>{mxn(value)}</p>
@@ -784,7 +784,7 @@ function HistorialTab({
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5">
+      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5">
         {sorted.length === 0 ? (
           <p className="p-10 text-center text-sm italic text-ink-3">Sin movimientos este mes</p>
         ) : (
@@ -853,7 +853,7 @@ function EnvelopeCard({
   const sorted = [...contributions].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h3 className="text-lg font-bold text-ink-4">{env.label}</h3>
@@ -1079,7 +1079,7 @@ function CompromisoTab({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
         <div className="grid grid-cols-3 divide-x divide-ink-4/10 text-center">
           {[
             { label: 'Total mensual', value: mxn(totalMensual), cls: 'text-danger' },
@@ -1094,7 +1094,7 @@ function CompromisoTab({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5">
+      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5">
         {commitments.length === 0 ? (
           <p className="p-10 text-center text-sm italic text-ink-3">Sin compromisos</p>
         ) : (
@@ -1110,21 +1110,21 @@ function CompromisoTab({
         <input
           value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
           placeholder="Netflix, Spotify, renta…"
-          className="min-w-0 flex-1 rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
+          className="min-w-0 flex-1 rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
         />
         <input
           type="number" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
           placeholder="Total $"
-          className="w-24 rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
+          className="w-24 rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
         />
         <input
           type="number" value={meses} onChange={e => setMeses(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
           placeholder="Meses"
-          className="w-20 rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
+          className="w-20 rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
         />
         <select
           value={metodo} onChange={e => setMetodo(e.target.value)}
-          className="rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2 text-sm text-ink-4 outline-none backdrop-blur-xl"
+          className="rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2 text-sm text-ink-4 outline-none backdrop-blur-xl"
         >
           <option value="efectivo">Ef</option>
           <option value="spei">SP</option>
@@ -1185,7 +1185,7 @@ function CuadrarTab({
 
   return (
     <div className="max-w-sm">
-      <div className="space-y-4 rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="space-y-4 rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
         {fields.map(({ label, value, set }) => (
           <div key={label}>
             <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-3">
@@ -1304,7 +1304,7 @@ function ConfigTab({
   return (
     <div className="max-w-lg space-y-4">
       {/* Income items */}
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
         <div className="border-b border-ink-4/5 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">Ingresos Recurrentes</p>
           <p className="mt-0.5 text-[10px] text-ink-3">Los activos aparecen en el Panel cada mes</p>
@@ -1351,7 +1351,7 @@ function ConfigTab({
       </div>
 
       {/* Info */}
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-4 shadow-xl shadow-black/20 backdrop-blur-xl space-y-2">
+      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-4 shadow-xl shadow-black/20 backdrop-blur-xl space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Tablas Supabase</p>
         <div className="space-y-1 text-xs text-ink-3">
           <p>• Gastos recurrentes → <code className="rounded bg-ink-2/30 px-1">finance_commitments</code> (Compromisos)</p>
@@ -1703,7 +1703,7 @@ export default function FinancePage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setMonth(m => shiftMonth(m, -1))}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/40 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/60 text-ink-3 backdrop-blur-xl hover:text-ink-4"
               >
                 ‹
               </button>
@@ -1712,7 +1712,7 @@ export default function FinancePage() {
               </span>
               <button
                 onClick={() => setMonth(m => shiftMonth(m, 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/40 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/60 text-ink-3 backdrop-blur-xl hover:text-ink-4"
               >
                 ›
               </button>
@@ -1721,7 +1721,7 @@ export default function FinancePage() {
         </div>
 
         {/* Tab bar */}
-        <div className="mb-6 flex w-fit gap-1 rounded-xl border border-ink-4/10 bg-ink-1/40 p-1 backdrop-blur-xl">
+        <div className="mb-6 flex w-fit gap-1 rounded-xl border border-ink-4/10 bg-ink-1/60 p-1 backdrop-blur-xl">
           {TABS.map(t => (
             <button
               key={t}

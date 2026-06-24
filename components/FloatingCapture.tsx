@@ -143,7 +143,7 @@ export default function FloatingCapture() {
               onKeyDown={onKeyDown}
               rows={4}
               placeholder="Escribe una tarea, nota, idea, contacto…"
-              className="w-full resize-none rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+              className="w-full resize-none rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
             />
 
             <div className="mt-3 flex items-center justify-between">

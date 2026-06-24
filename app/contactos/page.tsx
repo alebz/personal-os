@@ -281,7 +281,7 @@ function CategoryManagerModal({
               onChange={e => { setNewName(e.target.value); setAddError(null) }}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
               placeholder="Nueva categoría…"
-              className="flex-1 rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+              className="flex-1 rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
             />
             <button
               onClick={handleAdd}
@@ -391,7 +391,7 @@ function ContactDrawer({
   const isOpen = !!drawer
   const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-ink-3'
   const inputCls =
-    'w-full rounded-xl border border-ink-4/10 bg-ink-1/40 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 backdrop-blur-xl'
+    'w-full rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 backdrop-blur-xl'
 
   // Always include the contact's current category as an option even if it was deleted from the list
   const selectOptions = categoryNames.includes(form.category)
@@ -663,7 +663,7 @@ export default function ContactosPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nombre o empresa…"
-            className="w-full rounded-xl border border-ink-4/10 bg-ink-1/40 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+            className="w-full rounded-xl border border-ink-4/10 bg-ink-1/60 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             {/* Category pills + manage button */}
@@ -736,7 +736,7 @@ export default function ContactosPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/40 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/60 shadow-xl shadow-black/20 backdrop-blur-xl">
             {sort === 'tipo'
               ? groupByType(filtered, catNames).map(({ cat, items }) => (
                   <div key={cat}>

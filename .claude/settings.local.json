@@ -46,7 +46,8 @@
       "Bash(python3 *)",
       "Bash(echo \"Server PID: $!\")",
       "Bash(pip3 install *)",
-      "Bash(kill 65527)"
+      "Bash(kill 65527)",
+      "Bash(xargs sed -i '' 's/bg-ink-1\\\\/40/bg-ink-1\\\\/60/g; s/bg-ink-0\\\\/60/bg-ink-0\\\\/80/g')"
     ]
   }
 }

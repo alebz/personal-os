@@ -102,7 +102,7 @@ export default function CalendarCard() {
     : []
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
       {/* Month nav header */}
       <div className="mb-4 flex items-center justify-between">
         <button

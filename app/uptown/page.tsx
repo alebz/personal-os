@@ -467,7 +467,7 @@ function ResumenCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
   const neto = totalIngresos - totalEgresos
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
       <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen del Mes</p>
       <div className="grid grid-cols-3 divide-x divide-ink-4/10 text-center">
         {[
@@ -541,7 +541,7 @@ function BalanceCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses,
   }
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl space-y-3">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-5 shadow-xl shadow-black/20 backdrop-blur-xl space-y-3">
       <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Balance</p>
 
       {/* Starting balance */}
@@ -614,7 +614,7 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
   const faltan = Math.max(0, FONDO_META - fondoTotal)
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl">
       <div className="mb-2 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Fondo Mantenimiento</p>
@@ -780,7 +780,7 @@ function ValetTab({ month }: { month: string }) {
   return (
     <div className="space-y-4">
       {/* Resumen */}
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/60 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
         <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen Valet</p>
         <div className="space-y-3">
           <div>
@@ -1089,20 +1089,20 @@ export default function UptownPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMonth(m => shiftMonth(m, -1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/40 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/60 text-ink-3 backdrop-blur-xl hover:text-ink-4"
             >‹</button>
             <span className="min-w-[148px] text-center text-sm font-semibold capitalize text-ink-4">
               {monthLabel(month)}
             </span>
             <button
               onClick={() => setMonth(m => shiftMonth(m, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/40 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/60 text-ink-3 backdrop-blur-xl hover:text-ink-4"
             >›</button>
           </div>
         </div>
 
         {/* Tab bar */}
-        <div className="mb-5 flex w-fit gap-1 rounded-xl border border-ink-4/10 bg-ink-1/40 p-1 backdrop-blur-xl">
+        <div className="mb-5 flex w-fit gap-1 rounded-xl border border-ink-4/10 bg-ink-1/60 p-1 backdrop-blur-xl">
           {(['finanzas', 'valet'] as const).map(t => (
             <button key={t} onClick={() => setPageTab(t)}
               className={['rounded-lg px-4 py-1.5 text-sm transition-colors',
