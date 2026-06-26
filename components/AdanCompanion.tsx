@@ -215,11 +215,11 @@ const TALK_FRAMES = [
 ]
 const ALL_SPRITES = [
   // Base states
-  '/adan/adan_idle.png', '/adan/adan_blinking.png', '/adan/adan_happy.png',
+  '/adan/adan_idle_1.png', '/adan/adan_blinking.png', '/adan/adan_happy.png',
   // Talk & think
-  ...TALK_FRAMES, '/adan/adan_thinking.png',
+  ...TALK_FRAMES, '/adan/adan_idle_2.png',
   // Pose showcase
-  '/adan/adan_pose_1.png', '/adan/adan_pose_2.png', '/adan/adan_pose_3.png',
+  '/adan/adan_idle_3.png', '/adan/adan_pose_2.png', '/adan/adan_pose_3.png',
   '/adan/adan_pose_4.png', '/adan/adan_pose_5.png', '/adan/adan_pose_6.png',
   '/adan/adan_pose_7.png', '/adan/adan_pose_8.png',
   // Reactions
@@ -299,7 +299,7 @@ export default function AdanCompanion() {
   const typingRef        = useRef(false)
   const activeRef        = useRef(false)
   const poseRef          = useRef('idle')
-  const idleBaseRef      = useRef('/adan/adan_idle.png')
+  const idleBaseRef      = useRef('/adan/adan_idle_1.png')
   const talkFrameTimer   = useRef<ReturnType<typeof setInterval>|null>(null)
   const talkFrame        = useRef(0)
   const poseClickIdx     = useRef(0)
@@ -330,7 +330,7 @@ export default function AdanCompanion() {
   useEffect(()=>{
     const el = imgRef.current; if(!el) return
     if(pose !== 'talking'){
-      if(pose !== 'idle') idleBaseRef.current = '/adan/adan_idle.png'
+      if(pose !== 'idle') idleBaseRef.current = '/adan/adan_idle_1.png'
       const src = pose === 'idle' ? idleBaseRef.current : spriteSrc(pose)
       if(!el.src.endsWith(src.replace('/adan/','/'))) el.src = src
     }
@@ -749,12 +749,12 @@ export default function AdanCompanion() {
 
     // Idle expression cycle — weighted pool, variable 10-28s timing
     const IDLE_VARIANTS = [
-      '/adan/adan_idle.png',     // base — most common
-      '/adan/adan_idle.png',
-      '/adan/adan_idle.png',
+      '/adan/adan_idle_1.png',    // base — most common
+      '/adan/adan_idle_1.png',
+      '/adan/adan_idle_1.png',
       '/adan/adan_happy.png',    // happy
       '/adan/adan_happy.png',
-      '/adan/adan_thinking.png', // pensive / lost in thought
+      '/adan/adan_idle_2.png',   // pensive / lost in thought
       '/adan/adan_praying.png',  // calm / reflective
     ]
     let lastIdleSwitch = Date.now()
@@ -1226,11 +1226,11 @@ export default function AdanCompanion() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           ref={imgRef}
-                          src="/adan/adan_idle.png"
+                          src="/adan/adan_idle_1.png"
                           alt="Adan"
                           draggable={false}
                           onClick={onFaceClick}
-                          onError={e=>{ const el=e.target as HTMLImageElement; if(!/adan_idle\.png$/.test(el.src)) el.src='/adan/adan_idle.png' }}
+                          onError={e=>{ const el=e.target as HTMLImageElement; if(!/adan_idle_1\.png$/.test(el.src)) el.src='/adan/adan_idle_1.png' }}
                           style={{width:210,height:320,objectFit:'contain',objectPosition:'bottom center',display:'block',cursor:'pointer',imageRendering:'pixelated',userSelect:'none',filter:'drop-shadow(0 7px 7px rgba(40,30,10,.22))'}}
                         />
                       </div>
