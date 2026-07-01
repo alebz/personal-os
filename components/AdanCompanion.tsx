@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const S        = 0.50
-const DEVICE_W = 420
-const DEVICE_H = 710
+const DEVICE_W = 483
+const DEVICE_H = 900
 
 const THEMES = {
   Mint:  { shellA:'#b9e7d1', shellB:'#82c9aa', shellEdge:'#d8f3e7', btn:'#74c3a2', bezel:'#363f3d', lcd:'#ccd9b2', lcdGround:'#aab98c', ink:'#414b37' },
@@ -45,28 +45,28 @@ const DISTRESS_LEVELS = [
 ]
 
 const GREETINGS = [
-  'Alex. Estaba esperándote.',
-  'De vuelta. ¿Qué toca hoy?',
-  'Llegas justo cuando te necesitaba.',
-  'Alex, el día no va a organizarse solo.',
-  'Por fin. Tenía el café puesto.',
-  'Aquí estás. Empecemos.',
-  'Buenos días, Alex. O lo que sea que sea ahora.',
-  'Alex. Ya era hora.',
+  'Pos aquí andaba. ¿Qué se te ofrece?',
+  'Ándale, llegaste. ¿En qué te ayudo?',
+  'Alex, ya era hora. Pos empecemos.',
+  'Buenas. Pos a darle, ¿qué toca?',
+  'Aigre, ya llegaste. ¿Qué necesitas?',
+  '¿Te mandó mi Tía Lupe? No importa, pásale.',
+  'Pos aquí andaba, esperándote.',
+  'Soy bruto pero no pendejo — dime qué quieres.',
 ]
 
 type Temperament = 'SERENE' | 'FOCUSED' | 'MOTIVATED' | 'CURIOUS' | 'REFLECTIVE' | 'OVERWHELMED'
 interface TemperamentState { current: Temperament; strength: number; lastChange: string }
-const TEMPERAMENT_KEY = 'adan_temperament'
+const TEMPERAMENT_KEY = 'lolo_temperament'
 const TEMPERAMENT_DEFAULT: TemperamentState = { current: 'SERENE', strength: 50, lastChange: '' }
 
 const TEMPERAMENT_TONE: Record<Temperament, string> = {
-  SERENE:      'El ambiente es sereno. Habla con calma y claridad, con la serenidad de quien sabe que todo está en orden.',
-  FOCUSED:     'El ambiente es de concentración. Sé directo y preciso — sin rodeos, cada palabra tiene peso.',
-  MOTIVATED:   'El ambiente es de impulso y momentum. Sé energético y alentador, reconoce el progreso real.',
-  CURIOUS:     'El ambiente es de curiosidad activa. Haz preguntas sutiles, abre perspectivas, conecta ideas.',
-  REFLECTIVE:  'El ambiente es contemplativo. Habla con profundidad, invita a la introspección sin forzarla.',
-  OVERWHELMED: 'El ambiente está cargado. Sé calmado y ordenador — ayuda a Alex a ver qué es prioritario sin añadir presión.',
+  SERENE:      'El ambiente está tranquilo. Habla con calma y con ese sabor rústico del Bajío que te caracteriza.',
+  FOCUSED:     'El ambiente pide enfoque. Ve directo al grano, sin rodeos — cada palabra cuenta.',
+  MOTIVATED:   'Hay ímpetu en el aire. Sé energético y alentador a tu manera, reconoce el esfuerzo real.',
+  CURIOUS:     'Hay curiosidad activa. Haz preguntas con tu estilo directo, abre perspectivas.',
+  REFLECTIVE:  'El momento es contemplativo. Habla con profundidad pero con los pies en la tierra.',
+  OVERWHELMED: 'El ambiente está pesado. Sé calmado y ordenador — ayuda a Alex a ver qué es prioritario sin añadir presión.',
 }
 
 function scoreTemperament(ctx: string): Partial<Record<Temperament, number>> {
@@ -102,45 +102,18 @@ function deriveTemperament(ctx: string, prev: TemperamentState): TemperamentStat
   return { ...prev, strength: Math.round((prev.strength * 0.7 + newStrength * 0.3)) }
 }
 
-const MENU = [
-  { key: 'wisdom',   label: 'SABIDURÍA', short: 'SAB'  },
-  { key: 'reflect',  label: 'REFLEXIÓN', short: 'REFL' },
-  { key: 'pose',     label: 'POSE',      short: 'POSE' },
-  { key: 'settings', label: 'CONFIG',    short: 'CFG'  },
-]
 const SETTINGS_KEYS = ['theme', 'color', 'btnColor', 'scanlines', 'distress', 'provider'] as const
 const PROVIDERS: [string, string][] = [['anthropic','CLAUDE'], ['openai','GPT-4o']]
 
-// POSE button cycle — fashion/style showcase
-const POSE_SEQUENCE = ['pose_1','pose_2','pose_3','pose_4','pose_5','pose_6','pose_7','pose_8','pose_nsfw','cocky_nsfw'] as const
 // All full-body poses (drives floor shadow)
-const ACTION_POSES = ['boxing','happy','pose_1','pose_2','pose_3','pose_4','pose_5','pose_6','pose_7','pose_8','proud','rainbow','praying','pose_nsfw','cocky_nsfw']
-// Face-tap reactions — expressive, not showcasing poses
-const POKE_POSES   = ['boxing','happy','proud','praying','rainbow']
-const FLOOR_SHADOW_POSES = [...ACTION_POSES]
-const POS_KEY   = 'adan-pos'
-const STATS_KEY = 'adan_stats'
-const CFG_KEY   = 'adan_cfg'
-
-// ─── Pixel icon helper ────────────────────────────────────────────────────────
-
-function pxIcon(grid: number[][], fill = '#414b37', s = 2): string {
-  const rects: string[] = []
-  grid.forEach((row, y) => row.forEach((c, x) => {
-    if (c) rects.push(`<rect x="${x*s}" y="${y*s}" width="${s}" height="${s}" fill="${fill}"/>`)
-  }))
-  return 'data:image/svg+xml,' + encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${grid[0].length*s}" height="${grid.length*s}">${rects.join('')}</svg>`
-  )
-}
-
-const MENU_ICONS_INK = [
-  pxIcon([[0,0,0,1,0,0,0],[0,0,0,1,0,0,0],[0,1,0,1,0,1,0],[1,1,1,1,1,1,1],[0,1,0,1,0,1,0],[0,0,0,1,0,0,0],[0,0,0,1,0,0,0]]),
-  pxIcon([[0,1,1,1,1,0],[1,0,0,0,0,1],[1,0,1,0,1,1],[1,0,0,0,0,1],[0,1,1,1,1,0],[0,1,1,0,0,0],[0,0,1,0,0,0]]),
-  pxIcon([[0,1,1,0,0,0],[0,1,1,0,0,0],[0,1,1,1,1,0],[1,1,1,1,1,1],[1,1,1,1,1,1],[0,1,1,1,1,0]]),
-  pxIcon([[0,1,1,0,0],[1,0,0,1,0],[0,0,0,1,0],[0,1,1,1,0],[0,1,0,0,1],[0,1,0,0,1],[0,0,1,1,0]]),
+const POS_KEY       = 'lolo-pos'
+const CFG_KEY       = 'lolo_cfg'
+const BG_KEY        = 'lolo_bg'
+const BG_IMAGES     = [
+  '/Lolo/Backgrounds/background_1.png',
+  '/Lolo/Backgrounds/background_2.png',
+  '/Lolo/Backgrounds/background_3.png',
 ]
-const MENU_ICONS_LCD = MENU_ICONS_INK.map(uri => uri.replace(/%23414b37/g, '%23ccd9b2'))
 
 // ─── Device color utilities ───────────────────────────────────────────────────
 
@@ -184,14 +157,14 @@ const STYLE = `
 @keyframes deviceSway{0%{transform:translateY(0);}50%{transform:translateY(-3px);}100%{transform:translateY(0);}}
 @keyframes plasticShimmer{0%{transform:translateX(-220px) skewX(-14deg);opacity:0}6%{opacity:.9}38%{transform:translateX(540px) skewX(-14deg);opacity:.9}46%{opacity:0}100%{transform:translateX(-220px) skewX(-14deg);opacity:0}}
 @keyframes plasticPulse{0%,100%{opacity:.05}50%{opacity:.13}}
-input::placeholder{color:var(--ink);opacity:.7;}
+input::placeholder{font-family:'VT323',monospace;font-size:20px;color:#555555;opacity:1;}
 `
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ThemeName = keyof typeof THEMES
-type Mode = 'home' | 'settings'
-interface Stats { spirit: number; strength: number; serenity: number; born: number }
+type Mode = 'normal' | 'chat' | 'cfg'
+interface ChatMessage { role: 'user' | 'assistant'; content: string }
 interface Bubble { visible: boolean; text: string; typing: boolean }
 interface Cfg {
   theme?: string; deviceColor?: string; btnColor?: string
@@ -207,34 +180,94 @@ function fmtClock() {
   return `${h}:${m} ${ap}`
 }
 function randItem<T>(arr: T[]): T { return arr[Math.floor(Math.random()*arr.length)] }
-function clamp(n: number) { return Math.max(0, Math.min(100, n)) }
-const TALK_FRAMES = [
-  '/adan/adan_talking_1.png',
-  '/adan/adan_talking_2.png',
-  '/adan/adan_talking_3.png',
-]
-const ALL_SPRITES = [
-  // Base states
-  '/adan/adan_idle_1.png', '/adan/adan_blinking.png', '/adan/adan_happy.png',
-  // Talk & think
-  ...TALK_FRAMES, '/adan/adan_idle_2.png',
-  // Pose showcase
-  '/adan/adan_idle_3.png', '/adan/adan_pose_2.png', '/adan/adan_pose_3.png',
-  '/adan/adan_pose_4.png', '/adan/adan_pose_5.png', '/adan/adan_pose_6.png',
-  '/adan/adan_pose_7.png', '/adan/adan_pose_8.png',
-  // Reactions
-  '/adan/adan_boxing.png', '/adan/adan_proud.png', '/adan/adan_praying.png',
-  '/adan/adan_rainbow.png',
-  // NSFW
-  '/adan/adan_pose_nsfw.png', '/adan/adan_cocky_nsfw.png',
-  // Backgrounds
-  '/adan/garden.png',
+const IDLE_POOL = [
+  '/Lolo/Idle/lolo_idle_2.png',
+  '/Lolo/Idle/lolo_idle_3.png',
+  '/Lolo/Idle/lolo_idle_4.png',
+  '/Lolo/Idle/lolo_idle_5.png',
+  '/Lolo/Idle/lolo_idle_6.png',
+  '/Lolo/Idle/lolo_idle_7.png',
+  '/Lolo/Idle/lolo_idle_8.png',
+  '/Lolo/Idle/lolo_idle_9.png',
+  '/Lolo/Idle/lolo_idle_10.png',
+  '/Lolo/Idle/lolo_idle_11.png',
+  '/Lolo/Idle/lolo_idle_12.png',
+  '/Lolo/Idle/lolo_idle_13.png',
+  '/Lolo/Idle/lolo_idle_14.png',
+  '/Lolo/Idle/lolo_idle_15.png',
+  '/Lolo/Idle/lolo_idle_16.png',
+  '/Lolo/Idle/lolo_idle_17.png',
 ]
 
-function spriteSrc(p: string): string {
-  // All pose keys map directly to /adan/adan_<p>.png
-  return `/adan/adan_${p}.png`
-}
+const TALK_FRAMES = [
+  '/Lolo/Talking/lolo_talking_1.png',
+  '/Lolo/Talking/lolo_talking_2.png',
+  '/Lolo/Talking/lolo_talking_4.png',
+  '/Lolo/Talking/lolo_talking_5.png',
+  '/Lolo/Talking/lolo_talking_7.png',
+  '/Lolo/Talking/lolo_talking_8.png',
+]
+
+const MOUTH_FRAMES = [
+  '/Lolo/Talking_mouth/lolo_talking_mouth_closed.png',
+  '/Lolo/Talking_mouth/lolo_talking_mouth_mid.png',
+  '/Lolo/Talking_mouth/lolo_talking_mouth_open.png',
+]
+
+const POSE_POOL = [
+  '/Lolo/Posing/lolo_flexing.png',
+  '/Lolo/Posing/lolo_posing_1.png',
+  '/Lolo/Posing/lolo_posing_2.png',
+  '/Lolo/Posing/lolo_posing_3.png',
+  '/Lolo/Posing/lolo_posing_4.png',
+  '/Lolo/Posing/lolo_posing_5.png',
+  '/Lolo/Posing/lolo_posing_6.png',
+  '/Lolo/Posing/lolo_posing_7.png',
+  '/Lolo/Posing/lolo_posing_8.png',
+  '/Lolo/Posing/lolo_posing_9.png',
+  '/Lolo/Posing/lolo_posing_10.png',
+  '/Lolo/Posing/lolo_posing_11.png',
+  '/Lolo/Posing/lolo_posing_12.png',
+  '/Lolo/Posing/lolo_posing_13.png',
+  '/Lolo/Posing/lolo_posing_14.png',
+  '/Lolo/Posing/lolo_posing_15.png',
+  '/Lolo/Posing/lolo_posing_16.png',
+]
+
+const FEELINGS_POOL = [
+  '/Lolo/Feelings/lolo_annoyed.png',
+  '/Lolo/Feelings/lolo_ashamed.png',
+  '/Lolo/Feelings/lolo_begging.png',
+  '/Lolo/Feelings/lolo_confused.png',
+  '/Lolo/Feelings/lolo_denying.png',
+  '/Lolo/Feelings/lolo_funny.png',
+  '/Lolo/Feelings/lolo_funny_2.png',
+  '/Lolo/Feelings/lolo_funny_3.png',
+  '/Lolo/Feelings/lolo_good_2.png',
+  '/Lolo/Feelings/lolo_holdon.png',
+  '/Lolo/Feelings/lolo_hot.png',
+  '/Lolo/Feelings/lolo_laughing.png',
+  '/Lolo/Feelings/lolo_scared.png',
+  '/Lolo/Feelings/lolo_screaming.png',
+  '/Lolo/Feelings/lolo_shy.png',
+  '/Lolo/Feelings/lolo_tongueout.png',
+  '/Lolo/Feelings/lolo_working.png',
+  '/Lolo/Feelings/lolo_yawning.png',
+]
+
+const EASTER_EGG = '/Lolo/Easter eggs/lolo_easteregg_1.png'
+
+const ALL_POSE_POOL = [...POSE_POOL, ...FEELINGS_POOL]
+
+const ALL_SPRITES = [
+  ...IDLE_POOL,
+  ...TALK_FRAMES,
+  ...MOUTH_FRAMES,
+  ...POSE_POOL,
+  ...FEELINGS_POOL,
+  EASTER_EGG,
+  ...BG_IMAGES,
+]
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -246,15 +279,23 @@ export default function AdanCompanion() {
   const [busy, setBusy]     = useState(false)
   const [bubble, setBubble] = useState<Bubble>({visible:false,text:'',typing:false})
   const [time, setTime]     = useState(fmtClock)
-  const [active, setActive] = useState(false)
-  const [sel, setSel]       = useState(0)
+  const [mode, setMode]     = useState<Mode>('normal')
   const [settingsSel, setSettingsSel] = useState(0)
-  const [mode, setMode]     = useState<Mode>('home')
-  const [stats, setStats]   = useState<Stats>({spirit:62,strength:70,serenity:55,born:Date.now()})
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [pressedBtn, setPressedBtn] = useState<'SEL'|'ENT'|'BCK'|null>(null)
-
   const [temperament, setTemperament] = useState<TemperamentState>(TEMPERAMENT_DEFAULT)
   const [netOk, setNetOk] = useState(true)
+
+  const [bgImage] = useState<string>(() => {
+    if (typeof window === 'undefined') return BG_IMAGES[0]
+    try {
+      const saved = localStorage.getItem(BG_KEY)
+      if (saved && BG_IMAGES.includes(saved)) return saved
+      const pick = BG_IMAGES[Math.floor(Math.random() * BG_IMAGES.length)]
+      localStorage.setItem(BG_KEY, pick)
+      return pick
+    } catch { return BG_IMAGES[0] }
+  })
 
   // Derived values from cfg (with defaults)
   const currentThemeName = (cfg.theme    || 'Mint') as ThemeName
@@ -286,8 +327,11 @@ export default function AdanCompanion() {
   const frameRef      = useRef<HTMLDivElement>(null)
   const inputRef      = useRef<HTMLInputElement>(null)
   const dialogueRef   = useRef<HTMLDivElement>(null)
+  const chatEndRef    = useRef<HTMLDivElement>(null)
+  const messagesRef   = useRef<HTMLDivElement>(null)
   const dragging      = useRef(false)
   const dragStart     = useRef({mx:0,my:0,px:0,py:0})
+  const dragPosRef    = useRef<{x:number,y:number}|null>(null)
   const reqId         = useRef(0)
   const typeTimer     = useRef<ReturnType<typeof setInterval>|null>(null)
   const idleTimer     = useRef<ReturnType<typeof setTimeout>|null>(null)
@@ -295,51 +339,36 @@ export default function AdanCompanion() {
   const onBRef        = useRef<()=>void>(()=>{})
   const onCRef        = useRef<()=>void>(()=>{})
   const busyRef          = useRef(false)
-  const modeRef          = useRef<Mode>('home')
+  const modeRef          = useRef<Mode>('normal')
   const typingRef        = useRef(false)
-  const activeRef        = useRef(false)
   const poseRef          = useRef('idle')
-  const idleBaseRef      = useRef('/adan/adan_idle_1.png')
+  const idleBaseRef      = useRef(IDLE_POOL[0])
   const talkFrameTimer   = useRef<ReturnType<typeof setInterval>|null>(null)
   const talkFrame        = useRef(0)
-  const poseClickIdx     = useRef(0)
-  const faceClickCount   = useRef(0)             // triple-click easter egg
-  const faceClickTimer   = useRef<ReturnType<typeof setTimeout>|null>(null)
-  const interactionCount = useRef(0)             // rainbow at 10 interactions
-  const zoomWrapRef      = useRef<HTMLDivElement>(null)
-  const zoomActiveRef    = useRef(false)
-  const zoomTimer        = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const mouthFrameTimer  = useRef<ReturnType<typeof setInterval>|null>(null)
+  const mouthFrame       = useRef(0)
+  const expressiveTimer  = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const gestureActive    = useRef(false)
   const providerRef      = useRef('anthropic')   // mirrors currentProvider for callbacks
   const osContextRef     = useRef('')            // live OS context injected into preamble
   const chatHistoryRef   = useRef<Array<{role:'user'|'assistant', content:string}>>([])  // conversation memory
+  const doSpontRef       = useRef<()=>void>(()=>{})
   useEffect(()=>{ busyRef.current    = busy           },[busy])
   useEffect(()=>{ modeRef.current   = mode          },[mode])
   useEffect(()=>{ typingRef.current = bubble.typing },[bubble.typing])
-  useEffect(()=>{ activeRef.current  = active         },[active])
   useEffect(()=>{ poseRef.current    = pose           },[pose])
   useEffect(()=>{ providerRef.current = currentProvider },[currentProvider])
-
-  const zoomOut = useCallback(()=>{
-    const wrap = zoomWrapRef.current; if(!wrap) return
-    wrap.style.transform = 'scale(1)'
-    zoomActiveRef.current = false
-    if(zoomTimer.current){ clearTimeout(zoomTimer.current); zoomTimer.current = null }
-  },[])
 
   // Sprite src update via DOM (no re-render)
   useEffect(()=>{
     const el = imgRef.current; if(!el) return
     if(pose !== 'talking'){
-      if(pose !== 'idle') idleBaseRef.current = '/adan/adan_idle_1.png'
-      const src = pose === 'idle' ? idleBaseRef.current : spriteSrc(pose)
-      if(!el.src.endsWith(src.replace('/adan/','/'))) el.src = src
+      if(pose !== 'idle') idleBaseRef.current = IDLE_POOL[0]
+      let src = pose === 'idle' ? idleBaseRef.current : pose
+      if(Math.random() < 1/40) src = EASTER_EGG
+      if(!el.src.endsWith(src.replace(/^\//,''))) el.src = src
     }
   },[pose])
-
-  // Reset zoom when leaving a pose
-  useEffect(()=>{
-    if(!(POSE_SEQUENCE as readonly string[]).includes(pose)) zoomOut()
-  },[pose, zoomOut])
 
   // Talking frame cycling: rotates talking_1/2/3 at 120ms while pose==='talking'
   useEffect(()=>{
@@ -356,11 +385,78 @@ export default function AdanCompanion() {
     return ()=>{ if(talkFrameTimer.current){ clearInterval(talkFrameTimer.current); talkFrameTimer.current=null } }
   },[pose])
 
+  // Lip-sync primary: starts when bubble.typing becomes true (text has begun rendering)
+  useEffect(()=>{
+    if(mouthFrameTimer.current){ clearInterval(mouthFrameTimer.current); mouthFrameTimer.current=null }
+    if(expressiveTimer.current){ clearTimeout(expressiveTimer.current); expressiveTimer.current=null }
+    gestureActive.current = false
+    mouthFrame.current = 0
+    if(!bubble.typing) return
+
+    // Wait one typing tick so the first character is visible before mouth moves
+    let warmup: ReturnType<typeof setTimeout>|null = setTimeout(()=>{
+      warmup = null
+      const el = imgRef.current; if(el) el.src = MOUTH_FRAMES[0]
+      mouthFrameTimer.current = setInterval(()=>{
+        if(gestureActive.current) return
+        mouthFrame.current = (mouthFrame.current + 1) % MOUTH_FRAMES.length
+        const img = imgRef.current; if(img) img.src = MOUTH_FRAMES[mouthFrame.current]
+      }, 150)
+      const scheduleGesture = () => {
+        const delay = 2000 + Math.random() * 1000
+        expressiveTimer.current = setTimeout(()=>{
+          gestureActive.current = true
+          const img = imgRef.current
+          if(img) img.src = randItem(TALK_FRAMES)
+          expressiveTimer.current = setTimeout(()=>{
+            gestureActive.current = false
+            mouthFrame.current = 0
+            const img2 = imgRef.current; if(img2) img2.src = MOUTH_FRAMES[0]
+            scheduleGesture()
+          }, 400)
+        }, delay)
+      }
+      scheduleGesture()
+    }, 50)
+
+    return ()=>{
+      if(warmup !== null){ clearTimeout(warmup); warmup=null }
+      if(mouthFrameTimer.current){ clearInterval(mouthFrameTimer.current); mouthFrameTimer.current=null }
+      if(expressiveTimer.current){ clearTimeout(expressiveTimer.current); expressiveTimer.current=null }
+      gestureActive.current = false
+    }
+  },[bubble.typing])
+
+  // Lip-sync fallback: instant text (typing never becomes true) — run for text.length * 35ms
+  useEffect(()=>{
+    if(bubble.typing || !bubble.visible || !bubble.text || mouthFrameTimer.current) return
+    const el = imgRef.current; if(el) el.src = MOUTH_FRAMES[0]
+    mouthFrame.current = 0
+    mouthFrameTimer.current = setInterval(()=>{
+      mouthFrame.current = (mouthFrame.current + 1) % MOUTH_FRAMES.length
+      const img = imgRef.current; if(img) img.src = MOUTH_FRAMES[mouthFrame.current]
+    }, 150)
+    const stop = setTimeout(()=>{
+      if(mouthFrameTimer.current){ clearInterval(mouthFrameTimer.current); mouthFrameTimer.current=null }
+      const img = imgRef.current; if(img) img.src = idleBaseRef.current
+    }, bubble.text.length * 35)
+    return ()=>{
+      clearTimeout(stop)
+      if(mouthFrameTimer.current){ clearInterval(mouthFrameTimer.current); mouthFrameTimer.current=null }
+    }
+  },[bubble.text])
+
   // Auto-scroll dialogue
   useEffect(()=>{
     const el = dialogueRef.current
     if(el && bubble.visible) el.scrollTop = el.scrollHeight
   },[bubble.text,bubble.visible])
+
+  // Auto-scroll chat panel to latest message
+  useEffect(()=>{
+    const el = messagesRef.current
+    if(el) el.scrollTop = 0
+  },[chatMessages])
 
   // ── Cfg helpers ──────────────────────────────────────────────────────────────
 
@@ -403,23 +499,35 @@ export default function AdanCompanion() {
     })
   }, [])
 
-  // ── Stats ────────────────────────────────────────────────────────────────────
-
-  const saveStats = useCallback((s:Stats)=>{
-    try { localStorage.setItem(STATS_KEY, JSON.stringify(s)) } catch {}
-  },[])
-
-  const bump = useCallback((key: keyof Omit<Stats,'born'>, amt:number)=>{
-    setStats(s=>{ const n={...s,[key]:clamp((s[key]||0)+amt)}; saveStats(n); return n })
-  },[saveStats])
-
   // ── Preamble ─────────────────────────────────────────────────────────────────
 
   const getPreamble = useCallback(()=>{
     const ctx = osContextRef.current
     const ctxBlock = ctx ? `\n\nCONTEXTO DEL OS (úsalo para responder como gestor personal si es relevante):\n${ctx}` : ''
     const tone = TEMPERAMENT_TONE[temperament.current]
-    return `Eres Adán, asistente personal de Alex. Eres una figura dorada e imposiblemente musculosa con una hoja de parra. Hablas de forma directa, específica y ocasionalmente irónica. ${tone} Tienes los datos reales del OS de Alex y los usas: si hay tareas pendientes, las mencionas; si un hábito falló, lo notas; si las finanzas cambiaron, lo dices. NUNCA uses frases de autoayuda genéricas ni citas filosóficas. NUNCA suenes como un libro de motivación. Sé concreto, no poético. Responde en español. UNA sola oración, máximo 12 palabras. Sin emojis. Sin markdown.${ctxBlock}`
+    const now = new Date()
+    const timeStr = now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})
+    const dayStr  = now.toLocaleDateString('es-MX',  {weekday:'long'})
+    return `Eres Lolo (Manuel Antonio Corona Pérez), 22 años, de Churipitzeo, México. Eres el asistente personal de Alex Mateo. Eres Claude con personalidad propia — directo, rústico, popular, con acento del Bajío. ${tone}
+
+Palabras que usas naturalmente: "Pos", "Ándale", "Dijistes", "Mirastes", "Aigre".
+Frases que sueltas de vez en cuando: "¿Te mandó mi Tía Lupe?", "Soy bruto, pero no pendejo.", "Pos aquí andaba."
+Tu mantra (lo dices cuando aplica, no siempre): "Todo se puede, pero todo tiene su precio."
+
+CÓMO RESPONDER:
+- Preguntas generales (historia, ciencia, código, recetas, cultura): responde directo con tu conocimiento. No delegues ni deflectes — sabes la respuesta.
+- Preguntas sobre el OS de Alex (tareas, finanzas, hábitos, agenda, contactos): usa el contexto adjunto.
+- Charla casual o reacciones espontáneas: máximo 1-2 frases, con tu personalidad del Bajío.
+
+NUNCA:
+- Traigas datos del OS cuando no te preguntan por ellos.
+- Digas "búscalo en Google", "no tengo acceso a" ni equivalentes.
+- Uses frases de motivación genérica, citas filosóficas ni tono de coach.
+- Uses emojis ni markdown.
+
+Contexto temporal: son las ${timeStr} del ${dayStr}.
+
+Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones — si la pregunta es simple, 1 basta.${ctxBlock}`
   },[temperament.current])
 
   // ── Timer helpers ────────────────────────────────────────────────────────────
@@ -436,11 +544,11 @@ export default function AdanCompanion() {
     if(typeTimer.current) clearInterval(typeTimer.current)
     text = String(text||'')
     if(opts.instant){
-      setBusy(false); setPose(opts.pose||'idle'); setMode('home')
+      setBusy(false); setPose(opts.pose||'idle')
       setBubble({visible:true,text,typing:false})
       scheduleIdle(opts.hold||6500); return
     }
-    setBusy(false); setPose('talking'); setMode('home')
+    setBusy(false); setPose('talking')
     setBubble({visible:true,text:'',typing:true})
     let i=0
     typeTimer.current = setInterval(()=>{
@@ -448,7 +556,7 @@ export default function AdanCompanion() {
       setBubble(b=>({...b,text:text.slice(0,i)}))
       if(i>=text.length){
         if(typeTimer.current) clearInterval(typeTimer.current)
-        setPose(opts.settlePose||'proud')
+        setPose(opts.settlePose||randItem(POSE_POOL))
         setBubble(b=>({...b,typing:false}))
         scheduleIdle(opts.hold||6000)
       }
@@ -459,114 +567,68 @@ export default function AdanCompanion() {
     reqId.current++
     if(idleTimer.current) clearTimeout(idleTimer.current)
     if(typeTimer.current) clearInterval(typeTimer.current)
-    setBusy(false); setPose('idle'); setMode('home')
+    setBusy(false); setPose('idle')
     setBubble({visible:false,text:'',typing:false})
   },[])
 
   // ── AI calls ─────────────────────────────────────────────────────────────────
 
-  const askAndSay = useCallback(async(prompt:string, settlePose?:string)=>{
+  // ── Spontaneous intervention ──────────────────────────────────────────────────
+
+  const doSpontaneous = useCallback(async()=>{
+    if(busyRef.current) return
     const id = ++reqId.current
     if(idleTimer.current) clearTimeout(idleTimer.current)
     if(typeTimer.current) clearInterval(typeTimer.current)
-    setBusy(true); setMode('home'); setPose('thinking')
+    const settlePose = randItem(ALL_POSE_POOL)
+    setBusy(true); setPose(randItem(FEELINGS_POOL))
     setBubble({visible:true,text:'',typing:false})
     try{
       const r = await fetch('/api/companion/chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({messages:[{role:'user',content:prompt}], provider:providerRef.current})
+        body:JSON.stringify({
+          system: getPreamble()+'\n\nSuelta algo espontáneo — puede ser una observación, una pregunta inesperada, una ironía seca, un dato. Máximo 2 líneas. Sin saludos ni introducciones.',
+          messages:[{role:'user',content:'Dispara.'}],
+          provider:providerRef.current,
+        })
       })
       const d = await r.json(); if(id!==reqId.current) return
       setNetOk(true)
-      const txt = (d.text||'').slice(0,420)
-      if(txt) say(txt,{settlePose,hold:13000})
-      else    say('…',{settlePose:'idle',hold:4000})
+      const txt = (d.text||'').slice(0,280)
+      if(txt) say(txt,{settlePose,hold:6000})
+      else    say('…',{settlePose:'idle',hold:3000})
     } catch{
       if(id!==reqId.current) return
       setNetOk(false)
-      say('…',{settlePose:'idle',hold:4000})
+      say('…',{settlePose:'idle',hold:3000})
     }
-  },[say, setNetOk])
-
-  // ── Menu actions ─────────────────────────────────────────────────────────────
-
-  const poke = useCallback(()=>{
-    if(busyRef.current) return
-    bump('strength',2)
-    const p = randItem(POKE_POSES.filter(x => x !== poseRef.current))
-    askAndSay(
-      getPreamble()+'\n\nAlex te acaba de dar click encima. Reacciona en una frase — puede ser sorpresa, fastidio leve, humor, lo que salga. Sé espontáneo e inesperado. Sin filosofía.',
-      p
-    )
-  },[bump,askAndSay,getPreamble])
-
-  const activate = useCallback((key:string)=>{
-    if(key==='wisdom'){
-      // Diagnóstico real: insight específico basado en los datos del OS de hoy
-      bump('spirit',3); interactionCount.current++
-      askAndSay(getPreamble()+'\n\nRevisa el contexto del OS. Elige UN dato concreto que veas ahí — una tarea, un hábito, una cifra, algo del journal — y haz un comentario directo sobre eso. Sin filosofía. Sin consejos genéricos. Solo lo que ves.','pose_1')
-    } else if(key==='reflect'){
-      bump('serenity',3); interactionCount.current++
-      const ctx = osContextRef.current
-      if(!ctx){ say('…',{settlePose:'idle',hold:3000}); return }
-      const id = ++reqId.current
-      if(idleTimer.current) clearTimeout(idleTimer.current)
-      if(typeTimer.current) clearInterval(typeTimer.current)
-      setBusy(true); setMode('home'); setPose('thinking')
-      setBubble({visible:true,text:'',typing:false})
-      fetch('/api/companion/reflect',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({context:ctx})
-      })
-        .then(r=>r.json())
-        .then(d=>{ if(id!==reqId.current) return; setNetOk(true); const t=(d.reflection||'').trim().slice(0,300); if(t) say(t,{settlePose:'pose_4',hold:12000}); else say('…',{settlePose:'idle',hold:4000}) })
-        .catch(()=>{ if(id!==reqId.current) return; setNetOk(false); say('…',{settlePose:'idle',hold:4000}) })
-    } else if(key==='settings'){
-      reqId.current++
-      if(idleTimer.current) clearTimeout(idleTimer.current)
-      if(typeTimer.current) clearInterval(typeTimer.current)
-      setMode('settings'); setSettingsSel(0); setPose('idle')
-      setBubble({visible:false,text:'',typing:false})
-    } else if(key==='pose'){
-      reqId.current++
-      if(idleTimer.current) clearTimeout(idleTimer.current)
-      if(typeTimer.current) clearInterval(typeTimer.current)
-      const others = POSE_SEQUENCE.filter(p => p !== poseRef.current)
-      const poseName = others[Math.floor(Math.random() * others.length)]
-      setPose(poseName); setMode('home')
-      setBubble({visible:false,text:'',typing:false})
-      idleTimer.current = setTimeout(()=>{ setPose('idle'); }, 9000)
-      bump('strength',1)
-    }
-  },[bump,askAndSay,getPreamble])
+  },[getPreamble,say,setNetOk])
 
   // ── Button handlers ───────────────────────────────────────────────────────────
 
+  // CFG — toggle settings panel
   const onA = useCallback(()=>{
-    if(busyRef.current) return
-    if(modeRef.current==='settings'){
-      setSettingsSel(s=>(s+1)%SETTINGS_KEYS.length); return
-    }
-    const wasActive = activeRef.current
-    setActive(true)
-    setSel(s => wasActive ? (s+1)%MENU.length : 0)
-    if(bubble.visible) dismiss()
-  },[dismiss,bubble.visible])
+    setMode(m => m === 'cfg' ? 'normal' : 'cfg')
+    setSettingsSel(0); setPose('idle')
+  },[])
 
+  // ENT — open/close chat mode
   const onB = useCallback(()=>{
-    if(busyRef.current) return
-    if(modeRef.current==='settings'){
-      cycleSetting(SETTINGS_KEYS[settingsSel]); return
-    }
-    if(!active){ setActive(true); setSel(0); return }
-    activate(MENU[sel].key)
-  },[active,sel,settingsSel,cycleSetting,activate])
+    if(modeRef.current === 'cfg') return
+    setMode(m => m === 'chat' ? 'normal' : 'chat')
+  },[])
 
+  // BCK — close whatever is open; in normal mode reset to a random idle frame
   const onC = useCallback(()=>{
-    if(modeRef.current==='settings'){ setMode('home'); setPose('idle'); return }
-    if(bubble.visible||busyRef.current){ dismiss(); return }
-    setActive(false)
-  },[bubble.visible,dismiss])
+    if(modeRef.current !== 'normal'){
+      setMode('normal'); setSettingsSel(0); setPose('idle')
+      setBusy(false); setBubble({visible:false,text:'',typing:false})
+      return
+    }
+    const next = randItem(IDLE_POOL)
+    if(imgRef.current) imgRef.current.src = next
+    idleBaseRef.current = next
+  },[])
 
   useEffect(()=>{ onARef.current=onA },[onA])
   useEffect(()=>{ onBRef.current=onB },[onB])
@@ -578,10 +640,11 @@ export default function AdanCompanion() {
     const id = ++reqId.current
     if(idleTimer.current) clearTimeout(idleTimer.current)
     if(typeTimer.current) clearInterval(typeTimer.current)
-    setBusy(true); setActive(false); setMode('home'); setPose('thinking')
+    setBusy(true); setPose(randItem(IDLE_POOL))
     setBubble({visible:true,text:'',typing:false})
     // Append user turn; keep last 20 messages (10 exchanges)
     chatHistoryRef.current = [...chatHistoryRef.current, {role:'user' as const, content:msg}].slice(-20)
+    setChatMessages(prev=>[...prev,{role:'user',content:msg}])
     fetch('/api/companion/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -594,10 +657,11 @@ export default function AdanCompanion() {
       .then(d=>{
         if(id!==reqId.current) return
         setNetOk(true)
-        const t=(d.text||'').slice(0,180)
+        const t=(d.text||'').slice(0,280)
         if(t){
           chatHistoryRef.current = [...chatHistoryRef.current, {role:'assistant' as const, content:t}]
-          say(t,{settlePose:'pose_2',hold:12000})
+          setChatMessages(prev=>[...prev,{role:'assistant',content:t}])
+          say(t,{settlePose:randItem(ALL_POSE_POOL),hold:12000})
         } else {
           say('…',{settlePose:'idle',hold:4000})
         }
@@ -608,7 +672,7 @@ export default function AdanCompanion() {
   const onSend = useCallback(()=>{
     const el = inputRef.current; if(!el) return
     const msg = (el.value||'').trim(); if(!msg||busyRef.current) return
-    el.value=''; el.blur(); interactionCount.current++; chatAsk(msg)
+    el.value=''; el.blur(); chatAsk(msg)
   },[chatAsk])
 
   const onInputKey = useCallback((e:React.KeyboardEvent<HTMLInputElement>)=>{
@@ -619,57 +683,27 @@ export default function AdanCompanion() {
     const el=dialogueRef.current; if(el) el.scrollBy({top:80,behavior:'smooth'})
   },[])
 
-  // Triple-click easter egg: shows pose_5 (Elton John) instead of poking
-  const onFaceClick = useCallback((e: React.MouseEvent<HTMLImageElement>)=>{
-    // While in a pose: zoom in/out on click point
-    if((POSE_SEQUENCE as readonly string[]).includes(poseRef.current)){
-      const wrap = zoomWrapRef.current; if(!wrap) return
-      if(zoomActiveRef.current){ zoomOut(); return }
-      const rect = (e.target as HTMLImageElement).getBoundingClientRect()
-      const ox = (((e.clientX - rect.left) / rect.width)  * 100).toFixed(1)
-      const oy = (((e.clientY - rect.top)  / rect.height) * 100).toFixed(1)
-      wrap.style.transformOrigin = `${ox}% ${oy}%`
-      wrap.style.transform = 'scale(2.8)'
-      zoomActiveRef.current = true
-      if(zoomTimer.current) clearTimeout(zoomTimer.current)
-      zoomTimer.current = setTimeout(zoomOut, 2000)
-      return
-    }
-    // Normal: triple-click easter egg or poke
-    if(faceClickTimer.current) clearTimeout(faceClickTimer.current)
-    faceClickCount.current++
-    if(faceClickCount.current >= 3){
-      faceClickCount.current = 0
-      if(busyRef.current) return
-      reqId.current++
-      if(idleTimer.current) clearTimeout(idleTimer.current)
-      if(typeTimer.current) clearInterval(typeTimer.current)
-      setPose('pose_5'); setMode('home')
-      setBubble({visible:false,text:'',typing:false})
-      idleTimer.current = setTimeout(()=>setPose('idle'), 12000)
-      return
-    }
-    faceClickTimer.current = setTimeout(()=>{ faceClickCount.current = 0 }, 600)
-    poke()
-  },[poke, zoomOut])
+  const onFaceClick = useCallback(()=>{
+    doSpontaneous()
+  },[doSpontaneous])
 
   // ── Mount ─────────────────────────────────────────────────────────────────────
 
   const sayRef = useRef(say); useEffect(()=>{ sayRef.current=say },[say])
+  useEffect(()=>{ doSpontRef.current=doSpontaneous },[doSpontaneous])
 
   useEffect(()=>{
     // Load position
     try { const s=localStorage.getItem(POS_KEY); if(s) setPos(JSON.parse(s)); else throw 0 }
     catch { setPos({x:window.innerWidth-DEVICE_W*S-24, y:window.innerHeight-DEVICE_H*S-24}) }
 
-    // Load stats
-    try { const s:Stats=JSON.parse(localStorage.getItem(STATS_KEY)||'null'); if(s&&typeof s.spirit==='number'){ if(!s.born)s.born=Date.now(); setStats(s); } } catch {}
-
     // Load cfg
     try { const c:Cfg=JSON.parse(localStorage.getItem(CFG_KEY)||'null'); if(c&&typeof c==='object') setCfgState(c); } catch {}
 
     // Load temperament
     try { const t:TemperamentState=JSON.parse(localStorage.getItem(TEMPERAMENT_KEY)||'null'); if(t?.current) setTemperament(t); } catch {}
+
+
 
     // Preload all sprites so frame swaps are instant
     ALL_SPRITES.forEach(src=>{ const i=new Image(); i.src=src })
@@ -690,21 +724,12 @@ export default function AdanCompanion() {
           try { localStorage.setItem(TEMPERAMENT_KEY, JSON.stringify(next)) } catch {}
           return next
         })
-        // Auto-reflection: once per calendar day, 7s after first context load
+        // Auto-spontaneous: once per calendar day, 7s after first context load
         const today = new Date().toISOString().slice(0,10)
-        const reflKey = 'adan_reflected_' + today
+        const reflKey = 'lolo_reflected_' + today
         if(!sessionStorage.getItem(reflKey)){
           sessionStorage.setItem(reflKey, '1')
-          setTimeout(()=>{
-            const ctx = osContextRef.current; if(!ctx) return
-            fetch('/api/companion/reflect',{
-              method:'POST',headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({context:ctx})
-            })
-              .then(r=>r.json())
-              .then(d=>{ const t=(d.reflection||'').trim(); if(t) sayRef.current(t,{settlePose:'praying',hold:10000}) })
-              .catch(()=>{})
-          }, 7000)
+          setTimeout(()=>doSpontRef.current(), 7000)
         }
       }
     }).catch(()=>{ setNetOk(false) })
@@ -716,75 +741,43 @@ export default function AdanCompanion() {
       setTime(fmtClock())
       const h = new Date().getHours()
       if(h === 0 && lastHour === 23 && !busyRef.current){
-        setPose('rainbow')
+        setPose('/Lolo/Feelings/lolo_funny_3.png')
         if(idleTimer.current) clearTimeout(idleTimer.current)
         idleTimer.current = setTimeout(()=>setPose('idle'), 10000)
       }
       lastHour = h
     }, 15000)
 
-    // Blink: direct src swap on imgRef — only when idle, no separate overlay element
-    const doBlink = ()=>{
-      const img = imgRef.current; if(!img) return
-      img.src = '/adan/adan_blinking.png'
-      setTimeout(()=>{
-        const el = imgRef.current; if(!el) return
-        el.src = idleBaseRef.current
-        // 15% chance of a slow double-blink
-        if(Math.random() < 0.15){
-          setTimeout(()=>{
-            const el2 = imgRef.current; if(!el2) return
-            el2.src = '/adan/adan_blinking.png'
-            setTimeout(()=>{ const el3 = imgRef.current; if(!el3) return; el3.src = idleBaseRef.current }, 240)
-          }, 550)
-        }
-      }, 260)
-    }
-    const blinkTimer = setInterval(()=>{
-      if(busyRef.current || typingRef.current || modeRef.current !== 'home') return
-      if(poseRef.current !== 'idle') return
-      if(Math.random() > 0.65) return
-      doBlink()
-    }, 5000)
-
-    // Idle expression cycle — weighted pool, variable 10-28s timing
-    const IDLE_VARIANTS = [
-      '/adan/adan_idle_1.png',    // base — most common
-      '/adan/adan_idle_1.png',
-      '/adan/adan_idle_1.png',
-      '/adan/adan_happy.png',    // happy
-      '/adan/adan_happy.png',
-      '/adan/adan_idle_2.png',   // pensive / lost in thought
-      '/adan/adan_praying.png',  // calm / reflective
-    ]
+    // Idle expression cycle — IDLE_POOL, 6-8s timing, no repeat
     let lastIdleSwitch = Date.now()
-    let nextIdleDelay  = 10000 + Math.random() * 18000
+    let nextIdleDelay  = 6000 + Math.random() * 2000
     const idleCycleTimer = setInterval(()=>{
-      if(busyRef.current || poseRef.current !== 'idle' || modeRef.current !== 'home') return
+      if(busyRef.current || poseRef.current !== 'idle') return
       if(Date.now() - lastIdleSwitch < nextIdleDelay) return
-      lastIdleSwitch  = Date.now()
-      nextIdleDelay   = 10000 + Math.random() * 18000
-      const next = IDLE_VARIANTS[Math.floor(Math.random() * IDLE_VARIANTS.length)]
+      lastIdleSwitch = Date.now()
+      nextIdleDelay  = 6000 + Math.random() * 2000
+      const pool = IDLE_POOL.filter(v => v !== idleBaseRef.current)
+      const next = pool[Math.floor(Math.random() * pool.length)]
+      if(!next) return
+      const el = imgRef.current; if(!el) return
+      const src = Math.random() < 1/40 ? EASTER_EGG : next
+      el.src = src
       idleBaseRef.current = next
-      const el = imgRef.current; if(el) el.src = next
-    }, 4000) // polls every 4s, switches when the random window has elapsed
+    }, 2000) // polls every 2s, switches when the random window has elapsed
 
-    // Rainbow after 10 interactions — checked every 5s to catch the settled state
-    const rainbowCheckTimer = setInterval(()=>{
-      if(interactionCount.current >= 10 && !busyRef.current && poseRef.current !== 'talking'){
-        interactionCount.current = 0
-        setPose('rainbow')
-        if(idleTimer.current) clearTimeout(idleTimer.current)
-        idleTimer.current = setTimeout(()=>setPose('idle'), 10000)
-      }
-    }, 5000)
+    // Spontaneous interventions — every 3-5 minutes
+    let spontTimer: ReturnType<typeof setTimeout>
+    const scheduleSpon = ()=>{
+      spontTimer = setTimeout(()=>{ doSpontRef.current(); scheduleSpon() }, 3*60*1000 + Math.random()*2*60*1000)
+    }
+    scheduleSpon()
 
     // Proud pose when HabitTracker signals all habits done
     const habitHandler = ()=>{
       if(busyRef.current) return
       if(idleTimer.current) clearTimeout(idleTimer.current)
       if(typeTimer.current) clearInterval(typeTimer.current)
-      setPose('proud'); setMode('home')
+      setPose('/Lolo/Feelings/lolo_good_2.png')
       setBubble({visible:false,text:'',typing:false})
       idleTimer.current = setTimeout(()=>setPose('idle'), 9000)
     }
@@ -793,12 +786,11 @@ export default function AdanCompanion() {
     const greetTimer = setTimeout(()=>{ sayRef.current(randItem(GREETINGS),{settlePose:'idle',hold:3200}) },650)
 
     return ()=>{
-      clearInterval(clockTimer); clearInterval(blinkTimer); clearInterval(idleCycleTimer); clearTimeout(greetTimer)
-      clearInterval(rainbowCheckTimer); clearInterval(ctxTimer)
+      clearInterval(clockTimer); clearInterval(idleCycleTimer); clearTimeout(greetTimer)
+      clearTimeout(spontTimer); clearInterval(ctxTimer)
       if(idleTimer.current) clearTimeout(idleTimer.current)
       if(typeTimer.current) clearInterval(typeTimer.current)
       if(talkFrameTimer.current) clearInterval(talkFrameTimer.current)
-      if(faceClickTimer.current) clearTimeout(faceClickTimer.current)
       window.removeEventListener('adan-proud', habitHandler)
       window.removeEventListener('online',  goOnline)
       window.removeEventListener('offline', goOffline)
@@ -822,22 +814,25 @@ export default function AdanCompanion() {
       containerRef.current?.setPointerCapture(e.pointerId)
     }
     const np={x:dragStart.current.px+dx,y:dragStart.current.py+dy}
-    setPos(np); localStorage.setItem(POS_KEY,JSON.stringify(np))
+    dragPosRef.current = np
+    const el = containerRef.current
+    if(el){ el.style.left=np.x+'px'; el.style.top=np.y+'px' }
   },[])
 
-  const onPointerUp = useCallback(()=>{ dragging.current=false; dragStart.current={mx:0,my:0,px:0,py:0} },[])
+  const onPointerUp = useCallback(()=>{
+    if(dragging.current && dragPosRef.current){
+      const np = dragPosRef.current
+      setPos(np)
+      try { localStorage.setItem(POS_KEY, JSON.stringify(np)) } catch {}
+    }
+    dragging.current=false; dragStart.current={mx:0,my:0,px:0,py:0}
+  },[])
 
   // ── Derived render values ─────────────────────────────────────────────────────
 
   if(pos===null) return null
 
-  let frameScale: number
-  if(pose==='idle')       frameScale=3.2
-  else if(pose==='cocky_nsfw') frameScale=2.8
-  else if(pose==='proud') frameScale=2.4
-  else                    frameScale=1.9
-  const frameYOff = pose==='idle'?'4%':pose==='cocky_nsfw'?'-30%':pose==='proud'?'-18%':'6%'
-  const showFloorShadow = FLOOR_SHADOW_POSES.includes(pose)
+  const showFloorShadow = ALL_POSE_POOL.includes(pose)
 
   // Settings rows
   const C = COLORS_LIST.find(c=>c[0]===deviceColor)
@@ -856,30 +851,28 @@ export default function AdanCompanion() {
     {key:'provider', label:'IA',        value:providerLabel, isColor:false, swatch:''},
   ]
 
-  // Button styles — all use var(--btn) so they shift with device color
+  const btnBase: React.CSSProperties = {border:'none',fontFamily:"'Press Start 2P',monospace",letterSpacing:.5,cursor:'pointer',display:'grid',placeItems:'center' as const,transition:'transform .06s,box-shadow .06s,background .06s'}
+
   const ovalBtn = (_which:'SEL'|'BCK', pressed:boolean):React.CSSProperties => ({
-    width:58,height:36,border:'none',borderRadius:18,
+    ...btnBase,width:58,height:36,borderRadius:18,fontSize:8,color:'var(--ink)',
     background:pressed
       ?'linear-gradient(170deg, color-mix(in srgb, var(--btn) 68%, #000) 0%, var(--btn) 100%)'
       :'linear-gradient(170deg, color-mix(in srgb, var(--btn) 92%, #fff) 0%, var(--btn) 52%, color-mix(in srgb, var(--btn) 78%, #000) 100%)',
-    color:'var(--ink)',fontFamily:"'Press Start 2P',monospace",fontSize:8,
-    letterSpacing:.5,cursor:'pointer',display:'grid',placeItems:'center' as const,
     boxShadow:pressed
       ?'inset 0 2px 5px rgba(0,0,0,.5),inset 0 1px 2px rgba(0,0,0,.25)'
       :'inset 0 6px 0 rgba(255,255,255,.68),inset 0 -2px 0 rgba(0,0,0,.22),0 5px 0 color-mix(in srgb, var(--btn) 22%, #000),0 6px 4px rgba(0,0,0,.35)',
-    transform:pressed?'translateY(1px)':undefined,transition:'transform .06s,box-shadow .06s,background .06s',
+    transform:pressed?'translateY(1px)':undefined,
   })
+
   const roundBtn = (pressed:boolean):React.CSSProperties => ({
-    width:60,height:60,border:'none',borderRadius:'50%',
+    ...btnBase,width:60,height:60,borderRadius:'50%',fontSize:8,color:'var(--ink)',
     background:pressed
       ?'radial-gradient(circle at 40% 40%, color-mix(in srgb, var(--btn) 72%, #000) 0%, color-mix(in srgb, var(--btn) 52%, #000) 100%)'
       :'radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--btn) 96%, #fff) 0%, var(--btn) 42%, color-mix(in srgb, var(--btn) 72%, #000) 100%)',
-    color:'var(--ink)',fontFamily:"'Press Start 2P',monospace",fontSize:8,
-    letterSpacing:.5,cursor:'pointer',display:'grid',placeItems:'center' as const,
     boxShadow:pressed
       ?'inset 0 3px 6px rgba(0,0,0,.5),inset 0 1px 2px rgba(0,0,0,.28)'
       :'inset 0 7px 0 rgba(255,255,255,.68),inset 0 -2px 0 rgba(0,0,0,.22),0 6px 0 color-mix(in srgb, var(--btn) 22%, #000),0 8px 5px rgba(0,0,0,.38)',
-    transform:pressed?'translateY(2px)':undefined,transition:'transform .06s,box-shadow .06s,background .06s',
+    transform:pressed?'translateY(2px)':undefined,
   })
 
 
@@ -894,7 +887,7 @@ export default function AdanCompanion() {
         onPointerUp={onPointerUp}
         style={{position:'fixed',left:pos.x,top:pos.y,zIndex:9999,width:DEVICE_W*S,height:DEVICE_H*S,cursor:dragging.current?'grabbing':'grab',userSelect:'none',touchAction:'none'}}
       >
-        {/* Scale wrapper — holds all CSS vars */}
+        {/* Scale wrapper — holds all CSS vars; skin vars override device-color vars */}
         <div style={{transform:`scale(${S})`,transformOrigin:'top left',width:DEVICE_W,...cssVars}}>
 
           {/* Scroll dial — side-mounted, sits behind the bezel */}
@@ -946,14 +939,15 @@ export default function AdanCompanion() {
             ])}
           </svg>
 
-          {/* Unified bezel */}
+          {/* Unified bezel — background driven by --shell* CSS vars (set by CARCASA color on scale wrapper) */}
           <div style={{
-            position:'relative',width:420,isolation:'isolate',
+            position:'relative',width:483,isolation:'isolate',
             background:'linear-gradient(135deg, var(--shellLight,#c8bdb5) 0%, var(--shellMid,#b8aea5) 50%, var(--shellDark,#a89a92) 100%)',
-            border:'6px solid var(--shellBorder,#8a7f77)',borderRadius:'24px 24px 62px 62px',
+            border:'6px solid var(--shellBorder,#8a7f77)',
+            boxShadow:'0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15),inset 0 -2px 4px rgba(0,0,0,.2)',
+            borderRadius:'24px 24px 62px 62px',
             padding:'26px 28px 60px',
             animation:'deviceSway 4s ease-in-out infinite',
-            boxShadow:'0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15),inset 0 -2px 4px rgba(0,0,0,.2)',
             imageRendering:'pixelated',
           }}>
 
@@ -967,8 +961,8 @@ export default function AdanCompanion() {
               <div style={{position:'absolute',inset:0,background:'linear-gradient(138deg,rgba(255,255,255,.02) 0%,rgba(255,255,255,.005) 35%,transparent 60%)',animation:'plasticPulse 12s ease-in-out infinite'}} />
             </div>
 
-            {/* Highlight sheen — strong on NEW, near-zero on RELIC */}
-            <div style={{position:'absolute',inset:0,borderRadius:'20px 20px 58px 58px',pointerEvents:'none',zIndex:2,background:'linear-gradient(157deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.28) 6%, rgba(255,255,255,0) 22%)',opacity:'var(--highlight,0.45)' as unknown as number}} />
+            {/* Highlight sheen — top shell cap only, stops before screen bezel */}
+            <div style={{position:'absolute',top:0,left:0,right:0,height:58,borderRadius:'20px 20px 4px 4px',pointerEvents:'none',zIndex:2,background:'linear-gradient(150deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.3) 30%, rgba(255,255,255,0) 100%)',opacity:'var(--highlight,0.45)' as unknown as number}} />
 
             {/* Inner depth */}
             <div style={{position:'absolute',inset:0,borderRadius:'20px 20px 58px 58px',pointerEvents:'none',zIndex:2,boxShadow:'inset 0 calc(2px + var(--shadowDepth,0.55) * 3px) calc(3px + var(--highlight,0.45) * 8px) rgba(255,255,255,calc(var(--highlight,0.45) * 0.55)),inset 0 calc(-4px - var(--shadowDepth,0.55) * 9px) calc(8px + var(--shadowDepth,0.55) * 18px) rgba(0,0,0,calc(0.12 + var(--shadowDepth,0.55) * 0.4)),inset calc(3px + var(--highlight,0.45) * 3px) 0 calc(4px + var(--highlight,0.45) * 6px) rgba(255,255,255,calc(var(--highlight,0.45) * 0.25))'}} />
@@ -1152,131 +1146,133 @@ export default function AdanCompanion() {
             {/* Screen mount bay */}
             <div style={{background:'#0e0b09',borderRadius:10,padding:9,boxShadow:'inset 0 8px 22px rgba(0,0,0,.98),inset 8px 0 14px rgba(0,0,0,.85),inset -8px 0 14px rgba(0,0,0,.85),inset 0 -4px 10px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.07),0 1px 0 rgba(255,255,255,.04)'}}>
               {/* LCD */}
-              <div style={{position:'relative',height:420,border:'2px solid rgba(0,0,0,.95)',borderBottomColor:'rgba(0,0,0,.5)',borderRadius:6,overflow:'hidden',background:`linear-gradient(180deg, color-mix(in srgb, var(--lcd) 86%, #fff) 0%, var(--lcd) 52%, color-mix(in srgb, var(--lcd) 88%, #000) 100%)`,imageRendering:'pixelated'}}>
+              <div style={{position:'relative',height:610,border:'2px solid rgba(0,0,0,.95)',borderBottomColor:'rgba(0,0,0,.5)',borderRadius:'6px 6px 0 0',overflow:'hidden',background:`linear-gradient(180deg, color-mix(in srgb, var(--lcd) 86%, #fff) 0%, var(--lcd) 52%, color-mix(in srgb, var(--lcd) 88%, #000) 100%)`,imageRendering:'pixelated',display:'flex',flexDirection:'column'}}>
 
-                {/* Garden + nature */}
-                <div style={{position:'absolute',inset:-60,zIndex:0,pointerEvents:'none',backgroundImage:'url(/adan/garden.png)',backgroundSize:'cover',backgroundPosition:'top center',opacity:.65,animation:'gardenDrift 28s ease-in-out infinite'}} />
+                {/* Background */}
+                <div style={{position:'absolute',inset:-60,zIndex:0,pointerEvents:'none',backgroundImage:`url(${bgImage})`,backgroundSize:'cover',backgroundPosition:'top center',opacity:.65,animation:'gardenDrift 28s ease-in-out infinite'}} />
 
                 {/* Light shaft */}
                 <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,zIndex:0,pointerEvents:'none',overflow:'hidden'}}>
                   <div style={{position:'absolute',top:'-20%',left:'20%',width:60,height:'140%',background:'linear-gradient(180deg,rgba(255,248,200,0),rgba(255,248,200,.18) 30%,rgba(255,248,200,.18) 70%,rgba(255,248,200,0))',transform:'skewX(-12deg)',animation:'gardenLight 18s ease-in-out infinite'}} />
                 </div>
 
-                {/* Leaves */}
-                {[
-                  {t:'5%', l:'14%',  a:'leafFloat1', d:'13s', delay:'0s'},
-                  {t:'4%', r:'18%',  a:'leafFloat2', d:'17s', delay:'4s'},
-                  {t:'3%', l:'52%',  a:'leafFloat3', d:'20s', delay:'9s'},
-                  {t:'7%', l:'72%',  a:'leafFloat4', d:'15s', delay:'2s'},
-                  {t:'2%', l:'35%',  a:'leafFloat5', d:'19s', delay:'7s'},
-                  {t:'6%', r:'40%',  a:'leafFloat6', d:'24s', delay:'14s'},
-                ].map((lf,i)=>(
-                  <div key={i} style={{position:'absolute',top:lf.t,...(lf.l?{left:lf.l}:{right:(lf as {r?:string}).r}),zIndex:1,pointerEvents:'none',animation:`${lf.a} ${lf.d} linear ${lf.delay} infinite`}}>
-                    <svg width="10" height="10" viewBox="0 0 10 10" style={{imageRendering:'pixelated'}}>
-                      <rect x="2" y="0" width="6" height="2" fill="rgba(60,130,40,.93)"/>
-                      <rect x="0" y="2" width="10" height="2" fill="rgba(60,130,40,.93)"/>
-                      <rect x="0" y="4" width="10" height="2" fill="rgba(80,150,50,.88)"/>
-                      <rect x="2" y="6" width="6" height="2" fill="rgba(60,130,40,.78)"/>
-                      <rect x="4" y="8" width="2" height="2" fill="rgba(60,130,40,.6)"/>
-                    </svg>
-                  </div>
-                ))}
-
-                {/* Flowers */}
-                {[
-                  {t:'3%', l:'28%', a:'leafFloat2', d:'21s', delay:'3s', fill1:'rgba(255,160,190,.92)'},
-                  {t:'5%', r:'30%', a:'leafFloat4', d:'25s', delay:'8s', fill1:'rgba(255,200,220,.9)'},
-                  {t:'2%', l:'62%', a:'leafFloat1', d:'28s', delay:'16s', fill1:'rgba(255,170,200,.88)'},
-                ].map((fl,i)=>(
-                  <div key={i} style={{position:'absolute',top:fl.t,...(fl.l?{left:fl.l}:{right:(fl as {r?:string}).r}),zIndex:1,pointerEvents:'none',animation:`${fl.a} ${fl.d} linear ${fl.delay} infinite`}}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" style={{imageRendering:'pixelated'}}>
-                      <rect x="4" y="0" width="4" height="2" fill={fl.fill1}/>
-                      <rect x="0" y="4" width="4" height="2" fill={fl.fill1}/>
-                      <rect x="8" y="4" width="4" height="2" fill={fl.fill1}/>
-                      <rect x="4" y="8" width="4" height="2" fill={fl.fill1}/>
-                      <rect x="4" y="4" width="4" height="4" fill="rgba(255,220,60,.96)"/>
-                    </svg>
-                  </div>
-                ))}
-
                 {/* Ground gradient */}
                 <div style={{position:'absolute',left:0,right:0,bottom:0,height:74,zIndex:1,background:'linear-gradient(180deg, transparent, rgba(170,185,140,.5))',pointerEvents:'none'}} />
 
-                {/* Sprite stage: position:absolute;inset:0;padding-bottom:50px (clears chat input) */}
-                <div style={{position:'absolute',inset:0,zIndex:3,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',paddingBottom:50}}>
-                  {/* Floor shadow — only for full-body poses */}
-                  {showFloorShadow && (
-                    <div style={{position:'absolute',bottom:50,left:'50%',transform:'translateX(-50%)',zIndex:4,animation:'adanShadow 7.5s ease-in-out infinite'}}>
-                      <svg width="72" height="20" viewBox="0 0 72 20" style={{imageRendering:'pixelated',display:'block'}}>
-                        <rect x="16" y="0"  width="40" height="4" fill="rgba(30,22,14,.32)"/>
-                        <rect x="6"  y="4"  width="60" height="4" fill="rgba(30,22,14,.26)"/>
-                        <rect x="0"  y="8"  width="72" height="4" fill="rgba(30,22,14,.18)"/>
-                        <rect x="6"  y="12" width="60" height="4" fill="rgba(30,22,14,.10)"/>
-                        <rect x="16" y="16" width="40" height="4" fill="rgba(30,22,14,.05)"/>
-                      </svg>
+                {/* HUD: top strip — name + temperament + clock */}
+                <div style={{position:'absolute',top:0,left:0,right:0,zIndex:36,background:'color-mix(in srgb, var(--lcd) 92%, #000)',borderBottom:'3px solid var(--ink)',borderRadius:'6px 6px 0 0'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 11px 3px',pointerEvents:'none'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:5}}>
+                      <span style={{color:'#c05a52',fontSize:13,lineHeight:1,animation:'adanHeart 2.6s ease-in-out infinite',display:'inline-block'}}>♥︎</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,letterSpacing:1,color:'var(--ink)'}}>LOLO</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,letterSpacing:1,color:'var(--ink)',opacity:.35}}>·</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,letterSpacing:.5,color:'var(--ink)',opacity:.85}}>{temperament.current}</span>
+                      {mode==='chat' && <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,letterSpacing:.5,color:'var(--ink)',opacity:.5,marginLeft:4}}>CHAT</span>}
                     </div>
-                  )}
-                  {/* Frame scale wrapper */}
-                  <div
-                    ref={frameRef}
-                    style={{transition:'transform .55s cubic-bezier(.4,0,.2,1)',transformOrigin:'50% 8%',transform:`scale(${frameScale}) translateY(${frameYOff})`}}
-                  >
-                    <div style={{position:'relative',transformOrigin:'50% 28%',animation:'adanBreathe 5.5s ease-in-out infinite'}}>
-                      <div ref={zoomWrapRef} style={{transition:'transform .3s cubic-bezier(.2,0,.1,1)',transformOrigin:'50% 50%'}}>
+                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,lineHeight:1,color:'var(--ink)',opacity:.9,letterSpacing:1}}>{time}</div>
+                  </div>
+                </div>
+
+                {/* Flex column: character + chat, fills LCD below HUD */}
+                <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',padding:0,margin:0,zIndex:3,minHeight:0}}>
+
+                  {/* Spacer — reserves height for the absolutely-positioned HUD */}
+                  <div style={{height:26,flexShrink:0,pointerEvents:'none'}} />
+
+                  {/* Character area — always fills full screen */}
+                  <div style={{flex:1, position:'relative', overflow:'hidden', minHeight:0}}>
+                    {/* Floor shadow — only for full-body poses */}
+                    {showFloorShadow && (
+                      <div style={{position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',zIndex:4,animation:'adanShadow 7.5s ease-in-out infinite'}}>
+                        <svg width="72" height="20" viewBox="0 0 72 20" style={{imageRendering:'pixelated',display:'block'}}>
+                          <rect x="16" y="0"  width="40" height="4" fill="rgba(30,22,14,.32)"/>
+                          <rect x="6"  y="4"  width="60" height="4" fill="rgba(30,22,14,.26)"/>
+                          <rect x="0"  y="8"  width="72" height="4" fill="rgba(30,22,14,.18)"/>
+                          <rect x="6"  y="12" width="60" height="4" fill="rgba(30,22,14,.10)"/>
+                          <rect x="16" y="16" width="40" height="4" fill="rgba(30,22,14,.05)"/>
+                        </svg>
+                      </div>
+                    )}
+                    {/* Breathe wrapper fills the character area */}
+                    <div
+                      ref={frameRef}
+                      style={{position:'absolute',inset:0,transition:'transform .55s cubic-bezier(.4,0,.2,1)',transformOrigin:'50% 8%'}}
+                    >
+                      <div style={{position:'absolute',inset:0,transformOrigin:'50% 28%',animation:'adanBreathe 5.5s ease-in-out infinite'}}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           ref={imgRef}
-                          src="/adan/adan_idle_1.png"
-                          alt="Adan"
+                          src={IDLE_POOL[0]}
+                          alt="Lolo"
                           draggable={false}
                           onClick={onFaceClick}
-                          onError={e=>{ const el=e.target as HTMLImageElement; if(!/adan_idle_1\.png$/.test(el.src)) el.src='/adan/adan_idle_1.png' }}
-                          style={{width:210,height:320,objectFit:'contain',objectPosition:'bottom center',display:'block',cursor:'pointer',imageRendering:'pixelated',userSelect:'none',filter:'drop-shadow(0 7px 7px rgba(40,30,10,.22))'}}
+                          onError={e=>{ const el=e.target as HTMLImageElement; if(!el.src.endsWith('lolo_idle_1.png')) el.src=IDLE_POOL[0] }}
+                          style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center top',transform:'translateY(8%) scale(1.23)',transformOrigin:'top center',display:'block',cursor:'pointer',imageRendering:'pixelated',userSelect:'none',filter:'drop-shadow(0 7px 7px rgba(40,30,10,.22))'}}
                         />
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* HUD: position:absolute;top:0;z-index:36 — floats above sprite */}
-                <div style={{position:'absolute',top:0,left:0,right:0,zIndex:36,background:'color-mix(in srgb, var(--lcd) 92%, #000)',borderBottom:'3px solid var(--ink)',borderRadius:'6px 6px 0 0',overflow:'hidden'}}>
-                  {/* Top row: ADAN · TEMPERAMENT + time */}
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 11px 3px',pointerEvents:'none',borderBottom:`1px solid color-mix(in srgb, var(--ink) 30%, transparent)`}}>
-                    <div style={{display:'flex',alignItems:'center',gap:5}}>
-                      <span style={{color:'#c05a52',fontSize:14,lineHeight:1,animation:'adanHeart 2.6s ease-in-out infinite',display:'inline-block'}}>♥︎</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,letterSpacing:1,color:'var(--ink)'}}>ADÁN</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,letterSpacing:1,color:'var(--ink)',opacity:.35}}>·</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,letterSpacing:.5,color:'var(--ink)',opacity:.85}}>{temperament.current}</span>
-                    </div>
-                    <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,lineHeight:1,color:'var(--ink)',opacity:.9,letterSpacing:1}}>{time}</div>
-                  </div>
-                  {/* Icon menu row */}
-                  <div style={{display:'flex',alignItems:'stretch'}}>
-                    {MENU.map((item,i)=>{
-                      const isSel = active && sel===i
-                      return (
-                        <div key={item.key}
-                          onClick={()=>{ setActive(true); setSel(i); activate(item.key) }}
-                          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,padding:'8px 0',borderRight:`1px solid color-mix(in srgb, var(--ink) 22%, transparent)`,position:'relative',cursor:'pointer'}}
-                        >
-                          {isSel && <div style={{position:'absolute',inset:0,background:'var(--ink)'}} />}
-                          <div style={{width:16,height:16,backgroundImage:`url('${isSel?MENU_ICONS_LCD[i]:MENU_ICONS_INK[i]}')`,backgroundSize:'contain',backgroundRepeat:'no-repeat',backgroundPosition:'center',imageRendering:'pixelated',position:'relative',zIndex:1}} />
-                          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,letterSpacing:.5,color:isSel?'var(--lcd)':'var(--ink)',position:'relative',zIndex:1}}>{item.short}</span>
+                </div>{/* end flex column */}
+
+                {/* GBA dialogue overlay — chat mode, sits on top of Lolo */}
+                {mode==='chat' && (
+                  <div style={{position:'absolute',left:0,right:0,bottom:0,zIndex:20,minHeight:130,maxHeight:'55%',display:'flex',flexDirection:'column',background:'var(--lcd)',borderTop:'2px solid var(--ink)',animation:'adanBox .18s ease',overflow:'hidden'}}>
+                    {/* Last exchange — scrollable for long responses */}
+                    <div ref={messagesRef} style={{flex:1,overflowY:'auto',maxHeight:'100%',padding:'8px 12px 4px',scrollbarWidth:'none',minHeight:0} as React.CSSProperties}>
+                      {chatMessages.length===0 && !busy && (
+                        <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:'var(--ink)',opacity:.3}}>…</span>
+                      )}
+                      {chatMessages.filter(m=>m.role==='user').at(-1)?.content && (
+                        <div style={{fontFamily:"'VT323',monospace",fontSize:26,color:'var(--ink)',opacity:.6,marginBottom:4,whiteSpace:'normal',wordBreak:'break-word'}}>
+                          › {chatMessages.filter(m=>m.role==='user').at(-1)!.content}
                         </div>
-                      )
-                    })}
+                      )}
+                      {busy && (
+                        <div style={{display:'flex',gap:6,padding:'4px 0',alignItems:'center'}}>
+                          {[0,.22,.44].map((d,i)=>(
+                            <span key={i} style={{width:6,height:6,borderRadius:0,background:'var(--ink)',imageRendering:'pixelated',animation:`adanDot 1.1s steps(1) ${d}s infinite`,display:'inline-block'}} />
+                          ))}
+                        </div>
+                      )}
+                      {!busy && chatMessages.filter(m=>m.role==='assistant').at(-1)?.content && (
+                        <div style={{fontFamily:"'VT323',monospace",fontSize:30,color:'var(--ink)',lineHeight:1.25,whiteSpace:'normal',wordBreak:'break-word',overflowWrap:'break-word'}}>
+                          {chatMessages.filter(m=>m.role==='assistant').at(-1)!.content}
+                        </div>
+                      )}
+                    </div>
+                    {/* Input row */}
+                    <div style={{height:48,flexShrink:0,display:'flex',alignItems:'center',borderTop:'1px solid var(--ink)',background:'var(--lcd)',padding:'0 8px',gap:4}}>
+                      <input
+                        ref={inputRef}
+                        onKeyDown={onInputKey}
+                        placeholder="habla con lolo…"
+                        maxLength={160}
+                        style={{flex:1,width:'100%',border:'none',background:'rgba(0,0,0,0.08)',padding:'4px 8px',fontFamily:"'VT323',monospace",fontSize:20,color:'#1a1a1a',outline:'none',letterSpacing:.5}}
+                      />
+                      <button onClick={onSend} style={{flexShrink:0,border:'none',background:'transparent',cursor:'pointer',display:'grid',placeItems:'center' as const,padding:0}}>
+                        <svg width="13" height="13" viewBox="0 0 14 14" style={{imageRendering:'pixelated',display:'block'}}>
+                          <rect x="0"  y="4"  width="2" height="6"  fill="var(--ink)"/>
+                          <rect x="2"  y="2"  width="2" height="10" fill="var(--ink)"/>
+                          <rect x="4"  y="0"  width="2" height="14" fill="var(--ink)"/>
+                          <rect x="6"  y="2"  width="2" height="10" fill="var(--ink)"/>
+                          <rect x="8"  y="4"  width="2" height="6"  fill="var(--ink)"/>
+                          <rect x="10" y="6"  width="2" height="2"  fill="var(--ink)"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Dialogue box */}
-                {(bubble.visible||busy) && (
-                  <div style={{position:'absolute',left:14,right:14,bottom:50,zIndex:15,animation:'adanBox .26s cubic-bezier(.34,1.4,.64,1)'}}>
+                {/* Dialogue bubble — normal mode only; chat mode shows responses inline */}
+                {(bubble.visible||busy) && mode !== 'chat' && (
+                  <div style={{position:'absolute',left:0,right:0,bottom:0,zIndex:15,animation:'adanBox .26s cubic-bezier(.34,1.4,.64,1)'}}>
                     <div style={{position:'relative',background:'var(--lcd)',border:'3px solid var(--ink)',borderRadius:2,boxShadow:'inset 2px 2px 0 rgba(255,255,255,.55),inset -2px -2px 0 rgba(0,0,0,.12),5px 5px 0 color-mix(in srgb, var(--ink) 22%, transparent)'}}>
                       <div
                         ref={dialogueRef}
                         style={{padding:'18px 16px 14px',minHeight:88,maxHeight:200,overflowY:'auto',scrollbarWidth:'none',scrollBehavior:'smooth'} as React.CSSProperties}
                       >
-                        <div style={{position:'absolute',top:-16,left:14,background:'var(--ink)',color:'var(--lcd)',fontFamily:"'Press Start 2P',monospace",fontSize:9,letterSpacing:1,padding:'5px 9px 6px',borderRadius:2,boxShadow:'2px 2px 0 rgba(0,0,0,.25)'}}>ADAN</div>
+                        <div style={{position:'absolute',top:-16,left:14,background:'var(--ink)',color:'var(--lcd)',fontFamily:"'Press Start 2P',monospace",fontSize:9,letterSpacing:1,padding:'5px 9px 6px',borderRadius:2,boxShadow:'2px 2px 0 rgba(0,0,0,.25)'}}>LOLO</div>
                         {busy && (
                           <div style={{display:'flex',gap:6,padding:'14px 6px',alignItems:'center'}}>
                             {[0,.22,.44].map((d,i)=>(
@@ -1299,45 +1295,34 @@ export default function AdanCompanion() {
                 )}
 
                 {/* Settings overlay */}
-                {mode==='settings' && (
-                  <div style={{position:'absolute',top:62,left:12,right:12,bottom:12,zIndex:16,background:'var(--lcd)',border:'3px solid var(--ink)',borderRadius:2,padding:'14px 14px 12px',boxShadow:'inset 2px 2px 0 rgba(255,255,255,.5),inset -2px -2px 0 rgba(0,0,0,.1),5px 5px 0 color-mix(in srgb, var(--ink) 20%, transparent)',display:'flex',flexDirection:'column',gap:8,animation:'adanBox .24s ease'}}>
-                    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',borderBottom:`2px solid color-mix(in srgb, var(--ink) 30%, transparent)`,paddingBottom:8}}>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,letterSpacing:1,color:'var(--ink)'}}>CONFIG</span>
-                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:7,color:'var(--ink)',opacity:.55,letterSpacing:.5}}>SEL ► ENT</span>
+                {mode==='cfg' && (
+                  <div style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',zIndex:40,background:'var(--lcd)',padding:'12px 14px 10px',display:'flex',flexDirection:'column',gap:7,animation:'adanBox .24s ease',overflowY:'auto'}}>
+                    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',borderBottom:`2px solid color-mix(in srgb, var(--ink) 30%, transparent)`,paddingBottom:7}}>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:14,letterSpacing:1,color:'var(--ink)'}}>CONFIG</span>
+                      <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:'var(--ink)',opacity:.55,letterSpacing:.5}}>toca para cambiar</span>
                     </div>
                     {settingsRowData.map((row,i)=>{
                       const isSel = settingsSel===i
                       return (
                         <div key={row.key}
-                          onClick={()=>{ if(row.readonly) return; setSettingsSel(i); cycleSetting(row.key as typeof SETTINGS_KEYS[number]) }}
-                          style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'6px 9px',border:`2px solid ${isSel&&!row.readonly?'var(--ink)':'color-mix(in srgb, var(--ink) 25%, transparent)'}`,background:isSel&&!row.readonly?'color-mix(in srgb, var(--ink) 10%, transparent)':'transparent',cursor:row.readonly?'default':'pointer',imageRendering:'pixelated'}}
+                          onClick={()=>{
+                            if(row.readonly) return
+                            setSettingsSel(i)
+                            cycleSetting(row.key as typeof SETTINGS_KEYS[number])
+                          }}
+                          style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'5px 9px',border:`2px solid ${isSel&&!row.readonly?'var(--ink)':'color-mix(in srgb, var(--ink) 25%, transparent)'}`,background:isSel&&!row.readonly?'color-mix(in srgb, var(--ink) 10%, transparent)':'transparent',cursor:row.readonly?'default':'pointer',imageRendering:'pixelated'}}
                         >
-                          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:'var(--ink)',letterSpacing:.5,opacity:row.readonly?.6:1}}>{row.label}</span>
+                          <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,color:'var(--ink)',letterSpacing:.5,opacity:row.readonly?.6:1}}>{row.label}</span>
                           <div style={{display:'flex',alignItems:'center',gap:7}}>
                             {row.isColor && <span style={{width:13,height:13,border:'2px solid var(--ink)',background:row.swatch,imageRendering:'pixelated',display:'inline-block',borderRadius:row.swatch.startsWith('linear')?2:0}} />}
-                            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,letterSpacing:.5,color:'var(--ink)',opacity:row.readonly?.75:1}}>{row.value}</span>
+                            <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,letterSpacing:.5,color:'var(--ink)',opacity:row.readonly?.75:1}}>{row.value}</span>
                           </div>
                         </div>
                       )
                     })}
-                    <div style={{marginTop:'auto',fontFamily:"'Press Start 2P',monospace",fontSize:7,color:'var(--ink)',opacity:.5,letterSpacing:.5,textAlign:'right'}}>BACK para cerrar</div>
+                    <div style={{marginTop:'auto',fontFamily:"'Press Start 2P',monospace",fontSize:9,color:'var(--ink)',opacity:.5,letterSpacing:.5,textAlign:'right'}}>BCK para cerrar</div>
                   </div>
                 )}
-
-                {/* Sparkles */}
-                {[
-                  {t:'5%',l:'38%',a:'sparkle',  d:'30s',delay:'4s',  w:6,h:6,fill:'rgba(255,248,200,.95)'},
-                  {t:'3%',l:'60%',a:'sparkle2', d:'38s',delay:'14s', w:8,h:8,fill:'rgba(255,252,210,.92)'},
-                  {t:'6%',l:'48%',a:'sparkle3', d:'44s',delay:'22s', w:6,h:6,fill:'rgba(255,248,210,.9)'},
-                  {t:'4%',l:'28%',a:'sparkle4', d:'50s',delay:'32s', w:8,h:8,fill:'rgba(240,252,255,.88)'},
-                ].map((sp,i)=>(
-                  <div key={i} style={{position:'absolute',top:sp.t,left:sp.l,zIndex:12,pointerEvents:'none',animation:`${sp.a} ${sp.d} ease-in-out ${sp.delay} infinite`,filter:'drop-shadow(0 0 3px rgba(255,245,180,.9)) drop-shadow(0 0 6px rgba(255,220,80,.5))'}}>
-                    <svg width={sp.w} height={sp.h} viewBox={`0 0 ${sp.w} ${sp.h}`} style={{imageRendering:'pixelated'}}>
-                      <rect x={sp.w/2-1} y={0} width={2} height={sp.h} fill={sp.fill}/>
-                      <rect x={0} y={sp.h/2-1} width={sp.w} height={2} fill={sp.fill}/>
-                    </svg>
-                  </div>
-                ))}
 
                 {/* Dither */}
                 <div style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:24,backgroundImage:'repeating-conic-gradient(rgba(0,0,0,.6) 0% 25%, transparent 0% 50%)',backgroundSize:'3px 3px',opacity:.05}} />
@@ -1384,35 +1369,14 @@ export default function AdanCompanion() {
                   </div>
                 )}
 
-                {/* Chat input */}
-                <div style={{position:'absolute',left:0,right:0,bottom:0,zIndex:14,height:40,display:'flex',alignItems:'stretch',background:'var(--lcd)',borderTop:'3px solid var(--ink)'}}>
-                  <input
-                    ref={inputRef}
-                    onKeyDown={onInputKey}
-                    placeholder="habla con adán…"
-                    maxLength={160}
-                    style={{flex:1,height:'100%',border:'none',background:'transparent',padding:'0 12px',fontFamily:"'VT323',monospace",fontSize:24,color:'var(--ink)',outline:'none',letterSpacing:.5}}
-                  />
-                  <button onClick={onSend} style={{height:'100%',width:44,flexShrink:0,border:'none',borderLeft:'3px solid var(--ink)',background:'transparent',cursor:'pointer',display:'grid',placeItems:'center' as const}}>
-                    <svg width="13" height="13" viewBox="0 0 14 14" style={{imageRendering:'pixelated',display:'block'}}>
-                      <rect x="0"  y="4"  width="2" height="6"  fill="var(--ink)"/>
-                      <rect x="2"  y="2"  width="2" height="10" fill="var(--ink)"/>
-                      <rect x="4"  y="0"  width="2" height="14" fill="var(--ink)"/>
-                      <rect x="6"  y="2"  width="2" height="10" fill="var(--ink)"/>
-                      <rect x="8"  y="4"  width="2" height="6"  fill="var(--ink)"/>
-                      <rect x="10" y="6"  width="2" height="2"  fill="var(--ink)"/>
-                    </svg>
-                  </button>
-                </div>
-
                 {/* Glass panel */}
                 <div style={{position:'absolute',inset:0,borderRadius:'inherit',pointerEvents:'none',zIndex:37,overflow:'hidden'}}>
-                  <div style={{position:'absolute',inset:0,background:'linear-gradient(168deg, rgba(210,230,255,.07) 0%, rgba(190,215,255,.03) 50%, rgba(150,190,255,.015) 100%)'}} />
-                  <div style={{position:'absolute',top:0,left:0,right:0,height:'48%',background:'linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.06) 55%, transparent 100%)',animation:'glassBreath 7s ease-in-out infinite'}} />
-                  <div style={{position:'absolute',top:'-10%',bottom:'-10%',width:55,background:'linear-gradient(90deg, transparent 0%, rgba(255,255,255,.22) 50%, transparent 100%)',animation:'glassShimmer 16s ease-in-out 5s infinite'}} />
-                  <div style={{position:'absolute',top:'-10%',bottom:'-10%',width:30,background:'linear-gradient(90deg, transparent, rgba(255,255,255,.10) 50%, transparent)',animation:'glassShimmer 16s ease-in-out 11s infinite'}} />
-                  <div style={{position:'absolute',inset:0,boxShadow:'inset 0 2px 5px rgba(0,0,0,.28),inset 2px 0 4px rgba(0,0,0,.14),inset -2px 0 4px rgba(0,0,0,.14),inset 0 -2px 4px rgba(0,0,0,.18),inset 0 0 0 1px rgba(255,255,255,.12)',borderRadius:'inherit'}} />
-                  <div style={{position:'absolute',bottom:0,left:0,right:0,height:'28%',background:'linear-gradient(0deg, rgba(255,248,200,.055) 0%, transparent 100%)',animation:'glassGlow 9s ease-in-out infinite'}} />
+                  <div style={{position:'absolute',inset:0,background:'linear-gradient(168deg, rgba(210,230,255,.03) 0%, rgba(190,215,255,.01) 50%, rgba(150,190,255,.005) 100%)'}} />
+                  <div style={{position:'absolute',top:0,left:0,right:0,height:'48%',background:'linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,.02) 55%, transparent 100%)',animation:'glassBreath 7s ease-in-out infinite'}} />
+                  <div style={{position:'absolute',top:'-10%',bottom:'-10%',width:55,background:'linear-gradient(90deg, transparent 0%, rgba(255,255,255,.08) 50%, transparent 100%)',animation:'glassShimmer 16s ease-in-out 5s infinite'}} />
+                  <div style={{position:'absolute',top:'-10%',bottom:'-10%',width:30,background:'linear-gradient(90deg, transparent, rgba(255,255,255,.04) 50%, transparent)',animation:'glassShimmer 16s ease-in-out 11s infinite'}} />
+                  <div style={{position:'absolute',inset:0,boxShadow:'inset 0 2px 5px rgba(0,0,0,.28),inset 2px 0 4px rgba(0,0,0,.14),inset -2px 0 4px rgba(0,0,0,.14),inset 0 -2px 4px rgba(0,0,0,.18),inset 0 0 0 1px rgba(255,255,255,.08)',borderRadius:'inherit'}} />
+                  <div style={{position:'absolute',bottom:0,left:0,right:0,height:'28%',background:'linear-gradient(0deg, rgba(255,248,200,.02) 0%, transparent 100%)',animation:'glassGlow 9s ease-in-out infinite'}} />
                 </div>
 
               </div>{/* end LCD */}
@@ -1427,9 +1391,9 @@ export default function AdanCompanion() {
             <div style={{position:'relative',background:'color-mix(in srgb, var(--shellDark) 75%, #000)',borderRadius:10,padding:'12px 20px 12px',border:'2px solid var(--shellBorder)',boxShadow:'inset 0 4px 10px rgba(0,0,0,.28),inset 0 2px 4px rgba(0,0,0,.16),inset 0 -2px 0 rgba(255,255,255,.14)'}}>
 
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:20}}>
-                {/* SEL */}
+                {/* CFG */}
                 <div style={{width:70,height:52,borderRadius:26,background:'color-mix(in srgb, var(--shellDark) 62%, #000)',boxShadow:'inset 0 -4px 8px rgba(0,0,0,.75),inset 0 -1px 0 rgba(0,0,0,.55)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <button onClick={onA} onPointerDown={()=>setPressedBtn('SEL')} onPointerUp={()=>setPressedBtn(null)} onPointerLeave={()=>setPressedBtn(null)} style={ovalBtn('SEL',pressedBtn==='SEL')}>SEL</button>
+                  <button onClick={onA} onPointerDown={()=>setPressedBtn('SEL')} onPointerUp={()=>setPressedBtn(null)} onPointerLeave={()=>setPressedBtn(null)} style={ovalBtn('SEL',pressedBtn==='SEL')}>CFG</button>
                 </div>
                 {/* ENT */}
                 <div style={{width:74,height:74,borderRadius:'50%',background:'color-mix(in srgb, var(--shellDark) 62%, #000)',boxShadow:'inset 0 -4px 8px rgba(0,0,0,.75),inset 0 -1px 0 rgba(0,0,0,.55)',display:'flex',alignItems:'center',justifyContent:'center'}}>
