@@ -125,34 +125,34 @@ export default function AdanCompanion() {
 
   // Lip-sync primary: starts when bubble.typing becomes true
   useEffect(()=>{
+    // Stop any TALK_FRAMES cycling that the [pose] effect may have started
+    if(talkFrameTimer.current){ clearInterval(talkFrameTimer.current); talkFrameTimer.current=null }
     if(mouthFrameTimer.current){ clearInterval(mouthFrameTimer.current); mouthFrameTimer.current=null }
     if(expressiveTimer.current){ clearTimeout(expressiveTimer.current); expressiveTimer.current=null }
     gestureActive.current = false; mouthFrame.current = 0
     if(!bubble.typing) return
-    let warmup: ReturnType<typeof setTimeout>|null = setTimeout(()=>{
-      warmup = null
-      const el = imgRef.current; if(el) el.src = MOUTH_FRAMES[0]
-      mouthFrameTimer.current = setInterval(()=>{
-        if(gestureActive.current) return
-        mouthFrame.current = (mouthFrame.current + 1) % MOUTH_FRAMES.length
-        const img = imgRef.current; if(img) img.src = MOUTH_FRAMES[mouthFrame.current]
-      }, 150)
-      const scheduleGesture = () => {
-        const delay = 2000 + Math.random() * 1000
+    // Go directly to MOUTH_FRAMES — no warmup, no TALK_FRAMES at startup
+    const el = imgRef.current; if(el) el.src = MOUTH_FRAMES[0]
+    mouthFrameTimer.current = setInterval(()=>{
+      if(gestureActive.current) return
+      mouthFrame.current = (mouthFrame.current + 1) % MOUTH_FRAMES.length
+      const img = imgRef.current; if(img) img.src = MOUTH_FRAMES[mouthFrame.current]
+    }, 150)
+    // First expressive gesture: only after 2s of lip sync
+    // Subsequent gestures: minimum 3s apart
+    const scheduleGesture = (firstDelay: number) => {
+      expressiveTimer.current = setTimeout(()=>{
+        gestureActive.current = true
+        const img = imgRef.current; if(img) img.src = randItem(TALK_FRAMES)
         expressiveTimer.current = setTimeout(()=>{
-          gestureActive.current = true
-          const img = imgRef.current; if(img) img.src = randItem(TALK_FRAMES)
-          expressiveTimer.current = setTimeout(()=>{
-            gestureActive.current = false; mouthFrame.current = 0
-            const img2 = imgRef.current; if(img2) img2.src = MOUTH_FRAMES[0]
-            scheduleGesture()
-          }, 400)
-        }, delay)
-      }
-      scheduleGesture()
-    }, 50)
+          gestureActive.current = false; mouthFrame.current = 0
+          const img2 = imgRef.current; if(img2) img2.src = MOUTH_FRAMES[0]
+          scheduleGesture(3000 + Math.random() * 1000)
+        }, 400)
+      }, firstDelay)
+    }
+    scheduleGesture(2000 + Math.random() * 1000)
     return ()=>{
-      if(warmup !== null){ clearTimeout(warmup); warmup=null }
       if(mouthFrameTimer.current){ clearInterval(mouthFrameTimer.current); mouthFrameTimer.current=null }
       if(expressiveTimer.current){ clearTimeout(expressiveTimer.current); expressiveTimer.current=null }
       gestureActive.current = false
