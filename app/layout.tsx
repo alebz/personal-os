@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { unstable_ViewTransition as ViewTransition } from "react";
 import "./globals.css";
 import { StarsBackground } from "@/components/StarsBackground";
 
@@ -16,7 +17,7 @@ export default function RootLayout({
     <html lang="es" className="dark">
       <body className="bg-ink-0 text-ink-4 antialiased">
         <StarsBackground />
-        {children}
+        <ViewTransition>{children}</ViewTransition>
       </body>
     </html>
   );

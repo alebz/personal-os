@@ -42,8 +42,8 @@ export default function CumpleanosCard() {
         const sorted = data
           .filter(c => c.birthday)
           .map(c => ({ ...c, days: daysUntilBirthday(c.birthday) }))
-          .filter(c => c.days <= 30)
           .sort((a, b) => a.days - b.days)
+          .slice(0, 4)
         setUpcoming(sorted)
       })
       .catch(() => {})
@@ -66,7 +66,7 @@ export default function CumpleanosCard() {
         <p className="animate-pulse text-xs text-ink-3">Cargando…</p>
       ) : upcoming.length === 0 ? (
         <p className="text-xs italic text-ink-3/60">
-          Nadie cumple años en los próximos 30 días.
+          No hay cumpleaños registrados.
         </p>
       ) : (
         <ul className="space-y-2">

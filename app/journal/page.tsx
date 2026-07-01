@@ -384,7 +384,7 @@ export default function JournalPage() {
   const groups = groupByDate(entries)
 
   return (
-    <Shell glow="journal">
+    <Shell>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
 
         {/* Header */}

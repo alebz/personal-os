@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Shell from '@/components/Shell'
+import Mxn from '@/components/Mxn'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -49,9 +50,10 @@ interface ExpenseRow { category: string; amount: number; paid: boolean; method: 
 interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 'cash' | 'card' }
 interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
 interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
+interface Corte        { id: string; month: string; date: string; sistema: number; real: number; diferencia: number; concepto: string | null; cuenta_bancaria: number | null; efectivo: number | null; created_at: string }
 
 type ValetStatus = 'pending' | 'paid' | 'advance'
-interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; price_per_point: number }
+interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; provider_amounts: number[]; price_per_point: number }
 interface ValetPayment { week_num: number; tenant_id: string; status: ValetStatus }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -195,7 +197,7 @@ function AmountInput({
       onClick={() => setFocused(true)}
       className={`w-28 rounded border border-transparent px-1 py-0.5 text-right text-sm tabular-nums text-ink-4 hover:border-ink-4/10 ${className}`}
     >
-      {mxn(value)}
+      <Mxn v={value} />
     </button>
   )
 }
@@ -206,14 +208,14 @@ function SectionCard({ title, note, total, colorClass = 'text-ink-3', children }
   title: string; note?: string; total?: number; colorClass?: string; children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-ink-4/10 bg-ink-1/10 px-3 pt-3 pb-2">
+    <div className="rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 pt-3 pb-2 shadow-lg shadow-black/10 backdrop-blur-xl">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-baseline gap-1.5">
           <p className={`text-[10px] font-bold uppercase tracking-widest ${colorClass}`}>{title}</p>
           {note && <span className="text-[9px] text-ink-3/60">{note}</span>}
         </div>
         {total !== undefined && total > 0 && (
-          <span className="text-xs font-semibold tabular-nums text-ink-4">{mxn(total)}</span>
+          <span className="text-xs font-semibold tabular-nums text-ink-4"><Mxn v={total} /></span>
         )}
       </div>
       {children}
@@ -458,26 +460,24 @@ function ResumenCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
   const totalRentas   = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
   const totalExtraInc = extraIncome.reduce((s, i) => s + i.amount, 0)
   const totalIngresos = totalRentas + totalExtraInc
-
   const totalFijos    = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
   const totalNomina   = nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
   const totalExtraExp = extraExpenses.reduce((s, i) => s + i.amount, 0)
   const totalEgresos  = totalFijos + totalNomina + totalExtraExp
-
-  const neto = totalIngresos - totalEgresos
+  const neto          = totalIngresos - totalEgresos
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen del Mes</p>
-      <div className="grid grid-cols-3 divide-x divide-ink-4/10 text-center">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen del Mes</p>
+      <div className="space-y-4">
         {[
-          { label: 'Ingresos', value: totalIngresos, cls: 'text-ok' },
-          { label: 'Egresos',  value: totalEgresos,  cls: 'text-danger' },
-          { label: 'Neto',     value: neto,          cls: neto >= 0 ? 'text-ok' : 'text-danger' },
+          { label: 'Ingresos',      value: totalIngresos, cls: 'text-ok' },
+          { label: 'Egresos',       value: totalEgresos,  cls: 'text-danger' },
+          { label: 'Flujo del Mes', value: neto,          cls: neto >= 0 ? 'text-ok' : 'text-danger' },
         ].map(({ label, value, cls }) => (
-          <div key={label} className="px-4 py-1">
+          <div key={label}>
             <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-            <p className={`mt-0.5 text-xl font-black tabular-nums ${cls}`}>{mxn(value)}</p>
+            <p className={`text-xl font-black tabular-nums ${cls}`}><Mxn v={value} /></p>
           </div>
         ))}
       </div>
@@ -487,29 +487,29 @@ function ResumenCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
 
 // ─── BalanceCard ──────────────────────────────────────────────────────────────
 
-function BalanceCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses, month, onSave }: {
+function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses, month, onSave, onCorte }: {
   bal: BalanceState
   rents: RentRow[]; expenses: ExpenseRow[]; nomina: NominaRow[]
   extraIncome: ExtraItem[]; extraExpenses: ExtraItem[]
   month: string
   onSave: (fields: Partial<BalanceState>) => void
+  onCorte: (data: { month: string; sistema: number; real: number; diferencia: number; concepto: string; cuenta_bancaria: number; efectivo: number }) => Promise<void>
 }) {
-  const [sb, setSb]   = useState(String(bal.starting_balance))
-  const [cb, setCb]   = useState(String(bal.cuenta_bancaria))
-  const [ef, setEf]   = useState(String(bal.efectivo))
-  const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [cb,       setCb]       = useState(String(bal.cuenta_bancaria))
+  const [ef,       setEf]       = useState(String(bal.efectivo))
+  const [editCb,   setEditCb]   = useState(false)
+  const [editEf,   setEditEf]   = useState(false)
+  const [modal,    setModal]    = useState(false)
+  const [concepto, setConcepto] = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [toast,    setToast]    = useState(false)
 
   useEffect(() => {
-    setSb(String(bal.starting_balance))
     setCb(String(bal.cuenta_bancaria))
     setEf(String(bal.efectivo))
   }, [bal])
 
-  function schedSave(fields: Partial<BalanceState>) {
-    if (saveRef.current) clearTimeout(saveRef.current)
-    saveRef.current = setTimeout(() => onSave(fields), 600)
-  }
-
+  // Sistema: what the payment tracking says we should have
   const totalRentas   = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
   const totalExtraInc = extraIncome.reduce((s, i) => s + i.amount, 0)
   const totalIngresos = totalRentas + totalExtraInc
@@ -517,89 +517,123 @@ function BalanceCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses,
   const totalNomina   = nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
   const totalExtraExp = extraExpenses.reduce((s, i) => s + i.amount, 0)
   const totalEgresos  = totalFijos + totalNomina + totalExtraExp
-  const neto          = totalIngresos - totalEgresos
+  const sistema       = (bal.starting_balance || 0) + totalIngresos - totalEgresos
 
-  const startingN     = parseFloat(sb) || 0
-  const proyectado    = startingN + neto
-  const cuentaN       = parseFloat(cb) || 0
-  const efectivoN     = parseFloat(ef) || 0
-  const saldoActual   = cuentaN + efectivoN
-  const diferencia    = saldoActual - proyectado
+  const cuentaN    = parseFloat(cb) || 0
+  const efectivoN  = parseFloat(ef) || 0
+  const totalReal  = cuentaN + efectivoN
+  const diferencia = totalReal - sistema
 
-  function field(label: string, value: string, onChange: (v: string) => void, onBlurSave: (n: number) => void) {
-    return (
-      <div className="flex items-center justify-between">
-        <label className="text-xs text-ink-3">{label}</label>
-        <input
-          type="number" value={value}
-          onChange={e => { onChange(e.target.value); schedSave(onBlurSave(parseFloat(e.target.value) || 0) as unknown as Partial<BalanceState>) }}
-          onBlur={() => onBlurSave(parseFloat(value) || 0)}
-          className="w-32 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-right text-sm font-semibold tabular-nums text-ink-4 outline-none focus:border-accent/50"
-        />
-      </div>
-    )
-  }
+  const bigCls = 'w-full text-right text-3xl font-black tabular-nums text-ink-4 hover:text-accent'
+  const inCls  = 'w-full rounded-xl border border-accent/50 bg-ink-2/20 px-3 py-1.5 text-right text-2xl font-black tabular-nums text-ink-4 outline-none'
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl space-y-3">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Balance</p>
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo Actual</p>
 
-      {/* Starting balance */}
-      <div className="flex items-center justify-between">
-        <label className="text-xs text-ink-3">Saldo inicial</label>
-        <input
-          type="number" value={sb}
-          onChange={e => { setSb(e.target.value); schedSave({ starting_balance: parseFloat(e.target.value) || 0 }) }}
-          className="w-32 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-right text-sm font-semibold tabular-nums text-ink-4 outline-none focus:border-accent/50"
-        />
+      {/* Cuenta + Efectivo */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3/50">💳 Cuenta</p>
+          {editCb ? (
+            <input type="number" value={cb} autoFocus
+              onChange={e => setCb(e.target.value)}
+              onBlur={e => { onSave({ cuenta_bancaria: parseFloat(e.target.value) || 0 }); setEditCb(false) }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
+              className={inCls}
+            />
+          ) : (
+            <button onClick={() => setEditCb(true)} className={bigCls}><Mxn v={cuentaN} /></button>
+          )}
+        </div>
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3/50">💵 Efectivo</p>
+          {editEf ? (
+            <input type="number" value={ef} autoFocus
+              onChange={e => setEf(e.target.value)}
+              onBlur={e => { onSave({ efectivo: parseFloat(e.target.value) || 0 }); setEditEf(false) }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
+              className={inCls}
+            />
+          ) : (
+            <button onClick={() => setEditEf(true)} className={bigCls}><Mxn v={efectivoN} /></button>
+          )}
+        </div>
       </div>
 
-      {/* Calculated rows */}
-      <div className="space-y-1 border-t border-ink-4/10 pt-2 text-xs">
-        <div className="flex justify-between text-ink-3">
-          <span>+ Ingresos cobrados</span>
-          <span className="tabular-nums text-ok">{mxn(totalIngresos)}</span>
-        </div>
-        <div className="flex justify-between text-ink-3">
-          <span>− Egresos pagados</span>
-          <span className="tabular-nums text-danger">{mxn(totalEgresos)}</span>
-        </div>
-        <div className="flex justify-between border-t border-ink-4/10 pt-1 font-semibold">
-          <span className="text-ink-4">= Proyectado</span>
-          <span className={`tabular-nums ${proyectado >= 0 ? 'text-ok' : 'text-danger'}`}>{mxn(proyectado)}</span>
-        </div>
+      {/* Total */}
+      <div className="mt-4 border-t border-ink-4/10 pt-3 text-right">
+        <span className="text-[10px] uppercase tracking-wider text-ink-3/50">Total </span>
+        <span className="text-3xl font-black tabular-nums text-ink-4"><Mxn v={totalReal} /></span>
       </div>
 
-      {/* Actual balances */}
-      <div className="space-y-2 border-t border-ink-4/10 pt-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-3">Saldo actual</p>
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-ink-3">Cuenta bancaria</label>
+      {/* Registrar CORTE button */}
+      <button
+        onClick={() => { setModal(true); setConcepto('') }}
+        className="mt-4 w-full rounded-xl border border-ink-4/10 bg-ink-2/10 py-2 text-[11px] font-semibold text-ink-3 transition-colors hover:bg-ink-2/20 hover:text-ink-4"
+      >
+        📋 Registrar CORTE
+      </button>
+
+      {/* Success toast */}
+      {toast && (
+        <p className="mt-2 text-center text-[11px] font-medium text-ok">✓ Corte registrado</p>
+      )}
+
+      {/* Corte modal — inline panel */}
+      {modal && (
+        <div className="mt-4 space-y-3 rounded-xl border border-ink-4/10 bg-ink-2/10 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Registrar Corte</p>
+
+          <div className="space-y-1 text-[11px] text-ink-3/70">
+            <div className="flex justify-between">
+              <span>Sistema dice</span>
+              <span className="tabular-nums"><Mxn v={sistema} /></span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tú tienes</span>
+              <span className="font-semibold tabular-nums text-ink-4"><Mxn v={totalReal} /></span>
+            </div>
+            <div className={`flex justify-between border-t border-ink-4/10 pt-1 font-semibold ${diferencia >= 0 ? 'text-ok' : 'text-danger'}`}>
+              <span>Diferencia</span>
+              <span className="tabular-nums">
+                {diferencia >= 0 ? '▲' : '▼'} <Mxn v={Math.abs(diferencia)} />
+              </span>
+            </div>
+          </div>
+
           <input
-            type="number" value={cb}
-            onChange={e => { setCb(e.target.value); schedSave({ cuenta_bancaria: parseFloat(e.target.value) || 0 }) }}
-            className="w-32 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-right text-sm font-semibold tabular-nums text-ink-4 outline-none focus:border-accent/50"
+            type="text" value={concepto} placeholder="Concepto (opcional)"
+            onChange={e => setConcepto(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') setModal(false) }}
+            className="w-full rounded-lg border border-ink-4/10 bg-ink-2/20 px-3 py-1.5 text-[11px] text-ink-4 outline-none placeholder:text-ink-3/40 focus:border-accent/50"
           />
-        </div>
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-ink-3">Efectivo</label>
-          <input
-            type="number" value={ef}
-            onChange={e => { setEf(e.target.value); schedSave({ efectivo: parseFloat(e.target.value) || 0 }) }}
-            className="w-32 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-right text-sm font-semibold tabular-nums text-ink-4 outline-none focus:border-accent/50"
-          />
-        </div>
-        <div className="flex justify-between border-t border-ink-4/10 pt-1 text-sm font-bold">
-          <span className="text-ink-4">Total</span>
-          <span className="tabular-nums text-ink-4">{mxn(saldoActual)}</span>
-        </div>
-      </div>
 
-      {/* Difference */}
-      <div className={`rounded-lg px-3 py-2 text-xs ${Math.abs(diferencia) < 1 ? 'bg-ok/10 text-ok' : 'bg-warn/10 text-warn'}`}>
-        <span>Diferencia vs proyectado: </span>
-        <span className="font-bold tabular-nums">{mxn(diferencia)}</span>
-      </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setModal(false)}
+              className="flex-1 rounded-lg border border-ink-4/10 py-1.5 text-[11px] text-ink-3 hover:bg-ink-2/20"
+            >
+              Cancelar
+            </button>
+            <button
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true)
+                await onCorte({ month, sistema, real: totalReal, diferencia, concepto, cuenta_bancaria: cuentaN, efectivo: efectivoN })
+                setSaving(false)
+                setModal(false)
+                setConcepto('')
+                setToast(true)
+                setTimeout(() => setToast(false), 3000)
+              }}
+              className="flex-1 rounded-lg bg-accent/80 py-1.5 text-[11px] font-semibold text-white hover:bg-accent disabled:opacity-40"
+            >
+              {saving ? '…' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -618,11 +652,11 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
       <div className="mb-2 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Fondo Mantenimiento</p>
-          <p className="text-[10px] text-ink-3">Meta: {mxn(FONDO_META)}</p>
+          <p className="text-[10px] text-ink-3">Meta: <Mxn v={FONDO_META} /></p>
         </div>
         <div className="text-right">
-          <p className="text-lg font-black text-ok">{mxn(fondoTotal)}</p>
-          <p className="text-[10px] text-ink-3">{pct.toFixed(1)}% · Faltan {mxn(faltan)}</p>
+          <p className="text-lg font-black text-ok"><Mxn v={fondoTotal} /></p>
+          <p className="text-[10px] text-ink-3">{pct.toFixed(1)}% · Faltan <Mxn v={faltan} /></p>
         </div>
       </div>
 
@@ -643,17 +677,132 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
   )
 }
 
+// ─── UptownHistorialTab ───────────────────────────────────────────────────────
+
+interface UptownMov {
+  id: string
+  description: string
+  amount: number
+  flow: 'in' | 'out'
+  category: string
+  method: string
+}
+
+const UPTOWN_METHOD_STYLE: Record<string, string> = {
+  cash: 'bg-warn/15 text-warn',
+  card: 'bg-accent/15 text-accent',
+}
+const UPTOWN_METHOD_LABEL: Record<string, string> = { cash: 'Ef', card: 'TJ' }
+
+function UptownHistorialTab({ rents, expenses, nomina, extraIncome, extraExpenses, month }: {
+  rents: RentRow[]
+  expenses: ExpenseRow[]
+  nomina: NominaRow[]
+  extraIncome: ExtraItem[]
+  extraExpenses: ExtraItem[]
+  month: string
+}) {
+  const sats = saturdaysInMonth(month)
+  const movs: UptownMov[] = []
+
+  for (const r of rents.filter(r => r.paid)) {
+    const def = RENTER_DEFS.find(d => d.id === r.renter)
+    movs.push({ id: `rent:${r.renter}`, description: def?.name ?? r.renter, amount: r.amount, flow: 'in', category: 'Renta', method: r.method })
+  }
+  for (const i of extraIncome) {
+    movs.push({ id: `inc:${i.id}`, description: i.description, amount: i.amount, flow: 'in', category: 'Ingreso extra', method: i.method })
+  }
+  for (const e of expenses.filter(e => e.paid)) {
+    let name: string
+    if (e.category.startsWith('martha_')) {
+      const num = parseInt(e.category.split('_')[1])
+      name = `Martha · ${sats.find(s => s.num === num)?.label ?? `Sem. ${num}`}`
+    } else {
+      name = EXPENSE_DEFS.find(d => d.id === e.category)?.name ?? e.category
+    }
+    movs.push({ id: `exp:${e.category}`, description: name, amount: e.amount, flow: 'out', category: 'Gasto fijo', method: e.method })
+  }
+  for (const n of nomina.filter(n => n.paid)) {
+    const label = sats.find(s => s.num === n.week_num)?.label
+    movs.push({ id: `nom:${n.week_num}`, description: `Nómina · Sem. ${n.week_num}${label ? ` (${label})` : ''}`, amount: n.amount, flow: 'out', category: 'Nómina', method: n.method })
+  }
+  for (const i of extraExpenses) {
+    movs.push({ id: `xexp:${i.id}`, description: i.description, amount: i.amount, flow: 'out', category: 'Gasto extra', method: i.method })
+  }
+
+  const totalIn  = movs.filter(m => m.flow === 'in').reduce((s, m)  => s + m.amount, 0)
+  const totalOut = movs.filter(m => m.flow === 'out').reduce((s, m) => s + m.amount, 0)
+  const neto     = totalIn - totalOut
+
+  const sorted = [...movs].sort((a, b) => {
+    if (a.flow !== b.flow) return a.flow === 'in' ? -1 : 1
+    return b.amount - a.amount
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Entrado', value: totalIn,  cls: 'text-ok' },
+          { label: 'Salido',  value: totalOut, cls: 'text-danger' },
+          { label: 'Neto',    value: neto,     cls: neto >= 0 ? 'text-ok' : 'text-danger' },
+        ].map(({ label, value, cls }) => (
+          <div key={label} className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl">
+            <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
+            <p className={`mt-1 text-base font-bold tabular-nums ${cls}`}><Mxn v={value} /></p>
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5">
+        {sorted.length === 0 ? (
+          <p className="p-10 text-center text-sm italic text-ink-3">Sin movimientos registrados este mes</p>
+        ) : (
+          sorted.map(m => (
+            <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-sm text-ink-4">{m.description}</span>
+              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${UPTOWN_METHOD_STYLE[m.method] ?? 'bg-ink-2/20 text-ink-3'}`}>
+                {UPTOWN_METHOD_LABEL[m.method] ?? m.method}
+              </span>
+              <span className="shrink-0 rounded-full bg-ink-2/30 px-2 py-0.5 text-[10px] text-ink-3">
+                {m.category}
+              </span>
+              <span className={`shrink-0 text-sm font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
+                {m.flow === 'in' ? '+' : '−'}<Mxn v={m.amount} />
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── ValetWeekCard ────────────────────────────────────────────────────────────
 
 function ValetWeekCard({
-  weekNum, weekLabel, payments, providerPaid, pricePerPoint, onTenantToggle, onProviderToggle,
+  weekNum, weekLabel, payments, providerPaid, providerAmount, pricePerPoint, onTenantToggle, onProviderToggle, onProviderAmount,
 }: {
   weekNum: number; weekLabel: string; payments: ValetPayment[]
   providerPaid: boolean
+  providerAmount: number
   pricePerPoint: number
   onTenantToggle: (tenantId: string, paid: boolean) => void
   onProviderToggle: (paid: boolean) => void
+  onProviderAmount: (amount: number) => void
 }) {
+  const [editingAmt, setEditingAmt] = useState(false)
+  const [amtDraft,   setAmtDraft]   = useState(String(providerAmount))
+
+  useEffect(() => { if (!editingAmt) setAmtDraft(String(providerAmount)) }, [providerAmount, editingAmt])
+
+  function saveAmt() {
+    const n = parseFloat(amtDraft)
+    if (!isNaN(n) && n >= 0 && n !== providerAmount) onProviderAmount(n)
+    else setAmtDraft(String(providerAmount))
+    setEditingAmt(false)
+  }
+
   function isPaid(tid: string): boolean {
     const s = payments.find(p => p.tenant_id === tid)?.status
     return s === 'paid' || s === 'advance'
@@ -665,16 +814,33 @@ function ValetWeekCard({
 
   return (
     <div className={`rounded-xl border px-3 pt-3 pb-2 transition-colors ${
-      complete && providerPaid ? 'border-ok/20 bg-ok/5' : 'border-ink-4/10 bg-ink-1/10'
+      complete && providerPaid ? 'border-ok/20 bg-ok/5' : 'border-ink-4/10 bg-ink-1/60 backdrop-blur-xl'
     }`}>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-xs font-bold text-ink-4">Semana {weekNum}</span>
         <span className="text-[10px] text-ink-3">{weekLabel}</span>
         <span className="flex-1 text-right text-[10px] tabular-nums text-ink-3">
-          {mxn(cobrado)} / {mxn(totalWeek)}
+          <Mxn v={cobrado} /> / <Mxn v={totalWeek} />
         </span>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-ink-3">Proveedor</span>
+          {editingAmt ? (
+            <input
+              type="number" value={amtDraft} autoFocus
+              onChange={e => setAmtDraft(e.target.value)}
+              onBlur={saveAmt}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') saveAmt() }}
+              className="w-20 rounded border border-accent/50 bg-ink-2/20 px-1 py-0.5 text-right text-[11px] tabular-nums text-ink-4 outline-none"
+            />
+          ) : (
+            <button
+              onClick={() => setEditingAmt(true)}
+              className="text-[11px] tabular-nums text-ink-3 hover:text-ink-4"
+              title="Editar monto proveedor"
+            >
+              <Mxn v={providerAmount} />
+            </button>
+          )}
           <PaidToggle paid={providerPaid} onChange={onProviderToggle} />
         </div>
       </div>
@@ -689,7 +855,7 @@ function ValetWeekCard({
             </span>
             <span className="text-[10px] text-ink-3/40">{t.pts}pt</span>
             <span className={`text-xs tabular-nums font-medium ${paid ? 'text-ok' : 'text-ink-3/30'}`}>
-              {mxn(tenantAmt(t.pts))}
+              <Mxn v={tenantAmt(t.pts)} />
             </span>
           </div>
         )
@@ -701,7 +867,7 @@ function ValetWeekCard({
 // ─── ValetTab ─────────────────────────────────────────────────────────────────
 
 function ValetTab({ month }: { month: string }) {
-  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, nu_balance: 0, provider_paid: [], price_per_point: 176 })
+  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, nu_balance: 0, provider_paid: [], provider_amounts: [], price_per_point: 176 })
   const [payments, setPayments] = useState<ValetPayment[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
@@ -715,11 +881,12 @@ function ValetTab({ month }: { month: string }) {
       .then((data: { config: ValetConfig | null; payments: ValetPayment[]; error?: string }) => {
         if (data.error) throw new Error(data.error)
         const cfg: ValetConfig = {
-          num_weeks:      data.config?.num_weeks ?? 4,
-          week1_date:     data.config?.week1_date ?? firstSaturdayOfMonth(month),
-          nu_balance:     Number(data.config?.nu_balance ?? 0),
-          provider_paid:  Array.isArray(data.config?.provider_paid) ? data.config!.provider_paid : [],
-          price_per_point: Number(data.config?.price_per_point ?? 176),
+          num_weeks:        data.config?.num_weeks ?? 4,
+          week1_date:       data.config?.week1_date ?? firstSaturdayOfMonth(month),
+          nu_balance:       Number(data.config?.nu_balance ?? 0),
+          provider_paid:    Array.isArray(data.config?.provider_paid)    ? data.config!.provider_paid    : [],
+          provider_amounts: Array.isArray(data.config?.provider_amounts) ? data.config!.provider_amounts : [],
+          price_per_point:  Number(data.config?.price_per_point ?? 176),
         }
         setConfig(cfg)
         setNuDraft(String(cfg.nu_balance))
@@ -755,6 +922,13 @@ function ValetTab({ month }: { month: string }) {
     void saveConfig({ provider_paid: arr })
   }
 
+  function setProviderAmount(idx: number, amount: number) {
+    const arr = [...(config.provider_amounts as number[])]
+    while (arr.length <= idx) arr.push(VALET_PROVIDER_WEEK)
+    arr[idx] = amount
+    void saveConfig({ provider_amounts: arr })
+  }
+
   function weekLabel(w: number): string {
     if (!config.week1_date) return `Sem. ${w}`
     const d = new Date(config.week1_date + 'T12:00:00')
@@ -765,8 +939,9 @@ function ValetTab({ month }: { month: string }) {
   const ppt             = config.price_per_point
   const cobrado         = payments.filter(p => p.status !== 'pending').reduce((s, p) => s + Math.round((VALET_TENANTS.find(t => t.id === p.tenant_id)?.pts ?? 0) * ppt), 0)
   const esperado        = config.num_weeks * VALET_TOTAL_PTS * ppt
-  const proveedorPagado = (config.provider_paid as boolean[]).filter(Boolean).length * VALET_PROVIDER_WEEK
-  const proveedorTotal  = config.num_weeks * VALET_PROVIDER_WEEK
+  const weekProvAmt     = (idx: number) => (config.provider_amounts as number[])[idx] ?? VALET_PROVIDER_WEEK
+  const proveedorPagado = Array.from({ length: config.num_weeks }, (_, i) => (config.provider_paid as boolean[])[i] ? weekProvAmt(i) : 0).reduce((s, v) => s + v, 0)
+  const proveedorTotal  = Array.from({ length: config.num_weeks }, (_, i) => weekProvAmt(i)).reduce((s, v) => s + v, 0)
 
   if (loading) return (
     <div className="flex items-center justify-center py-32">
@@ -786,7 +961,7 @@ function ValetTab({ month }: { month: string }) {
           <div>
             <div className="mb-1 flex justify-between text-xs">
               <span className="text-ink-3">Cobrado</span>
-              <span className="font-medium tabular-nums text-ink-4">{mxn(cobrado)} / {mxn(esperado)}</span>
+              <span className="font-medium tabular-nums text-ink-4"><Mxn v={cobrado} /> / <Mxn v={esperado} /></span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-ink-2/30">
               <div className="h-full rounded-full bg-ok transition-all duration-500"
@@ -796,7 +971,7 @@ function ValetTab({ month }: { month: string }) {
           <div>
             <div className="mb-1 flex justify-between text-xs">
               <span className="text-ink-3">Proveedor pagado</span>
-              <span className="font-medium tabular-nums text-ink-4">{mxn(proveedorPagado)} / {mxn(proveedorTotal)}</span>
+              <span className="font-medium tabular-nums text-ink-4"><Mxn v={proveedorPagado} /> / <Mxn v={proveedorTotal} /></span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-ink-2/30">
               <div className="h-full rounded-full bg-accent transition-all duration-500"
@@ -807,7 +982,7 @@ function ValetTab({ month }: { month: string }) {
             const nuEsperado = cobrado - proveedorPagado
             const diferencia = nuEsperado - config.nu_balance
             return (
-              <div className="space-y-1.5 rounded-lg border border-ink-4/10 bg-ink-1/10 px-3 py-2.5">
+              <div className="space-y-1.5 rounded-lg border border-ink-4/10 bg-ink-2/20 px-3 py-2.5">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Cuenta NU · real vs esperado</p>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-ink-3">Saldo real</span>
@@ -826,11 +1001,11 @@ function ValetTab({ month }: { month: string }) {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-ink-3">Saldo esperado</span>
-                  <span className="tabular-nums text-ink-4">{mxn(nuEsperado)}</span>
+                  <span className="tabular-nums text-ink-4"><Mxn v={nuEsperado} /></span>
                 </div>
                 <div className={`flex items-center justify-between border-t border-ink-4/10 pt-1 text-xs font-bold ${diferencia <= 0 ? 'text-ok' : 'text-danger'}`}>
                   <span>Diferencia</span>
-                  <span className="tabular-nums">{mxn(diferencia)}</span>
+                  <span className="tabular-nums"><Mxn v={diferencia} /></span>
                 </div>
               </div>
             )
@@ -839,7 +1014,7 @@ function ValetTab({ month }: { month: string }) {
       </div>
 
       {/* Configuración */}
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-ink-4/10 bg-ink-1/10 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-ink-4/10 bg-ink-2/20 px-4 py-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Configuración</p>
 
         <div className="flex items-center gap-1.5">
@@ -895,9 +1070,11 @@ function ValetTab({ month }: { month: string }) {
           weekLabel={weekLabel(w)}
           payments={payments.filter(p => p.week_num === w)}
           providerPaid={(config.provider_paid as boolean[])[w - 1] ?? false}
+          providerAmount={weekProvAmt(w - 1)}
           pricePerPoint={ppt}
           onTenantToggle={(tid, paid) => void toggleTenant(w, tid, paid)}
           onProviderToggle={paid => toggleProvider(w - 1, paid)}
+          onProviderAmount={amount => setProviderAmount(w - 1, amount)}
         />
       ))}
     </div>
@@ -916,9 +1093,11 @@ export default function UptownPage() {
   const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
   const [fondoTotal, setFondoTotal]   = useState(0)
   const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
-  const [loading, setLoading]         = useState(true)
-  const [error, setError]             = useState<string | null>(null)
-  const [pageTab, setPageTab]         = useState<'finanzas' | 'valet'>('finanzas')
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [pageTab, setPageTab]   = useState<'finanzas' | 'valet' | 'historial'>('finanzas')
+  const [cortes, setCortes]     = useState<Corte[]>([])
+  const [showCortes, setShowCortes] = useState(false)
 
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true); setError(null)
@@ -1065,11 +1244,44 @@ export default function UptownPage() {
     await fetch(`/api/uptown/extra-expenses/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) })
   }
 
-  // ── Balance handler ───────────────────────────────────────────────────────
+  // ── Balance + corte handlers ──────────────────────────────────────────────
 
   async function saveBalance(fields: Partial<BalanceState>) {
     setBalance(prev => ({ ...prev, ...fields }))
     await post('/api/uptown/balance', { month, ...fields })
+  }
+
+  async function registrarCorte(data: { month: string; sistema: number; real: number; diferencia: number; concepto: string; cuenta_bancaria: number; efectivo: number }) {
+    const res = await fetch('/api/uptown/corte', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, cuenta_bancaria: data.cuenta_bancaria, efectivo: data.efectivo }),
+    })
+    const body = await res.json()
+    console.log('[corte] API response status:', res.status, 'body:', body)
+    if (!res.ok) { console.error('[corte] API error:', body); return }
+
+    const { corte, movement } = body
+    console.log('[corte] saved corte:', corte, '| movement:', movement)
+
+    if (corte) {
+      setCortes(prev => [corte, ...prev])
+      setShowCortes(true)
+    }
+    if (movement) {
+      const item: ExtraItem = { id: movement.id, description: movement.description, amount: movement.amount, method: movement.method }
+      if (data.diferencia > 0) setExtraIncome(prev => [...prev, item])
+      else                     setExtraExp(prev => [...prev, item])
+    }
+  }
+
+  async function loadCortes() {
+    const res = await fetch(`/api/uptown/corte?month=${month}`)
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[corte] loaded from server:', data)
+      setCortes(data)
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1077,7 +1289,7 @@ export default function UptownPage() {
   const currentFondo = expenses.find(e => e.category === 'fondo')
 
   return (
-    <Shell glow="uptown">
+    <Shell>
       <main className="mx-auto max-w-6xl px-6 py-6">
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -1103,19 +1315,25 @@ export default function UptownPage() {
 
         {/* Tab bar */}
         <div className="mb-5 flex w-fit gap-1 rounded-xl border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
-          {(['finanzas', 'valet'] as const).map(t => (
+          {(['finanzas', 'historial', 'valet'] as const).map(t => (
             <button key={t} onClick={() => setPageTab(t)}
               className={['rounded-lg px-4 py-1.5 text-sm transition-colors',
                 pageTab === t ? 'bg-ink-4/10 font-medium text-ink-4' : 'text-ink-3 hover:text-ink-4',
               ].join(' ')}
             >
-              {t === 'finanzas' ? 'Finanzas' : 'Valet'}
+              {t === 'finanzas' ? 'Finanzas' : t === 'historial' ? 'Historial' : 'Valet'}
             </button>
           ))}
         </div>
 
         {pageTab === 'valet' ? (
           <ValetTab month={month} />
+        ) : pageTab === 'historial' && !loading && !error ? (
+          <UptownHistorialTab
+            rents={rents} expenses={expenses} nomina={nomina}
+            extraIncome={extraIncome} extraExpenses={extraExpenses}
+            month={month}
+          />
         ) : loading ? (
           <div className="flex items-center justify-center py-32">
             <p className="animate-pulse text-sm text-ink-3">Cargando…</p>
@@ -1127,19 +1345,68 @@ export default function UptownPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Resumen — full width, top */}
-            <ResumenCard
-              rents={rents} expenses={expenses} nomina={nomina}
-              extraIncome={extraIncome} extraExpenses={extraExpenses}
-            />
+            {/* Resumen + Saldo Actual */}
+            <div className="grid grid-cols-[5fr_7fr] gap-5">
+              <ResumenCard
+                rents={rents} expenses={expenses} nomina={nomina}
+                extraIncome={extraIncome} extraExpenses={extraExpenses}
+              />
+              <SaldoActualCard
+                bal={balance} month={month}
+                rents={rents} expenses={expenses} nomina={nomina}
+                extraIncome={extraIncome} extraExpenses={extraExpenses}
+                onSave={saveBalance}
+                onCorte={registrarCorte}
+              />
+            </div>
 
-            {/* Balance */}
-            <BalanceCard
-              bal={balance} month={month}
-              rents={rents} expenses={expenses} nomina={nomina}
-              extraIncome={extraIncome} extraExpenses={extraExpenses}
-              onSave={saveBalance}
-            />
+            {/* Historial de Cortes */}
+            <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
+              <button
+                onClick={() => {
+                  const opening = !showCortes
+                  setShowCortes(opening)
+                  if (opening) void loadCortes()
+                }}
+                className="flex w-full items-center justify-between px-5 py-3 text-left"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ink-3">📋 Historial de Cortes</span>
+                <span className="text-[10px] text-ink-3/50">{showCortes ? '▲' : '▼'}</span>
+              </button>
+              {showCortes && (
+                <div className="border-t border-ink-4/10 px-5 pb-4">
+                  {cortes.length === 0 ? (
+                    <p className="pt-4 text-[11px] text-ink-3/50">No hay cortes registrados este mes.</p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {cortes.map(c => {
+                        const pos   = c.diferencia >= 0
+                        const zero  = Math.abs(c.diferencia) < 1
+                        const label = new Date(c.date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        return (
+                          <div key={c.id} className="rounded-lg border border-ink-4/10 bg-ink-2/10 px-3 py-2 text-[11px]">
+                            <div className="flex items-center gap-4">
+                              <span className="shrink-0 text-ink-3/60">{label}</span>
+                              <span className="font-semibold tabular-nums text-ink-4"><Mxn v={c.real} /></span>
+                              <span className={`ml-auto font-bold tabular-nums ${zero ? 'text-ok' : pos ? 'text-ok' : 'text-danger'}`}>
+                                {zero ? '✓' : pos ? <><span>▲ </span><Mxn v={c.diferencia} /></> : <><span>▼ </span><Mxn v={Math.abs(c.diferencia)} /></>}
+                              </span>
+                              {c.concepto && <span className="text-ink-3/50">{c.concepto}</span>}
+                            </div>
+                            {(c.cuenta_bancaria != null || c.efectivo != null) && (
+                              <div className="mt-1 flex gap-3 text-ink-3/50">
+                                {c.cuenta_bancaria != null && <span>💳 <Mxn v={c.cuenta_bancaria} /></span>}
+                                {c.efectivo != null && <span>💵 <Mxn v={c.efectivo} /></span>}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Main grid: income | expenses */}
             <div className="grid gap-5 lg:grid-cols-2">

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Shell from '@/components/Shell'
+import Mxn from '@/components/Mxn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,14 @@ interface IncomeItem {
   metodo: string
   sort_order: number
   active: boolean
+}
+
+interface NominaMirror {
+  week_num:  number
+  week_date: string
+  amount:    number | null
+  paid:      boolean
+  method:    string | null
 }
 
 interface MonthChecks {
@@ -260,7 +269,7 @@ function IncomeRow({
       ) : (
         <>
           <MethodBadge metodo={item.metodo} />
-          <span className="shrink-0 text-xs tabular-nums text-ink-3">{mxn(item.monto)}</span>
+          <span className="shrink-0 text-xs tabular-nums text-ink-3"><Mxn v={item.monto} /></span>
         </>
       )}
     </div>
@@ -289,7 +298,7 @@ function GastoRow({
         {commitment.name}
       </span>
       <MethodBadge metodo={commitment.metodo ?? 'cargo'} />
-      <span className="shrink-0 text-xs tabular-nums text-ink-3">{mxn(commitment.amount)}</span>
+      <span className="shrink-0 text-xs tabular-nums text-ink-3"><Mxn v={commitment.amount} /></span>
     </div>
   )
 }
@@ -310,7 +319,7 @@ function ExtraRow({
       <span className="min-w-0 flex-1 truncate text-xs text-ink-4">{mv.description}</span>
       {mv.metodo && <MethodBadge metodo={mv.metodo} />}
       <span className={`shrink-0 text-xs font-medium tabular-nums ${isIncome ? 'text-ok' : 'text-danger'}`}>
-        {isIncome ? '+' : '−'}{mxn(Number(mv.amount))}
+        {isIncome ? '+' : '−'}<Mxn v={Number(mv.amount)} />
       </span>
       <button
         onClick={() => onEdit(mv)}
@@ -389,11 +398,9 @@ function AddExtraForm({
 function PanelVacPanel({
   viajes,
   vacMvsThisMonth,
-  onToggleSem,
 }: {
   viajes: Envelope[]
   vacMvsThisMonth: Movement[]
-  onToggleSem: (viaje: Envelope, week: number) => Promise<void>
 }) {
   const active = viajes.filter(v => !v.pausado)
   if (active.length === 0) return null
@@ -403,18 +410,11 @@ function PanelVacPanel({
     <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-ink-4/5 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">Sobrecito Vacaciones</p>
-        <span className="text-xs font-medium text-accent">{mxn(totalThisMonth)} este mes</span>
+        <span className="text-xs font-medium text-accent"><Mxn v={totalThisMonth} /> este mes</span>
       </div>
       <div className="divide-y divide-ink-4/5">
         {active.map(v => {
-          const pct         = v.target > 0 ? Math.min((Number(v.saved) / v.target) * 100, 100) : 0
-          const semAhorro   = Number(v.sem_ahorro) || 600
-          const weekChecked = [1, 2, 3, 4].map(w =>
-            vacMvsThisMonth.some(m =>
-              m.envelope_id === v.id && m.description === `${v.label} · Sem ${w}`
-            )
-          )
-
+          const pct = v.target > 0 ? Math.min((Number(v.saved) / v.target) * 100, 100) : 0
           return (
             <div key={v.id} className="px-4 py-3">
               <div className="mb-2 flex items-start justify-between">
@@ -424,39 +424,18 @@ function PanelVacPanel({
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold tabular-nums text-accent">
-                    {mxn(Number(v.saved))} <span className="text-ink-3 font-normal">/ {mxn(v.target)}</span>
+                    <Mxn v={Number(v.saved)} /> <span className="font-normal text-ink-3">/ <Mxn v={v.target} /></span>
                   </p>
                   <p className="text-[10px] text-ink-3">
-                    {pct.toFixed(0)}% · faltan {mxn(Math.max(0, v.target - Number(v.saved)))}
+                    {pct.toFixed(0)}% · faltan <Mxn v={Math.max(0, v.target - Number(v.saved))} />
                   </p>
                 </div>
               </div>
-
-              <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-ink-2/30">
+              <div className="h-1.5 overflow-hidden rounded-full bg-ink-2/30">
                 <div
                   className="h-full rounded-full bg-accent transition-all duration-500"
                   style={{ width: `${pct}%` }}
                 />
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((w, i) => (
-                  <button
-                    key={w}
-                    onClick={() => void onToggleSem(v, w)}
-                    className={[
-                      'flex flex-col items-center rounded-xl border py-2 text-center transition-colors',
-                      weekChecked[i]
-                        ? 'border-accent/30 bg-accent/15 text-accent'
-                        : 'border-ink-4/10 text-ink-3 hover:border-accent/20 hover:bg-accent/5',
-                    ].join(' ')}
-                  >
-                    <span className="text-[10px] font-semibold">
-                      {weekChecked[i] ? '✓' : '○'} Sem {w}
-                    </span>
-                    <span className="text-[9px] opacity-70">{mxn(semAhorro)}</span>
-                  </button>
-                ))}
               </div>
             </div>
           )
@@ -553,6 +532,7 @@ interface PanelTabProps {
   envelopes: Envelope[]
   monthChecks: MonthChecks
   balance: Balance | null
+  nominaMirror: NominaMirror | null | 'loading'
   onToggleIncome: (item: IncomeItem) => Promise<void>
   onSetRealMonto: (itemId: string, monto: number) => void
   onSetRealMetodo: (itemId: string, metodo: string) => void
@@ -561,7 +541,6 @@ interface PanelTabProps {
   onEditMov: (id: string, description: string, amount: number, metodo: string) => Promise<void>
   onDeleteMov: (id: string) => Promise<void>
   onAddGX: (nombre: string, monto: number, metodo: string) => Promise<void>
-  onToggleVacSem: (viaje: Envelope, week: number) => Promise<void>
 }
 
 function PanelTab({
@@ -571,6 +550,7 @@ function PanelTab({
   envelopes,
   monthChecks,
   balance,
+  nominaMirror,
   onToggleIncome,
   onSetRealMonto,
   onSetRealMetodo,
@@ -579,7 +559,6 @@ function PanelTab({
   onEditMov,
   onDeleteMov,
   onAddGX,
-  onToggleVacSem,
 }: PanelTabProps) {
   const [editMov, setEditMov] = useState<Movement | null>(null)
 
@@ -592,12 +571,17 @@ function PanelTab({
   const activeIncome  = incomeItems.filter(i => i.active)
   const activeCosts   = commitments.filter(c => c.active)
 
-  const totalInPrevistos   = activeIncome.reduce((s, i) => s + Number(i.monto), 0)
+  const mirror = nominaMirror !== 'loading' ? nominaMirror : null
+  const mirrorTotal  = mirror?.amount ?? 0
+  const mirrorPaid   = mirror !== null && mirror.paid && mirror.amount !== null ? mirror.amount : 0
+
+  const totalInPrevistos   = activeIncome.reduce((s, i) => s + Number(i.monto), 0) + mirrorTotal
   const totalGastoPrevistos = activeCosts.reduce((s, c) => s + Number(c.amount), 0)
 
   const cobrado =
     activeIncome.filter(i => checks[i.id]).reduce((s, i) => s + Number(realM[i.id] ?? i.monto), 0) +
-    freelanceMvs.reduce((s, m) => s + Number(m.amount), 0)
+    freelanceMvs.reduce((s, m) => s + Number(m.amount), 0) +
+    mirrorPaid
 
   const pagado =
     activeCosts.filter(c => checks[c.id]).reduce((s, c) => s + Number(c.amount), 0) +
@@ -607,14 +591,15 @@ function PanelTab({
   const caja  = Number(balance?.caja_fuerte ?? 0)
 
   function PanelCard({
-    label, value, cls, sub,
+    label, value, cls, sub, subNode,
   }: {
-    label: string; value: number; cls: string; sub?: string
+    label: string; value: number; cls: string; sub?: string; subNode?: React.ReactNode
   }) {
     return (
       <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
         <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-        <p className={`mt-1 text-xl font-black tabular-nums ${cls}`}>{mxn(value)}</p>
+        <p className={`mt-1 text-xl font-black tabular-nums ${cls}`}><Mxn v={value} /></p>
+        {subNode && <p className="mt-0.5 text-[10px]">{subNode}</p>}
         {sub && <p className="mt-0.5 text-[10px] text-ink-3">{sub}</p>}
       </div>
     )
@@ -624,7 +609,7 @@ function PanelTab({
     return (
       <div className="flex items-center justify-between border-b border-ink-4/5 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">{title}</p>
-        <span className={`text-xs font-semibold tabular-nums ${cls}`}>{mxn(total)}</span>
+        <span className={`text-xs font-semibold tabular-nums ${cls}`}><Mxn v={total} /></span>
       </div>
     )
   }
@@ -633,8 +618,8 @@ function PanelTab({
     <div className="space-y-5">
       {/* 4 summary cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     sub={`de ${mxn(totalInPrevistos)}`} />
-        <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" sub={`de ${mxn(totalGastoPrevistos)}`} />
+        <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     subNode={<><span className="text-ink-3">de </span><Mxn v={totalInPrevistos} /></>} />
+        <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" subNode={<><span className="text-ink-3">de </span><Mxn v={totalGastoPrevistos} /></>} />
         <PanelCard label="Flujo del mes"      value={flujo}   cls={flujo >= 0 ? 'text-ok' : 'text-danger'} />
         <PanelCard label="Caja Fuerte"        value={caja}    cls="text-warn" />
       </div>
@@ -646,7 +631,7 @@ function PanelTab({
           {/* Ingresos previstos */}
           <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
             <SectionHeader title="Ingresos Previstos" total={totalInPrevistos} cls="text-ok" />
-            {activeIncome.length === 0 ? (
+            {activeIncome.length === 0 && nominaMirror === 'loading' ? (
               <p className="px-4 py-6 text-center text-xs italic text-ink-3">Sin ingresos previstos — configúralos en Config</p>
             ) : (
               activeIncome.map(item => (
@@ -662,6 +647,31 @@ function PanelTab({
                 />
               ))
             )}
+            {/* Nómina mirror — read-only from Uptown */}
+            {nominaMirror !== 'loading' && (() => {
+              const nm = nominaMirror
+              const weekDay = nm?.week_date
+                ? new Date(nm.week_date + 'T12:00:00').getDate()
+                : null
+              return (
+                <div className={['flex items-center gap-2 border-t border-ink-4/5 px-3 py-2.5', nm?.paid ? 'opacity-55' : ''].join(' ')}>
+                  <CheckBox checked={nm?.paid ?? false} />
+                  <span className={`min-w-0 flex-1 truncate text-xs ${nm?.paid ? 'line-through text-ink-3' : 'text-ink-4'}`}>
+                    Nómina{weekDay ? ` · Sáb ${weekDay}` : ''}
+                  </span>
+                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-accent/10 text-accent">
+                    ↑ Uptown
+                  </span>
+                  {nm?.amount != null ? (
+                    <span className={`shrink-0 text-xs tabular-nums ${nm.paid ? 'text-ok' : 'text-ink-3'}`}>
+                      <Mxn v={nm.amount} />
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[10px] italic text-ink-3/50">Sin registrar</span>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Freelance / Extras */}
@@ -732,7 +742,6 @@ function PanelTab({
       <PanelVacPanel
         viajes={envelopes}
         vacMvsThisMonth={vacMvsThisMonth}
-        onToggleSem={onToggleVacSem}
       />
 
       {/* Edit modal */}
@@ -779,7 +788,7 @@ function HistorialTab({
             className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl"
           >
             <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-            <p className={`mt-1 text-base font-bold tabular-nums ${cls}`}>{mxn(value)}</p>
+            <p className={`mt-1 text-base font-bold tabular-nums ${cls}`}><Mxn v={value} /></p>
           </div>
         ))}
       </div>
@@ -797,7 +806,7 @@ function HistorialTab({
                 {CAT_LABEL[m.category]}
               </span>
               <span className={`shrink-0 text-sm font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
-                {m.flow === 'in' ? '+' : '−'}{mxn(Number(m.amount))}
+                {m.flow === 'in' ? '+' : '−'}<Mxn v={Number(m.amount)} />
               </span>
               <button
                 onClick={() => onDelete(m.id)}
@@ -820,26 +829,41 @@ function EnvelopeCard({
   contributions,
   onUpdateTarget,
   onAddContribution,
+  onUpdateSemAhorro,
 }: {
   env: Envelope
   contributions: Movement[]
   onUpdateTarget: (id: string, target: number) => void
   onAddContribution: (desc: string, amount: number) => void
+  onUpdateSemAhorro: (id: string, sem: number) => void
 }) {
   const saved  = Number(env.saved)
   const target = Number(env.target)
   const pct    = target > 0 ? Math.min((saved / target) * 100, 100) : 0
-  const [editing, setEditing] = useState(false)
-  const [draft,   setDraft]   = useState(String(target))
-  const [addDesc, setAddDesc] = useState('')
-  const [addAmt,  setAddAmt]  = useState('')
+  const [editing,    setEditing]    = useState(false)
+  const [draft,      setDraft]      = useState(String(target))
+  const [addDesc,    setAddDesc]    = useState('')
+  const [addAmt,     setAddAmt]     = useState('')
+  const [semDraft, setSemDraft] = useState(String(Number(env.sem_ahorro) || 0))
+  const [semSaved, setSemSaved] = useState(false)
 
   useEffect(() => { setDraft(String(Number(env.target))) }, [env.target])
+  useEffect(() => { setSemDraft(String(Number(env.sem_ahorro) || 0)) }, [env.sem_ahorro])
 
   function saveMeta() {
     const n = parseFloat(draft)
     if (n > 0 && n !== target) onUpdateTarget(env.id, n)
     setEditing(false)
+  }
+
+  function saveSem() {
+    const n = parseFloat(semDraft)
+    if (isNaN(n) || n < 0) { setSemDraft(String(Number(env.sem_ahorro) || 0)); return }
+    if (n !== Number(env.sem_ahorro)) {
+      onUpdateSemAhorro(env.id, n)
+      setSemSaved(true)
+      setTimeout(() => setSemSaved(false), 2000)
+    }
   }
 
   function submitContribution() {
@@ -857,14 +881,27 @@ function EnvelopeCard({
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h3 className="text-lg font-bold text-ink-4">{env.label}</h3>
-          <p className="text-xs text-ink-3">
-            {env.fecha ? env.fecha : 'Sobrecito vacaciones'}
-            {env.sem_ahorro ? ` · ${mxn(env.sem_ahorro)}/sem` : ''}
-          </p>
+          <div className="flex items-center gap-1.5 text-xs text-ink-3">
+            <span>{env.fecha ? env.fecha : 'Sobrecito vacaciones'}</span>
+            <span className="text-ink-2/50">·</span>
+            <input
+              type="number"
+              value={semDraft}
+              onChange={e => setSemDraft(e.target.value)}
+              onBlur={saveSem}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setSemDraft(String(Number(env.sem_ahorro) || 0))
+              }}
+              className="w-20 rounded border border-ink-4/10 bg-ink-2/20 px-1 py-0.5 tabular-nums text-xs text-ink-4 outline-none focus:border-accent/50"
+            />
+            <span>/sem</span>
+            {semSaved && <span className="text-[10px] font-medium text-ok">✓</span>}
+          </div>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-black text-ok">{mxn(saved)}</p>
-          <p className="text-xs text-ink-3">de {mxn(target)}</p>
+          <p className="text-2xl font-black text-ok"><Mxn v={saved} /></p>
+          <p className="text-xs text-ink-3">de <Mxn v={target} /></p>
         </div>
       </div>
 
@@ -872,7 +909,7 @@ function EnvelopeCard({
         <div className="h-full rounded-full bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
       <p className="mb-4 text-right text-[10px] text-ink-3">
-        {pct.toFixed(1)}% · faltan {mxn(Math.max(0, target - saved))}
+        {pct.toFixed(1)}% · faltan <Mxn v={Math.max(0, target - saved)} />
       </p>
 
       {editing ? (
@@ -888,7 +925,7 @@ function EnvelopeCard({
         </div>
       ) : (
         <button onClick={() => setEditing(true)} className="mb-4 text-[11px] text-ink-3 underline-offset-2 hover:text-ink-4 hover:underline">
-          Cambiar meta ({mxn(target)})
+          Cambiar meta (<Mxn v={target} />)
         </button>
       )}
 
@@ -921,7 +958,7 @@ function EnvelopeCard({
               <div key={m.id} className="flex items-center justify-between text-xs">
                 <span className="text-ink-3">{m.date}</span>
                 <span className="flex-1 truncate px-3 text-ink-4">{m.description}</span>
-                <span className="font-medium tabular-nums text-ok">{mxn(Number(m.amount))}</span>
+                <span className="font-medium tabular-nums text-ok"><Mxn v={Number(m.amount)} /></span>
               </div>
             ))}
           </div>
@@ -937,11 +974,13 @@ function VacacionesTab({
   envelopes,
   vacMovements,
   onUpdateTarget,
+  onUpdateSemAhorro,
   onAdd,
 }: {
   envelopes: Envelope[]
   vacMovements: Movement[]
   onUpdateTarget: (id: string, target: number) => void
+  onUpdateSemAhorro: (id: string, sem: number) => void
   onAdd: (envId: string, desc: string, amount: number) => void
 }) {
   return (
@@ -952,6 +991,7 @@ function VacacionesTab({
           env={env}
           contributions={vacMovements.filter(m => m.envelope_id === env.id)}
           onUpdateTarget={onUpdateTarget}
+          onUpdateSemAhorro={onUpdateSemAhorro}
           onAddContribution={(desc, amount) => onAdd(env.id, desc, amount)}
         />
       ))}
@@ -1032,7 +1072,7 @@ function CommitmentRow({
       />
 
       {c.meses && c.meses > 1 && (
-        <span className="shrink-0 text-[10px] text-ink-3 tabular-nums">{mxn(monthly)}/mes</span>
+        <span className="shrink-0 text-[10px] text-ink-3 tabular-nums"><Mxn v={monthly} />/mes</span>
       )}
 
       <button
@@ -1082,9 +1122,9 @@ function CompromisoTab({
       <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
         <div className="grid grid-cols-3 divide-x divide-ink-4/10 text-center">
           {[
-            { label: 'Total mensual', value: mxn(totalMensual), cls: 'text-danger' },
-            { label: 'Activos',       value: String(active.length), cls: 'text-ink-4' },
-            { label: 'Anual',         value: mxn(totalAnual),   cls: 'text-warn'   },
+            { label: 'Total mensual', value: <Mxn v={totalMensual} />, cls: 'text-danger' },
+            { label: 'Activos',       value: String(active.length),  cls: 'text-ink-4' },
+            { label: 'Anual',         value: <Mxn v={totalAnual} />, cls: 'text-warn'   },
           ].map(({ label, value, cls }) => (
             <div key={label} className="px-4 py-1">
               <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
@@ -1202,7 +1242,7 @@ function CuadrarTab({
         <div className="border-t border-ink-4/10 pt-4">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-xs text-ink-3">Total</p>
-            <p className="text-2xl font-black tabular-nums text-ink-4">{mxn(total)}</p>
+            <p className="text-2xl font-black tabular-nums text-ink-4"><Mxn v={total} /></p>
           </div>
           <button
             onClick={save} disabled={saving}
@@ -1381,6 +1421,7 @@ export default function FinancePage() {
   const [balance,      setBalance]      = useState<Balance | null>(null)
   const [incomeItems,  setIncomeItems]  = useState<IncomeItem[]>([])
   const [monthChecks,  setMonthChecks]  = useState<MonthChecks>(EMPTY_CHECKS)
+  const [nominaMirror, setNominaMirror] = useState<NominaMirror | null | 'loading'>('loading')
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState<string | null>(null)
 
@@ -1420,18 +1461,20 @@ export default function FinancePage() {
       setLoading(true)
       setError(null)
       try {
-        const [comms, envs, bal, vacMovs, incItems] = await Promise.all([
+        const [comms, envs, bal, vacMovs, incItems, nomina] = await Promise.all([
           apiFetch<Commitment[]>('/api/finance/commitments'),
           apiFetch<Envelope[]>('/api/finance/envelopes'),
           apiFetch<Balance | null>('/api/finance/balance'),
           apiFetch<Movement[]>('/api/finance/movements?category=vacaciones'),
           apiFetch<IncomeItem[]>('/api/finance/income'),
+          fetch('/api/uptown/nomina-current').then(r => r.ok ? r.json() as Promise<NominaMirror | null> : null).catch(() => null),
         ])
         setCommitments(comms)
         setEnvelopes(envs)
         setBalance(bal)
         setVacMovements(vacMovs)
         setIncomeItems(incItems)
+        setNominaMirror(nomina)
       } catch (e) {
         setError(String(e))
       } finally {
@@ -1655,6 +1698,11 @@ export default function FinancePage() {
     setEnvelopes(prev => prev.map(e => e.id === id ? { ...e, target } : e))
   }
 
+  async function updateEnvelopeSemAhorro(id: string, sem_ahorro: number) {
+    await apiPatch(`/api/finance/envelopes/${id}`, { sem_ahorro })
+    setEnvelopes(prev => prev.map(e => e.id === id ? { ...e, sem_ahorro } : e))
+  }
+
   async function addVacacionesContribution(envId: string, desc: string, amount: number) {
     await addMovement({ date: todayStr(), description: desc, amount, flow: 'out', category: 'vacaciones', commitment_id: null, envelope_id: envId, metodo: null })
   }
@@ -1690,7 +1738,7 @@ export default function FinancePage() {
   const showMonthNav = tab === 'Panel' || tab === 'Historial'
 
   return (
-    <Shell glow="finance">
+    <Shell>
       <main className="mx-auto max-w-5xl px-6 py-6">
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -1758,6 +1806,7 @@ export default function FinancePage() {
                 envelopes={envelopes}
                 monthChecks={monthChecks}
                 balance={balance}
+                nominaMirror={nominaMirror}
                 onToggleIncome={toggleIncome}
                 onSetRealMonto={setRealMonto}
                 onSetRealMetodo={setRealMetodo}
@@ -1766,7 +1815,6 @@ export default function FinancePage() {
                 onEditMov={editMovement}
                 onDeleteMov={deleteMovement}
                 onAddGX={addGX}
-                onToggleVacSem={toggleVacSem}
               />
             )}
             {tab === 'Historial' && (
@@ -1777,6 +1825,7 @@ export default function FinancePage() {
                 envelopes={envelopes}
                 vacMovements={vacMovements}
                 onUpdateTarget={updateEnvelopeTarget}
+                onUpdateSemAhorro={updateEnvelopeSemAhorro}
                 onAdd={addVacacionesContribution}
               />
             )}

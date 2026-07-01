@@ -950,7 +950,7 @@ export default function CRMPage() {
   ]
 
   return (
-    <Shell glow="crm">
+    <Shell>
       <div className="mx-auto max-w-7xl px-6 pb-4 pt-6">
         <div className="flex items-center justify-between">
           <div>

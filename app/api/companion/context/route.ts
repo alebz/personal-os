@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import ICAL from 'ical.js'
 
 export const runtime = 'nodejs'
+
+interface HabitDef { id: string; label: string }
 
 function daysUntilBirthday(birthday: string): number {
   const parts = birthday.split('-').map(Number)
@@ -24,9 +27,13 @@ function daysSince(dateStr: string): number {
 
 // GET /api/companion/context
 // Full OS snapshot for Adán — every data source in Alex's personal OS.
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = createServerClient()
-  const today = new Date().toISOString().split('T')[0]
+  let body: { localDate?: string; habitDefs?: HabitDef[] } = {}
+  try { body = await req.json() } catch { /* no body is fine */ }
+
+  // Prefer client-supplied local date; fall back to server-side Mexico City time
+  const today = body.localDate ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
   const todayMonth = today.slice(5, 7)
   const todayDay   = today.slice(8, 10)
 
@@ -99,14 +106,18 @@ export async function GET() {
       .eq('log_date', today)
       .maybeSingle()
 
+    console.log('[companion/context] habits query — today:', today, '| raw data:', JSON.stringify(data))
     const habits = (data?.metadata as { habits?: { done?: string[]; total?: number } } | null)?.habits
-    if (habits) {
-      const done  = habits.done  ?? []
-      const total = habits.total ?? 0
-      const pending = total - done.length
-      const hLines = [`Hoy: ${done.length}/${total} completados`]
-      if (done.length)    hLines.push(`Hechos: ${done.join(', ')}`)
-      if (pending > 0)    hLines.push(`Pendientes: ${pending} hábitos sin completar`)
+    const habitDefs: HabitDef[] = body.habitDefs ?? []
+    const doneIds: string[] = habits?.done ?? []
+
+    if (habitDefs.length > 0 || doneIds.length > 0) {
+      const total = habitDefs.length || habits?.total || doneIds.length
+      const doneLabels   = doneIds.map(id => habitDefs.find(h => h.id === id)?.label ?? id)
+      const pendingLabels = habitDefs.filter(h => !doneIds.includes(h.id)).map(h => h.label)
+      const hLines = [`Hoy: ${doneIds.length}/${total} completados`]
+      if (doneLabels.length)   hLines.push(`Hechos: ${doneLabels.join(', ')}`)
+      if (pendingLabels.length) hLines.push(`Pendientes: ${pendingLabels.join(', ')}`)
       sections.push('HÁBITOS\n' + hLines.join('\n'))
     }
   } catch { /* ignore */ }

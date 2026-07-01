@@ -89,14 +89,14 @@ export async function POST(req: NextRequest) {
     const sysMsg = fullSystem ? [{ role: 'system' as const, content: fullSystem }] : []
     const res = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
-      max_tokens: 60,
+      max_tokens: 1024,
       messages: [...sysMsg, ...messages] as Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
     })
     text = res.choices[0]?.message?.content?.trim() ?? ''
   } else {
     const msg = await anthropic.messages.create({
       model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
-      max_tokens: 60,
+      max_tokens: 1024,
       ...(fullSystem ? { system: fullSystem } : {}),
       messages: messages as Array<{ role: 'user' | 'assistant'; content: string }>,
     })

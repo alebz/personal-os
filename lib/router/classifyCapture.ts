@@ -6,11 +6,11 @@ import { getOpenAI } from '@/lib/openai'
 export const URGENCIES = ['today', 'this_week', 'this_month', 'someday'] as const
 export type Urgency = (typeof URGENCIES)[number]
 
-export const KINDS = ['task', 'reminder', 'log', 'note', 'idea', 'contact'] as const
+export const KINDS = ['task', 'reminder', 'event', 'log', 'note', 'idea', 'contact'] as const
 export type Kind = (typeof KINDS)[number]
 
 /** Kinds that become rows in `tasks`; everything else becomes a `daily_logs` row. */
-const TASK_KINDS = new Set<Kind>(['task', 'reminder'])
+const TASK_KINDS = new Set<Kind>(['task', 'reminder', 'event'])
 export function isTaskKind(kind: Kind): boolean {
   return TASK_KINDS.has(kind)
 }
@@ -69,6 +69,10 @@ export type CaptureClassification = {
   summary: string
   /** Populated when kind === 'contact'; all-null otherwise. */
   contact_fields: ContactFields
+  /** Populated when kind === 'event': resolved date as YYYY-MM-DD. */
+  event_date: string | null
+  /** Populated when kind === 'event': 24h time as HH:MM, null if all-day. */
+  event_time: string | null
 }
 
 export type ClassifyResult = CaptureClassification & {
@@ -88,20 +92,23 @@ const CONTACT_CATEGORY_GUIDE = `
   - "Clientes": cliente, customer, quien compra o contrata
   - "Enemigos": rival, enemigo, conflicto abierto`
 
-const SYSTEM_PROMPT = `You triage short personal captures (typed or transcribed from voice) into a structured record. Messages may be in Spanish or English.
+const SYSTEM_PROMPT = `You triage short personal captures (typed or transcribed from voice) into a structured record. Messages may be in Spanish or English. The user's local date is provided at the start of each message.
 
 Classify each capture:
 - kind:
-  • "task" or "reminder" — actionable items to do
-  • "log" — things that already happened
-  • "note" — reference information
+  • "event" — a scheduled appointment, meeting, or event with a specific date/time (e.g. "masaje a las 2pm", "cena con mamá el viernes", "junta mañana a las 10", "dentist Thursday 3pm"). Has a WHEN. Use this over "task" or "reminder" when the entry describes attending or being somewhere at a time.
+  • "task" or "reminder" — actionable items to do that don't describe a calendar appointment (buy, call, send, fix, pay, follow up)
+  • "log" — things that already happened (past tense, completed actions)
+  • "note" — reference information, no action needed
   • "idea" — thoughts or proposals
   • "contact" — adding or saving a person (triggered by phrases like "agrega a", "guarda contacto", "nuevo contacto", "add contact", mentioning a person's name + category or birthday)
-- urgency: "today", "this_week", "this_month", or "someday". Infer from time cues ("tonight", "by Friday", "next month"). Default to "someday" when there is no signal.
+- urgency: "today", "this_week", "this_month", or "someday". For events, derive from event_date relative to today's date. Default to "someday" when there is no signal.
 - entity_id: which business/area this belongs to, by slug, or null if none clearly applies:
 ${ENTITY_GUIDE}
 - tags: 0-5 short lowercase keyword tags.
-- summary: one concise sentence (<= 140 chars) describing the capture.
+- summary: one concise sentence (<= 140 chars) describing the capture. For events, include the time if known: "Masaje con Fernando — 14:00".
+- event_date: Only for kind "event". Resolve relative expressions ("hoy", "mañana", "el viernes") using today's date provided in the message. Output as YYYY-MM-DD. Null for all other kinds.
+- event_time: Only for kind "event". 24-hour HH:MM (e.g. "14:00" for 2pm). Null if no specific time mentioned or for non-event kinds.
 - contact_fields: ALWAYS include this object. When kind is "contact", extract:
   • name: person's full name
   • category: one of the following (infer from relationship words):${CONTACT_CATEGORY_GUIDE}
@@ -120,6 +127,8 @@ const JSON_SCHEMA = {
     },
     tags:    { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },
+    event_date: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    event_time: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     contact_fields: {
       type: 'object',
       properties: {
@@ -133,7 +142,7 @@ const JSON_SCHEMA = {
       additionalProperties: false,
     },
   },
-  required: ['kind', 'urgency', 'entity_id', 'tags', 'summary', 'contact_fields'],
+  required: ['kind', 'urgency', 'entity_id', 'tags', 'summary', 'event_date', 'event_time', 'contact_fields'],
   additionalProperties: false,
 } as const
 
@@ -175,7 +184,11 @@ function normalize(raw: unknown, text: string): CaptureClassification {
       ? obj.summary.trim().slice(0, 140)
       : text.slice(0, 140)
   const contact_fields = normalizeContactFields(obj, kind)
-  return { kind, urgency, entity_id, tags, summary, contact_fields }
+  const event_date = kind === 'event' && typeof obj.event_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(obj.event_date)
+    ? obj.event_date : null
+  const event_time = kind === 'event' && typeof obj.event_time === 'string' && /^\d{2}:\d{2}$/.test(obj.event_time)
+    ? obj.event_time : null
+  return { kind, urgency, entity_id, tags, summary, contact_fields, event_date, event_time }
 }
 
 // --- Tier 1: Claude ----------------------------------------------------------
@@ -251,25 +264,33 @@ function classifyWithRegex(text: string): CaptureClassification {
         notes:    text.slice(0, 1000) || null,
         company:  null,
       },
+      event_date: null,
+      event_time: null,
     }
   }
 
   const entity = ENTITIES.find((e) => e.keywords.some((k) => lower.includes(k)))
 
   let urgency: Urgency = 'someday'
-  if (/\b(today|tonight|now|asap|urgent|immediately)\b/.test(lower)) urgency = 'today'
-  else if (/\b(tomorrow|this week|by (mon|tue|wed|thu|fri|sat|sun))/.test(lower)) urgency = 'this_week'
-  else if (/\b(this month|next week|end of month)\b/.test(lower)) urgency = 'this_month'
+  if (/\b(today|tonight|now|asap|urgent|immediately|hoy|ahorita)\b/.test(lower)) urgency = 'today'
+  else if (/\b(tomorrow|this week|by (mon|tue|wed|thu|fri|sat|sun)|mañana|esta semana)\b/.test(lower)) urgency = 'this_week'
+  else if (/\b(this month|next week|end of month|este mes|próxima semana)\b/.test(lower)) urgency = 'this_month'
+
+  // Detect events by time cues
+  const hasTimeCue = /\b(\d{1,2}(:\d{2})?\s*(am|pm|hrs?)|a las|at \d)/i.test(text)
+  const isEvent = hasTimeCue && !/\b(remind|don'?t forget|need to|have to|must|buy|call|email|fix|send|finish|pay|order)\b/.test(lower)
 
   const isTask =
     /\b(remind|don'?t forget|need to|have to|must|todo|to-?do|task|buy|call|email|schedule|book|fix|send|finish|pay|order|follow up)\b/.test(
       lower
     )
-  const kind: Kind = /\bremind|don'?t forget\b/.test(lower)
-    ? 'reminder'
-    : isTask
-      ? 'task'
-      : 'note'
+  const kind: Kind = isEvent
+    ? 'event'
+    : /\bremind|don'?t forget\b/.test(lower)
+      ? 'reminder'
+      : isTask
+        ? 'task'
+        : 'note'
 
   return {
     kind,
@@ -278,12 +299,15 @@ function classifyWithRegex(text: string): CaptureClassification {
     tags: [],
     summary: text.slice(0, 140),
     contact_fields: nullContactFields(),
+    event_date: null,
+    event_time: null,
   }
 }
 
 // --- Orchestrator ------------------------------------------------------------
 
-export async function classifyCapture(text: string): Promise<ClassifyResult> {
+export async function classifyCapture(text: string, rawText?: string): Promise<ClassifyResult> {
+  const forRegex = rawText ?? text
   try {
     return { ...(await classifyWithClaude(text)), via: 'claude' }
   } catch (claudeErr) {
@@ -292,7 +316,7 @@ export async function classifyCapture(text: string): Promise<ClassifyResult> {
       return { ...(await classifyWithOpenAI(text)), via: 'openai' }
     } catch (openaiErr) {
       console.warn('classifyCapture: OpenAI failed, falling back to regex', openaiErr)
-      return { ...classifyWithRegex(text), via: 'regex' }
+      return { ...classifyWithRegex(forRegex), via: 'regex' }
     }
   }
 }

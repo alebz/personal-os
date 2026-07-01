@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import ICAL from 'ical.js'
+import { createServerClient } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
@@ -101,6 +102,50 @@ async function fetchAndParse(): Promise<CalEvent[]> {
   return events
 }
 
+// ── Supabase captured events ──────────────────────────────────────────────────
+
+async function fetchCapturedEvents(): Promise<CalEvent[]> {
+  try {
+    const supabase = createServerClient()
+    const { data } = await supabase
+      .from('tasks')
+      .select('id, title, metadata, urgency')
+      .eq('kind', 'event')
+      .eq('status', 'todo')
+      .order('created_at', { ascending: false })
+
+    if (!data?.length) return []
+
+    const now = new Date()
+    const todayStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+    const in14 = new Date(now); in14.setDate(in14.getDate() + 14)
+    const in14Str = in14.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+
+    return data.flatMap((row): CalEvent[] => {
+      const meta = (row.metadata ?? {}) as { event_date?: string; event_time?: string }
+      const event_date = meta.event_date
+      const event_time = meta.event_time
+      if (!event_date) return []
+      if (event_date < todayStr || event_date > in14Str) return []
+
+      const start = event_time ? `${event_date}T${event_time}:00` : event_date
+      const endDate = event_time
+        ? (() => { const d = new Date(`${event_date}T${event_time}:00`); d.setHours(d.getHours() + 1); return d.toISOString().slice(0, 16) + ':00' })()
+        : event_date
+
+      return [{
+        uid:    `captured:${row.id}`,
+        title:  row.title,
+        start,
+        end:    endDate,
+        allDay: !event_time,
+      }]
+    })
+  } catch {
+    return []
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function GET() {
@@ -111,7 +156,11 @@ export async function GET() {
   }
 
   try {
-    const events = await fetchAndParse()
+    const [icalEvents, capturedEvents] = await Promise.all([
+      fetchAndParse().catch(() => [] as CalEvent[]),
+      fetchCapturedEvents(),
+    ])
+    const events = [...icalEvents, ...capturedEvents].sort((a, b) => a.start.localeCompare(b.start))
     _cache = { events, ts: now }
     return NextResponse.json(events, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {

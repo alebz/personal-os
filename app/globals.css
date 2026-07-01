@@ -1,5 +1,61 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'DSEG7 Classic';
+  src: url('/fonts/DSEG7Classic-Regular.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+/* ── View Transitions ────────────────────────────────────────────────────────── */
+
+/* Root: suppress default cross-fade — all chrome is excluded via named layers */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Page glow: slow cross-fade between per-page color blurs */
+::view-transition-old(page-glow) {
+  animation: 350ms ease-out both fade-out;
+}
+::view-transition-new(page-glow) {
+  animation: 350ms ease-in both fade-in;
+}
+
+/* Persistent shell elements: no animation — hold still */
+::view-transition-old(toprail),
+::view-transition-new(toprail),
+::view-transition-old(stars-field),
+::view-transition-new(stars-field),
+::view-transition-old(stars-events),
+::view-transition-new(stars-events),
+::view-transition-old(adan),
+::view-transition-new(adan) {
+  animation: none;
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modo Discreto ───────────────────────────────────────────────────────────── */
+.modo-discreto [data-sensitive] {
+  filter: blur(8px);
+  transition: filter 200ms ease;
+  cursor: pointer;
+}
+.modo-discreto [data-sensitive]:hover {
+  filter: blur(0);
+}
+
 /*
  * Design tokens — oklch(L C H)
  * Neutral ramp: ink-0 = deepest base surface … ink-4 = brightest foreground.
@@ -74,19 +130,15 @@ body {
 }
 
 /* Plane one-shot crossings (60 s). Element is removed from DOM when not active. */
-@keyframes plane-cross {
-  from { transform: translateX(-20px);              }
-  to   { transform: translateX(calc(100vw + 20px)); }
+/* Single-animation plane travel — start/end driven by CSS vars set inline per element */
+@keyframes plane-travel {
+  from { transform: translate(var(--px0, 0), var(--py0, 0)); }
+  to   { transform: translate(var(--px1, 100vw), var(--py1, 0)); }
 }
-@keyframes plane-cross-rtl {
-  from { transform: translateX(calc(100vw + 20px)); }
-  to   { transform: translateX(-20px);              }
-}
-/* Vertical drift on inner div — value comes from --plane-dy CSS custom property
-   set inline per element, giving each plane a unique diagonal angle. */
-@keyframes plane-y {
-  from { transform: translateY(0); }
-  to   { transform: translateY(var(--plane-dy, 0vh)); }
+
+@keyframes oracle-appear {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
 }
 
 /* Nav lights: mostly on, brief off */
@@ -131,5 +183,47 @@ body {
 @keyframes sat-glow {
   0%, 100% { opacity: 0.6; }
   50%       { opacity: 1.0; }
+}
+
+/* ── Celestial bodies ───────────────────────────────────────────────────────── */
+
+/* Luna drifts slowly from right to left over 8 hours */
+@keyframes luna-drift {
+  0%   { transform: translateX(0);     }
+  100% { transform: translateX(-75vw); }
+}
+
+/* Comet travels between two screen positions (vars set per-element) */
+@keyframes comet-travel {
+  0%   { transform: translate(var(--cx0), var(--cy0)); opacity: 0;    }
+  10%  {                                                opacity: 0.95; }
+  90%  {                                                opacity: 0.9;  }
+  100% { transform: translate(var(--cx1), var(--cy1)); opacity: 0;    }
+}
+
+/* Saturn floats diagonally across the night sky */
+@keyframes saturn-travel {
+  0%   { transform: translate(var(--stx0), var(--sty0)); opacity: 0;   }
+  8%   {                                                   opacity: 0.8; }
+  92%  {                                                   opacity: 0.8; }
+  100% { transform: translate(var(--stx1), var(--sty1)); opacity: 0;   }
+}
+
+/* OVNI tractor beam pulse */
+@keyframes ovni-beam {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 0.7; }
+}
+
+/* Moon glow halo pulse — ±10% opacity on the glow div */
+@keyframes moon-glow-pulse {
+  0%, 100% { opacity: 0.85; }
+  50%       { opacity: 1.0;  }
+}
+
+/* Comet tail sparkle — individual pixels flicker in the trailing plasma */
+@keyframes comet-spark {
+  0%, 100% { opacity: 0; }
+  40%, 60%  { opacity: 1; }
 }
 

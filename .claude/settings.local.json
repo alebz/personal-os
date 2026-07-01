@@ -53,7 +53,13 @@
       "Bash(awk '{print $6}')",
       "Bash(awk '{print $3}')",
       "Bash(xargs cat)",
-      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')"
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')",
+      "Bash(kill %1)",
+      "Bash(grep -n \"Vacaciones\\\\|vacaciones\\\\|envelope\\\\|Envelope\\\\|weekly_amount\\\\|weekly\\\\|$/sem\" /Users/alexmateo/personal-os/app/finance/page.tsx)",
+      "Bash(awk -F: '$1 > 488')",
+      "Bash(grep -n \"mxn\\(\\\\|{mxn\\\\|data-sensitive\\\\|MXN\\\\|\\\\$\" /Users/alexmateo/personal-os/app/uptown/page.tsx)",
+      "Bash(grep -n \"mxn\\(\\\\|{mxn\\\\|\\\\$[0-9]\" /Users/alexmateo/personal-os/app/uptown/page.tsx)",
+      "Bash(xargs ls)"
     ]
   }
 }

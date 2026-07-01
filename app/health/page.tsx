@@ -130,7 +130,7 @@ export default function HealthPage() {
   }, [window30])
 
   return (
-    <Shell glow="health">
+    <Shell>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
 
         {/* Header */}

@@ -13,6 +13,7 @@ interface Toast {
 const KIND_LABEL: Record<string, string> = {
   task:     '✅ Tarea',
   reminder: '🔔 Recordatorio',
+  event:    '📅 Evento',
   log:      '📝 Nota',
   note:     '📌 Nota',
   idea:     '💡 Idea',

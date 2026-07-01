@@ -445,7 +445,7 @@ function NominaPanel({ nomina, onToggleSemana, onSetMonto }: {
   const pagado = nomina.semanas.reduce((a, v, i) => a + (nomina.pagadas[i] ? v : 0), 0)
 
   return (
-    <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/10">
+    <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
       <SectionHeader
         title="Nómina semanal"
         summary={`${fmt(pagado)} / ${fmt(total)}`}
@@ -676,7 +676,7 @@ export default function UptownPanel({ month }: { month: string }) {
           { label: 'Remanente',      value: t.remanente, cls: t.remanente >= 0 ? 'text-ok' : 'text-danger' },
           { label: 'Fondo total',    value: fondoAcum,   cls: 'text-warn'   },
         ].map(({ label, value, cls }) => (
-          <div key={label} className="rounded-xl border border-ink-4/10 bg-ink-1/30 p-3 text-center backdrop-blur-xl">
+          <div key={label} className="rounded-xl border border-ink-4/10 bg-ink-1/60 p-3 text-center backdrop-blur-xl">
             <p className="text-[10px] uppercase tracking-wider text-ink-2">{label}</p>
             <p className={`mt-0.5 text-lg font-black tabular-nums ${cls}`}>{fmt(value)}</p>
           </div>
@@ -691,7 +691,7 @@ export default function UptownPanel({ month }: { month: string }) {
           <p className="text-[10px] font-bold uppercase tracking-widest text-ok">↑ Ingresos</p>
 
           {/* Rentas */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/10">
+          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
             <SectionHeader
               title="Rentas"
               summary={`${fmt(rentasCobradas)} / ${fmt(rentasTotal)}`}
@@ -708,7 +708,7 @@ export default function UptownPanel({ month }: { month: string }) {
           </div>
 
           {/* Ingresos extra */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/10">
+          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
             <SectionHeader
               title="Ingresos extra"
               summary={ms.extrasIngresos.length > 0
@@ -738,7 +738,7 @@ export default function UptownPanel({ month }: { month: string }) {
           <p className="text-[10px] font-bold uppercase tracking-widest text-danger">↓ Gastos</p>
 
           {/* Gastos fijos */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/10">
+          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
             <SectionHeader
               title="Gastos fijos"
               summary={`${fmt(gastosFijosPag)} / ${fmt(gastosFijosTotal)}`}
@@ -755,7 +755,7 @@ export default function UptownPanel({ month }: { month: string }) {
           </div>
 
           {/* Gastos extra */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/10">
+          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
             <SectionHeader
               title="Gastos extra"
               summary={ms.extras.length > 0 ? fmt(extrasPagados) : undefined}

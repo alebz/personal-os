@@ -637,7 +637,7 @@ export default function ContactosPage() {
   }
 
   return (
-    <Shell glow="contactos">
+    <Shell>
       <main className="mx-auto max-w-3xl px-6 py-6">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
