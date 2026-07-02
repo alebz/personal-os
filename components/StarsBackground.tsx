@@ -173,80 +173,81 @@ function CometSVG() {
   )
 }
 
-// ─── SVG: Spaceship (pixel-art, rect-only) ───────────────────────────────────
+// ─── SVG: Fighter Ship (pixel-art, rect-only) ────────────────────────────────
 //
-// Design matches reference: staircase-stepped body/nose, white nose section,
-// magenta accent band, purple body with dark center, orange exhaust fire.
-// viewBox 34×12, nose at right (x=33), exhaust at left (x=0).
-//
-// Staircase profile (each row's extents):
-//   y=1  body x=16-19  mag x=20-21  white x=22-29
-//   y=2  body x=10-19  mag x=20-21  white x=22-31
-//   y=3  body x=6-19   mag x=20-21  white x=22-33
-//   y=4  body x=3-19   mag x=20-21  white x=22-33  ← fire row
-//   y=5  body x=3-19   mag x=20-21  white x=22-33  ← fire row
-//   y=6  body x=3-19   mag x=20-21  white x=22-33
-//   y=7  body x=6-19   mag x=20-21  white x=22-33
-//   y=8  body x=10-19  mag x=20-21  white x=22-31
-//   y=9  body x=16-19  mag x=20-21  white x=22-29
+// Body: x=0..108, y=4..28. Wings extend to y=-8/y=37. Thruster at x=-50..0.
+// Trail extends x=-250..-50. viewBox "-250 -8 358 45" → width 179, height 23 (0.5 scale).
 
 function SpaceshipSVG({ rtl }: { rtl: boolean }) {
   return (
     <svg
-      width="17" height="6"
-      viewBox="0 0 34 12"
+      width="90" height="12"
+      viewBox="-250 -8 358 45"
       style={{ display: 'block', imageRendering: 'pixelated', transform: rtl ? 'scaleX(-1)' : undefined }}
       shapeRendering="crispEdges"
     >
       <defs>
         <style>{`
-          @keyframes ship-fire{0%,100%{fill:#ff8800}35%{fill:#ffdd00}70%{fill:#ff3300}}
-          @keyframes ship-fire2{0%,100%{fill:#ffbb00}35%{fill:#ff6600}70%{fill:#ffee44}}
+          @keyframes fl1 { 0%,100%{opacity:1} 50%{opacity:0.4} }
+          @keyframes fl2 { 0%,100%{opacity:0.6} 50%{opacity:1} }
+          @keyframes fl3 { 0%,100%{opacity:0.3} 66%{opacity:0.7} }
+          .fl1{animation:fl1 0.12s ease-in-out infinite}
+          .fl2{animation:fl2 0.10s ease-in-out infinite}
+          .fl3{animation:fl3 0.15s ease-in-out infinite}
         `}</style>
+        <linearGradient id="fighter-trail" x1="-250" y1="15" x2="-50" y2="15" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="rgba(255,0,170,0)"   />
+          <stop offset="100%" stopColor="rgba(255,0,170,0.4)" />
+        </linearGradient>
       </defs>
 
-      {/* ── White nose section (stepped left edge, pointed right) ── */}
-      <rect x={22} y={1} width={8}  height={1} fill="#dce6ff"/>
-      <rect x={22} y={2} width={10} height={1} fill="#e4eaff"/>
-      <rect x={22} y={3} width={12} height={1} fill="#eaf0ff"/>
-      <rect x={22} y={4} width={12} height={4} fill="#eef2ff"/>
-      <rect x={22} y={8} width={12} height={1} fill="#eaf0ff"/>
-      <rect x={22} y={9} width={10} height={1} fill="#e4eaff"/>
-      <rect x={22} y={10} width={8} height={1} fill="#dce6ff"/>
-      {/* nose tip highlight */}
-      <rect x={33} y={5} width={1}  height={2} fill="#ffffff"/>
+      {/* Dotted magenta trail */}
+      <line x1="-250" y1="15" x2="-50" y2="15"
+        stroke="url(#fighter-trail)"
+        strokeDasharray="3 6"
+        strokeWidth="2"
+      />
 
-      {/* ── Magenta accent band (vertical, between body and white) ── */}
-      <rect x={20} y={1} width={2}  height={1} fill="#d030a0"/>
-      <rect x={20} y={2} width={2}  height={1} fill="#d030a0"/>
-      <rect x={20} y={3} width={2}  height={7} fill="#cc28a0"/>
-      <rect x={20} y={10} width={2} height={1} fill="#d030a0"/>
+      {/* Thruster flames */}
+      <g>
+        <rect className="fl1" x="-10" y="13" width="10" height="4" fill="#ffffff"/>
+        <rect className="fl2" x="-18" y="13" width="10" height="4" fill="#ffcc00"/>
+        <rect className="fl1" x="-26" y="14" width="10" height="3" fill="#ff8800"/>
+        <rect className="fl3" x="-34" y="14" width="10" height="3" fill="#ff4400"/>
+        <rect className="fl2" x="-42" y="15" width="10" height="2" fill="#ff6600" opacity={0.6}/>
+        <rect className="fl3" x="-50" y="15" width="8"  height="2" fill="#ff4400" opacity={0.3}/>
+      </g>
 
-      {/* ── Purple body (staircase left edge matching reference) ── */}
-      {/* top steps */}
-      <rect x={16} y={1}  width={4} height={1} fill="#7030d0"/>
-      <rect x={10} y={2}  width={10} height={1} fill="#7030d0"/>
-      <rect x={6}  y={3}  width={14} height={1} fill="#7838d8"/>
-      {/* main fuselage rows (widest) */}
-      <rect x={4}  y={4}  width={16} height={4} fill="#7030c8"/>
-      {/* darker core stripe */}
-      <rect x={6}  y={4}  width={12} height={4} fill="#5418a8"/>
-      {/* small engine highlight */}
-      <rect x={5}  y={5}  width={2}  height={2} fill="#9848e8"/>
-      {/* bottom steps */}
-      <rect x={6}  y={8}  width={14} height={1} fill="#7838d8"/>
-      <rect x={10} y={9}  width={10} height={1} fill="#7030d0"/>
-      <rect x={16} y={10} width={4}  height={1} fill="#7030d0"/>
+      {/* Body */}
+      <rect x="0"   y="10" width="8"  height="10" fill="#e0e0ff"/>
+      <rect x="8"   y="6"  width="16" height="18" fill="#ffffff"/>
+      <rect x="24"  y="4"  width="24" height="22" fill="#ffffff"/>
+      <rect x="48"  y="6"  width="20" height="18" fill="#ffffff"/>
+      <rect x="68"  y="8"  width="16" height="14" fill="#f0f0ff"/>
+      <rect x="84"  y="10" width="10" height="10" fill="#e0e0ee"/>
+      <rect x="94"  y="12" width="8"  height="7"  fill="#d0d0dd"/>
+      <rect x="102" y="13" width="6"  height="5"  fill="#c0c0cc"/>
 
-      {/* ── Engine nozzle block (just right of fire) ── */}
-      <rect x={3}  y={4}  width={2}  height={4} fill="#c06000"/>
+      {/* Magenta stripe */}
+      <rect x="0" y="17" width="104" height="3" fill="#ff00aa"/>
 
-      {/* ── Exhaust fire ── */}
-      <rect x={0} y={3} width={3} height={1} fill="#ff8800" style={{ animation: 'ship-fire  0.13s 0.00s linear infinite' }}/>
-      <rect x={0} y={4} width={4} height={4} fill="#ffbb00" style={{ animation: 'ship-fire2 0.13s 0.04s linear infinite' }}/>
-      <rect x={0} y={8} width={3} height={1} fill="#ff8800" style={{ animation: 'ship-fire  0.13s 0.08s linear infinite' }}/>
-      <rect x={0} y={5} width={3} height={2} fill="#ffee00" style={{ animation: 'ship-fire2 0.13s 0.06s linear infinite' }}/>
-      <rect x={1} y={6} width={1} height={1} fill="#ffffff" opacity={0.65}/>
+      {/* Wings top */}
+      <rect x="16" y="0"  width="8" height="6" fill="#ffffff"/>
+      <rect x="8"  y="-4" width="8" height="6" fill="#f0f0ff"/>
+      <rect x="0"  y="-6" width="8" height="6" fill="#e0e0ff"/>
+
+      {/* Wings bottom */}
+      <rect x="16" y="24" width="8" height="6" fill="#ffffff"/>
+      <rect x="8"  y="28" width="8" height="6" fill="#f0f0ff"/>
+      <rect x="0"  y="30" width="8" height="6" fill="#e0e0ff"/>
+
+      {/* Magenta wing tips */}
+      <rect x="0" y="-8" width="8" height="3" fill="#ff00aa"/>
+      <rect x="0" y="34" width="8" height="3" fill="#ff00aa"/>
+
+      {/* Cockpit */}
+      <rect x="60" y="4" width="20" height="8" fill="#334466"/>
+      <rect x="62" y="5" width="6"  height="4" fill="#5577aa" opacity={0.7}/>
     </svg>
   )
 }

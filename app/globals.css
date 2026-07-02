@@ -8,6 +8,41 @@
   font-display: block;
 }
 
+/* ── Lolo companion animations ──────────────────────────────────────────────── */
+
+@keyframes adanBreathe{0%{transform:scaleX(1) scaleY(1);}30%{transform:scaleX(1.019) scaleY(1.013);}55%{transform:scaleX(1.024) scaleY(1.016);}80%{transform:scaleX(0.997) scaleY(0.996);}100%{transform:scaleX(1) scaleY(1);}}
+@keyframes adanLedGreen{0%,100%{background:radial-gradient(circle at 36% 30%,#aaffcc,#20dd66 44%,#008a30);box-shadow:0 0 4px 2px rgba(28,200,90,.72),0 0 9px 2px rgba(20,180,60,.28),inset 0 -1px 1px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.55);}50%{background:radial-gradient(circle at 36% 30%,#ccffd8,#30ee77 44%,#009e3a);box-shadow:0 0 6px 3px rgba(35,220,90,.78),0 0 14px 3px rgba(24,190,70,.32),inset 0 -1px 1px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.55);}}
+@keyframes adanLedRed{0%,49%{background:radial-gradient(circle at 36% 30%,#ffaaaa,#dd2020 44%,#8a0000);box-shadow:0 0 5px 2px rgba(200,28,28,.8),0 0 10px 2px rgba(180,20,20,.35),inset 0 -1px 1px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.55);}50%,100%{background:radial-gradient(circle at 36% 30%,#3a0000,#660000 44%,#1a0000);box-shadow:0 0 1px 1px rgba(100,0,0,.4),inset 0 -1px 1px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.1);}}
+@keyframes adanHeart{0%,100%{transform:scale(1);}30%{transform:scale(1.25);}45%{transform:scale(1);}}
+@keyframes adanDot{0%,80%,100%{opacity:.2;transform:translateY(0);}40%{opacity:1;transform:translateY(-5px);}}
+@keyframes adanShadow{0%,100%{transform:translateX(-50%) scaleX(1);opacity:.3;}50%{transform:translateX(-50%) scaleX(.88);opacity:.2;}}
+@keyframes adanBox{0%{transform:translateY(16px);opacity:0;}100%{transform:translateY(0);opacity:1;}}
+@keyframes adanBlink{0%,100%{opacity:1;}50%{opacity:.25;}}
+@keyframes adanCaret{0%,100%{opacity:1;}50%{opacity:0;}}
+@keyframes gardenDrift{0%,100%{transform:scale(1.08) translateX(0);}50%{transform:scale(1.08) translateX(-14px);}}
+@keyframes gardenLight{0%,100%{opacity:.13;transform:translateX(-30px);}50%{opacity:.22;transform:translateX(20px);}}
+@keyframes leafFloat1{0%{transform:translate(0,0) rotate(0deg);opacity:.92;}100%{transform:translate(-44px,380px) rotate(340deg);opacity:0;}}
+@keyframes leafFloat2{0%{transform:translate(0,0) rotate(0deg);opacity:.88;}100%{transform:translate(30px,400px) rotate(-300deg);opacity:0;}}
+@keyframes leafFloat3{0%{transform:translate(0,0) rotate(0deg);opacity:.82;}100%{transform:translate(-22px,360px) rotate(220deg);opacity:0;}}
+@keyframes leafFloat4{0%{transform:translate(0,0) rotate(0deg);opacity:.9;}100%{transform:translate(18px,420px) rotate(-260deg);opacity:0;}}
+@keyframes leafFloat5{0%{transform:translate(0,0) rotate(0deg);opacity:.85;}100%{transform:translate(-32px,370px) rotate(290deg);opacity:0;}}
+@keyframes leafFloat6{0%{transform:translate(0,0) rotate(0deg);opacity:.78;}100%{transform:translate(26px,350px) rotate(-180deg);opacity:0;}}
+@keyframes sparkle{0%{transform:translate(0,0) scale(1);opacity:0;}15%{opacity:.65;}50%{transform:translate(-8px,180px) scale(1.1);opacity:.55;}85%{opacity:.3;}100%{transform:translate(4px,390px) scale(.8);opacity:0;}}
+@keyframes sparkle2{0%{transform:translate(0,0) scale(.9);opacity:0;}20%{opacity:.6;}55%{transform:translate(10px,200px) scale(1);opacity:.5;}90%{opacity:.22;}100%{transform:translate(-6px,410px) scale(.7);opacity:0;}}
+@keyframes sparkle3{0%{transform:translate(0,0) scale(1.1);opacity:0;}18%{opacity:.55;}48%{transform:translate(-12px,160px) scale(.95);opacity:.45;}82%{opacity:.2;}100%{transform:translate(8px,370px) scale(.75);opacity:0;}}
+@keyframes sparkle4{0%{transform:translate(0,0);opacity:0;}22%{opacity:.5;}60%{transform:translate(6px,220px);opacity:.4;}100%{transform:translate(-4px,430px);opacity:0;}}
+@keyframes glassShimmer{0%{transform:translateX(-140%) skewX(-14deg);opacity:0;}12%{opacity:1;}88%{opacity:.85;}100%{transform:translateX(280%) skewX(-14deg);opacity:0;}}
+@keyframes glassBreath{0%,100%{opacity:.14;}50%{opacity:.22;}}
+@keyframes glassGlow{0%,100%{opacity:.55;}50%{opacity:.72;}}
+@keyframes deviceSway{0%{transform:translateY(0);}50%{transform:translateY(-3px);}100%{transform:translateY(0);}}
+@keyframes plasticShimmer{0%{transform:translateX(-220px) skewX(-14deg);opacity:0}6%{opacity:.9}38%{transform:translateX(540px) skewX(-14deg);opacity:.9}46%{opacity:0}100%{transform:translateX(-220px) skewX(-14deg);opacity:0}}
+@keyframes plasticPulse{0%,100%{opacity:.05}50%{opacity:.13}}
+@keyframes glitterShimmer{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+@keyframes arcadeMarquee{0%{background-position:0% 0%;}100%{background-position:200% 0%;}}
+@keyframes glitterParticle{0%,85%,100%{opacity:0.15}90%{opacity:1}95%{opacity:0.3}}
+
+input::placeholder { font-family: 'VT323', monospace; font-size: 20px; color: #555555; opacity: 1; }
+
 /* ── View Transitions ────────────────────────────────────────────────────────── */
 
 /* Root: suppress default cross-fade — all chrome is excluded via named layers */

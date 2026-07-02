@@ -12,32 +12,32 @@ import AdanCompanion from '@/components/AdanCompanion'
 export default function DashboardPage() {
   return (
     <Shell>
+      <AdanCompanion />
       <main className="mx-auto max-w-7xl px-6 py-6">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
 
-          {/* Left rail */}
+          {/* Column 1 — Tarot + Metas */}
           <div className="flex flex-col gap-5 lg:col-span-3">
             <TarotCard />
-            <FinancePulseCard />
-            <HabitTracker />
-          </div>
-
-          {/* Center stage */}
-          <div className="flex flex-col gap-5 lg:col-span-6">
-            <QuickCaptureCard />
-            <SessionCard />
             <GoalsCard />
           </div>
 
-          {/* Right rail */}
-          <div className="flex flex-col gap-5 lg:col-span-3">
+          {/* Column 2 — Calendar + capture + tasks */}
+          <div className="flex flex-col gap-5 lg:col-span-6">
             <CalendarCard />
+            <QuickCaptureCard />
+            <SessionCard />
+          </div>
+
+          {/* Column 3 — Finance + Hábitos + Cumpleaños */}
+          <div className="flex flex-col gap-5 lg:col-span-3">
+            <FinancePulseCard />
+            <HabitTracker />
             <CumpleanosCard />
           </div>
 
         </div>
       </main>
-      <AdanCompanion />
     </Shell>
   )
 }

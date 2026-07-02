@@ -736,7 +736,7 @@ export default function ContactosPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl" style={{ height: 700, overflowY: 'auto' }}>
             {sort === 'tipo'
               ? groupByType(filtered, catNames).map(({ cat, items }) => (
                   <div key={cat}>

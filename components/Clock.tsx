@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 const MON_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
@@ -17,7 +17,7 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-export default function Clock({ color = '#F59E0B' }: { color?: string }) {
+function Clock({ color = '#F59E0B' }: { color?: string }) {
   const [now,   setNow]   = useState<Date | null>(null)
   const [colon, setColon] = useState(true)
 
@@ -108,9 +108,8 @@ export default function Clock({ color = '#F59E0B' }: { color?: string }) {
         {dateStr}
       </div>
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-      `}</style>
     </div>
   )
 }
+
+export default memo(Clock)

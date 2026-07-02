@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import ICAL from 'ical.js'
 import { createServerClient } from '@/lib/supabase'
 
@@ -147,6 +148,28 @@ async function fetchCapturedEvents(): Promise<CalEvent[]> {
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
+
+export async function POST(req: NextRequest) {
+  try {
+    const { title, event_date, event_time } = await req.json()
+    if (!title?.trim() || !event_date) {
+      return NextResponse.json({ error: 'title and event_date required' }, { status: 400 })
+    }
+    const supabase = createServerClient()
+    const { error } = await supabase.from('tasks').insert({
+      title: title.trim(),
+      kind: 'event',
+      status: 'todo',
+      urgency: 'someday',
+      metadata: { event_date, ...(event_time ? { event_time } : {}) },
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    _cache = null  // bust cache so next GET reflects the new event
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
 
 export async function GET() {
   const now = Date.now()

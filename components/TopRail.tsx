@@ -90,7 +90,7 @@ export default function TopRail() {
           <button
             onClick={toggleDiscreto}
             title={discreto ? 'Desactivar modo discreto' : 'Activar modo discreto'}
-            style={{ fontSize: 18, opacity: discreto ? 1 : 0.4, transition: 'opacity 200ms ease', lineHeight: 1 }}
+            style={{ fontSize: 18, opacity: discreto ? 1 : 0.4, transition: 'opacity 200ms ease', lineHeight: 1, position: 'relative', zIndex: 10001, pointerEvents: 'auto' }}
           >
             {discreto ? '🙈' : '👁'}
           </button>

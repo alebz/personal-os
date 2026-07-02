@@ -2,6 +2,52 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 
+export const runtime = 'nodejs'
+
+function saturdaysInMonth(month: string): { num: number; label: string }[] {
+  const [y, mo] = month.split('-').map(Number)
+  const result: { num: number; label: string }[] = []
+  const d = new Date(y, mo - 1, 1)
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1)
+  let n = 1
+  while (d.getMonth() === mo - 1) {
+    result.push({ num: n, label: `Sáb ${d.getDate()}` })
+    d.setDate(d.getDate() + 7)
+    n++
+  }
+  return result
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const month = searchParams.get('month')
+    ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }).slice(0, 7)
+
+  const sats = saturdaysInMonth(month)
+  const supabase = createServerClient()
+
+  const { data } = await supabase
+    .from('uptown_nomina')
+    .select('week_num,amount,paid,method')
+    .eq('month', month)
+    .order('week_num')
+
+  const db = data ?? []
+
+  return NextResponse.json(
+    sats.map(s => {
+      const row = db.find(n => n.week_num === s.num)
+      return {
+        week_num:  s.num,
+        week_date: s.label,
+        amount:    row ? Number(row.amount) : null,
+        paid:      row ? Boolean(row.paid)  : false,
+        method:    row?.method ?? null,
+      }
+    })
+  )
+}
+
 export async function POST(req: NextRequest) {
   let body: { month?: string; week_num?: number; amount?: number; paid?: boolean; method?: string }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }

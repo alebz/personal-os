@@ -67,19 +67,21 @@ function formatJournalContext(entries: JournalEntry[]): string {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { messages?: Array<{ role: string; content: string }>; system?: string; provider?: string }
+  let body: { messages?: Array<{ role: string; content: string }>; system?: string; provider?: string; spontaneous?: boolean }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
-  const { messages, system, provider = 'anthropic' } = body
+  const { messages, system, provider = 'anthropic', spontaneous = false } = body
   if (!messages?.length) return NextResponse.json({ error: 'messages required' }, { status: 400 })
 
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? ''
 
-  // Brain search and journal fetch run in parallel
-  const [brainChunks, journalEntries] = await Promise.all([
-    lastUserMsg ? searchBrain(lastUserMsg) : Promise.resolve([]),
-    recentJournal(5),
-  ])
+  // Skip brain search and journal for spontaneous interventions — they don't need OS context
+  const [brainChunks, journalEntries] = spontaneous
+    ? [[], []]
+    : await Promise.all([
+        lastUserMsg ? searchBrain(lastUserMsg) : Promise.resolve([]),
+        recentJournal(5),
+      ])
 
   const fullSystem = (system ?? '') + formatJournalContext(journalEntries) + formatBrainContext(brainChunks)
 

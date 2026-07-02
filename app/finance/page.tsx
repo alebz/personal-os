@@ -62,7 +62,7 @@ interface IncomeItem {
 
 interface NominaMirror {
   week_num:  number
-  week_date: string
+  week_date: string   // label e.g. "Sáb 5"
   amount:    number | null
   paid:      boolean
   method:    string | null
@@ -532,7 +532,7 @@ interface PanelTabProps {
   envelopes: Envelope[]
   monthChecks: MonthChecks
   balance: Balance | null
-  nominaMirror: NominaMirror | null | 'loading'
+  nominaMirror: NominaMirror[] | 'loading'
   onToggleIncome: (item: IncomeItem) => Promise<void>
   onSetRealMonto: (itemId: string, monto: number) => void
   onSetRealMetodo: (itemId: string, metodo: string) => void
@@ -571,9 +571,9 @@ function PanelTab({
   const activeIncome  = incomeItems.filter(i => i.active)
   const activeCosts   = commitments.filter(c => c.active)
 
-  const mirror = nominaMirror !== 'loading' ? nominaMirror : null
-  const mirrorTotal  = mirror?.amount ?? 0
-  const mirrorPaid   = mirror !== null && mirror.paid && mirror.amount !== null ? mirror.amount : 0
+  const mirrorRows  = nominaMirror !== 'loading' ? nominaMirror : []
+  const mirrorTotal = mirrorRows.reduce((s, r) => s + (r.amount ?? 0), 0)
+  const mirrorPaid  = mirrorRows.filter(r => r.paid && r.amount != null).reduce((s, r) => s + (r.amount ?? 0), 0)
 
   const totalInPrevistos   = activeIncome.reduce((s, i) => s + Number(i.monto), 0) + mirrorTotal
   const totalGastoPrevistos = activeCosts.reduce((s, c) => s + Number(c.amount), 0)
@@ -617,11 +617,13 @@ function PanelTab({
   return (
     <div className="space-y-5">
       {/* 4 summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-3">
+        <PanelCard label="Efectivo"           value={Number(balance?.efectivo   ?? 0)} cls="text-success" />
+        <PanelCard label="Tarjeta"            value={Number(balance?.tarjeta    ?? 0)} cls="text-info" />
+        <PanelCard label="Caja Fuerte"        value={caja}    cls="text-warn" />
         <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     subNode={<><span className="text-ink-3">de </span><Mxn v={totalInPrevistos} /></>} />
         <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" subNode={<><span className="text-ink-3">de </span><Mxn v={totalGastoPrevistos} /></>} />
         <PanelCard label="Flujo del mes"      value={flujo}   cls={flujo >= 0 ? 'text-ok' : 'text-danger'} />
-        <PanelCard label="Caja Fuerte"        value={caja}    cls="text-warn" />
       </div>
 
       {/* Two-column layout */}
@@ -647,31 +649,25 @@ function PanelTab({
                 />
               ))
             )}
-            {/* Nómina mirror — read-only from Uptown */}
-            {nominaMirror !== 'loading' && (() => {
-              const nm = nominaMirror
-              const weekDay = nm?.week_date
-                ? new Date(nm.week_date + 'T12:00:00').getDate()
-                : null
-              return (
-                <div className={['flex items-center gap-2 border-t border-ink-4/5 px-3 py-2.5', nm?.paid ? 'opacity-55' : ''].join(' ')}>
-                  <CheckBox checked={nm?.paid ?? false} />
-                  <span className={`min-w-0 flex-1 truncate text-xs ${nm?.paid ? 'line-through text-ink-3' : 'text-ink-4'}`}>
-                    Nómina{weekDay ? ` · Sáb ${weekDay}` : ''}
+            {/* Nómina mirror — read-only from Uptown, all 4 weeks */}
+            {nominaMirror !== 'loading' && mirrorRows.map(nm => (
+              <div key={nm.week_num} className={['flex items-center gap-2 border-t border-ink-4/5 px-3 py-2.5', nm.paid ? 'opacity-55' : ''].join(' ')}>
+                <CheckBox checked={nm.paid} />
+                <span className={`min-w-0 flex-1 truncate text-xs ${nm.paid ? 'line-through text-ink-3' : 'text-ink-4'}`}>
+                  Semana {nm.week_num}{nm.week_date ? ` · ${nm.week_date}` : ''}
+                </span>
+                <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-accent/10 text-accent">
+                  ↑ Uptown
+                </span>
+                {nm.amount != null ? (
+                  <span className={`shrink-0 text-xs tabular-nums ${nm.paid ? 'text-ok' : 'text-ink-3'}`}>
+                    <Mxn v={nm.amount} />
                   </span>
-                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-accent/10 text-accent">
-                    ↑ Uptown
-                  </span>
-                  {nm?.amount != null ? (
-                    <span className={`shrink-0 text-xs tabular-nums ${nm.paid ? 'text-ok' : 'text-ink-3'}`}>
-                      <Mxn v={nm.amount} />
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-[10px] italic text-ink-3/50">Sin registrar</span>
-                  )}
-                </div>
-              )
-            })()}
+                ) : (
+                  <span className="shrink-0 text-[10px] italic text-ink-3/50">Sin registrar</span>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Freelance / Extras */}
@@ -1421,7 +1417,7 @@ export default function FinancePage() {
   const [balance,      setBalance]      = useState<Balance | null>(null)
   const [incomeItems,  setIncomeItems]  = useState<IncomeItem[]>([])
   const [monthChecks,  setMonthChecks]  = useState<MonthChecks>(EMPTY_CHECKS)
-  const [nominaMirror, setNominaMirror] = useState<NominaMirror | null | 'loading'>('loading')
+  const [nominaMirror, setNominaMirror] = useState<NominaMirror[] | 'loading'>('loading')
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState<string | null>(null)
 
@@ -1467,14 +1463,14 @@ export default function FinancePage() {
           apiFetch<Balance | null>('/api/finance/balance'),
           apiFetch<Movement[]>('/api/finance/movements?category=vacaciones'),
           apiFetch<IncomeItem[]>('/api/finance/income'),
-          fetch('/api/uptown/nomina-current').then(r => r.ok ? r.json() as Promise<NominaMirror | null> : null).catch(() => null),
+          fetch(`/api/uptown/nomina?month=${currMonth()}`).then(r => r.ok ? r.json() as Promise<NominaMirror[]> : []).catch(() => []),
         ])
         setCommitments(comms)
         setEnvelopes(envs)
         setBalance(bal)
         setVacMovements(vacMovs)
         setIncomeItems(incItems)
-        setNominaMirror(nomina)
+        setNominaMirror(nomina ?? [])
       } catch (e) {
         setError(String(e))
       } finally {

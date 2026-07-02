@@ -160,9 +160,11 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json({
-    ok:      true,
-    kind:    classification.kind,
-    summary: classification.summary,
-    urgency: classification.urgency,
+    ok:         true,
+    kind:       classification.kind,
+    summary:    classification.summary,
+    urgency:    classification.urgency,
+    event_date: classification.event_date,
+    event_time: classification.event_time,
   })
 }

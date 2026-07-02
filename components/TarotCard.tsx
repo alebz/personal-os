@@ -510,8 +510,8 @@ export default function TarotCard() {
 
   if (!card) {
     return (
-      <div className="relative w-full" style={{ paddingBottom: '150%' }}>
-        <div className="absolute inset-0 flex items-center justify-center bg-ink-1/85" style={{ clipPath: CARD_CLIP }}>
+      <div className="relative w-full" style={{ paddingBottom: '150%', position: 'relative', zIndex: 10000 }}>
+        <div className="absolute inset-0 flex items-center justify-center bg-ink-1" style={{ clipPath: CARD_CLIP }}>
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent/60" />
         </div>
       </div>
@@ -535,6 +535,8 @@ export default function TarotCard() {
           ...floatStyle,
           boxShadow: '2px 3px 0px rgba(0,0,0,0.4), 0px 12px 35px rgba(0,0,0,0.35), 0px 4px 10px rgba(0,0,0,0.2)',
           borderRadius: 16,
+          position: 'relative',
+          zIndex: 10000,
         }}
       >
         <div style={{ perspective: '1200px' }}>

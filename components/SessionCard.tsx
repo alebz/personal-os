@@ -102,12 +102,18 @@ export default function SessionCard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  function fetchTasks() {
     fetch('/api/tasks?status=open')
       .then((r) => r.json())
       .then((data: Task[]) => Array.isArray(data) ? setTasks(data) : setTasks([]))
       .catch(() => setTasks([]))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchTasks()
+    window.addEventListener('capture:task', fetchTasks)
+    return () => window.removeEventListener('capture:task', fetchTasks)
   }, [])
 
   function removeDone(id: string) {

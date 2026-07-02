@@ -51,8 +51,13 @@ function GoalSection({
   items: GoalItem[]
   onChange: (next: GoalItem[]) => void
 }) {
-  const [draft, setDraft] = useState('')
+  const [draft,     setDraft]     = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText,  setEditText]  = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const editRef  = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
   function add() {
     const text = draft.trim()
@@ -67,6 +72,27 @@ function GoalSection({
 
   function remove(id: string) {
     onChange(items.filter((g) => g.id !== id))
+  }
+
+  function startEdit(g: GoalItem) {
+    setEditingId(g.id)
+    setEditText(g.text)
+  }
+
+  function commitEdit() {
+    if (!editingId) return
+    const text = editText.trim()
+    if (text) onChange(items.map((g) => (g.id === editingId ? { ...g, text } : g)))
+    setEditingId(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  function onEditKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter')  { e.preventDefault(); commitEdit() }
+    if (e.key === 'Escape') { e.preventDefault(); cancelEdit() }
   }
 
   function onKey(e: KeyboardEvent<HTMLInputElement>) {
@@ -101,15 +127,27 @@ function GoalSection({
                 )}
               </button>
 
-              {/* Text */}
-              <span
-                className={[
-                  'flex-1 text-sm',
-                  g.done ? 'text-ink-3 line-through' : 'text-ink-4',
-                ].join(' ')}
-              >
-                {g.text}
-              </span>
+              {/* Text / inline edit */}
+              {editingId === g.id ? (
+                <input
+                  ref={editRef}
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onBlur={commitEdit}
+                  onKeyDown={onEditKey}
+                  className="flex-1 bg-transparent text-sm text-ink-4 outline-none border-b border-accent/50"
+                />
+              ) : (
+                <span
+                  onClick={() => startEdit(g)}
+                  className={[
+                    'flex-1 cursor-text text-sm',
+                    g.done ? 'text-ink-3 line-through' : 'text-ink-4',
+                  ].join(' ')}
+                >
+                  {g.text}
+                </span>
+              )}
 
               {/* Delete */}
               <button

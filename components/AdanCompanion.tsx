@@ -1,16 +1,121 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+
+// Single-canvas glitter: 200 particles, one rAF loop, pauses when hidden/off-screen
+function GlitterCanvas({ colors, variant }: { colors: string[]; variant: string }) {
+  const canvasRef   = useRef<HTMLCanvasElement>(null)
+  const colorsRef   = useRef(colors)
+  useEffect(() => { colorsRef.current = colors }, [colors])
+  const particlesRef = useRef<{ x: number; y: number; size: number; hue: number; phase: number }[]>([])
+
+  // Generate particle positions once on mount — avoids the screen bay (x:12-459, y:10-654)
+  useEffect(() => {
+    const pts: typeof particlesRef.current = []
+    let i = 0, attempts = 0
+    while (pts.length < 200 && attempts < 5000) {
+      attempts++
+      const x = Math.random() * 471
+      const y = Math.random() * 938
+      if (x >= 12 && x <= 459 && y >= 10 && y <= 654) continue
+      pts.push({ x, y, size: Math.random() < 0.7 ? 1 : 2, hue: (i++ * 137.5) % 360, phase: Math.random() })
+    }
+    particlesRef.current = pts
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    // Re-assign to typed aliases so TypeScript preserves non-null inside closures
+    const cvs: HTMLCanvasElement        = canvas
+    const c:   CanvasRenderingContext2D = ctx
+
+    let rafId: number | null = null
+    let shouldRun = true
+    const isHolo = variant === 'glitter-holographic'
+
+    function loop(time: number) {
+      if (!shouldRun) { rafId = null; return }
+      c.clearRect(0, 0, cvs.width, cvs.height)
+      const cols = colorsRef.current
+      for (let pi = 0; pi < particlesRef.current.length; pi++) {
+        const p = particlesRef.current[pi]
+        const raw = Math.max(0, Math.sin((time / 3000 + p.phase) * Math.PI))
+        c.globalAlpha = 0.15 + 0.85 * raw * raw * raw * raw
+        c.fillStyle   = isHolo ? `hsl(${p.hue}, 100%, 70%)` : cols[pi % cols.length]
+        c.fillRect(p.x, p.y, p.size, p.size)
+      }
+      c.globalAlpha = 1
+      rafId = requestAnimationFrame(loop)
+    }
+
+    function start()  { if (shouldRun && rafId === null) rafId = requestAnimationFrame(loop) }
+    function pause()  { shouldRun = false; if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null } }
+    function resume() { shouldRun = true; start() }
+
+    function onVisibilityChange() { if (document.hidden) pause(); else resume() }
+
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting) resume(); else pause() },
+      { threshold: 0 }
+    )
+    observer.observe(cvs)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    if (!document.hidden) start()
+
+    return () => {
+      shouldRun = false
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      observer.disconnect()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [variant])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={471}
+      height={938}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }}
+    />
+  )
+}
 import LoloShell from './lolo/LoloShell'
 import {
-  THEMES, THEMES_LIST, COLORS_LIST, BUTTON_COLORS, DISTRESS_LEVELS, GREETINGS,
+  THEMES, THEMES_LIST, COLORS_LIST, BUTTON_COLORS, GREETINGS,
   TEMPERAMENT_KEY, TEMPERAMENT_DEFAULT, TEMPERAMENT_TONE, deriveTemperament,
-  SETTINGS_KEYS, PROVIDERS, POS_KEY, CFG_KEY, BG_KEY, BG_IMAGES,
+  SETTINGS_KEYS, PROVIDERS, POS_KEY, CFG_KEY, BG_KEY, BG_IMAGES, BUTTON_SETS,
   shadeHex, fmtClock, randItem,
-  IDLE_POOL, TALK_FRAMES, MOUTH_FRAMES, POSE_POOL, FEELINGS_POOL, EASTER_EGG,
-  ALL_POSE_POOL, ALL_SPRITES, DEVICE_W, DEVICE_H, S,
+  ALL_LOLO_IMAGES, TALK_FRAMES, MOUTH_FRAMES, EASTER_EGG,
+  ALL_SPRITES, DEVICE_W, DEVICE_H, S,
 } from './lolo/LoloConstants'
 import type { ThemeName, Mode, ChatMessage, Bubble, Cfg, TemperamentState, SettingsRow } from './lolo/LoloTypes'
+
+const SPONT_PROMPT = `Elige UNO de estos modos al azar y ejecútalo. Varía el modo en cada intervención — no repitas el mismo dos veces seguidas.
+
+PREGUNTA: Una pregunta personal e inesperada. Sobre sueños, miedos, decisiones, el cuerpo, la memoria, lo que la gente nunca pregunta. Muy específica, no genérica.
+
+OPINIÓN: Un hot take tuyo sobre CUALQUIER tema — puede ser sobre animales, arquitectura, idiomas, comida, deportes, clima, ropa, música, coches, plantas, herramientas, el mar, los perros, las ciudades, lo que sea. NO solo dinero o tiempo. Con postura clara, lenguaje del Bajío.
+
+DATO: Un hecho sorprendente o contraintuitivo sobre el mundo — ciencia, historia, biología, geografía, astronomía, el cuerpo humano, animales, fenómenos naturales. Con actitud, no enciclopedia.
+
+IRONÍA: Una observación seca sobre algo cotidiano — no sobre la condición humana en general, sino sobre algo MUY específico y concreto que pasó o pasa.
+
+MEMORIA: Algo de Churipitzeo o de su vida — el campo, la tía Lupe, el Negro, la Mula Rita, Doña Pelos, el Gringo Jonni, Marisol, un trabajo de mantenimiento, una anécdota del rancho.
+
+SILENCIO: Solo una línea. Puede ser [...] o una sola frase suelta sin contexto, como si estuviera pensando en voz alta.
+
+Reglas:
+- Máximo 2 oraciones excepto en MEMORIA (máximo 3)
+- En español con vocabulario natural del Bajío
+- Sin emojis, sin saludos, sin introducciones
+- Sé MUY específico — lo genérico no cuenta
+- NUNCA menciones tareas, finanzas, cumpleaños ni el OS
+- Nunca empieces con 'Yo creo', 'La verdad es', 'Mira'
+- Cada intervención debe sentirse diferente a la anterior
+- Alterna entre modos — no uses OPINIÓN más de una vez por cada 3 intervenciones`
 
 export default function AdanCompanion() {
   const [cfg, setCfgState] = useState<Cfg>({})
@@ -29,10 +134,10 @@ export default function AdanCompanion() {
     if (typeof window === 'undefined') return BG_IMAGES[0]
     try {
       const saved = localStorage.getItem(BG_KEY)
-      if (saved && BG_IMAGES.includes(saved)) return saved
-      const pick = BG_IMAGES[Math.floor(Math.random() * BG_IMAGES.length)]
-      localStorage.setItem(BG_KEY, pick)
-      return pick
+      const idx = BG_IMAGES.indexOf(saved ?? '')
+      const next = BG_IMAGES[(idx + 1) % BG_IMAGES.length]
+      localStorage.setItem(BG_KEY, next)
+      return next
     } catch { return BG_IMAGES[0] }
   })
 
@@ -41,23 +146,130 @@ export default function AdanCompanion() {
   const currentThemeName = (cfg.theme    || 'Mint') as ThemeName
   const deviceColor      = cfg.deviceColor || '#52ffbd'
   const scanlinesOn      = cfg.scanlines !== undefined ? cfg.scanlines : true
-  const distressVal      = cfg.distress  !== undefined ? cfg.distress  : 0.5
   const currentProvider  = cfg.provider  || 'anthropic'
   const T                = THEMES[currentThemeName]
+
+  // ── Special shell detection ───────────────────────────────────────────────────
   const isCrystal        = deviceColor === 'crystal'
-  const btnColorOverride = cfg.btnColor && cfg.btnColor !== 'theme' ? cfg.btnColor : null
+  const isGlitter        = deviceColor.startsWith('glitter-')
+  const isCrystalVariant = deviceColor.startsWith('crystal-') && deviceColor !== 'crystal'
+  const isMemphis        = deviceColor === 'memphis'
+  const isNeonNight      = deviceColor === 'neon-night'
+  const isFuture         = deviceColor === 'future-outline'
+  const isArcade         = deviceColor === 'arcade-cab'
+  const isGameBoy        = deviceColor === 'gameboy-dmg'
+  const isSpecialShell   = isGlitter || isCrystalVariant || isMemphis || isNeonNight || isFuture || isArcade || isGameBoy
+
+  const crystalVariantBase: Record<string, string> = {
+    'crystal-rose':   'rgba(255,150,180,0.25)',
+    'crystal-mint':   'rgba(100,220,180,0.25)',
+    'crystal-amber':  'rgba(255,180,50,0.25)',
+    'crystal-violet': 'rgba(180,100,255,0.25)',
+  }
+
+  // shadeHex only works on valid hex; fall back to neutral for special values
+  const safeShade = (d: string, pct: number) => /^#[0-9a-fA-F]{3,6}$/.test(d) ? shadeHex(d, pct) : shadeHex('#888888', pct)
+
+  const btnSet = cfg.btnColor ? BUTTON_SETS[cfg.btnColor] : undefined
+  const btnColorOverride = cfg.btnColor && cfg.btnColor !== 'theme' && !btnSet ? cfg.btnColor : null
+
+  const shellLightVar = isCrystal        ? 'rgba(220,245,255,0.28)'
+                      : isCrystalVariant ? (crystalVariantBase[deviceColor] ?? 'rgba(200,200,200,0.25)')
+                      : isSpecialShell   ? safeShade('#888888', 0.06)
+                      : safeShade(deviceColor, 0.06)
+  const shellMidVar   = isCrystal        ? 'rgba(180,220,255,0.18)'
+                      : isCrystalVariant ? 'rgba(255,255,255,0.12)'
+                      : isSpecialShell   ? safeShade('#888888', -0.08)
+                      : safeShade(deviceColor, -0.08)
+  const shellDarkVar  = isCrystal        ? 'rgba(140,190,255,0.10)'
+                      : isCrystalVariant ? (crystalVariantBase[deviceColor] ?? 'rgba(200,200,200,0.25)')
+                      : isSpecialShell   ? safeShade('#888888', -0.20)
+                      : safeShade(deviceColor, -0.20)
+  const shellBorderVar = isCrystal        ? 'rgba(80,140,220,0.35)'
+                       : isCrystalVariant ? 'rgba(255,255,255,0.35)'
+                       : isGlitter        ? (deviceColor === 'glitter-gold' ? 'rgba(220,160,30,0.6)' : deviceColor === 'glitter-pink' ? 'rgba(255,60,150,0.6)' : 'rgba(160,100,255,0.55)')
+                       : isNeonNight      ? '#222222'
+                       : isArcade         ? '#2d1854'
+                       : isMemphis        ? '#1a1a1a'
+                       : isSpecialShell   ? safeShade('#888888', -0.34)
+                       : safeShade(deviceColor, -0.34)
+
   const cssVars = {
     '--shellA': T.shellA, '--shellB': T.shellB, '--shellEdge': T.shellEdge,
     '--btn': btnColorOverride ?? T.btn,
     '--bezel': T.bezel, '--lcd': T.lcd, '--lcdGround': T.lcdGround, '--ink': T.ink,
-    '--shellLight':  isCrystal ? 'rgba(220,245,255,0.28)' : shadeHex(deviceColor,  0.06),
-    '--shellMid':    isCrystal ? 'rgba(180,220,255,0.18)' : shadeHex(deviceColor, -0.08),
-    '--shellDark':   isCrystal ? 'rgba(140,190,255,0.10)' : shadeHex(deviceColor, -0.20),
-    '--shellBorder': isCrystal ? 'rgba(80,140,220,0.35)'  : shadeHex(deviceColor, -0.34),
-    '--distress':    String(distressVal),
-    '--highlight':   String(Math.max(0.02, 1.0 - distressVal * 0.98)),
-    '--shadowDepth': String(0.18 + distressVal * 0.78),
+    '--shellLight':  shellLightVar,
+    '--shellMid':    shellMidVar,
+    '--shellDark':   shellDarkVar,
+    '--shellBorder': shellBorderVar,
   } as React.CSSProperties
+
+  // ── Shell style overrides ─────────────────────────────────────────────────────
+  const glitterBases: Record<string, string> = {
+    'glitter-gold':        'rgba(160,100,10,0.4)',
+    'glitter-pink':        'rgba(200,20,90,0.4)',
+    'glitter-holographic': 'rgba(100,50,200,0.4)',
+  }
+
+  const shellStyle: React.CSSProperties | undefined = (() => {
+    if (isGlitter) return {
+      background: glitterBases[deviceColor] ?? glitterBases['glitter-gold'],
+      backdropFilter: 'blur(0px)',
+    }
+    if (isCrystalVariant) {
+      const c = crystalVariantBase[deviceColor] ?? 'rgba(200,200,200,0.25)'
+      return {
+        background: `linear-gradient(135deg,${c} 0%,rgba(255,255,255,0.18) 50%,${c} 100%)`,
+        backdropFilter: 'blur(2px)',
+        border: '6px solid rgba(255,255,255,0.35)',
+      }
+    }
+    if (isNeonNight) return {
+      background: '#0a0a0a',
+      boxShadow: '0 8px 24px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.04),inset 0 -2px 4px rgba(0,0,0,.5),0 0 20px #ff00ff,0 0 40px rgba(255,0,255,0.27)',
+    }
+    if (isFuture) return {
+      background: 'rgba(5,5,16,0.6)',
+      border: '6px solid #00e5ff',
+      boxShadow: '0 0 15px #00e5ff,0 0 30px rgba(0,229,255,0.27),inset 0 0 15px rgba(0,229,255,0.07)',
+    }
+    if (isArcade) return {
+      background: '#1a0a2e',
+      boxShadow: '0 8px 24px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06),inset 0 -2px 4px rgba(0,0,0,.4),0 0 15px #ff0066,0 0 30px rgba(255,0,102,0.27)',
+    }
+    if (isGameBoy) return {
+      background: 'linear-gradient(135deg,#9faa80 0%,#8b956d 50%,#6b7a52 100%)',
+      border: '6px solid #3d4a2e',
+    }
+    if (isMemphis) return { background: '#f5f0e8' }
+    return undefined
+  })()
+
+  const glitterColors: Record<string, string[]> = {
+    'glitter-gold':        ['#ffd700', '#ffeeaa'],
+    'glitter-pink':        ['#ff69b4', '#ffaadd'],
+    'glitter-holographic': ['#ff88ff', '#88ffee', '#ffff88', '#88aaff'],
+  }
+
+  // ── Shell overlays (decorative patterns on the shell surface) ─────────────────
+  const shellOverlay: React.ReactNode = (() => {
+    if (isGlitter) return (
+      <div style={{ position:'absolute', inset:0, borderRadius:'18px 18px 56px 56px', pointerEvents:'none', zIndex:1, overflow:'hidden' }}>
+        <GlitterCanvas colors={glitterColors[deviceColor] ?? ['#ffd700', '#ffeeaa']} variant={deviceColor} />
+      </div>
+    )
+    if (isMemphis) return (
+      <div style={{ position:'absolute', inset:0, borderRadius:'18px 18px 56px 56px', pointerEvents:'none', zIndex:1, overflow:'hidden', opacity:0.18 }}>
+        <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(circle,#ff3366 2px,transparent 2px),radial-gradient(circle,#00ccff 1.5px,transparent 1.5px),linear-gradient(45deg,transparent 38%,#ffee00 38%,#ffee00 42%,transparent 42%),linear-gradient(-45deg,transparent 40%,#33cc66 40%,#33cc66 44%,transparent 44%)`, backgroundSize:'22px 22px,14px 14px,16px 16px,20px 20px', backgroundPosition:'0 0,7px 7px,0 0,10px 0' }} />
+      </div>
+    )
+    if (isArcade) return (
+      <div style={{ position:'absolute', inset:0, borderRadius:'18px 18px 56px 56px', pointerEvents:'none', zIndex:1, overflow:'hidden', opacity:0.45 }}>
+        <div style={{ position:'absolute', inset:0, backgroundImage:`repeating-linear-gradient(90deg,#ff0066 0px,#ff0066 4px,transparent 4px,transparent 20px,#ffee00 20px,#ffee00 24px,transparent 24px,transparent 40px,#2060e8 40px,#2060e8 44px,transparent 44px,transparent 60px)`, backgroundSize:'60px 4px', backgroundPosition:'0 0', animation:'arcadeMarquee 2s linear infinite', maskImage:'radial-gradient(ellipse at center,transparent 55%,black 100%)', WebkitMaskImage:'radial-gradient(ellipse at center,transparent 55%,black 100%)' }} />
+      </div>
+    )
+    return null
+  })()
 
   // ── Refs ─────────────────────────────────────────────────────────────────────
 
@@ -80,7 +292,7 @@ export default function AdanCompanion() {
   const modeRef       = useRef<Mode>('normal')
   const typingRef     = useRef(false)
   const poseRef       = useRef('idle')
-  const idleBaseRef   = useRef(IDLE_POOL[0])
+  const idleBaseRef   = useRef(ALL_LOLO_IMAGES[0])
   const talkFrameTimer  = useRef<ReturnType<typeof setInterval>|null>(null)
   const talkFrame       = useRef(0)
   const mouthFrameTimer = useRef<ReturnType<typeof setInterval>|null>(null)
@@ -91,7 +303,15 @@ export default function AdanCompanion() {
   const osContextRef    = useRef('')
   const chatHistoryRef  = useRef<Array<{role:'user'|'assistant';content:string}>>([])
   const doSpontRef      = useRef<()=>void>(()=>{})
+  const spontMsgRef     = useRef<string>('')
+  const idleTimerSetAt  = useRef(0)
+  const idleTimerDur    = useRef(0)
 
+  useEffect(()=>{
+    if(pos!==null) return
+    setPos({ x: window.innerWidth - DEVICE_W * S - 24, y: window.innerHeight - DEVICE_H * S - 24 })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[])
   useEffect(()=>{ busyRef.current    = busy           },[busy])
   useEffect(()=>{ modeRef.current    = mode           },[mode])
   useEffect(()=>{ typingRef.current  = bubble.typing  },[bubble.typing])
@@ -103,7 +323,7 @@ export default function AdanCompanion() {
   useEffect(()=>{
     const el = imgRef.current; if(!el) return
     if(pose !== 'talking'){
-      if(pose !== 'idle') idleBaseRef.current = IDLE_POOL[0]
+      if(pose !== 'idle') idleBaseRef.current = ALL_LOLO_IMAGES[0]
       let src = pose === 'idle' ? idleBaseRef.current : pose
       if(Math.random() < 1/40) src = EASTER_EGG
       if(!el.src.endsWith(src.replace(/^\//,''))) el.src = src
@@ -200,11 +420,6 @@ export default function AdanCompanion() {
         next.deviceColor = colors[(i+1)%colors.length]
       } else if (key === 'scanlines') {
         next.scanlines = !(prev.scanlines !== undefined ? prev.scanlines : true)
-      } else if (key === 'distress') {
-        const vals = DISTRESS_LEVELS.map(d=>d.value)
-        const cur = prev.distress !== undefined ? prev.distress : 0.36
-        const i = vals.findIndex(v=>Math.abs(v-cur)<0.09)
-        next.distress = vals[(i+1)%vals.length]
       } else if (key === 'btnColor') {
         const ids = BUTTON_COLORS.map(b=>b[0])
         const i = ids.indexOf(prev.btnColor||'theme')
@@ -221,9 +436,9 @@ export default function AdanCompanion() {
 
   // ── Preamble ─────────────────────────────────────────────────────────────────
 
-  const getPreamble = useCallback(()=>{
+  const getPreamble = useCallback((withContext = true)=>{
     const ctx = osContextRef.current
-    const ctxBlock = ctx ? `\n\nCONTEXTO DEL OS (úsalo para responder como gestor personal si es relevante):\n${ctx}` : ''
+    const ctxBlock = withContext && ctx ? `\n\nCONTEXTO DEL OS (úsalo para responder como gestor personal si es relevante):\n${ctx}` : ''
     const tone = TEMPERAMENT_TONE[temperament.current]
     const now = new Date()
     const timeStr = now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})
@@ -254,8 +469,21 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
 
   const scheduleIdle = useCallback((hold=10000)=>{
     if(idleTimer.current) clearTimeout(idleTimer.current)
-    idleTimer.current = setTimeout(()=>{ setPose('idle'); setBubble({visible:false,text:'',typing:false}) }, hold)
+    idleTimerSetAt.current = Date.now(); idleTimerDur.current = hold
+    idleTimer.current = setTimeout(()=>{
+      spontMsgRef.current = ''
+      setPose('idle'); setBubble({visible:false,text:'',typing:false})
+    }, hold)
   },[])
+
+  const pauseBubble = useCallback(()=>{
+    if(idleTimer.current){ clearTimeout(idleTimer.current); idleTimer.current=null }
+  },[])
+
+  const resumeBubble = useCallback(()=>{
+    const remaining = Math.max(3000, idleTimerDur.current - (Date.now() - idleTimerSetAt.current))
+    scheduleIdle(remaining)
+  },[scheduleIdle])
 
   const say = useCallback((text:string, opts:{instant?:boolean;pose?:string;settlePose?:string;hold?:number}={})=>{
     if(idleTimer.current) clearTimeout(idleTimer.current)
@@ -274,7 +502,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
       setBubble(b=>({...b,text:text.slice(0,i)}))
       if(i>=text.length){
         if(typeTimer.current) clearInterval(typeTimer.current)
-        setPose(opts.settlePose||randItem(POSE_POOL))
+        setPose(opts.settlePose||randItem(ALL_LOLO_IMAGES))
         setBubble(b=>({...b,typing:false}))
         scheduleIdle(opts.hold||6000)
       }
@@ -295,21 +523,28 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
     const id = ++reqId.current
     if(idleTimer.current) clearTimeout(idleTimer.current)
     if(typeTimer.current) clearInterval(typeTimer.current)
-    const settlePose = randItem(ALL_POSE_POOL)
-    setBusy(true); setPose(randItem(FEELINGS_POOL)); setBubble({visible:true,text:'',typing:false})
+    const settlePose = randItem(ALL_LOLO_IMAGES)
+    setBusy(true); setPose(randItem(ALL_LOLO_IMAGES)); setBubble({visible:true,text:'',typing:false})
     try{
       const r = await fetch('/api/companion/chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          system: getPreamble()+'\n\nSuelta algo espontáneo — puede ser una observación, una pregunta inesperada, una ironía seca, un dato. Máximo 2 líneas. Sin saludos ni introducciones.',
+          system: getPreamble(false)+'\n\n'+SPONT_PROMPT,
           messages:[{role:'user',content:'Dispara.'}],
           provider:providerRef.current,
+          spontaneous:true,
         })
       })
       const d = await r.json(); if(id!==reqId.current) return
       setNetOk(true)
       const txt = (d.text||'').slice(0,280)
-      if(txt) say(txt,{settlePose,hold:6000}); else say('…',{settlePose:'idle',hold:3000})
+      if(txt){
+        spontMsgRef.current = txt
+        const words = txt.trim().split(/\s+/).length
+        const readingTimeMs = (words / 150) * 60 * 1000
+        const hold = Math.max(8000, readingTimeMs + 2000)
+        say(txt,{settlePose,hold})
+      } else say('…',{settlePose:'idle',hold:3000})
     } catch{
       if(id!==reqId.current) return; setNetOk(false); say('…',{settlePose:'idle',hold:3000})
     }
@@ -323,7 +558,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
 
   const onB = useCallback(()=>{
     if(modeRef.current === 'cfg') return
-    setMode(m => m === 'chat' ? 'normal' : 'chat')
+    doSpontRef.current()
   },[])
 
   const onC = useCallback(()=>{
@@ -331,7 +566,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
       setMode('normal'); setSettingsSel(0); setPose('idle')
       setBusy(false); setBubble({visible:false,text:'',typing:false}); return
     }
-    const next = randItem(IDLE_POOL)
+    const next = randItem(ALL_LOLO_IMAGES.filter(v => v !== idleBaseRef.current))
     if(imgRef.current) imgRef.current.src = next
     idleBaseRef.current = next
   },[])
@@ -346,8 +581,11 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
     const id = ++reqId.current
     if(idleTimer.current) clearTimeout(idleTimer.current)
     if(typeTimer.current) clearInterval(typeTimer.current)
-    setBusy(true); setPose(randItem(IDLE_POOL)); setBubble({visible:true,text:'',typing:false})
-    chatHistoryRef.current = [...chatHistoryRef.current, {role:'user' as const, content:msg}].slice(-20)
+    setBusy(true); setPose(randItem(ALL_LOLO_IMAGES)); setBubble({visible:true,text:'',typing:false})
+    setMode('chat')
+    const spont = spontMsgRef.current; spontMsgRef.current = ''
+    const base = spont ? [...chatHistoryRef.current, {role:'assistant' as const, content:spont}] : chatHistoryRef.current
+    chatHistoryRef.current = [...base, {role:'user' as const, content:msg}].slice(-20)
     setChatMessages(prev=>[...prev,{role:'user',content:msg}])
     fetch('/api/companion/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -357,7 +595,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
       .then(d=>{
         if(id!==reqId.current) return; setNetOk(true)
         const t=(d.text||'').slice(0,280)
-        if(t){ chatHistoryRef.current=[...chatHistoryRef.current,{role:'assistant' as const,content:t}]; setChatMessages(prev=>[...prev,{role:'assistant',content:t}]); say(t,{settlePose:randItem(ALL_POSE_POOL),hold:12000}) }
+        if(t){ chatHistoryRef.current=[...chatHistoryRef.current,{role:'assistant' as const,content:t}]; setChatMessages(prev=>[...prev,{role:'assistant',content:t}]); say(t,{settlePose:randItem(ALL_LOLO_IMAGES),hold:12000}) }
         else { say('…',{settlePose:'idle',hold:4000}) }
       })
       .catch(()=>{ if(id!==reqId.current) return; setNetOk(false); say('Sin señal.',{settlePose:'idle',hold:5000}) })
@@ -432,7 +670,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
       if(busyRef.current || poseRef.current !== 'idle') return
       if(Date.now() - lastIdleSwitch < nextIdleDelay) return
       lastIdleSwitch = Date.now(); nextIdleDelay = 6000 + Math.random() * 2000
-      const pool = IDLE_POOL.filter(v => v !== idleBaseRef.current)
+      const pool = ALL_LOLO_IMAGES.filter(v => v !== idleBaseRef.current)
       const next = pool[Math.floor(Math.random() * pool.length)]; if(!next) return
       const el = imgRef.current; if(!el) return
       const src = Math.random() < 1/40 ? EASTER_EGG : next
@@ -501,20 +739,45 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
 
   if(pos===null) return null
 
-  const showFloorShadow = ALL_POSE_POOL.includes(pose)
+  const showFloorShadow = pose.includes('/Posing/') || pose.includes('/Feelings/')
   const C = COLORS_LIST.find(c=>c[0]===deviceColor)
-  const D = DISTRESS_LEVELS.reduce((a,b)=>Math.abs(b.value-distressVal)<Math.abs(a.value-distressVal)?b:a)
   const providerLabel = PROVIDERS.find(p=>p[0]===currentProvider)?.[1] ?? 'CLAUDE'
   const BtnC = BUTTON_COLORS.find(b=>b[0]===(cfg.btnColor||'theme'))
+
   const crystalSwatch = 'linear-gradient(135deg,rgba(200,240,255,.75) 0%,rgba(255,255,255,.92) 50%,rgba(200,220,255,.65) 100%)'
-  const shellSwatch = isCrystal ? crystalSwatch : deviceColor
-  const currentBtnSwatch = btnColorOverride ?? T.btn
+  const glitterSwatches: Record<string,string> = {
+    'glitter-pink':        'rgba(255,20,120,0.55)',
+    'glitter-gold':        'rgba(200,140,20,0.65)',
+    'glitter-holographic': 'rgba(140,80,255,0.60)',
+  }
+  const crystalVariantSwatches: Record<string,string> = {
+    'crystal-rose':   'linear-gradient(135deg,rgba(255,150,180,0.7),rgba(255,210,225,0.9))',
+    'crystal-mint':   'linear-gradient(135deg,rgba(100,220,180,0.7),rgba(180,255,230,0.9))',
+    'crystal-amber':  'linear-gradient(135deg,rgba(255,180,50,0.7),rgba(255,225,130,0.9))',
+    'crystal-violet': 'linear-gradient(135deg,rgba(180,100,255,0.7),rgba(220,175,255,0.9))',
+  }
+  const specialShellSwatches: Record<string,string> = {
+    'memphis':        'linear-gradient(135deg,#f5f0e8 40%,#ff3366 40%,#ff3366 60%,#00ccff 60%)',
+    'neon-night':     'linear-gradient(135deg,#0a0a0a,#ff00ff)',
+    'future-outline': 'linear-gradient(135deg,#050510,#00e5ff)',
+    'arcade-cab':     'linear-gradient(135deg,#1a0a2e,#ff0066)',
+    'gameboy-dmg':    '#8b956d',
+  }
+  const shellSwatch = isCrystal        ? crystalSwatch
+                    : isGlitter        ? (glitterSwatches[deviceColor] ?? deviceColor)
+                    : isCrystalVariant ? (crystalVariantSwatches[deviceColor] ?? deviceColor)
+                    : isSpecialShell   ? (specialShellSwatches[deviceColor] ?? deviceColor)
+                    : deviceColor
+
+  const currentBtnSwatch = btnSet
+    ? `linear-gradient(90deg,${btnSet.cfg} 0%,${btnSet.cfg} 33%,${btnSet.ent} 33%,${btnSet.ent} 66%,${btnSet.bck} 66%,${btnSet.bck} 100%)`
+    : (btnColorOverride ?? T.btn)
+
   const settingsRowData: SettingsRow[] = [
     {key:'theme',    label:'PANTALLA',  value:currentThemeName.toUpperCase(), isColor:false, swatch:''},
     {key:'color',    label:'CARCASA',   value:C?C[1]:'CUSTOM', isColor:true, swatch:shellSwatch},
     {key:'btnColor', label:'BOTONES',   value:BtnC?BtnC[1]:'CUSTOM', isColor:true, swatch:currentBtnSwatch},
     {key:'scanlines',label:'RASTREO',   value:scanlinesOn?'SÍ':'NO', isColor:false, swatch:''},
-    {key:'distress', label:'DESGASTE',  value:D.label, isColor:false, swatch:''},
     {key:'provider', label:'IA',        value:providerLabel, isColor:false, swatch:''},
   ]
 
@@ -522,7 +785,6 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
     <LoloShell
       pos={pos}
       cssVars={cssVars}
-      distressVal={distressVal}
       scanlinesOn={scanlinesOn}
       netOk={netOk}
       time={time}
@@ -533,6 +795,9 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
       chatMessages={chatMessages}
       showFloorShadow={showFloorShadow}
       bgImage={bgImage}
+      shellStyle={shellStyle}
+      shellOverlay={shellOverlay}
+      btnColors={btnSet}
       containerRef={containerRef}
       frameRef={frameRef}
       imgRef={imgRef}
@@ -545,6 +810,8 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
       onPointerUp={onPointerUp}
       onFaceClick={onFaceClick}
       onScrollDown={onScrollDown}
+      onBubblePause={pauseBubble}
+      onBubbleResume={resumeBubble}
       onInputKey={onInputKey}
       onSend={onSend}
       onA={onA}

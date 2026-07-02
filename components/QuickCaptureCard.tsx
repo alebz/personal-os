@@ -1,18 +1,77 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import type { Kind } from '@/lib/router/classifyCapture'
+
+type CaptureResponse = {
+  kind?: Kind
+  summary?: string
+  urgency?: string
+  event_date?: string | null
+  event_time?: string | null
+}
+
+type ToastInfo = {
+  icon: string
+  summary: string
+  destination: string
+  detail: string | null
+}
+
+const KIND_META: Record<Kind, { icon: string; destination: string }> = {
+  event:    { icon: '📅', destination: 'Calendario' },
+  task:     { icon: '✅', destination: 'Tareas' },
+  reminder: { icon: '✅', destination: 'Tareas' },
+  contact:  { icon: '👤', destination: 'Contactos' },
+  log:      { icon: '📝', destination: 'Cerebro' },
+  note:     { icon: '📝', destination: 'Cerebro' },
+  idea:     { icon: '💡', destination: 'Cerebro' },
+}
+
+function fmt12h(t: string): string {
+  const [h, m] = t.split(':').map(Number)
+  const ampm = h < 12 ? 'AM' : 'PM'
+  const h12 = h % 12 || 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
+function fmtEventDetail(date: string | null | undefined, time: string | null | undefined): string | null {
+  if (!date && !time) return null
+  const today = new Date().toISOString().slice(0, 10)
+  const parts: string[] = []
+  if (date && date !== today) {
+    const d = new Date(date + 'T12:00:00')
+    parts.push(d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }))
+  }
+  if (time) parts.push(fmt12h(time))
+  return parts.length ? parts.join(', ') : null
+}
+
+function buildToast(data: CaptureResponse): ToastInfo {
+  const kind = data.kind ?? 'note'
+  const meta = KIND_META[kind] ?? { icon: '📝', destination: 'Cerebro' }
+  const detail = kind === 'event'
+    ? fmtEventDetail(data.event_date, data.event_time)
+    : null
+  return {
+    icon: meta.icon,
+    summary: data.summary ?? 'Capturado',
+    destination: meta.destination,
+    detail,
+  }
+}
 
 export default function QuickCaptureCard() {
   const [value, setValue] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastInfo | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  function showToast(msg: string) {
-    setToast(msg)
+  function showToast(info: ToastInfo) {
+    setToast(info)
     clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 2500)
+    toastTimer.current = setTimeout(() => setToast(null), 4000)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -27,12 +86,19 @@ export default function QuickCaptureCard() {
         body: JSON.stringify({ text }),
       })
       if (!res.ok) throw new Error('Failed')
-      const data: { kind?: string; summary?: string } = await res.json()
+      const data: CaptureResponse = await res.json()
       setValue('')
-      showToast(data.summary ? `Guardado: ${data.summary}` : 'Capturado')
+      showToast(buildToast(data))
       inputRef.current?.focus()
+
+      const kind = data.kind
+      if (kind === 'task' || kind === 'reminder' || kind === 'event') {
+        window.dispatchEvent(new CustomEvent('capture:task'))
+      }
     } catch {
-      showToast('Error al guardar')
+      setToast({ icon: '⚠️', summary: 'Error al guardar', destination: '', detail: null })
+      clearTimeout(toastTimer.current)
+      toastTimer.current = setTimeout(() => setToast(null), 4000)
     } finally {
       setSubmitting(false)
     }
@@ -60,13 +126,24 @@ export default function QuickCaptureCard() {
         </button>
       </form>
 
-      {/* Toast */}
+      {/* Rich confirmation toast */}
       <div
-        className={`absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-ink-4/10 bg-ink-1 px-3 py-1.5 text-xs text-ink-4 shadow-lg transition-all duration-200 ${
+        className={`absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-lg border border-ink-4/10 bg-ink-1 px-3 py-2 shadow-lg transition-all duration-200 ${
           toast ? 'pointer-events-none translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'
         }`}
       >
-        {toast}
+        {toast && (
+          <div className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+            <span>{toast.icon}</span>
+            <span className="text-ink-4">{toast.summary}</span>
+            {toast.detail && (
+              <span className="text-ink-3">· {toast.detail}</span>
+            )}
+            {toast.destination && (
+              <span className="text-ink-3/60">→ {toast.destination}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

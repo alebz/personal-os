@@ -22,14 +22,7 @@ interface Note {
   updated_at: string
 }
 
-interface Resonance {
-  id: string
-  message: string
-  type: string
-  created_at: string
-}
-
-type Mode = 'search' | 'ask' | 'patterns' | 'notas' | 'resonancias'
+type Mode = 'search' | 'ask' | 'patterns' | 'notas'
 
 interface Evidence {
   type:  string
@@ -97,21 +90,7 @@ const MODE_META: { id: Mode; label: string }[] = [
   { id: 'ask',         label: '✨ Preguntar'   },
   { id: 'patterns',    label: '🔮 Patrones'    },
   { id: 'notas',       label: '📋 Notas'       },
-  { id: 'resonancias', label: '✦ Resonancias' },
 ]
-
-const RESONANCE_COLORS: Record<string, string> = {
-  'ORÁCULO': 'oklch(0.78 0.14 65)',
-  'TAROT':   'oklch(0.65 0.14 240)',
-  'ESTOICO': 'oklch(0.62 0.18 15)',
-  'AUGURIO': 'oklch(0.68 0.17 290)',
-  'COSMOS':  'oklch(0.72 0.12 185)',
-  'SEÑAL':   'oklch(0.82 0.12 85)',
-}
-const RESONANCE_SYMBOLS: Record<string, string> = {
-  'ORÁCULO': '✦', 'TAROT': '☽', 'ESTOICO': '⊕',
-  'AUGURIO': '∴', 'COSMOS': '◈', 'SEÑAL': '⌖',
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -439,32 +418,6 @@ function NoteModal({
   )
 }
 
-// ── ResonanceCard ─────────────────────────────────────────────────────────────
-
-function ResonanceCard({ resonance }: { resonance: Resonance }) {
-  const color  = RESONANCE_COLORS[resonance.type]  ?? 'oklch(0.78 0.14 65)'
-  const symbol = RESONANCE_SYMBOLS[resonance.type] ?? '✦'
-
-  return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-lg shadow-black/10 backdrop-blur-xl">
-      <div className="mb-3 flex items-center gap-2">
-        <div
-          className="flex items-center gap-1.5 rounded-full border px-2 py-0.5"
-          style={{
-            borderColor:     `color-mix(in oklch, ${color} 40%, transparent)`,
-            backgroundColor: `color-mix(in oklch, ${color} 12%, transparent)`,
-          }}
-        >
-          <span className="text-[10px]" style={{ color }}>{symbol}</span>
-          <span className="text-[8px] font-bold tracking-widest" style={{ color }}>{resonance.type}</span>
-        </div>
-        <span className="ml-auto text-[9px] text-ink-2/50">{fmtDate(resonance.created_at)}</span>
-      </div>
-      <p className="text-sm italic leading-relaxed text-ink-4">{resonance.message}</p>
-    </div>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function BrainPage() {
@@ -488,10 +441,6 @@ export default function BrainPage() {
   const [noteSearch,  setNoteSearch]  = useState('')
   const [noteModal,   setNoteModal]   = useState<Note | 'new' | null>(null)
 
-  // Resonances state
-  const [resonances,       setResonances]       = useState<Resonance[]>([])
-  const [resonancesLoaded, setResonancesLoaded] = useState(false)
-
   useEffect(() => { inputRef.current?.focus() }, [])
 
   // Load notes once when switching to notas tab
@@ -502,15 +451,6 @@ export default function BrainPage() {
       .then(data => { if (Array.isArray(data)) setNotes(data) })
       .finally(() => setNotesLoaded(true))
   }, [mode, notesLoaded])
-
-  // Load resonances once when switching to resonancias tab
-  useEffect(() => {
-    if (mode !== 'resonancias' || resonancesLoaded) return
-    fetch('/api/resonances')
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setResonances(data) })
-      .finally(() => setResonancesLoaded(true))
-  }, [mode, resonancesLoaded])
 
   const filteredNotes = useMemo(() => {
     const q = noteSearch.toLowerCase().trim()
@@ -640,8 +580,6 @@ export default function BrainPage() {
               ? 'Motor de detección de patrones — identifica tendencias en tu vida'
               : mode === 'notas'
               ? 'Bóveda de referencia permanente — datos que nunca expiran'
-              : mode === 'resonancias'
-              ? 'Mensajes del cosmos que decidiste guardar'
               : 'Busca en tu memoria semántica o pregunta algo'}
           </p>
         </div>
@@ -718,33 +656,8 @@ export default function BrainPage() {
           </>
         )}
 
-        {/* ── RESONANCIAS MODE ───────────────────────────────────────────── */}
-        {mode === 'resonancias' && (
-          <>
-            {!resonancesLoaded ? (
-              <div className="flex justify-center py-16">
-                <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
-              </div>
-            ) : resonances.length === 0 ? (
-              <div className="py-20 text-center">
-                <p className="mb-3 text-4xl">✦</p>
-                <p className="text-sm text-ink-3">
-                  Aún no has guardado ninguna resonancia.<br />
-                  Cuando una señal te mueva, toca ♡ en la carta del oráculo.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {resonances.map(r => (
-                  <ResonanceCard key={r.id} resonance={r} />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
         {/* ── SEARCH / ASK / PATTERNS MODE ──────────────────────────────── */}
-        {mode !== 'notas' && mode !== 'resonancias' && (
+        {mode !== 'notas' && (
           <>
             <form onSubmit={handleSubmit} className="mb-8">
               <div className="relative">
