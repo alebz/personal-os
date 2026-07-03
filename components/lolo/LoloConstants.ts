@@ -182,7 +182,6 @@ export const ALL_LOLO_IMAGES = [
   '/Lolo/Idle/lolo_idle_16.png',
   '/Lolo/Idle/lolo_idle_17.png',
   // Posing
-  '/Lolo/Posing/lolo_flexing.png',
   '/Lolo/Posing/lolo_posing_1.png',
   '/Lolo/Posing/lolo_posing_2.png',
   '/Lolo/Posing/lolo_posing_3.png',
@@ -216,7 +215,6 @@ export const ALL_LOLO_IMAGES = [
   '/Lolo/Feelings/lolo_screaming.png',
   '/Lolo/Feelings/lolo_shy.png',
   '/Lolo/Feelings/lolo_tongueout.png',
-  '/Lolo/Feelings/lolo_working.png',
   '/Lolo/Feelings/lolo_yawning.png',
 ]
 

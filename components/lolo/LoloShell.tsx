@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import LoloChat from './LoloChat'
 import LoloConfig from './LoloConfig'
 import { S, DEVICE_W, DEVICE_H, ALL_LOLO_IMAGES } from './LoloConstants'
@@ -151,14 +152,13 @@ export default function LoloShell({
   }, [containerRef])
   const dynS = containerWidth / DEVICE_W
 
-  return (
-    <>
-      <div
-        ref={containerRef}
+  return createPortal(
+    <div
+      ref={containerRef}
         onPointerDown={onPointerDown}
         onPointerMove={(e) => { onPointerMove(e); setWidgetDragging(dragging.current) }}
         onPointerUp={() => { onPointerUp(); setWidgetDragging(false) }}
-        style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: widgetDragging ? 300 : 200, width: DEVICE_W * S, height: DEVICE_H * dynS, userSelect: 'none', touchAction: 'none', overflow: 'visible' }}
+        style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 10000, width: DEVICE_W * S, height: DEVICE_H * dynS, userSelect: 'none', touchAction: 'none', overflow: 'visible' }}
       >
         {/* Scale wrapper — holds all CSS vars. pointerEvents:none prevents layout-box overflow from blocking clicks outside the visual gadget. Interactive children (bezel, dial) restore auto. */}
         <div style={{ transform: `scale(${dynS})`, transformOrigin: 'top left', width: DEVICE_W, pointerEvents: 'none', ...cssVars }}>
@@ -310,7 +310,7 @@ export default function LoloShell({
                             draggable={false}
                             onClick={onFaceClick}
                             onError={e => { const el = e.target as HTMLImageElement; if (!el.src.endsWith('lolo_idle_2.png')) el.src = ALL_LOLO_IMAGES[0] }}
-                            style={{ position: 'absolute', bottom: 0, left: '50%', width: '100%', height: 'auto', transform: `translateX(-50%) translateY(calc(${(dialZoom - 1.0) * 80}% + ${activeShift}%)) scale(${activeZoom}) rotateX(${dialTilt}deg)`, transformOrigin: 'bottom center', display: 'block', cursor: 'pointer', imageRendering: 'pixelated', userSelect: 'none', filter: 'drop-shadow(0 7px 7px rgba(40,30,10,.22))', transition: isDragging ? 'transform 0.1s ease' : 'transform 0.4s ease-out' }}
+                            style={{ position: 'absolute', bottom: 0, left: '50%', width: '100%', height: 'auto', transform: `translateX(-50%) translateY(calc(${(dialZoom - 1.0) * 80}% + ${activeShift}% - 5%)) scale(${activeZoom}) rotateX(${dialTilt}deg)`, transformOrigin: 'bottom center', display: 'block', cursor: 'pointer', imageRendering: 'pixelated', userSelect: 'none', filter: 'drop-shadow(0 7px 7px rgba(40,30,10,.22))', transition: isDragging ? 'transform 0.1s ease' : 'transform 0.4s ease-out' }}
                           />
                         </div>
                       </div>
@@ -394,7 +394,7 @@ export default function LoloShell({
 
           </div>{/* end bezel */}
         </div>{/* end scale wrapper */}
-      </div>
-    </>
+    </div>,
+    document.body
   )
 }

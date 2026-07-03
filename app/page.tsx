@@ -12,7 +12,9 @@ import AdanCompanion from '@/components/AdanCompanion'
 export default function DashboardPage() {
   return (
     <Shell>
-      <AdanCompanion />
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, pointerEvents: 'none', isolation: 'isolate' }}>
+        <AdanCompanion />
+      </div>
       <main className="mx-auto max-w-7xl px-6 py-6">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
 
