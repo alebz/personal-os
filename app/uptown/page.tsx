@@ -451,43 +451,46 @@ function NominaSection({ nomina, month, onToggle, onAmount, onMethod }: {
   )
 }
 
-// ─── ResumenCard ──────────────────────────────────────────────────────────────
+// ─── PrevistoCard ─────────────────────────────────────────────────────────────
 
-function ResumenCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
+function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
   rents: RentRow[]; expenses: ExpenseRow[]; nomina: NominaRow[]
   extraIncome: ExtraItem[]; extraExpenses: ExtraItem[]
 }) {
-  const totalRentas   = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
+  const totalRentas   = rents.reduce((s, r) => s + r.amount, 0)
   const totalExtraInc = extraIncome.reduce((s, i) => s + i.amount, 0)
   const totalIngresos = totalRentas + totalExtraInc
-  const totalFijos    = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
-  const totalNomina   = nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
+
+  const totalFijos    = expenses.reduce((s, e) => s + e.amount, 0)
+  const totalNomina   = nomina.reduce((s, n) => s + n.amount, 0)
   const totalExtraExp = extraExpenses.reduce((s, i) => s + i.amount, 0)
   const totalEgresos  = totalFijos + totalNomina + totalExtraExp
-  const neto          = totalIngresos - totalEgresos
+
+  const previsto = totalIngresos - totalEgresos
 
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen del Mes</p>
-      <div className="space-y-4">
-        {[
-          { label: 'Ingresos',      value: totalIngresos, cls: 'text-ok' },
-          { label: 'Egresos',       value: totalEgresos,  cls: 'text-danger' },
-          { label: 'Flujo del Mes', value: neto,          cls: neto >= 0 ? 'text-ok' : 'text-danger' },
-        ].map(({ label, value, cls }) => (
-          <div key={label}>
-            <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-            <p className={`text-xl font-black tabular-nums ${cls}`}><Mxn v={value} /></p>
-          </div>
-        ))}
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Previsto final del mes</p>
+      <p className={`text-4xl font-black tabular-nums ${previsto >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={previsto} /></p>
+      <p className="mb-3 text-[10px] text-ink-3/50">Si cobras y pagas todo</p>
+      <div className="space-y-1.5 border-t border-ink-4/10 pt-3">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-ink-3">↑ Ingresos esperados</span>
+          <span className="tabular-nums font-medium text-ok"><Mxn v={totalIngresos} /></span>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-ink-3">↓ Egresos esperados</span>
+          <span className="tabular-nums font-medium text-danger"><Mxn v={totalEgresos} /></span>
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── BalanceCard ──────────────────────────────────────────────────────────────
+// ─── SaldoRealCard ────────────────────────────────────────────────────────────
 
-function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses, month, onSave, onCorte }: {
+function SaldoRealCard({ lastCorteBalance, bal, rents, expenses, nomina, extraIncome, extraExpenses, month, onSave, onCorte }: {
+  lastCorteBalance: number
   bal: BalanceState
   rents: RentRow[]; expenses: ExpenseRow[]; nomina: NominaRow[]
   extraIncome: ExtraItem[]; extraExpenses: ExtraItem[]
@@ -507,52 +510,40 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
     setEf(String(bal.efectivo))
   }, [bal])
 
-  // Sistema: recalculates live from every checked/unchecked movement
-  const totalRentas   = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
-  const totalExtraInc = extraIncome.reduce((s, i) => s + i.amount, 0)
-  const totalIngresos = totalRentas + totalExtraInc
-  const totalFijos    = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
-  const totalNomina   = nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
-  const totalExtraExp = extraExpenses.reduce((s, i) => s + i.amount, 0)
-  const totalEgresos  = totalFijos + totalNomina + totalExtraExp
-  const sistema       = (bal.starting_balance || 0) + totalIngresos - totalEgresos
+  // REAL ACTUAL: lastCorteBalance + checked ingresos − checked egresos
+  const cobrado    = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
+                   + extraIncome.reduce((s, i) => s + i.amount, 0)
+  const pagado     = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
+                   + nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
+                   + extraExpenses.reduce((s, i) => s + i.amount, 0)
+  const realActual = lastCorteBalance + cobrado - pagado
 
-  // Only used inside the CORTE modal
   const cuentaN    = parseFloat(cb) || 0
   const efectivoN  = parseFloat(ef) || 0
   const totalReal  = cuentaN + efectivoN
-  const diferencia = totalReal - sistema
+  const diferencia = totalReal - realActual
 
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo Actual</p>
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo real actual</p>
+      <p className={`text-4xl font-black tabular-nums ${realActual >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={realActual} /></p>
+      <p className="mb-3 text-[10px] text-ink-3/50">¿cuánto tienes ahorita?</p>
 
-      {/* Primary value — derived automatically */}
-      <p className="text-4xl font-black tabular-nums text-ink-4"><Mxn v={sistema} /></p>
-
-      {/* Breakdown */}
-      <div className="mt-3 space-y-1.5 border-t border-ink-4/10 pt-3">
-        {bal.starting_balance > 0 && (
-          <div className="flex items-center justify-between text-[11px] text-ink-3/60">
-            <span>Saldo inicial</span>
-            <span className="tabular-nums"><Mxn v={bal.starting_balance} /></span>
-          </div>
-        )}
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-ink-3">↑ Ingresos cobrados</span>
-          <span className="tabular-nums font-medium text-ok"><Mxn v={totalIngresos} /></span>
+      <div className="space-y-1.5 border-t border-ink-4/10 pt-3">
+        <div className="flex items-center justify-between text-[11px] text-ink-3/60">
+          <span>Desde último corte</span>
+          <span className="tabular-nums"><Mxn v={lastCorteBalance} /></span>
         </div>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-ink-3">↓ Egresos pagados</span>
-          <span className="tabular-nums font-medium text-danger"><Mxn v={totalEgresos} /></span>
+          <span className="text-ink-3">+ Cobrado</span>
+          <span className="tabular-nums font-medium text-ok"><Mxn v={cobrado} /></span>
         </div>
-        <div className="flex items-center justify-between border-t border-ink-4/10 pt-1.5 text-xs font-semibold">
-          <span className="text-ink-3">= Saldo actual</span>
-          <span className={`tabular-nums ${sistema >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={sistema} /></span>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-ink-3">− Pagado</span>
+          <span className="tabular-nums font-medium text-danger"><Mxn v={pagado} /></span>
         </div>
       </div>
 
-      {/* Registrar CORTE button */}
       <button
         onClick={() => { setModal(true); setConcepto('') }}
         className="mt-4 w-full rounded-xl border border-ink-4/10 bg-ink-2/10 py-2 text-[11px] font-semibold text-ink-3 transition-colors hover:bg-ink-2/20 hover:text-ink-4"
@@ -560,17 +551,14 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
         📋 Registrar CORTE
       </button>
 
-      {/* Success toast */}
       {toastMsg && (
         <p className="mt-2 text-center text-[11px] font-medium text-ok">✓ {toastMsg}</p>
       )}
 
-      {/* Corte modal — inline panel */}
       {modal && (
         <div className="mt-4 space-y-3 rounded-xl border border-ink-4/10 bg-ink-2/10 p-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Registrar Corte</p>
 
-          {/* Manual real-world balance inputs — only needed here */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="mb-1 text-[10px] text-ink-3/60">💳 Cuenta real</p>
@@ -594,11 +582,10 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
             </div>
           </div>
 
-          {/* Sistema vs real comparison */}
           <div className="space-y-1 text-[11px] text-ink-3/70">
             <div className="flex justify-between">
               <span>Sistema dice</span>
-              <span className="tabular-nums"><Mxn v={sistema} /></span>
+              <span className="tabular-nums"><Mxn v={realActual} /></span>
             </div>
             <div className="flex justify-between">
               <span>Tú tienes</span>
@@ -606,9 +593,7 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
             </div>
             <div className={`flex justify-between border-t border-ink-4/10 pt-1 font-semibold ${diferencia >= 0 ? 'text-ok' : 'text-danger'}`}>
               <span>Diferencia</span>
-              <span className="tabular-nums">
-                {diferencia >= 0 ? '▲' : '▼'} <Mxn v={Math.abs(diferencia)} />
-              </span>
+              <span className="tabular-nums">{diferencia >= 0 ? '▲' : '▼'} <Mxn v={Math.abs(diferencia)} /></span>
             </div>
           </div>
 
@@ -623,28 +608,20 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
             <button
               onClick={() => setModal(false)}
               className="flex-1 rounded-lg border border-ink-4/10 py-1.5 text-[11px] text-ink-3 hover:bg-ink-2/20"
-            >
-              Cancelar
-            </button>
+            >Cancelar</button>
             <button
               disabled={saving}
               onClick={async () => {
-                const adjAmt = Math.abs(diferencia)
                 setSaving(true)
-                await onCorte({ month, sistema, real: totalReal, diferencia, concepto, cuenta_bancaria: cuentaN, efectivo: efectivoN })
+                await onCorte({ month, sistema: realActual, real: totalReal, diferencia, concepto, cuenta_bancaria: cuentaN, efectivo: efectivoN })
                 setSaving(false)
                 setModal(false)
                 setConcepto('')
-                const msg = adjAmt >= 1
-                  ? `Corte registrado · Ajuste de ${mxn(adjAmt)} aplicado`
-                  : 'Corte registrado · Sin diferencia'
-                setToastMsg(msg)
+                setToastMsg('Corte registrado · Saldo actualizado')
                 setTimeout(() => setToastMsg(null), 4000)
               }}
               className="flex-1 rounded-lg bg-accent/80 py-1.5 text-[11px] font-semibold text-white hover:bg-accent disabled:opacity-40"
-            >
-              {saving ? '…' : 'Confirmar'}
-            </button>
+            >{saving ? '…' : 'Confirmar'}</button>
           </div>
         </div>
       )}
@@ -1104,8 +1081,9 @@ export default function UptownPage() {
   const [nomina, setNomina]           = useState<NominaRow[]>([])
   const [extraIncome, setExtraIncome] = useState<ExtraItem[]>([])
   const [extraExpenses, setExtraExp]  = useState<ExtraItem[]>([])
-  const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
-  const [fondoTotal, setFondoTotal]   = useState(0)
+  const [balance, setBalance]           = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
+  const [lastCorteBalance, setLastCorteBalance] = useState(0)
+  const [fondoTotal, setFondoTotal]     = useState(0)
   const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
@@ -1130,8 +1108,10 @@ export default function UptownPage() {
         const autoBalance = { starting_balance: data.prev_saldo, cuenta_bancaria: 0, efectivo: 0 }
         setBalance(autoBalance)
         post('/api/uptown/balance', { month: m, ...autoBalance }).catch(() => {})
+        setLastCorteBalance(data.last_corte_real ?? data.prev_saldo)
       } else {
         setBalance(data.balance)
+        setLastCorteBalance(data.last_corte_real ?? data.balance.starting_balance ?? 0)
       }
     } catch (e) { setError(String(e)) }
     finally { setLoading(false) }
@@ -1269,23 +1249,16 @@ export default function UptownPage() {
     const res = await fetch('/api/uptown/corte', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, cuenta_bancaria: data.cuenta_bancaria, efectivo: data.efectivo }),
+      body: JSON.stringify(data),
     })
     const body = await res.json()
-    console.log('[corte] API response status:', res.status, 'body:', body)
     if (!res.ok) { console.error('[corte] API error:', body); return }
 
-    const { corte, movement } = body
-    console.log('[corte] saved corte:', corte, '| movement:', movement)
-
+    const { corte } = body
     if (corte) {
       setCortes(prev => [corte, ...prev])
       setShowCortes(true)
-    }
-    if (movement) {
-      const item: ExtraItem = { id: movement.id, description: movement.description, amount: movement.amount, method: movement.method }
-      if (data.diferencia > 0) setExtraIncome(prev => [...prev, item])
-      else                     setExtraExp(prev => [...prev, item])
+      setLastCorteBalance(data.real)
     }
   }
 
@@ -1359,13 +1332,14 @@ export default function UptownPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Resumen + Saldo Actual */}
-            <div className="grid grid-cols-[5fr_7fr] gap-5">
-              <ResumenCard
+            {/* Previsto + Saldo Real */}
+            <div className="grid grid-cols-2 gap-5">
+              <PrevistoCard
                 rents={rents} expenses={expenses} nomina={nomina}
                 extraIncome={extraIncome} extraExpenses={extraExpenses}
               />
-              <SaldoActualCard
+              <SaldoRealCard
+                lastCorteBalance={lastCorteBalance}
                 bal={balance} month={month}
                 rents={rents} expenses={expenses} nomina={nomina}
                 extraIncome={extraIncome} extraExpenses={extraExpenses}
@@ -1399,20 +1373,15 @@ export default function UptownPage() {
                         const label = new Date(c.date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                         return (
                           <div key={c.id} className="rounded-lg border border-ink-4/10 bg-ink-2/10 px-3 py-2 text-[11px]">
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                               <span className="shrink-0 text-ink-3/60">{label}</span>
-                              <span className="font-semibold tabular-nums text-ink-4"><Mxn v={c.real} /></span>
+                              <span className="text-ink-3">Tú tenías: <span className="font-semibold tabular-nums text-ink-4"><Mxn v={c.real} /></span></span>
+                              <span className="text-ink-3">Sistema: <span className="tabular-nums"><Mxn v={c.sistema} /></span></span>
                               <span className={`ml-auto font-bold tabular-nums ${zero ? 'text-ok' : pos ? 'text-ok' : 'text-danger'}`}>
-                                {zero ? '✓' : pos ? <><span>▲ </span><Mxn v={c.diferencia} /></> : <><span>▼ </span><Mxn v={Math.abs(c.diferencia)} /></>}
+                                {zero ? 'Sin diferencia' : <>{pos ? '▲' : '▼'} <Mxn v={Math.abs(c.diferencia)} /></>}
                               </span>
-                              {c.concepto && <span className="text-ink-3/50">{c.concepto}</span>}
                             </div>
-                            {(c.cuenta_bancaria != null || c.efectivo != null) && (
-                              <div className="mt-1 flex gap-3 text-ink-3/50">
-                                {c.cuenta_bancaria != null && <span>💳 <Mxn v={c.cuenta_bancaria} /></span>}
-                                {c.efectivo != null && <span>💵 <Mxn v={c.efectivo} /></span>}
-                              </div>
-                            )}
+                            {c.concepto && <p className="mt-0.5 text-ink-3/50">{c.concepto}</p>}
                           </div>
                         )
                       })}

@@ -49,21 +49,5 @@ export async function POST(req: NextRequest) {
 
   if (corteErr) return NextResponse.json({ error: corteErr.message }, { status: 500 })
 
-  // Create adjustment movement if there is a difference
-  let movement = null
-  if (Math.abs(diferencia) >= 1) {
-    const description = concepto ? `Ajuste de corte · ${concepto}` : 'Ajuste de corte'
-    const table   = diferencia > 0 ? 'uptown_extra_income' : 'uptown_extra_expenses'
-    const amount  = Math.abs(diferencia)
-
-    const { data: mv, error: mvErr } = await supabase
-      .from(table)
-      .insert({ month, description, amount, method: 'cash' })
-      .select('id,description,amount,method')
-      .single()
-
-    if (!mvErr) movement = { ...mv, table }
-  }
-
-  return NextResponse.json({ corte, movement }, { status: 201 })
+  return NextResponse.json({ corte }, { status: 201 })
 }
