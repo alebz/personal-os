@@ -50,7 +50,6 @@ interface ExpenseRow { category: string; amount: number; paid: boolean; method: 
 interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 'cash' | 'card' }
 interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
 interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
-interface Corte        { id: string; month: string; date: string; sistema: number; real: number; diferencia: number; concepto: string | null; cuenta_bancaria: number | null; efectivo: number | null; created_at: string }
 
 type ValetStatus = 'pending' | 'paid' | 'advance'
 interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; provider_amounts: number[]; price_per_point: number }
@@ -117,15 +116,21 @@ function mergeRents(db: RentRow[], month: string): RentRow[] {
 function mergeExpenses(db: ExpenseRow[], month: string): ExpenseRow[] {
   const sats = saturdaysInMonth(month)
   const rows: ExpenseRow[] = []
+  const seen = new Set<string>()
   for (const def of activeExpenses(month)) {
     if (def.id === 'martha') {
       for (const sat of sats) {
         const cat = `martha_${sat.num}`
         rows.push(db.find(d => d.category === cat) ?? { category: cat, amount: def.defaultAmount ?? 0, paid: false, method: 'cash' as const })
+        seen.add(cat)
       }
     } else {
       rows.push(db.find(d => d.category === def.id) ?? { category: def.id, amount: def.defaultAmount ?? 0, paid: false, method: 'cash' as const })
+      seen.add(def.id)
     }
+  }
+  for (const row of db) {
+    if (!seen.has(row.category)) rows.push(row)
   }
   return rows
 }
@@ -380,15 +385,27 @@ function ExtraSection({ title, colorClass = 'text-ink-3', items, onAdd, onDelete
 
 // ─── GastosFijosSection ───────────────────────────────────────────────────────
 
-function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod }: {
+function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onAdd, onDelete, onRename }: {
   expenses: ExpenseRow[]
   month: string
   onToggle: (category: string, paid: boolean) => void
   onAmount: (category: string, amount: number) => void
   onMethod: (category: string, method: 'cash' | 'card') => void
+  onAdd: (category: string, amount: number, method: 'cash' | 'card') => Promise<void>
+  onDelete: (category: string) => Promise<void>
+  onRename: (oldCategory: string, newCategory: string) => Promise<void>
 }) {
   const sats = saturdaysInMonth(month)
   const total = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
+
+  const [addOpen,      setAddOpen]      = useState(false)
+  const [addName,      setAddName]      = useState('')
+  const [addAmount,    setAddAmount]    = useState('')
+  const [addMethod,    setAddMethod]    = useState<'cash' | 'card'>('cash')
+  const [adding,       setAdding]       = useState(false)
+  const [confirmDel,   setConfirmDel]   = useState<string | null>(null)
+  const [editingName,  setEditingName]  = useState<string | null>(null)
+  const [nameDraft,    setNameDraft]    = useState('')
 
   function rowInfo(category: string): { name: string; note?: string } {
     if (category.startsWith('martha_')) {
@@ -399,22 +416,136 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod }: {
     return { name: def?.name ?? category, note: def?.note ?? undefined }
   }
 
+  function isCustom(category: string) {
+    return !category.startsWith('martha_') && !EXPENSE_DEFS.some(d => d.id === category)
+  }
+
+  async function handleAdd() {
+    const name = addName.trim()
+    if (!name) return
+    const amount = parseFloat(addAmount) || 0
+    setAdding(true)
+    await onAdd(name, amount, addMethod)
+    setAdding(false)
+    setAddOpen(false)
+    setAddName(''); setAddAmount(''); setAddMethod('cash')
+  }
+
+  async function commitRename(oldCategory: string) {
+    const next = nameDraft.trim()
+    setEditingName(null)
+    if (next && next !== oldCategory) await onRename(oldCategory, next)
+  }
+
   return (
     <SectionCard title="Gastos Fijos" total={total} colorClass="text-warn">
       {expenses.map(row => {
         const { name, note } = rowInfo(row.category)
+        const custom     = isCustom(row.category)
+        const pendingDel = confirmDel === row.category
+        const editingThisName = editingName === row.category
+
+        if (pendingDel) {
+          return (
+            <div key={row.category} className="flex items-center justify-between border-t border-ink-4/5 py-1.5 text-[11px] first:border-0">
+              <span className="text-ink-3/70">¿Eliminar <span className="font-semibold text-ink-4">{name}</span> de todos los meses futuros?</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => { await onDelete(row.category); setConfirmDel(null) }}
+                  className="rounded bg-danger/80 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-danger"
+                >Sí</button>
+                <button
+                  onClick={() => setConfirmDel(null)}
+                  className="rounded border border-ink-4/10 px-2 py-0.5 text-[10px] text-ink-3 hover:text-ink-4"
+                >No</button>
+              </div>
+            </div>
+          )
+        }
+
         return (
           <div key={row.category} className="group flex items-center gap-2 border-t border-ink-4/5 py-1.5 first:border-0">
             <PaidToggle paid={row.paid} onChange={v => onToggle(row.category, v)} />
-            <span className={`flex-1 text-sm ${row.paid ? 'text-ink-3/60 line-through' : 'text-ink-4'}`}>
-              {name}
-            </span>
+            {custom && editingThisName ? (
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={e => setNameDraft(e.target.value)}
+                onBlur={() => void commitRename(row.category)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                  if (e.key === 'Escape') { setEditingName(null) }
+                }}
+                className="flex-1 rounded border border-accent/40 bg-ink-2/20 px-1 py-0.5 text-sm text-ink-4 outline-none"
+              />
+            ) : (
+              <span
+                className={`flex-1 text-sm ${row.paid ? 'text-ink-3/60 line-through' : 'text-ink-4'} ${custom ? 'cursor-text' : ''}`}
+                onClick={() => { if (custom) { setEditingName(row.category); setNameDraft(name) } }}
+              >
+                {name}
+              </span>
+            )}
             {note && <span className="text-[9px] text-ink-3/50">{note}</span>}
             <MethodToggle method={row.method} onChange={m => onMethod(row.category, m)} />
             <AmountInput value={row.amount} onSave={n => onAmount(row.category, n)} />
+            <button
+              onClick={() => setConfirmDel(row.category)}
+              className="ml-1 text-[11px] text-ink-3/30 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+              title="Eliminar gasto"
+            >×</button>
           </div>
         )
       })}
+
+      {/* Add form */}
+      {addOpen ? (
+        <div className="mt-2 space-y-2 border-t border-ink-4/5 pt-2">
+          <input
+            type="text"
+            value={addName}
+            onChange={e => setAddName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void handleAdd(); if (e.key === 'Escape') setAddOpen(false) }}
+            placeholder="Nombre del gasto"
+            autoFocus
+            className="w-full rounded border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-sm text-ink-4 outline-none placeholder:text-ink-3/40 focus:border-accent/40"
+          />
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={addAmount}
+              onChange={e => setAddAmount(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') void handleAdd() }}
+              placeholder="Monto"
+              className="w-28 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-right text-sm tabular-nums text-ink-4 outline-none placeholder:text-ink-3/40 focus:border-accent/40"
+            />
+            <select
+              value={addMethod}
+              onChange={e => setAddMethod(e.target.value as 'cash' | 'card')}
+              className="flex-1 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-sm text-ink-4 outline-none focus:border-accent/40"
+            >
+              <option value="cash">💵 Efectivo</option>
+              <option value="card">💳 Tarjeta</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setAddOpen(false); setAddName(''); setAddAmount(''); setAddMethod('cash') }}
+              className="flex-1 rounded border border-ink-4/10 py-1 text-[11px] text-ink-3 hover:text-ink-4"
+            >Cancelar</button>
+            <button
+              disabled={adding || !addName.trim()}
+              onClick={() => void handleAdd()}
+              className="flex-1 rounded bg-accent/80 py-1 text-[11px] font-semibold text-white hover:bg-accent disabled:opacity-40"
+            >{adding ? '…' : 'Agregar'}</button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddOpen(true)}
+          className="mt-2 w-full border-t border-ink-4/5 pt-2 text-left text-[11px] text-ink-3/50 hover:text-ink-3"
+        >+ Agregar gasto fijo</button>
+      )}
     </SectionCard>
   )
 }
@@ -487,52 +618,63 @@ function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
   )
 }
 
-// ─── SaldoRealCard ────────────────────────────────────────────────────────────
+// ─── SaldoActualCard ──────────────────────────────────────────────────────────
 
-function SaldoRealCard({ lastCorteBalance, bal, rents, expenses, nomina, extraIncome, extraExpenses, month, onSave, onCorte }: {
-  lastCorteBalance: number
+function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses, onSave }: {
   bal: BalanceState
   rents: RentRow[]; expenses: ExpenseRow[]; nomina: NominaRow[]
   extraIncome: ExtraItem[]; extraExpenses: ExtraItem[]
-  month: string
-  onSave: (fields: Partial<BalanceState>) => void
-  onCorte: (data: { month: string; sistema: number; real: number; diferencia: number; concepto: string; cuenta_bancaria: number; efectivo: number }) => Promise<void>
+  onSave: (starting_balance: number) => void
 }) {
-  const [cb,       setCb]       = useState(String(bal.cuenta_bancaria))
-  const [ef,       setEf]       = useState(String(bal.efectivo))
-  const [modal,    setModal]    = useState(false)
-  const [concepto, setConcepto] = useState('')
-  const [saving,   setSaving]   = useState(false)
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [draft,   setDraft]   = useState(String(bal.starting_balance))
 
   useEffect(() => {
-    setCb(String(bal.cuenta_bancaria))
-    setEf(String(bal.efectivo))
-  }, [bal])
+    if (!editing) setDraft(String(bal.starting_balance))
+  }, [bal.starting_balance, editing])
 
-  // REAL ACTUAL: lastCorteBalance + checked ingresos − checked egresos
-  const cobrado    = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
-                   + extraIncome.reduce((s, i) => s + i.amount, 0)
-  const pagado     = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
-                   + nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
-                   + extraExpenses.reduce((s, i) => s + i.amount, 0)
-  const realActual = lastCorteBalance + cobrado - pagado
+  function commit() {
+    const v = parseFloat(draft) || 0
+    setEditing(false)
+    onSave(v)
+  }
 
-  const cuentaN    = parseFloat(cb) || 0
-  const efectivoN  = parseFloat(ef) || 0
-  const totalReal  = cuentaN + efectivoN
-  const diferencia = totalReal - realActual
+  const cobrado     = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
+                    + extraIncome.reduce((s, i) => s + i.amount, 0)
+  const pagado      = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
+                    + nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
+                    + extraExpenses.reduce((s, i) => s + i.amount, 0)
+  const saldoActual = (bal.starting_balance || 0) + cobrado - pagado
 
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo real actual</p>
-      <p className={`text-4xl font-black tabular-nums ${realActual >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={realActual} /></p>
-      <p className="mb-3 text-[10px] text-ink-3/50">¿cuánto tienes ahorita?</p>
-
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo actual</p>
+      <p className={`text-4xl font-black tabular-nums ${saldoActual >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={saldoActual} /></p>
+      <p className="mb-3 text-[10px] text-ink-3/50">Lo que tienes según lo marcado</p>
       <div className="space-y-1.5 border-t border-ink-4/10 pt-3">
         <div className="flex items-center justify-between text-[11px] text-ink-3/60">
-          <span>Desde último corte</span>
-          <span className="tabular-nums"><Mxn v={lastCorteBalance} /></span>
+          <span>Saldo inicial</span>
+          {editing ? (
+            <input
+              type="number"
+              value={draft}
+              autoFocus
+              onChange={e => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') { setEditing(false); setDraft(String(bal.starting_balance)) }
+              }}
+              className="w-32 rounded border border-accent/40 bg-ink-2/20 px-2 py-0.5 text-right tabular-nums text-ink-4 outline-none"
+            />
+          ) : (
+            <button
+              onClick={() => setEditing(true)}
+              className="tabular-nums underline decoration-dotted underline-offset-2 hover:text-ink-4"
+            >
+              <Mxn v={bal.starting_balance} />
+            </button>
+          )}
         </div>
         <div className="flex items-center justify-between text-xs">
           <span className="text-ink-3">+ Cobrado</span>
@@ -543,88 +685,6 @@ function SaldoRealCard({ lastCorteBalance, bal, rents, expenses, nomina, extraIn
           <span className="tabular-nums font-medium text-danger"><Mxn v={pagado} /></span>
         </div>
       </div>
-
-      <button
-        onClick={() => { setModal(true); setConcepto('') }}
-        className="mt-4 w-full rounded-xl border border-ink-4/10 bg-ink-2/10 py-2 text-[11px] font-semibold text-ink-3 transition-colors hover:bg-ink-2/20 hover:text-ink-4"
-      >
-        📋 Registrar CORTE
-      </button>
-
-      {toastMsg && (
-        <p className="mt-2 text-center text-[11px] font-medium text-ok">✓ {toastMsg}</p>
-      )}
-
-      {modal && (
-        <div className="mt-4 space-y-3 rounded-xl border border-ink-4/10 bg-ink-2/10 p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Registrar Corte</p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="mb-1 text-[10px] text-ink-3/60">💳 Cuenta real</p>
-              <input
-                type="number" value={cb}
-                onChange={e => setCb(e.target.value)}
-                onBlur={e => onSave({ cuenta_bancaria: parseFloat(e.target.value) || 0 })}
-                onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
-                className="w-full rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-right text-sm tabular-nums text-ink-4 outline-none focus:border-accent/50"
-              />
-            </div>
-            <div>
-              <p className="mb-1 text-[10px] text-ink-3/60">💵 Efectivo real</p>
-              <input
-                type="number" value={ef}
-                onChange={e => setEf(e.target.value)}
-                onBlur={e => onSave({ efectivo: parseFloat(e.target.value) || 0 })}
-                onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
-                className="w-full rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-right text-sm tabular-nums text-ink-4 outline-none focus:border-accent/50"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1 text-[11px] text-ink-3/70">
-            <div className="flex justify-between">
-              <span>Sistema dice</span>
-              <span className="tabular-nums"><Mxn v={realActual} /></span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tú tienes</span>
-              <span className="font-semibold tabular-nums text-ink-4"><Mxn v={totalReal} /></span>
-            </div>
-            <div className={`flex justify-between border-t border-ink-4/10 pt-1 font-semibold ${diferencia >= 0 ? 'text-ok' : 'text-danger'}`}>
-              <span>Diferencia</span>
-              <span className="tabular-nums">{diferencia >= 0 ? '▲' : '▼'} <Mxn v={Math.abs(diferencia)} /></span>
-            </div>
-          </div>
-
-          <input
-            type="text" value={concepto} placeholder="Concepto (opcional)"
-            onChange={e => setConcepto(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Escape') setModal(false) }}
-            className="w-full rounded-lg border border-ink-4/10 bg-ink-2/20 px-3 py-1.5 text-[11px] text-ink-4 outline-none placeholder:text-ink-3/40 focus:border-accent/50"
-          />
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setModal(false)}
-              className="flex-1 rounded-lg border border-ink-4/10 py-1.5 text-[11px] text-ink-3 hover:bg-ink-2/20"
-            >Cancelar</button>
-            <button
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true)
-                await onCorte({ month, sistema: realActual, real: totalReal, diferencia, concepto, cuenta_bancaria: cuentaN, efectivo: efectivoN })
-                setSaving(false)
-                setModal(false)
-                setConcepto('')
-                setToastMsg('Corte registrado · Saldo actualizado')
-                setTimeout(() => setToastMsg(null), 4000)
-              }}
-              className="flex-1 rounded-lg bg-accent/80 py-1.5 text-[11px] font-semibold text-white hover:bg-accent disabled:opacity-40"
-            >{saving ? '…' : 'Confirmar'}</button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -1081,15 +1141,12 @@ export default function UptownPage() {
   const [nomina, setNomina]           = useState<NominaRow[]>([])
   const [extraIncome, setExtraIncome] = useState<ExtraItem[]>([])
   const [extraExpenses, setExtraExp]  = useState<ExtraItem[]>([])
-  const [balance, setBalance]           = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
-  const [lastCorteBalance, setLastCorteBalance] = useState(0)
-  const [fondoTotal, setFondoTotal]     = useState(0)
+  const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
+  const [fondoTotal, setFondoTotal]   = useState(0)
   const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
-  const [pageTab, setPageTab]   = useState<'finanzas' | 'valet' | 'historial'>('finanzas')
-  const [cortes, setCortes]     = useState<Corte[]>([])
-  const [showCortes, setShowCortes] = useState(false)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [pageTab, setPageTab]         = useState<'finanzas' | 'valet' | 'historial'>('finanzas')
 
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true); setError(null)
@@ -1108,10 +1165,8 @@ export default function UptownPage() {
         const autoBalance = { starting_balance: data.prev_saldo, cuenta_bancaria: 0, efectivo: 0 }
         setBalance(autoBalance)
         post('/api/uptown/balance', { month: m, ...autoBalance }).catch(() => {})
-        setLastCorteBalance(data.last_corte_real ?? data.prev_saldo)
       } else {
         setBalance(data.balance)
-        setLastCorteBalance(data.last_corte_real ?? data.balance.starting_balance ?? 0)
       }
     } catch (e) { setError(String(e)) }
     finally { setLoading(false) }
@@ -1172,6 +1227,34 @@ export default function UptownPage() {
     setExpenses(prev => prev.map(e => e.category === category ? { ...e, method } : e))
     const row = expenses.find(e => e.category === category)
     await post('/api/uptown/expense', { month, category, method, amount: row?.amount ?? 0, paid: row?.paid ?? false })
+  }
+
+  async function addGastoFijo(category: string, amount: number, method: 'cash' | 'card') {
+    const res = await fetch('/api/uptown/fixed-expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, amount, method, month_start: month }),
+    })
+    if (!res.ok) { console.error('[add-gasto]', await res.json()); return }
+    setExpenses(prev => [...prev, { category, amount, paid: false, method }])
+  }
+
+  async function deleteGastoFijo(category: string) {
+    await fetch('/api/uptown/fixed-expenses', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, month_from: month }),
+    })
+    setExpenses(prev => prev.filter(e => e.category !== category))
+  }
+
+  async function renameGastoFijo(oldCategory: string, newCategory: string) {
+    setExpenses(prev => prev.map(e => e.category === oldCategory ? { ...e, category: newCategory } : e))
+    await fetch('/api/uptown/fixed-expenses', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_category: oldCategory, new_category: newCategory, month }),
+    })
   }
 
   // ── Nomina handlers ───────────────────────────────────────────────────────
@@ -1238,37 +1321,11 @@ export default function UptownPage() {
     await fetch(`/api/uptown/extra-expenses/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) })
   }
 
-  // ── Balance + corte handlers ──────────────────────────────────────────────
+  // ── Balance handler ───────────────────────────────────────────────────────
 
-  async function saveBalance(fields: Partial<BalanceState>) {
-    setBalance(prev => ({ ...prev, ...fields }))
-    await post('/api/uptown/balance', { month, ...fields })
-  }
-
-  async function registrarCorte(data: { month: string; sistema: number; real: number; diferencia: number; concepto: string; cuenta_bancaria: number; efectivo: number }) {
-    const res = await fetch('/api/uptown/corte', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    const body = await res.json()
-    if (!res.ok) { console.error('[corte] API error:', body); return }
-
-    const { corte } = body
-    if (corte) {
-      setCortes(prev => [corte, ...prev])
-      setShowCortes(true)
-      setLastCorteBalance(data.real)
-    }
-  }
-
-  async function loadCortes() {
-    const res = await fetch(`/api/uptown/corte?month=${month}`)
-    if (res.ok) {
-      const data = await res.json()
-      console.log('[corte] loaded from server:', data)
-      setCortes(data)
-    }
+  async function saveStartingBalance(starting_balance: number) {
+    setBalance(prev => ({ ...prev, starting_balance }))
+    await post('/api/uptown/balance', { month, starting_balance })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1332,63 +1389,18 @@ export default function UptownPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Previsto + Saldo Real */}
+            {/* Previsto + Saldo Actual */}
             <div className="grid grid-cols-2 gap-5">
               <PrevistoCard
                 rents={rents} expenses={expenses} nomina={nomina}
                 extraIncome={extraIncome} extraExpenses={extraExpenses}
               />
-              <SaldoRealCard
-                lastCorteBalance={lastCorteBalance}
-                bal={balance} month={month}
+              <SaldoActualCard
+                bal={balance}
                 rents={rents} expenses={expenses} nomina={nomina}
                 extraIncome={extraIncome} extraExpenses={extraExpenses}
-                onSave={saveBalance}
-                onCorte={registrarCorte}
+                onSave={saveStartingBalance}
               />
-            </div>
-
-            {/* Historial de Cortes */}
-            <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
-              <button
-                onClick={() => {
-                  const opening = !showCortes
-                  setShowCortes(opening)
-                  if (opening) void loadCortes()
-                }}
-                className="flex w-full items-center justify-between px-5 py-3 text-left"
-              >
-                <span className="text-[10px] font-bold uppercase tracking-widest text-ink-3">📋 Historial de Cortes</span>
-                <span className="text-[10px] text-ink-3/50">{showCortes ? '▲' : '▼'}</span>
-              </button>
-              {showCortes && (
-                <div className="border-t border-ink-4/10 px-5 pb-4">
-                  {cortes.length === 0 ? (
-                    <p className="pt-4 text-[11px] text-ink-3/50">No hay cortes registrados este mes.</p>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      {cortes.map(c => {
-                        const pos   = c.diferencia >= 0
-                        const zero  = Math.abs(c.diferencia) < 1
-                        const label = new Date(c.date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                        return (
-                          <div key={c.id} className="rounded-lg border border-ink-4/10 bg-ink-2/10 px-3 py-2 text-[11px]">
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span className="shrink-0 text-ink-3/60">{label}</span>
-                              <span className="text-ink-3">Tú tenías: <span className="font-semibold tabular-nums text-ink-4"><Mxn v={c.real} /></span></span>
-                              <span className="text-ink-3">Sistema: <span className="tabular-nums"><Mxn v={c.sistema} /></span></span>
-                              <span className={`ml-auto font-bold tabular-nums ${zero ? 'text-ok' : pos ? 'text-ok' : 'text-danger'}`}>
-                                {zero ? 'Sin diferencia' : <>{pos ? '▲' : '▼'} <Mxn v={Math.abs(c.diferencia)} /></>}
-                              </span>
-                            </div>
-                            {c.concepto && <p className="mt-0.5 text-ink-3/50">{c.concepto}</p>}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Main grid: income | expenses */}
@@ -1418,6 +1430,7 @@ export default function UptownPage() {
                 <GastosFijosSection
                   expenses={expenses} month={month}
                   onToggle={toggleExpense} onAmount={setExpenseAmount} onMethod={setExpenseMethod}
+                  onAdd={addGastoFijo} onDelete={deleteGastoFijo} onRename={renameGastoFijo}
                 />
                 <NominaSection
                   nomina={nomina} month={month}
