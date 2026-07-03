@@ -29,25 +29,40 @@ export async function POST(req: NextRequest) {
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
-  const { month, sistema, real, diferencia, concepto, cuenta_bancaria, efectivo } = body
-  if (!month || sistema == null || real == null || diferencia == null) {
-    return NextResponse.json({ error: 'month, sistema, real, diferencia required' }, { status: 400 })
+  try {
+    const { month, sistema, real, diferencia, concepto, cuenta_bancaria, efectivo } = body
+    if (!month || sistema == null || real == null || diferencia == null) {
+      return NextResponse.json({ error: 'month, sistema, real, diferencia required' }, { status: 400 })
+    }
+
+    const supabase = createServerClient()
+
+    // Record the corte
+    const { data: corte, error: corteErr } = await supabase
+      .from('uptown_cortes')
+      .insert({
+        month, sistema, real, diferencia, concepto: concepto || null,
+      })
+      .select()
+      .single()
+
+    if (corteErr) {
+      console.error('CORTE API ERROR - supabase insert:', corteErr)
+      return NextResponse.json({ error: corteErr.message }, { status: 500 })
+    }
+
+    // Reset all paid flags and clear extras — clean slate for next period
+    await Promise.all([
+      supabase.from('uptown_rents').update({ paid: false }).eq('month', month),
+      supabase.from('uptown_fixed_expenses').update({ paid: false }).eq('month', month),
+      supabase.from('uptown_nomina').update({ paid: false }).eq('month', month),
+      supabase.from('uptown_extra_expenses').delete().eq('month', month),
+      supabase.from('uptown_extra_income').delete().eq('month', month),
+    ])
+
+    return NextResponse.json({ corte }, { status: 201 })
+  } catch (err) {
+    console.error('CORTE API ERROR:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
-
-  const supabase = createServerClient()
-
-  // Record the corte
-  const { data: corte, error: corteErr } = await supabase
-    .from('uptown_cortes')
-    .insert({
-      month, sistema, real, diferencia, concepto: concepto || null,
-      cuenta_bancaria: cuenta_bancaria ?? null,
-      efectivo: efectivo ?? null,
-    })
-    .select()
-    .single()
-
-  if (corteErr) return NextResponse.json({ error: corteErr.message }, { status: 500 })
-
-  return NextResponse.json({ corte }, { status: 201 })
 }
