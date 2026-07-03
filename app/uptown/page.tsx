@@ -1259,11 +1259,6 @@ export default function UptownPage() {
       setCortes(prev => [corte, ...prev])
       setShowCortes(true)
       setLastCorteBalance(data.real)
-      setRents(prev => prev.map(r => ({ ...r, paid: false })))
-      setExpenses(prev => prev.map(e => ({ ...e, paid: false })))
-      setNomina(prev => prev.map(n => ({ ...n, paid: false })))
-      setExtraIncome([])
-      setExtraExp([])
     }
   }
 
