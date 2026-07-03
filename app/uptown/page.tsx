@@ -497,19 +497,17 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
 }) {
   const [cb,       setCb]       = useState(String(bal.cuenta_bancaria))
   const [ef,       setEf]       = useState(String(bal.efectivo))
-  const [editCb,   setEditCb]   = useState(false)
-  const [editEf,   setEditEf]   = useState(false)
   const [modal,    setModal]    = useState(false)
   const [concepto, setConcepto] = useState('')
   const [saving,   setSaving]   = useState(false)
-  const [toast,    setToast]    = useState(false)
+  const [toastMsg, setToastMsg] = useState<string | null>(null)
 
   useEffect(() => {
     setCb(String(bal.cuenta_bancaria))
     setEf(String(bal.efectivo))
   }, [bal])
 
-  // Sistema: what the payment tracking says we should have
+  // Sistema: recalculates live from every checked/unchecked movement
   const totalRentas   = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
   const totalExtraInc = extraIncome.reduce((s, i) => s + i.amount, 0)
   const totalIngresos = totalRentas + totalExtraInc
@@ -519,52 +517,39 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
   const totalEgresos  = totalFijos + totalNomina + totalExtraExp
   const sistema       = (bal.starting_balance || 0) + totalIngresos - totalEgresos
 
+  // Only used inside the CORTE modal
   const cuentaN    = parseFloat(cb) || 0
   const efectivoN  = parseFloat(ef) || 0
   const totalReal  = cuentaN + efectivoN
   const diferencia = totalReal - sistema
 
-  const bigCls = 'w-full text-right text-3xl font-black tabular-nums text-ink-4 hover:text-accent'
-  const inCls  = 'w-full rounded-xl border border-accent/50 bg-ink-2/20 px-3 py-1.5 text-right text-2xl font-black tabular-nums text-ink-4 outline-none'
-
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo Actual</p>
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo Actual</p>
 
-      {/* Cuenta + Efectivo */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3/50">💳 Cuenta</p>
-          {editCb ? (
-            <input type="number" value={cb} autoFocus
-              onChange={e => setCb(e.target.value)}
-              onBlur={e => { onSave({ cuenta_bancaria: parseFloat(e.target.value) || 0 }); setEditCb(false) }}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
-              className={inCls}
-            />
-          ) : (
-            <button onClick={() => setEditCb(true)} className={bigCls}><Mxn v={cuentaN} /></button>
-          )}
-        </div>
-        <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3/50">💵 Efectivo</p>
-          {editEf ? (
-            <input type="number" value={ef} autoFocus
-              onChange={e => setEf(e.target.value)}
-              onBlur={e => { onSave({ efectivo: parseFloat(e.target.value) || 0 }); setEditEf(false) }}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
-              className={inCls}
-            />
-          ) : (
-            <button onClick={() => setEditEf(true)} className={bigCls}><Mxn v={efectivoN} /></button>
-          )}
-        </div>
-      </div>
+      {/* Primary value — derived automatically */}
+      <p className="text-4xl font-black tabular-nums text-ink-4"><Mxn v={sistema} /></p>
 
-      {/* Total */}
-      <div className="mt-4 border-t border-ink-4/10 pt-3 text-right">
-        <span className="text-[10px] uppercase tracking-wider text-ink-3/50">Total </span>
-        <span className="text-3xl font-black tabular-nums text-ink-4"><Mxn v={totalReal} /></span>
+      {/* Breakdown */}
+      <div className="mt-3 space-y-1.5 border-t border-ink-4/10 pt-3">
+        {bal.starting_balance > 0 && (
+          <div className="flex items-center justify-between text-[11px] text-ink-3/60">
+            <span>Saldo inicial</span>
+            <span className="tabular-nums"><Mxn v={bal.starting_balance} /></span>
+          </div>
+        )}
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-ink-3">↑ Ingresos cobrados</span>
+          <span className="tabular-nums font-medium text-ok"><Mxn v={totalIngresos} /></span>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-ink-3">↓ Egresos pagados</span>
+          <span className="tabular-nums font-medium text-danger"><Mxn v={totalEgresos} /></span>
+        </div>
+        <div className="flex items-center justify-between border-t border-ink-4/10 pt-1.5 text-xs font-semibold">
+          <span className="text-ink-3">= Saldo actual</span>
+          <span className={`tabular-nums ${sistema >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={sistema} /></span>
+        </div>
       </div>
 
       {/* Registrar CORTE button */}
@@ -576,8 +561,8 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
       </button>
 
       {/* Success toast */}
-      {toast && (
-        <p className="mt-2 text-center text-[11px] font-medium text-ok">✓ Corte registrado</p>
+      {toastMsg && (
+        <p className="mt-2 text-center text-[11px] font-medium text-ok">✓ {toastMsg}</p>
       )}
 
       {/* Corte modal — inline panel */}
@@ -585,6 +570,31 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
         <div className="mt-4 space-y-3 rounded-xl border border-ink-4/10 bg-ink-2/10 p-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Registrar Corte</p>
 
+          {/* Manual real-world balance inputs — only needed here */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="mb-1 text-[10px] text-ink-3/60">💳 Cuenta real</p>
+              <input
+                type="number" value={cb}
+                onChange={e => setCb(e.target.value)}
+                onBlur={e => onSave({ cuenta_bancaria: parseFloat(e.target.value) || 0 })}
+                onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
+                className="w-full rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-right text-sm tabular-nums text-ink-4 outline-none focus:border-accent/50"
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] text-ink-3/60">💵 Efectivo real</p>
+              <input
+                type="number" value={ef}
+                onChange={e => setEf(e.target.value)}
+                onBlur={e => onSave({ efectivo: parseFloat(e.target.value) || 0 })}
+                onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
+                className="w-full rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-right text-sm tabular-nums text-ink-4 outline-none focus:border-accent/50"
+              />
+            </div>
+          </div>
+
+          {/* Sistema vs real comparison */}
           <div className="space-y-1 text-[11px] text-ink-3/70">
             <div className="flex justify-between">
               <span>Sistema dice</span>
@@ -619,13 +629,17 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
             <button
               disabled={saving}
               onClick={async () => {
+                const adjAmt = Math.abs(diferencia)
                 setSaving(true)
                 await onCorte({ month, sistema, real: totalReal, diferencia, concepto, cuenta_bancaria: cuentaN, efectivo: efectivoN })
                 setSaving(false)
                 setModal(false)
                 setConcepto('')
-                setToast(true)
-                setTimeout(() => setToast(false), 3000)
+                const msg = adjAmt >= 1
+                  ? `Corte registrado · Ajuste de ${mxn(adjAmt)} aplicado`
+                  : 'Corte registrado · Sin diferencia'
+                setToastMsg(msg)
+                setTimeout(() => setToastMsg(null), 4000)
               }}
               className="flex-1 rounded-lg bg-accent/80 py-1.5 text-[11px] font-semibold text-white hover:bg-accent disabled:opacity-40"
             >

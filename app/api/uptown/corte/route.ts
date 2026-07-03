@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   // Create adjustment movement if there is a difference
   let movement = null
   if (Math.abs(diferencia) >= 1) {
-    const description = `CORTE${concepto ? ` · ${concepto}` : ''}`
+    const description = concepto ? `Ajuste de corte · ${concepto}` : 'Ajuste de corte'
     const table   = diferencia > 0 ? 'uptown_extra_income' : 'uptown_extra_expenses'
     const amount  = Math.abs(diferencia)
 
