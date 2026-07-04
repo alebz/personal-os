@@ -51,7 +51,7 @@ export default function CumpleanosCard() {
   }, [])
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide text-ink-4">🎂 Cumpleaños</h2>
         <Link

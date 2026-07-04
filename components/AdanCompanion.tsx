@@ -2,24 +2,34 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-// Single-canvas glitter: 200 particles, one rAF loop, pauses when hidden/off-screen
+// Single-canvas glitter: 400 particles, one rAF loop, pauses when hidden/off-screen
 function GlitterCanvas({ colors, variant }: { colors: string[]; variant: string }) {
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const colorsRef   = useRef(colors)
   useEffect(() => { colorsRef.current = colors }, [colors])
   const particlesRef = useRef<{ x: number; y: number; size: number; hue: number; phase: number }[]>([])
 
-  // Generate particle positions once on mount — avoids the screen bay (x:12-459, y:10-654)
+  // Generate particle positions once on mount — zone-based for even shell coverage
   useEffect(() => {
     const pts: typeof particlesRef.current = []
-    let i = 0, attempts = 0
-    while (pts.length < 200 && attempts < 5000) {
-      attempts++
-      const x = Math.random() * 471
-      const y = Math.random() * 938
-      if (x >= 12 && x <= 459 && y >= 10 && y <= 654) continue
-      pts.push({ x, y, size: Math.random() < 0.7 ? 1 : 2, hue: (i++ * 137.5) % 360, phase: Math.random() })
+
+    function fill(count: number, xMin: number, xMax: number, yMin: number, yMax: number) {
+      const target = pts.length + count
+      let attempts = 0
+      while (pts.length < target && attempts < count * 30) {
+        attempts++
+        const x = xMin + Math.random() * (xMax - xMin)
+        const y = yMin + Math.random() * (yMax - yMin)
+        const rnd = Math.random()
+        pts.push({ x, y, size: rnd < 0.6 ? 2 : rnd < 0.9 ? 3 : 5, hue: (pts.length * 137.5) % 360, phase: Math.random() })
+      }
     }
+
+    fill(30,  0,   471, 0,   37)   // top strip
+    fill(50,  0,   16,  37,  764)  // left strip
+    fill(50,  455, 471, 37,  764)  // right strip
+    fill(270, 0,   471, 764, 938)  // bottom bezel
+
     particlesRef.current = pts
   }, [])
 
@@ -216,11 +226,16 @@ export default function AdanCompanion() {
       background: glitterBases[deviceColor] ?? glitterBases['glitter-gold'],
       backdropFilter: 'blur(0px)',
     }
+    if (isCrystal) return {
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
+    }
     if (isCrystalVariant) {
       const c = crystalVariantBase[deviceColor] ?? 'rgba(200,200,200,0.25)'
       return {
         background: `linear-gradient(135deg,${c} 0%,rgba(255,255,255,0.18) 50%,${c} 100%)`,
-        backdropFilter: 'blur(2px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         border: '6px solid rgba(255,255,255,0.35)',
       }
     }

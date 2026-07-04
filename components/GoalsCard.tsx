@@ -227,7 +227,7 @@ export default function GoalsCard() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
       <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">🏆 Metas</h2>
 
       <div className="space-y-5">

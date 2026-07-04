@@ -36,7 +36,7 @@ export default function TopRail() {
   }
 
   return (
-    <header className="sticky top-0 z-[10000] border-b border-ink-4/10 bg-ink-0/80 backdrop-blur-xl" style={{ viewTransitionName: 'toprail' }}>
+    <header className="sticky top-0 z-[10000]" style={{ viewTransitionName: 'toprail' }}>
       <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-5 px-6" style={{ minHeight: '7rem' }}>
 
         {/* Col 1 — logo, aligned with left rail */}

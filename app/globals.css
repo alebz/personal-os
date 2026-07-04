@@ -81,6 +81,16 @@ input::placeholder { font-family: 'VT323', monospace; font-size: 20px; color: #5
   to   { opacity: 1; }
 }
 
+/* ── Dashboard cards ─────────────────────────────────────────────────────────── */
+.dashboard-card {
+  position: relative;
+  z-index: 2;
+  background-color: rgba(13, 13, 18, 0.60) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  mix-blend-mode: normal !important;
+}
+
 /* ── Modo Discreto ───────────────────────────────────────────────────────────── */
 .modo-discreto [data-sensitive] {
   filter: blur(8px);

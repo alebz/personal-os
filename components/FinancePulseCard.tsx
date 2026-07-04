@@ -150,7 +150,7 @@ export default function FinancePulseCard() {
   }, [])
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 p-4 shadow-xl shadow-black/20 dashboard-card">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[11px] font-bold tracking-widest text-ink-3">

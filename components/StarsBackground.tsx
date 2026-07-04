@@ -16,6 +16,151 @@ const SHOOT_TRAIL = [
 
 const SAT_SHADOW = '-4px 0 0 0 rgba(255,255,255,0.5), 4px 0 0 0 rgba(255,255,255,0.5)'
 
+// ─── Foozle ship assets ───────────────────────────────────────────────────────
+
+const _B = '/Foozle_2DS0011_Void_MainShip/Main Ship'
+
+const SHIP_BASES = [
+  `${_B}/Main Ship - Bases/PNGs/Main Ship - Base - Full health.png`,
+  `${_B}/Main Ship - Bases/PNGs/Main Ship - Base - Slight damage.png`,
+  `${_B}/Main Ship - Bases/PNGs/Main Ship - Base - Damaged.png`,
+  `${_B}/Main Ship - Bases/PNGs/Main Ship - Base - Very damaged.png`,
+]
+
+const SHIP_ENGINES = [
+  { img: `${_B}/Main Ship - Engines/PNGs/Main Ship - Engines - Base Engine.png`,           sheet: `${_B}/Main Ship - Engine Effects/PNGs/Main Ship - Engines - Base Engine - Spritesheet.png`,           frames: 4 },
+  { img: `${_B}/Main Ship - Engines/PNGs/Main Ship - Engines - Big Pulse Engine.png`,       sheet: `${_B}/Main Ship - Engine Effects/PNGs/Main Ship - Engines - Big Pulse Engine - Spritesheet.png`,       frames: 4 },
+  { img: `${_B}/Main Ship - Engines/PNGs/Main Ship - Engines - Burst Engine.png`,           sheet: `${_B}/Main Ship - Engine Effects/PNGs/Main Ship - Engines - Burst Engine - Spritesheet.png`,           frames: 7 },
+  { img: `${_B}/Main Ship - Engines/PNGs/Main Ship - Engines - Supercharged Engine.png`,   sheet: `${_B}/Main Ship - Engine Effects/PNGs/Main Ship - Engines - Supercharged Engine - Spritesheet.png`,   frames: 4 },
+]
+
+// Weapons: horizontal spritesheets, 48px tall per frame (same as ship base)
+// frames = totalWidth / 48
+const SHIP_WEAPONS = [
+  { sheet: `${_B}/Main Ship - Weapons/PNGs/Main Ship - Weapons - Auto Cannon.png`,  frames:  7 },
+  { sheet: `${_B}/Main Ship - Weapons/PNGs/Main Ship - Weapons - Big Space Gun.png`, frames: 12 },
+  { sheet: `${_B}/Main Ship - Weapons/PNGs/Main Ship - Weapons - Rockets.png`,       frames: 17 },
+  { sheet: `${_B}/Main Ship - Weapons/PNGs/Main Ship - Weapons - Zapper.png`,        frames: 14 },
+]
+
+
+// ─── Nairan enemy fleet assets ───────────────────────────────────────────────
+// Engine effects: all 8 frames (width/height = 8). Weapons/shields: width÷frameHeight.
+
+const _N = '/Foozle_2DS0013_Void_EnemyFleet_2/Nairan'
+
+const NAIRAN_SHIPS = [
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Battlecruiser - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Battlecruiser - Engine.png`,
+    weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Battlecruiser - Weapons.png`,  frames:  9 },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Battlecruiser - Shield.png`,   frames:  8 } },
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Bomber - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Bomber - Engine.png`,
+    weapon: null,
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Bomber - Shield.png`,          frames: 10 } },
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Dreadnought - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Dreadnought - Engine.png`,
+    weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Dreadnought - Weapons.png`,    frames: 34 },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Dreadnought - Shield.png`,     frames:  8 } },
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Fighter - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Fighter - Engine.png`,
+    weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Fighter - Weapons.png`,        frames: 28 },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Fighter - Shield.png`,         frames: 20 } },
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Frigate - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Frigate - Engine.png`,
+    weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Frigate - Weapons.png`,        frames:  5 },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Frigate - Shield.png`,         frames:  8 } },
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Scout - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Scout - Engine.png`,
+    weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Scout - Weapons.png`,          frames:  6 },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Scout - Shield.png`,           frames: 18 } },
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Support Ship - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Support Ship - Engine.png`,
+    weapon: null,
+    shield: null },
+  { base: `${_N}/Designs - Base/PNGs/Nairan - Torpedo Ship - Base.png`,
+    engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Torpedo Ship - Engine.png`,
+    weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Torpedo Ship - Weapons.png`,   frames: 12 },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Torpedo Ship - Shield.png`,    frames:  8 } },
+]
+
+// ─── Kla'ed enemy fleet assets ───────────────────────────────────────────────
+// Engine frames vary per ship (10 or 12). Weapons/shields: width÷frameHeight.
+
+const _K = "/Foozle_2DS0012_Void_EnemyFleet_1/Kla'ed"
+
+const KLAED_SHIPS = [
+  { base: `${_K}/Base/PNGs/Kla'ed - Battlecruiser - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Battlecruiser - Engine.png`,  engineFrames: 12,
+    weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Battlecruiser - Weapons.png`, frames: 30 },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Battlecruiser - Shield.png`,   frames: 16 } },
+  { base: `${_K}/Base/PNGs/Kla'ed - Bomber - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Bomber - Engine.png`,         engineFrames: 10,
+    weapon: null,
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Bomber - Shield.png`,          frames:  6 } },
+  { base: `${_K}/Base/PNGs/Kla'ed - Dreadnought - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Dreadnought - Engine.png`,    engineFrames: 12,
+    weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Dreadnought - Weapons.png`,   frames: 60 },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Dreadnought - Shield.png`,     frames: 10 } },
+  { base: `${_K}/Base/PNGs/Kla'ed - Fighter - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Fighter - Engine.png`,        engineFrames: 10,
+    weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Fighter - Weapons.png`,       frames:  6 },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Fighter - Shield.png`,         frames: 10 } },
+  { base: `${_K}/Base/PNGs/Kla'ed - Frigate - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Frigate - Engine.png`,        engineFrames: 12,
+    weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Frigate - Weapons.png`,       frames:  6 },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Frigate - Shield.png`,         frames: 40 } },
+  { base: `${_K}/Base/PNGs/Kla'ed - Scout - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Scout - Engine.png`,          engineFrames: 10,
+    weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Scout - Weapons.png`,         frames:  6 },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Scout - Shield.png`,           frames: 14 } },
+  { base: `${_K}/Base/PNGs/Kla'ed - Support ship - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Support ship - Engine.png`,   engineFrames: 10,
+    weapon: null,
+    shield: null },
+  { base: `${_K}/Base/PNGs/Kla'ed - Torpedo Ship - Base.png`,
+    engineSheet: `${_K}/Engine/PNGs/Kla'ed - Torpedo Ship - Engine.png`,   engineFrames: 10,
+    weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Torpedo Ship - Weapons.png`,  frames: 16 },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Torpedo Ship - Shield.png`,    frames: 10 } },
+]
+
+const SHIP_SPEED     = 2.4
+const WAVE_AMPLITUDE = 16
+const WAVE_FREQUENCY = 0.004
+
+type ShipLayer = { sheet: string; frames: number }
+type ShipCombo = {
+  base: string
+  engineImg: string | null   // Main Ship static engine layer; null for Nairan
+  engineSheet: string
+  engineFrames: number
+  weapon: ShipLayer | null
+  shield: ShipLayer | null
+}
+
+function randomShip(): ShipCombo {
+  const r = Math.random()
+  if (r < 0.25) {
+    // Main Ship (25%)
+    const base   = SHIP_BASES[Math.floor(Math.random() * SHIP_BASES.length)]
+    const engine = SHIP_ENGINES[Math.floor(Math.random() * SHIP_ENGINES.length)]
+    const weapon = Math.random() < 0.65 ? SHIP_WEAPONS[Math.floor(Math.random() * SHIP_WEAPONS.length)] : null
+    return { base, engineImg: engine.img, engineSheet: engine.sheet, engineFrames: engine.frames, weapon, shield: null }
+  }
+  if (r < 0.625) {
+    // Nairan (37.5%)
+    const ship   = NAIRAN_SHIPS[Math.floor(Math.random() * NAIRAN_SHIPS.length)]
+    const weapon = ship.weapon && Math.random() < 0.65 ? ship.weapon : null
+    const shield = ship.shield && Math.random() < 0.50 ? ship.shield : null
+    return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8, weapon, shield }
+  }
+  // Kla'ed (37.5%)
+  const ship   = KLAED_SHIPS[Math.floor(Math.random() * KLAED_SHIPS.length)]
+  const weapon = ship.weapon && Math.random() < 0.65 ? ship.weapon : null
+  const shield = ship.shield && Math.random() < 0.50 ? ship.shield : null
+  return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames, weapon, shield }
+}
+
 // ─── Math helpers ─────────────────────────────────────────────────────────────
 
 function mulberry32(seed: number) {
@@ -69,11 +214,9 @@ function pickEvent(night: boolean): string {
   const pool = [
     { type: 'shooting-star', w: 28 },
     { type: 'airplane',      w: 24 },
-    { type: 'spaceship',     w: 18 },
     { type: 'satellite',     w: 18 },
     { type: 'comet',         w: 14 },
     { type: 'saturn', w: (now - (lastRare['saturn'] ?? 0) < RARE_COOLDOWN_MS) ? 0 : (night ? 4 : 2) },
-    { type: 'ufo',    w: (now - (lastRare['ufo']    ?? 0) < RARE_COOLDOWN_MS) ? 0 : (night ? 2 : 1) },
   ]
   const total = pool.reduce((s, e) => s + e.w, 0)
   let r = Math.random() * total
@@ -173,243 +316,179 @@ function CometSVG() {
   )
 }
 
-// ─── SVG: Fighter Ship (pixel-art, rect-only) ────────────────────────────────
+// ─── Foozle composite ship ────────────────────────────────────────────────────
 //
-// Body: x=0..108, y=4..28. Wings extend to y=-8/y=37. Thruster at x=-50..0.
-// Trail extends x=-250..-50. viewBox "-250 -8 358 45" → width 179, height 23 (0.5 scale).
+// Sprite nose points RIGHT by default.
+// Orientation + banking are handled entirely by the flight keyframes injected
+// per-pass (scaleX(-1) for LTR, scaleX(1) for RTL, small rotate() for banking).
+//
+// Trail extends RIGHT in local space so it appears BEHIND after scaleX flip:
+//   LTR (scaleX(-1)) → trail flips to LEFT  = behind the ship ✓
+//   RTL (scaleX(+1)) → trail stays at RIGHT = behind the ship ✓
+//
+// All spritesheets clipped via background-image so only first frame (or animated
+// frame sequence) is visible — no bleed from adjacent frames.
+//
+// Engine effect frames are 48×96 (natural). Container is 48×48, so we use
+// background-size: N*100% 200% to render at natural 96px height; the 48px
+// container clips to the top 48px = ship-body overlay only (no squish artifact).
+//
+// Weapons are 48px-tall spritesheets; shown as static first frame in a 48×48 div.
 
-function SpaceshipSVG({ rtl }: { rtl: boolean }) {
+function FoozleShip({ combo }: { combo: ShipCombo }) {
+  const { base, engineImg, engineSheet, engineFrames, weapon, shield } = combo
+  // Main Ship effects are 2× tall (96px natural); clip to 48px with 200% height.
+  // Nairan effects are square; render at 100% height.
+  const engineSizeY = engineImg ? '200%' : '100%'
+  const anim = engineFrames === 7  ? 'engineCycle7  0.875s steps(7,  end) infinite'
+             : engineFrames === 8  ? 'engineCycle8  1s     steps(8,  end) infinite'
+             : engineFrames === 10 ? 'engineCycle10 1.25s  steps(10, end) infinite'
+             : engineFrames === 12 ? 'engineCycle12 1.5s   steps(12, end) infinite'
+             : 'engineCycle4 0.5s steps(4, end) infinite'
+
   return (
-    <svg
-      width="90" height="12"
-      viewBox="-250 -8 358 45"
-      style={{ display: 'block', imageRendering: 'pixelated', transform: rtl ? 'scaleX(-1)' : undefined }}
-      shapeRendering="crispEdges"
-    >
-      <defs>
-        <style>{`
-          @keyframes fl1 { 0%,100%{opacity:1} 50%{opacity:0.4} }
-          @keyframes fl2 { 0%,100%{opacity:0.6} 50%{opacity:1} }
-          @keyframes fl3 { 0%,100%{opacity:0.3} 66%{opacity:0.7} }
-          .fl1{animation:fl1 0.12s ease-in-out infinite}
-          .fl2{animation:fl2 0.10s ease-in-out infinite}
-          .fl3{animation:fl3 0.15s ease-in-out infinite}
-        `}</style>
-        <linearGradient id="fighter-trail" x1="-250" y1="15" x2="-50" y2="15" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="rgba(255,0,170,0)"   />
-          <stop offset="100%" stopColor="rgba(255,0,170,0.4)" />
-        </linearGradient>
-      </defs>
-
-      {/* Dotted magenta trail */}
-      <line x1="-250" y1="15" x2="-50" y2="15"
-        stroke="url(#fighter-trail)"
-        strokeDasharray="3 6"
-        strokeWidth="2"
-      />
-
-      {/* Thruster flames */}
-      <g>
-        <rect className="fl1" x="-10" y="13" width="10" height="4" fill="#ffffff"/>
-        <rect className="fl2" x="-18" y="13" width="10" height="4" fill="#ffcc00"/>
-        <rect className="fl1" x="-26" y="14" width="10" height="3" fill="#ff8800"/>
-        <rect className="fl3" x="-34" y="14" width="10" height="3" fill="#ff4400"/>
-        <rect className="fl2" x="-42" y="15" width="10" height="2" fill="#ff6600" opacity={0.6}/>
-        <rect className="fl3" x="-50" y="15" width="8"  height="2" fill="#ff4400" opacity={0.3}/>
-      </g>
-
-      {/* Body */}
-      <rect x="0"   y="10" width="8"  height="10" fill="#e0e0ff"/>
-      <rect x="8"   y="6"  width="16" height="18" fill="#ffffff"/>
-      <rect x="24"  y="4"  width="24" height="22" fill="#ffffff"/>
-      <rect x="48"  y="6"  width="20" height="18" fill="#ffffff"/>
-      <rect x="68"  y="8"  width="16" height="14" fill="#f0f0ff"/>
-      <rect x="84"  y="10" width="10" height="10" fill="#e0e0ee"/>
-      <rect x="94"  y="12" width="8"  height="7"  fill="#d0d0dd"/>
-      <rect x="102" y="13" width="6"  height="5"  fill="#c0c0cc"/>
-
-      {/* Magenta stripe */}
-      <rect x="0" y="17" width="104" height="3" fill="#ff00aa"/>
-
-      {/* Wings top */}
-      <rect x="16" y="0"  width="8" height="6" fill="#ffffff"/>
-      <rect x="8"  y="-4" width="8" height="6" fill="#f0f0ff"/>
-      <rect x="0"  y="-6" width="8" height="6" fill="#e0e0ff"/>
-
-      {/* Wings bottom */}
-      <rect x="16" y="24" width="8" height="6" fill="#ffffff"/>
-      <rect x="8"  y="28" width="8" height="6" fill="#f0f0ff"/>
-      <rect x="0"  y="30" width="8" height="6" fill="#e0e0ff"/>
-
-      {/* Magenta wing tips */}
-      <rect x="0" y="-8" width="8" height="3" fill="#ff00aa"/>
-      <rect x="0" y="34" width="8" height="3" fill="#ff00aa"/>
-
-      {/* Cockpit */}
-      <rect x="60" y="4" width="20" height="8" fill="#334466"/>
-      <rect x="62" y="5" width="6"  height="4" fill="#5577aa" opacity={0.7}/>
-    </svg>
+    <div style={{ position: 'relative', width: 48, height: 48, overflow: 'visible' }}>
+      {/* Trail extends UP in local space = LEFT in world at angle≈0 (behind ship moving right) */}
+      <svg width="4" height="200" style={{ position: 'absolute', left: 22, top: -200, display: 'block', overflow: 'visible' }}>
+        <defs>
+          <linearGradient id="foozle-trail" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor="rgba(255,0,170,0)"    />
+            <stop offset="100%" stopColor="rgba(255,0,170,0.45)" />
+          </linearGradient>
+        </defs>
+        <line x1="2" y1="0" x2="2" y2="200" stroke="url(#foozle-trail)" strokeDasharray="3 6" strokeWidth="2" />
+      </svg>
+      {/* Layer 1: Engine effect (animated spritesheet) */}
+      <div style={{
+        position: 'absolute', inset: 0, width: 48, height: 48,
+        backgroundImage: `url("${engineSheet}")`,
+        backgroundSize: `${engineFrames * 100}% ${engineSizeY}`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: '0% 0%',
+        imageRendering: 'pixelated',
+        animation: anim,
+      }} />
+      {/* Layer 2: Engine base static — Main Ship only */}
+      {engineImg && (
+        <img src={engineImg} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
+      )}
+      {/* Layer 3: Ship base */}
+      <img src={base} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
+      {/* Layer 4: Weapon — static first frame */}
+      {weapon && (
+        <div style={{
+          position: 'absolute', inset: 0, width: 48, height: 48,
+          backgroundImage: `url("${weapon.sheet}")`,
+          backgroundSize: `${weapon.frames * 100}% 100%`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: '0% 0%',
+          imageRendering: 'pixelated',
+        }} />
+      )}
+      {/* Layer 5: Shield — static first frame */}
+      {shield && (
+        <div style={{
+          position: 'absolute', inset: 0, width: 48, height: 48,
+          backgroundImage: `url("${shield.sheet}")`,
+          backgroundSize: `${shield.frames * 100}% 100%`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: '0% 0%',
+          imageRendering: 'pixelated',
+        }} />
+      )}
+    </div>
   )
 }
 
-// ─── SVG: OVNI (pixel-art, rect-only, bottom-up perspective) ─────────────────
+// ─── RAF ship (constant-speed, sine-wave path, nose tracks heading) ──────────
 
-// 8 rim lights chasing clockwise around the visible disc edge
-type OvniLight = { x: number; y: number; c: string; d: number }
-const OVNI_LIGHTS: OvniLight[] = [
-  { x:  2, y: 12, c: '#4de039', d: 0.00 }, // lime   — top-left rim
-  { x:  4, y: 18, c: '#ff8c00', d: 0.22 }, // orange — mid-left
-  { x:  8, y: 23, c: '#33c8f4', d: 0.44 }, // cyan   — lower-mid-left
-  { x: 14, y: 27, c: '#f427b4', d: 0.66 }, // pink   — lower-left
-  { x: 38, y: 27, c: '#4de039', d: 0.88 }, // lime   — lower-right
-  { x: 43, y: 23, c: '#ff8c00', d: 1.10 }, // orange — lower-mid-right
-  { x: 47, y: 18, c: '#33c8f4', d: 1.32 }, // cyan   — mid-right
-  { x: 49, y: 12, c: '#f427b4', d: 1.54 }, // pink   — top-right rim
-]
+type ShipDir = 'ltr' | 'rtl' | 'ttb' | 'btt'
 
-// Window slots: [frameX, frameY] — red-orange with yellow glass
-const OVNI_WINS = [
-  [ 8, 12], [17, 11], [25, 10], [33, 11], [42, 12],
-] as const
+function RafShip() {
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const shipComboRef  = useRef<ShipCombo>(randomShip())
+  const [shipKey, setShipKey] = useState(0)
 
-function OvniSVG() {
+  useEffect(() => {
+    let raf: number
+    let cooldownTimer: ReturnType<typeof setTimeout> | null = null
+    let active = true
+
+    function newPass() {
+      const dirs: ShipDir[] = ['ltr', 'rtl', 'ttb', 'btt']
+      const dir = dirs[Math.floor(Math.random() * 4)]
+      const W = window.innerWidth
+      const H = window.innerHeight
+      let primary: number
+      let baseSecondary: number
+      if (dir === 'ltr')      { primary = -100;    baseSecondary = 100 + Math.random() * (H - 200) }
+      else if (dir === 'rtl') { primary = W + 100; baseSecondary = 100 + Math.random() * (H - 200) }
+      else if (dir === 'ttb') { primary = -100;    baseSecondary = 100 + Math.random() * (W - 200) }
+      else                    { primary = H + 100; baseSecondary = 100 + Math.random() * (W - 200) }
+      const phase1 = Math.random() * Math.PI * 2
+      const phase2 = Math.random() * Math.PI * 2
+      const wave0 = Math.sin(primary * WAVE_FREQUENCY + phase1) * WAVE_AMPLITUDE
+                  + Math.sin(primary * WAVE_FREQUENCY * 2.3 + phase2) * (WAVE_AMPLITUDE * 0.3)
+      const sec0 = baseSecondary + wave0
+      const prevX = dir === 'ltr' || dir === 'rtl' ? primary : sec0
+      const prevY = dir === 'ltr' || dir === 'rtl' ? sec0    : primary
+      return { dir, primary, baseSecondary, phase1, phase2, prevX, prevY }
+    }
+
+    const s = newPass()
+
+    function tick() {
+      const W = window.innerWidth
+      const H = window.innerHeight
+      s.primary += (s.dir === 'rtl' || s.dir === 'btt') ? -SHIP_SPEED : SHIP_SPEED
+
+      const wave = Math.sin(s.primary * WAVE_FREQUENCY + s.phase1) * WAVE_AMPLITUDE
+                 + Math.sin(s.primary * WAVE_FREQUENCY * 2.3 + s.phase2) * (WAVE_AMPLITUDE * 0.3)
+      const secondary = s.baseSecondary + wave
+      const x = s.dir === 'ltr' || s.dir === 'rtl' ? s.primary : secondary
+      const y = s.dir === 'ltr' || s.dir === 'rtl' ? secondary  : s.primary
+
+      const angle = Math.atan2(y - s.prevY, x - s.prevX) * (180 / Math.PI)
+      s.prevX = x
+      s.prevY = y
+
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate(${x}px, ${y}px) rotate(${angle + 90}deg)`
+      }
+
+      const exited = s.dir === 'ltr' ? x > W + 100
+                   : s.dir === 'rtl' ? x < -100
+                   : s.dir === 'ttb' ? y > H + 100
+                   : y < -100
+
+      if (exited) {
+        if (containerRef.current) containerRef.current.style.visibility = 'hidden'
+        cooldownTimer = setTimeout(() => {
+          if (!active) return
+          Object.assign(s, newPass())
+          shipComboRef.current = randomShip()
+          setShipKey(k => k + 1)
+          if (containerRef.current) containerRef.current.style.visibility = 'visible'
+          raf = requestAnimationFrame(tick)
+        }, (15 + Math.random() * 10) * 1000)
+        return
+      }
+
+      raf = requestAnimationFrame(tick)
+    }
+
+    raf = requestAnimationFrame(tick)
+    return () => {
+      active = false
+      cancelAnimationFrame(raf)
+      if (cooldownTimer !== null) clearTimeout(cooldownTimer)
+    }
+  }, [])
+
   return (
-    <svg
-      width="28" height="24"
-      viewBox="0 0 56 48"
-      style={{ display: 'block', imageRendering: 'pixelated', overflow: 'visible' }}
-      shapeRendering="crispEdges"
-    >
-      <defs>
-        <filter id="ovni-glow" x="-150%" y="-150%" width="400%" height="400%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur"/>
-          <feMerge>
-            <feMergeNode in="blur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-        <style>{`
-          @keyframes ovni-chase {
-            0%,100% { opacity: 0.2; }
-            10%      { opacity: 1;   }
-            28%      { opacity: 0.2; }
-          }
-          @keyframes ovni-beam {
-            0%,100% { opacity: 0.28; }
-            50%      { opacity: 0.55; }
-          }
-        `}</style>
-      </defs>
-
-      {/* ── Tractor beams (behind disc) ── */}
-      {([
-        [17, 6], [26, 7], [35, 6],
-      ] as [number, number][]).map(([cx, w0], bi) =>
-        Array.from({ length: 9 }, (_, i) => {
-          const w  = Math.max(1, w0 - i)
-          const op = Math.max(0.04, 0.52 - i * 0.055)
-          return (
-            <rect
-              key={`b${bi}${i}`}
-              x={cx - Math.floor(w / 2)} y={38 + i} width={w} height={1}
-              fill="#2a6040" opacity={op}
-              style={{ animation: `ovni-beam 2.3s ${(bi * 0.28).toFixed(2)}s ease-in-out infinite` }}
-            />
-          )
-        })
-      )}
-
-      {/* ── Top magenta cap ── */}
-      <rect x={20} y={4}  width={16} height={1} fill="#e0128e"/>
-      <rect x={14} y={5}  width={28} height={1} fill="#e0128e"/>
-
-      {/* ── Gold outer band ── */}
-      <rect x={10} y={6}  width={36} height={1} fill="#f4c430"/>
-      <rect x={6}  y={7}  width={44} height={1} fill="#f4c430"/>
-      <rect x={4}  y={8}  width={48} height={1} fill="#f4c430"/>
-      <rect x={2}  y={9}  width={52} height={1} fill="#f4c430"/>
-
-      {/* ── Outer hull — dark purple, full disc extent row-by-row ── */}
-      <rect x={2}  y={10} width={52} height={1} fill="#2d1f4a"/>
-      <rect x={2}  y={11} width={52} height={1} fill="#2d1f4a"/>
-      <rect x={2}  y={12} width={52} height={3} fill="#2d1f4a"/>
-      <rect x={2}  y={15} width={52} height={3} fill="#2d1f4a"/>
-      <rect x={4}  y={18} width={48} height={2} fill="#2d1f4a"/>
-      <rect x={6}  y={20} width={44} height={2} fill="#2d1f4a"/>
-      <rect x={8}  y={22} width={40} height={2} fill="#2d1f4a"/>
-      <rect x={10} y={24} width={36} height={2} fill="#2d1f4a"/>
-      <rect x={14} y={26} width={28} height={2} fill="#2d1f4a"/>
-      <rect x={18} y={28} width={20} height={2} fill="#2d1f4a"/>
-      <rect x={22} y={30} width={12} height={2} fill="#2d1f4a"/>
-      <rect x={24} y={32} width={8}  height={2} fill="#2d1f4a"/>
-      <rect x={26} y={34} width={4}  height={2} fill="#2d1f4a"/>
-      <rect x={27} y={36} width={2}  height={1} fill="#2d1f4a"/>
-
-      {/* ── Navy ring 1 (inset 4px each side) ── */}
-      <rect x={6}  y={10} width={44} height={6} fill="#1e1840"/>
-      <rect x={8}  y={16} width={40} height={2} fill="#1e1840"/>
-      <rect x={10} y={18} width={36} height={2} fill="#1e1840"/>
-      <rect x={12} y={20} width={32} height={2} fill="#1e1840"/>
-      <rect x={14} y={22} width={28} height={2} fill="#1e1840"/>
-      <rect x={16} y={24} width={24} height={2} fill="#1e1840"/>
-      <rect x={18} y={26} width={20} height={2} fill="#1e1840"/>
-      <rect x={20} y={28} width={16} height={2} fill="#1e1840"/>
-      <rect x={22} y={30} width={12} height={2} fill="#1e1840"/>
-
-      {/* ── Navy ring 2 (inset 8px each side) ── */}
-      <rect x={10} y={10} width={36} height={6} fill="#17153a"/>
-      <rect x={12} y={16} width={32} height={2} fill="#17153a"/>
-      <rect x={14} y={18} width={28} height={2} fill="#17153a"/>
-      <rect x={16} y={20} width={24} height={2} fill="#17153a"/>
-      <rect x={18} y={22} width={20} height={2} fill="#17153a"/>
-      <rect x={20} y={24} width={16} height={2} fill="#17153a"/>
-      <rect x={22} y={26} width={12} height={2} fill="#17153a"/>
-      <rect x={24} y={28} width={8}  height={2} fill="#17153a"/>
-
-      {/* ── Magenta inner ring (inset 12px each side) ── */}
-      <rect x={14} y={10} width={28} height={6} fill="#7a1260"/>
-      <rect x={16} y={16} width={24} height={2} fill="#7a1260"/>
-      <rect x={18} y={18} width={20} height={2} fill="#7a1260"/>
-      <rect x={20} y={20} width={16} height={2} fill="#7a1260"/>
-      <rect x={22} y={22} width={12} height={2} fill="#7a1260"/>
-      <rect x={24} y={24} width={8}  height={2} fill="#7a1260"/>
-      <rect x={26} y={26} width={4}  height={2} fill="#7a1260"/>
-
-      {/* ── Dark center (inset 16px each side) ── */}
-      <rect x={18} y={10} width={20} height={6} fill="#0e0e22"/>
-      <rect x={20} y={16} width={16} height={2} fill="#0e0e22"/>
-      <rect x={22} y={18} width={12} height={2} fill="#0e0e22"/>
-      <rect x={24} y={20} width={8}  height={2} fill="#0e0e22"/>
-      <rect x={26} y={22} width={4}  height={2} fill="#0e0e22"/>
-
-      {/* ── Center portal — darkest oval ── */}
-      <rect x={22} y={14} width={12} height={2} fill="#07071a"/>
-      <rect x={20} y={16} width={16} height={4} fill="#07071a"/>
-      <rect x={22} y={20} width={12} height={2} fill="#07071a"/>
-
-      {/* ── Window band (y=10-15, overlaid on disc rings) ── */}
-      {/* Red-orange band base */}
-      <rect x={6} y={10} width={44} height={6} fill="#6a1e22" opacity={0.9}/>
-      {/* Window frames */}
-      {OVNI_WINS.map(([wx, wy]) => (
-        <rect key={`wf${wx}`} x={wx} y={wy} width={6} height={5} fill="#a83020"/>
-      ))}
-      {/* Window glass */}
-      {OVNI_WINS.map(([wx, wy]) => (
-        <rect key={`wg${wx}`} x={wx + 1} y={wy + 1} width={4} height={3} fill="#f4b800"/>
-      ))}
-
-      {/* ── Colored rim lights (chasing clockwise) ── */}
-      {OVNI_LIGHTS.map((l, i) => (
-        <rect
-          key={i}
-          x={l.x} y={l.y} width={3} height={3}
-          fill={l.c}
-          filter="url(#ovni-glow)"
-          style={{ animation: `ovni-chase 1.8s ${l.d.toFixed(2)}s ease-in-out infinite` }}
-        />
-      ))}
-    </svg>
+    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform' }}>
+      <FoozleShip combo={shipComboRef.current} />
+    </div>
   )
 }
 
@@ -420,8 +499,6 @@ type PlaneEvt  = { x0: number; y0: number; x1: number; y1: number; angle: number
 type SatEvt    = { y: number; rtl: boolean; key: string }
 type SaturnEvt = { x0: number; y0: number; x1: number; y1: number; duration: number; key: string }
 type CometEvt  = { x0: number; y0: number; x1: number; y1: number; angle: number; duration: number; key: string }
-type OvniEvt   = { duration: number; key: string }
-type ShipEvt   = { rtl: boolean; y0: number; y1: number; duration: number; key: string }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -433,13 +510,10 @@ export function StarsBackground() {
   const [satEvent,    setSatEvent]    = useState<SatEvt    | null>(null)
   const [saturnEvent, setSaturnEvent] = useState<SaturnEvt | null>(null)
   const [cometEvent,  setCometEvent]  = useState<CometEvt  | null>(null)
-  const [ovniEvent,   setOvniEvent]   = useState<OvniEvt   | null>(null)
-  const [shipEvent,   setShipEvent]   = useState<ShipEvt   | null>(null)
 
   const mountedRef    = useRef(true)
   const schedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clearTimers    = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  const ovniStyleRef   = useRef<HTMLStyleElement | null>(null)
 
   // ── Stars (generated once on mount) ───────────────────────────────────────
   useEffect(() => {
@@ -512,57 +586,14 @@ export function StarsBackground() {
       return 0
     }
 
-    function fireOvni(): number {
-      const rtl = Math.random() < 0.5
-      const x0  = rtl ? 108 : -8
-      const y0  = 10 + Math.random() * 40
-      const x1  = 20 + Math.random() * 60
-      const y1  = 8  + Math.random() * 45
-      const x2  = rtl ? -12 : 112
-      const y2  = 5  + Math.random() * 50
-      const dur = 180 + Math.random() * 120
-      const key = `ovni-${Date.now()}`
-
-      if (ovniStyleRef.current) ovniStyleRef.current.remove()
-      const style = document.createElement('style')
-      style.innerHTML = `
-        @keyframes ${key} {
-          0%   { transform: translate(${x0}vw, ${y0}vh); opacity: 0;   }
-          5%   {                                           opacity: 0.9; }
-          38%  { transform: translate(${x1}vw, ${y1}vh);               }
-          42%  { transform: translate(${x1}vw, ${y1}vh);               }
-          95%  {                                           opacity: 0.9; }
-          100% { transform: translate(${x2}vw, ${y2}vh); opacity: 0;   }
-        }
-      `
-      document.head.appendChild(style)
-      ovniStyleRef.current = style
-
-      setOvniEvent({ duration: dur, key })
-      setClear('ovni', () => setOvniEvent(null), dur * 1000 + 2000)
-      return dur * 1000
-    }
-
-    function fireShip(): number {
-      const rtl = Math.random() < 0.5
-      const y0  = 8 + Math.random() * 60
-      const y1  = 8 + Math.random() * 60
-      const dur = 10 + Math.random() * 15
-      setShipEvent({ rtl, y0, y1, duration: dur, key: `ship-${Date.now()}` })
-      setClear('ship', () => setShipEvent(null), dur * 1000 + 2000)
-      return 0
-    }
-
     function fireEvent(type: string): number {
       if (!mountedRef.current) return 0
       switch (type) {
         case 'shooting-star': return fireStar()
         case 'satellite':     return fireSat()
         case 'airplane':      return firePlane()
-        case 'spaceship':     return fireShip()
         case 'comet':         return fireComet()
         case 'saturn':        lastRare['saturn'] = Date.now(); return fireSaturn()
-        case 'ufo':           lastRare['ufo']    = Date.now(); return fireOvni()
         default:              return 0
       }
     }
@@ -576,20 +607,39 @@ export function StarsBackground() {
       }, extraMs + gap)
     }
 
-    // Fire spaceship on load so the sky feels alive immediately
-    setTimeout(() => { if (mountedRef.current) fireShip() }, 1200)
     scheduleNext(5000)
 
     return () => {
       if (schedTimerRef.current) clearTimeout(schedTimerRef.current)
       Object.values(clearTimers.current).forEach(clearTimeout)
-      if (ovniStyleRef.current) ovniStyleRef.current.remove()
     }
   }, [])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
+      <style>{`
+        @keyframes engineCycle4 {
+          from { background-position: 0% 0%; }
+          to   { background-position: 133.33% 0%; }
+        }
+        @keyframes engineCycle7 {
+          from { background-position: 0% 0%; }
+          to   { background-position: 116.67% 0%; }
+        }
+        @keyframes engineCycle8 {
+          from { background-position: 0% 0%; }
+          to   { background-position: 114.29% 0%; }
+        }
+        @keyframes engineCycle10 {
+          from { background-position: 0% 0%; }
+          to   { background-position: 111.11% 0%; }
+        }
+        @keyframes engineCycle12 {
+          from { background-position: 0% 0%; }
+          to   { background-position: 109.09% 0%; }
+        }
+      `}</style>
       {/*
         Star field — 150vw×150vh centered on the viewport.
         transformOrigin 50%/50% maps to viewport center so sky-rotate is correct.
@@ -601,7 +651,7 @@ export function StarsBackground() {
           top: '-25vh', left: '-25vw',
           width: '150vw', height: '150vh',
           pointerEvents: 'none',
-          zIndex: 9998,
+          zIndex: 0,
           mixBlendMode: 'screen',
           transformOrigin: '50% 50%',
           animation: 'sky-rotate 3600s linear infinite',
@@ -628,7 +678,7 @@ export function StarsBackground() {
         aria-hidden="true"
         style={{
           position: 'fixed', inset: 0, pointerEvents: 'none',
-          zIndex: 9999, mixBlendMode: 'screen', overflow: 'hidden',
+          zIndex: 1, mixBlendMode: 'screen', overflow: 'hidden',
           viewTransitionName: 'stars-events',
         } as React.CSSProperties}
       >
@@ -737,35 +787,10 @@ export function StarsBackground() {
           </div>
         )}
 
-        {/* Spaceship */}
-        {shipEvent && (
-          <div
-            key={shipEvent.key}
-            style={{
-              position: 'absolute', top: 0, left: 0,
-              animation: `plane-travel ${shipEvent.duration}s linear 1 forwards`,
-              ['--px0' as string]: shipEvent.rtl ? '108vw' : '-5vw',
-              ['--py0' as string]: `${shipEvent.y0}vh`,
-              ['--px1' as string]: shipEvent.rtl ? '-5vw'  : '108vw',
-              ['--py1' as string]: `${shipEvent.y1}vh`,
-            } as React.CSSProperties}
-          >
-            <SpaceshipSVG rtl={shipEvent.rtl} />
-          </div>
-        )}
+        {/* Spaceship — RAF-animated, always present */}
+        <RafShip />
 
-        {/* OVNI */}
-        {ovniEvent && (
-          <div
-            key={ovniEvent.key}
-            style={{
-              position: 'absolute', top: 0, left: 0,
-              animation: `${ovniEvent.key} ${ovniEvent.duration}s linear 1 forwards`,
-            }}
-          >
-            <OvniSVG />
-          </div>
-        )}
+
       </div>
     </>
   )
