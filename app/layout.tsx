@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { unstable_ViewTransition as ViewTransition } from "react";
 import "./globals.css";
 import { StarsBackground } from "@/components/StarsBackground";
+import { OSSettingsProvider } from "@/components/OSSettingsContext";
+import AdanCompanionWrapper from "@/components/AdanCompanionWrapper";
 
 export const metadata: Metadata = {
   title: "personal-os",
@@ -21,8 +23,11 @@ export default function RootLayout({
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Press+Start+2P&family=VT323&display=swap" />
       </head>
       <body className="bg-ink-0 text-ink-4 antialiased">
-        <StarsBackground />
-        <ViewTransition>{children}</ViewTransition>
+        <OSSettingsProvider>
+          <StarsBackground />
+          <AdanCompanionWrapper />
+          <ViewTransition>{children}</ViewTransition>
+        </OSSettingsProvider>
       </body>
     </html>
   );

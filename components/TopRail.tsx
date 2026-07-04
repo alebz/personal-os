@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Clock from '@/components/Clock'
+import { useOSSettings } from '@/components/OSSettingsContext'
+import OSSettings from '@/components/OSSettings'
 
 const TABS = [
   { label: 'Inicio',    href: '/',          color: null },
@@ -18,28 +19,13 @@ const TABS = [
 export default function TopRail() {
   const pathname   = usePathname()
   const clockColor = TABS.find(t => t.href === pathname)?.color ?? '#ffffff'
-  const [discreto, setDiscreto] = useState(false)
-
-  useEffect(() => {
-    const saved = localStorage.getItem('modo_discreto') === 'true'
-    setDiscreto(saved)
-    document.body.classList.toggle('modo-discreto', saved)
-  }, [])
-
-  function toggleDiscreto() {
-    setDiscreto(prev => {
-      const next = !prev
-      localStorage.setItem('modo_discreto', String(next))
-      document.body.classList.toggle('modo-discreto', next)
-      return next
-    })
-  }
+  const { toggleSettings, settingsOpen } = useOSSettings()
 
   return (
     <header className="sticky top-0 z-[10000]" style={{ viewTransitionName: 'toprail' }}>
       <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-5 px-6" style={{ minHeight: '7rem' }}>
 
-        {/* Col 1 — logo, aligned with left rail */}
+        {/* Col 1 — logo */}
         <div className="col-span-3 flex items-center">
           <Link href="/" className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -51,7 +37,7 @@ export default function TopRail() {
           </Link>
         </div>
 
-        {/* Col 2 — nav, aligned with center stage */}
+        {/* Col 2 — nav + gear */}
         <div className="col-span-6 hidden items-center justify-center gap-3 md:flex">
           <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1.5 backdrop-blur-xl">
             {TABS.map(({ label, href, color }) => {
@@ -88,20 +74,36 @@ export default function TopRail() {
             })}
           </nav>
           <button
-            onClick={toggleDiscreto}
-            title={discreto ? 'Desactivar modo discreto' : 'Activar modo discreto'}
-            style={{ fontSize: 18, opacity: discreto ? 1 : 0.4, transition: 'opacity 200ms ease', lineHeight: 1, position: 'relative', zIndex: 9998, pointerEvents: 'auto' }}
+            onClick={toggleSettings}
+            title="Ajustes del sistema"
+            style={{
+              fontSize:   18,
+              lineHeight: 1,
+              opacity:    settingsOpen ? 1 : 0.45,
+              transition: 'opacity 200ms ease, transform 300ms ease',
+              transform:  settingsOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+              position:   'relative',
+              zIndex:     10002,
+              pointerEvents: 'auto',
+              background: 'none',
+              border:     'none',
+              cursor:     'pointer',
+              padding:    0,
+            }}
           >
-            {discreto ? '🙈' : '👁'}
+            ⚙
           </button>
         </div>
 
-        {/* Col 3 — clock, aligned with right rail */}
+        {/* Col 3 — clock */}
         <div className="col-span-3 flex items-center justify-end">
           <Clock color={clockColor} />
         </div>
 
       </div>
+
+      {/* Settings panel (fixed-position, rendered here for co-location with gear button) */}
+      <OSSettings />
     </header>
   )
 }

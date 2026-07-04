@@ -159,7 +159,7 @@ export default function HealthPage() {
               {stats.map(h => (
                 <div
                   key={h.id}
-                  className="rounded-2xl border border-ink-4/10 bg-ink-1/85 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl"
+                  className="rounded-2xl border border-ink-4/10 bg-ink-1/85 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card"
                 >
                   <p className="mb-2.5 truncate text-xs font-semibold text-ink-4">{h.label}</p>
                   <div className="flex items-end justify-between gap-1">
@@ -183,7 +183,7 @@ export default function HealthPage() {
             </div>
 
             {/* Heatmap grid */}
-            <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
+            <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
               <div className="overflow-x-auto">
                 <div className="min-w-[540px] p-5">
 

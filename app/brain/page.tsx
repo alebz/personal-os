@@ -115,7 +115,7 @@ function ChunkCard({ chunk, index }: { chunk: MemoryChunk; index?: number }) {
   const body = !expanded && long ? chunk.content.slice(0, 260) + '…' : chunk.content
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-lg shadow-black/10 backdrop-blur-xl">
+    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="flex items-center gap-3 border-b border-ink-4/5 px-4 py-2.5">
         {index !== undefined && (
           <span className="min-w-[1.5rem] text-center text-xs font-mono text-ink-3/60">
@@ -155,7 +155,7 @@ function PatternCard({ insight, index }: { insight: PatternInsight; index: numbe
 
   return (
     <div
-      className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-lg shadow-black/10 backdrop-blur-xl"
+      className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card"
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -211,7 +211,7 @@ function NoteCard({
   return (
     <div
       onClick={onEdit}
-      className="break-inside-avoid mb-3 cursor-pointer overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-lg shadow-black/10 backdrop-blur-xl transition-colors hover:border-accent/20 group"
+      className="break-inside-avoid mb-3 cursor-pointer overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-lg shadow-black/10 backdrop-blur-xl transition-colors hover:border-accent/20 group dashboard-card"
     >
       <h3 className="mb-1.5 text-sm font-semibold leading-snug text-ink-4">{note.title}</h3>
 
@@ -701,7 +701,7 @@ export default function BrainPage() {
 
             {/* Ask mode — streaming answer */}
             {mode === 'ask' && hasAnswer && (
-              <div className="mb-8 overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl">
+              <div className="mb-8 overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
                 <div className="border-b border-ink-4/5 px-5 py-3">
                   <span className="text-xs font-medium text-accent">✨ Respuesta</span>
                 </div>

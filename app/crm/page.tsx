@@ -339,7 +339,7 @@ function KanbanView({
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {TIERS.map((tier) => (
-        <div key={tier.id} className={`rounded-2xl border bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl ${tier.borderCls}`}>
+        <div key={tier.id} className={`rounded-2xl border bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card ${tier.borderCls}`}>
           <KanbanColumn
             tier={tier}
             tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
@@ -389,7 +389,7 @@ function SmartView({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-6 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-6 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -487,7 +487,7 @@ function CategoryView({
         const done = group.tasks.filter((t) => t.completed_at)
 
         return (
-          <div key={group.name} className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div key={group.name} className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <div className="mb-4 flex items-center gap-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">{group.name}</h3>
               {open.length > 0 && (

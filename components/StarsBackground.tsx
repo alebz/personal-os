@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useOSSettings } from './OSSettingsContext'
+import type { Fleet } from './OSSettingsContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -138,27 +140,66 @@ type ShipCombo = {
   shield: ShipLayer | null
 }
 
-function randomShip(): ShipCombo {
-  const r = Math.random()
-  if (r < 0.25) {
-    // Main Ship (25%)
+function randomShip(fleet: Fleet = 'all'): ShipCombo {
+  const pickMain = () => {
     const base   = SHIP_BASES[Math.floor(Math.random() * SHIP_BASES.length)]
     const engine = SHIP_ENGINES[Math.floor(Math.random() * SHIP_ENGINES.length)]
     const weapon = Math.random() < 0.65 ? SHIP_WEAPONS[Math.floor(Math.random() * SHIP_WEAPONS.length)] : null
     return { base, engineImg: engine.img, engineSheet: engine.sheet, engineFrames: engine.frames, weapon, shield: null }
   }
-  if (r < 0.625) {
-    // Nairan (37.5%)
+  const pickNairan = () => {
     const ship   = NAIRAN_SHIPS[Math.floor(Math.random() * NAIRAN_SHIPS.length)]
     const weapon = ship.weapon && Math.random() < 0.65 ? ship.weapon : null
     const shield = ship.shield && Math.random() < 0.50 ? ship.shield : null
     return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8, weapon, shield }
   }
-  // Kla'ed (37.5%)
-  const ship   = KLAED_SHIPS[Math.floor(Math.random() * KLAED_SHIPS.length)]
-  const weapon = ship.weapon && Math.random() < 0.65 ? ship.weapon : null
-  const shield = ship.shield && Math.random() < 0.50 ? ship.shield : null
-  return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames, weapon, shield }
+  const pickKlaed = () => {
+    const ship   = KLAED_SHIPS[Math.floor(Math.random() * KLAED_SHIPS.length)]
+    const weapon = ship.weapon && Math.random() < 0.65 ? ship.weapon : null
+    const shield = ship.shield && Math.random() < 0.50 ? ship.shield : null
+    return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames, weapon, shield }
+  }
+  if (fleet === 'mainship') return pickMain()
+  if (fleet === 'nairan')   return pickNairan()
+  if (fleet === 'klaed')    return pickKlaed()
+  // 'all': weighted random (Main 25%, Nairan 37.5%, Kla'ed 37.5%)
+  const r = Math.random()
+  if (r < 0.25)  return pickMain()
+  if (r < 0.625) return pickNairan()
+  return pickKlaed()
+}
+
+function randomShipForChase(forFleeing: boolean): ShipCombo {
+  const r = Math.random()
+  if (r < 0.25) {
+    const base   = SHIP_BASES[Math.floor(Math.random() * SHIP_BASES.length)]
+    const engine = SHIP_ENGINES[Math.floor(Math.random() * SHIP_ENGINES.length)]
+    const weapon = !forFleeing ? SHIP_WEAPONS[Math.floor(Math.random() * SHIP_WEAPONS.length)] : null
+    return { base, engineImg: engine.img, engineSheet: engine.sheet, engineFrames: engine.frames, weapon, shield: null }
+  }
+  if (r < 0.625) {
+    const ship = NAIRAN_SHIPS[Math.floor(Math.random() * NAIRAN_SHIPS.length)]
+    return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8,
+      weapon: !forFleeing ? ship.weapon : null,
+      shield: forFleeing ? ship.shield : null }
+  }
+  const ship = KLAED_SHIPS[Math.floor(Math.random() * KLAED_SHIPS.length)]
+  return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames,
+    weapon: !forFleeing ? ship.weapon : null,
+    shield: forFleeing ? ship.shield : null }
+}
+
+function shieldCycleAnim(frames: number): string {
+  const kf = frames === 6  ? 'shieldCycle6'
+           : frames === 8  ? 'engineCycle8'
+           : frames === 10 ? 'engineCycle10'
+           : frames === 14 ? 'shieldCycle14'
+           : frames === 16 ? 'shieldCycle16'
+           : frames === 18 ? 'shieldCycle18'
+           : frames === 20 ? 'shieldCycle20'
+           : frames === 40 ? 'shieldCycle40'
+           : 'engineCycle8'
+  return `${kf} 0.4s steps(${frames}, end) infinite`
 }
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
@@ -233,35 +274,21 @@ function edgePos(edge: number): [number, number] {
   }
 }
 
-// ─── SVG: Saturn (pixel-art, rect-only) ──────────────────────────────────────
+// ─── Sprite: Planet (animated spritesheet, 50 frames) ────────────────────────
 
-function SaturnSVG() {
-  const CX = 13, CY = 7, R = 5
-  const planetRows: React.ReactElement[] = []
-  for (let y = 2; y <= 11; y++) {
-    const dy = y + 0.5 - CY
-    if (dy * dy >= R * R) continue
-    const dx = Math.sqrt(R * R - dy * dy)
-    const x0 = Math.ceil(CX - dx), x1 = Math.floor(CX + dx)
-    const col = y <= 3 ? '#e8c070' : y <= 7 ? '#d4a84c' : y <= 9 ? '#b88835' : '#a07020'
-    planetRows.push(<rect key={y} x={x0} y={y} width={x1 - x0 + 1} height={1} fill={col} shapeRendering="crispEdges" />)
-  }
+function PlanetSprite() {
   return (
-    <svg width="26" height="14" viewBox="0 0 26 14"
-      style={{ display: 'block', imageRendering: 'pixelated', transform: 'rotate(-20deg)' }}
-      shapeRendering="crispEdges"
-    >
-      {/* Back ring (drawn first so planet covers middle) */}
-      <rect x={1} y={5} width={24} height={1} fill="#8b6d30" opacity={0.55} shapeRendering="crispEdges" />
-      <rect x={1} y={6} width={24} height={1} fill="#8b6d30" opacity={0.55} shapeRendering="crispEdges" />
-      {/* Planet body */}
-      {planetRows}
-      {/* Front ring — sides only, outside planet disk (x<9 and x>17) */}
-      <rect x={1}  y={7} width={8} height={1} fill="#c9a060" shapeRendering="crispEdges" />
-      <rect x={18} y={7} width={7} height={1} fill="#c9a060" shapeRendering="crispEdges" />
-      <rect x={1}  y={8} width={8} height={1} fill="#c9a060" shapeRendering="crispEdges" />
-      <rect x={18} y={8} width={7} height={1} fill="#c9a060" shapeRendering="crispEdges" />
-    </svg>
+    <div style={{
+      width: 80,
+      height: 80,
+      backgroundImage: 'url(/planet.png)',
+      backgroundSize: '5000% 100%',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: '0 0',
+      imageRendering: 'pixelated',
+      animation: 'planetSpin 3s steps(50) infinite',
+      borderRadius: '50%',
+    }} />
   )
 }
 
@@ -335,10 +362,13 @@ function CometSVG() {
 //
 // Weapons are 48px-tall spritesheets; shown as static first frame in a 48×48 div.
 
-function FoozleShip({ combo }: { combo: ShipCombo }) {
+function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail' }: {
+  combo: ShipCombo
+  chaseRole?: 'fleeing' | 'chasing'
+  trailId?: string
+}) {
   const { base, engineImg, engineSheet, engineFrames, weapon, shield } = combo
-  // Main Ship effects are 2× tall (96px natural); clip to 48px with 200% height.
-  // Nairan effects are square; render at 100% height.
+  const flashDelay = useRef(Math.random() * 4).current
   const engineSizeY = engineImg ? '200%' : '100%'
   const anim = engineFrames === 7  ? 'engineCycle7  0.875s steps(7,  end) infinite'
              : engineFrames === 8  ? 'engineCycle8  1s     steps(8,  end) infinite'
@@ -347,16 +377,15 @@ function FoozleShip({ combo }: { combo: ShipCombo }) {
              : 'engineCycle4 0.5s steps(4, end) infinite'
 
   return (
-    <div style={{ position: 'relative', width: 48, height: 48, overflow: 'visible' }}>
-      {/* Trail extends UP in local space = LEFT in world at angle≈0 (behind ship moving right) */}
+    <div style={{ position: 'relative', width: 48, height: 48, overflow: 'visible', filter: chaseRole ? 'brightness(1.2)' : undefined }}>
       <svg width="4" height="200" style={{ position: 'absolute', left: 22, top: -200, display: 'block', overflow: 'visible' }}>
         <defs>
-          <linearGradient id="foozle-trail" x1="0%" y1="0%" x2="0%" y2="100%">
+          <linearGradient id={trailId} x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%"   stopColor="rgba(255,0,170,0)"    />
             <stop offset="100%" stopColor="rgba(255,0,170,0.45)" />
           </linearGradient>
         </defs>
-        <line x1="2" y1="0" x2="2" y2="200" stroke="url(#foozle-trail)" strokeDasharray="3 6" strokeWidth="2" />
+        <line x1="2" y1="0" x2="2" y2="200" stroke={`url(#${trailId})`} strokeDasharray="3 6" strokeWidth="2" />
       </svg>
       {/* Layer 1: Engine effect (animated spritesheet) */}
       <div style={{
@@ -374,7 +403,7 @@ function FoozleShip({ combo }: { combo: ShipCombo }) {
       )}
       {/* Layer 3: Ship base */}
       <img src={base} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
-      {/* Layer 4: Weapon — static first frame */}
+      {/* Layer 4: Weapon — chasing ships get a red tint */}
       {weapon && (
         <div style={{
           position: 'absolute', inset: 0, width: 48, height: 48,
@@ -383,9 +412,10 @@ function FoozleShip({ combo }: { combo: ShipCombo }) {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: '0% 0%',
           imageRendering: 'pixelated',
+          filter: chaseRole === 'chasing' ? 'brightness(1.2) hue-rotate(20deg)' : undefined,
         }} />
       )}
-      {/* Layer 5: Shield — static first frame */}
+      {/* Layer 5: Shield — flashes on/off; panic mode for fleeing chase ships */}
       {shield && (
         <div style={{
           position: 'absolute', inset: 0, width: 48, height: 48,
@@ -394,6 +424,10 @@ function FoozleShip({ combo }: { combo: ShipCombo }) {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: '0% 0%',
           imageRendering: 'pixelated',
+          animation: chaseRole === 'fleeing'
+            ? `${shieldCycleAnim(shield.frames)}, shieldPanic 1.2s ease-in-out infinite`
+            : `${shieldCycleAnim(shield.frames)}, shieldFlash 6s ease-in-out infinite`,
+          animationDelay: chaseRole === 'fleeing' ? '0s, 0s' : `0s, ${flashDelay.toFixed(2)}s`,
         }} />
       )}
     </div>
@@ -405,70 +439,126 @@ function FoozleShip({ combo }: { combo: ShipCombo }) {
 type ShipDir = 'ltr' | 'rtl' | 'ttb' | 'btt'
 
 function RafShip() {
-  const containerRef  = useRef<HTMLDivElement>(null)
-  const shipComboRef  = useRef<ShipCombo>(randomShip())
-  const [shipKey, setShipKey] = useState(0)
+  const { shipFleet, showChases } = useOSSettings()
+  const fleetRef      = useRef<Fleet>(shipFleet)
+  const chasesRef     = useRef(showChases)
+  useEffect(() => { fleetRef.current  = shipFleet  }, [shipFleet])
+  useEffect(() => { chasesRef.current = showChases }, [showChases])
+
+  const containerARef = useRef<HTMLDivElement>(null)
+  const containerBRef = useRef<HTMLDivElement>(null)
+  const comboARef     = useRef<ShipCombo>(randomShip(shipFleet))
+  const [keyA, setKeyA]               = useState(0)
+  const [chaseCombo, setChaseCombo]   = useState<ShipCombo | null>(null)
 
   useEffect(() => {
     let raf: number
     let cooldownTimer: ReturnType<typeof setTimeout> | null = null
     let active = true
 
-    function newPass() {
+    function makePass() {
       const dirs: ShipDir[] = ['ltr', 'rtl', 'ttb', 'btt']
       const dir = dirs[Math.floor(Math.random() * 4)]
-      const W = window.innerWidth
-      const H = window.innerHeight
-      let primary: number
-      let baseSecondary: number
+      const W = window.innerWidth, H = window.innerHeight
+      let primary: number, baseSecondary: number
       if (dir === 'ltr')      { primary = -100;    baseSecondary = 100 + Math.random() * (H - 200) }
       else if (dir === 'rtl') { primary = W + 100; baseSecondary = 100 + Math.random() * (H - 200) }
       else if (dir === 'ttb') { primary = -100;    baseSecondary = 100 + Math.random() * (W - 200) }
       else                    { primary = H + 100; baseSecondary = 100 + Math.random() * (W - 200) }
       const phase1 = Math.random() * Math.PI * 2
       const phase2 = Math.random() * Math.PI * 2
-      const wave0 = Math.sin(primary * WAVE_FREQUENCY + phase1) * WAVE_AMPLITUDE
-                  + Math.sin(primary * WAVE_FREQUENCY * 2.3 + phase2) * (WAVE_AMPLITUDE * 0.3)
-      const sec0 = baseSecondary + wave0
-      const prevX = dir === 'ltr' || dir === 'rtl' ? primary : sec0
-      const prevY = dir === 'ltr' || dir === 'rtl' ? sec0    : primary
+      const wave0  = Math.sin(primary * WAVE_FREQUENCY + phase1) * WAVE_AMPLITUDE
+                   + Math.sin(primary * WAVE_FREQUENCY * 2.3 + phase2) * (WAVE_AMPLITUDE * 0.3)
+      const sec0   = baseSecondary + wave0
+      const prevX  = dir === 'ltr' || dir === 'rtl' ? primary : sec0
+      const prevY  = dir === 'ltr' || dir === 'rtl' ? sec0    : primary
       return { dir, primary, baseSecondary, phase1, phase2, prevX, prevY }
     }
 
-    const s = newPass()
+    const sA = makePass()
+    let bPrimary    = 0
+    let bSecondary  = 0
+    let bPrevX      = 0
+    let bPrevY      = 0
+    let chaseActive = false
+    let bShown      = false
+
+    function initChaseB() {
+      const behind  = sA.dir === 'rtl' || sA.dir === 'btt' ? 960 : -960
+      bPrimary      = sA.primary + behind
+      bSecondary    = sA.baseSecondary
+      bPrevX        = sA.dir === 'ltr' || sA.dir === 'rtl' ? bPrimary   : bSecondary
+      bPrevY        = sA.dir === 'ltr' || sA.dir === 'rtl' ? bSecondary : bPrimary
+      bShown        = false
+    }
+
+    // Roll chase for first pass
+    chaseActive = chasesRef.current && Math.random() < 0.05
+    if (chaseActive) {
+      comboARef.current = randomShipForChase(true)
+      initChaseB()
+      setChaseCombo(randomShipForChase(false))
+    }
+
+    function beginPass() {
+      Object.assign(sA, makePass())
+      chaseActive = chasesRef.current && Math.random() < 0.05
+      if (chaseActive) {
+        comboARef.current = randomShipForChase(true)
+        initChaseB()
+        setChaseCombo(randomShipForChase(false))
+      } else {
+        comboARef.current = randomShip(fleetRef.current)
+        setChaseCombo(null)
+      }
+      setKeyA(k => k + 1)
+      if (containerARef.current) containerARef.current.style.visibility = 'visible'
+    }
 
     function tick() {
-      const W = window.innerWidth
-      const H = window.innerHeight
-      s.primary += (s.dir === 'rtl' || s.dir === 'btt') ? -SHIP_SPEED : SHIP_SPEED
+      const W = window.innerWidth, H = window.innerHeight
 
-      const wave = Math.sin(s.primary * WAVE_FREQUENCY + s.phase1) * WAVE_AMPLITUDE
-                 + Math.sin(s.primary * WAVE_FREQUENCY * 2.3 + s.phase2) * (WAVE_AMPLITUDE * 0.3)
-      const secondary = s.baseSecondary + wave
-      const x = s.dir === 'ltr' || s.dir === 'rtl' ? s.primary : secondary
-      const y = s.dir === 'ltr' || s.dir === 'rtl' ? secondary  : s.primary
-
-      const angle = Math.atan2(y - s.prevY, x - s.prevX) * (180 / Math.PI)
-      s.prevX = x
-      s.prevY = y
-
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translate(${x}px, ${y}px) rotate(${angle + 90}deg)`
+      sA.primary += (sA.dir === 'rtl' || sA.dir === 'btt') ? -SHIP_SPEED : SHIP_SPEED
+      const waveA      = Math.sin(sA.primary * WAVE_FREQUENCY + sA.phase1) * WAVE_AMPLITUDE
+                       + Math.sin(sA.primary * WAVE_FREQUENCY * 2.3 + sA.phase2) * (WAVE_AMPLITUDE * 0.3)
+      const aSecondary = sA.baseSecondary + waveA
+      const ax         = sA.dir === 'ltr' || sA.dir === 'rtl' ? sA.primary  : aSecondary
+      const ay         = sA.dir === 'ltr' || sA.dir === 'rtl' ? aSecondary  : sA.primary
+      const angA       = Math.atan2(ay - sA.prevY, ax - sA.prevX) * (180 / Math.PI)
+      sA.prevX = ax; sA.prevY = ay
+      if (containerARef.current) {
+        containerARef.current.style.transform = `translate(${ax}px, ${ay}px) rotate(${angA + 90}deg)`
       }
 
-      const exited = s.dir === 'ltr' ? x > W + 100
-                   : s.dir === 'rtl' ? x < -100
-                   : s.dir === 'ttb' ? y > H + 100
-                   : y < -100
+      if (chaseActive) {
+        bPrimary   += (sA.dir === 'rtl' || sA.dir === 'btt') ? -(SHIP_SPEED * 1.35) : (SHIP_SPEED * 1.35)
+        // Enforce 40px minimum gap on primary axis — B closes in but never catches A
+        const isReverse = sA.dir === 'rtl' || sA.dir === 'btt'
+        if (isReverse ? bPrimary - sA.primary < 320 : sA.primary - bPrimary < 320) {
+          bPrimary = sA.primary + (isReverse ? 320 : -320)
+        }
+        bSecondary += (aSecondary - bSecondary) * 0.02
+        const bx   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bPrimary   : bSecondary
+        const by   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bSecondary : bPrimary
+        const angB = Math.atan2(by - bPrevY, bx - bPrevX) * (180 / Math.PI)
+        bPrevX = bx; bPrevY = by
+        if (containerBRef.current) {
+          containerBRef.current.style.transform = `translate(${bx}px, ${by}px) rotate(${angB + 90}deg)`
+          if (!bShown) { containerBRef.current.style.visibility = 'visible'; bShown = true }
+        }
+      }
+
+      const exited = sA.dir === 'ltr' ? ax > W + 100
+                   : sA.dir === 'rtl' ? ax < -100
+                   : sA.dir === 'ttb' ? ay > H + 100
+                   : ay < -100
 
       if (exited) {
-        if (containerRef.current) containerRef.current.style.visibility = 'hidden'
+        if (containerARef.current) containerARef.current.style.visibility = 'hidden'
+        if (containerBRef.current) containerBRef.current.style.visibility = 'hidden'
         cooldownTimer = setTimeout(() => {
           if (!active) return
-          Object.assign(s, newPass())
-          shipComboRef.current = randomShip()
-          setShipKey(k => k + 1)
-          if (containerRef.current) containerRef.current.style.visibility = 'visible'
+          beginPass()
           raf = requestAnimationFrame(tick)
         }, (15 + Math.random() * 10) * 1000)
         return
@@ -486,9 +576,16 @@ function RafShip() {
   }, [])
 
   return (
-    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform' }}>
-      <FoozleShip combo={shipComboRef.current} />
-    </div>
+    <>
+      <div ref={containerARef} style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform' }}>
+        <FoozleShip key={'a' + keyA} combo={comboARef.current} chaseRole={chaseCombo ? 'fleeing' : undefined} trailId="foozle-trail-a" />
+      </div>
+      {chaseCombo && (
+        <div ref={containerBRef} style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform', visibility: 'hidden' }}>
+          <FoozleShip key={'b' + keyA} combo={chaseCombo} chaseRole="chasing" trailId="foozle-trail-b" />
+        </div>
+      )}
+    </>
   )
 }
 
@@ -503,6 +600,7 @@ type CometEvt  = { x0: number; y0: number; x1: number; y1: number; angle: number
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function StarsBackground() {
+  const { showStars, showComets, showPlanets, showPlanes, showShips } = useOSSettings()
   const [stars, setStars] = useState<StarData[]>([])
 
   const [starEvent,   setStarEvent]   = useState<StarEvt   | null>(null)
@@ -639,39 +737,55 @@ export function StarsBackground() {
           from { background-position: 0% 0%; }
           to   { background-position: 109.09% 0%; }
         }
+        @keyframes shieldCycle6  { from { background-position: 0% 0%; } to { background-position: 120.00% 0%; } }
+        @keyframes shieldCycle14 { from { background-position: 0% 0%; } to { background-position: 107.69% 0%; } }
+        @keyframes shieldCycle16 { from { background-position: 0% 0%; } to { background-position: 106.67% 0%; } }
+        @keyframes shieldCycle18 { from { background-position: 0% 0%; } to { background-position: 105.88% 0%; } }
+        @keyframes shieldCycle20 { from { background-position: 0% 0%; } to { background-position: 105.26% 0%; } }
+        @keyframes shieldCycle40 { from { background-position: 0% 0%; } to { background-position: 102.56% 0%; } }
+        @keyframes shieldFlash {
+          0%, 20%   { opacity: 1; }
+          21%, 100% { opacity: 0; }
+        }
+        @keyframes shieldPanic {
+          0%, 40%   { opacity: 1; }
+          41%, 100% { opacity: 0; }
+        }
+        @keyframes planetSpin {
+          from { background-position: 0% 0; }
+          to   { background-position: 100% 0; }
+        }
       `}</style>
-      {/*
-        Star field — 150vw×150vh centered on the viewport.
-        transformOrigin 50%/50% maps to viewport center so sky-rotate is correct.
-      */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          top: '-25vh', left: '-25vw',
-          width: '150vw', height: '150vh',
-          pointerEvents: 'none',
-          zIndex: 0,
-          mixBlendMode: 'screen',
-          transformOrigin: '50% 50%',
-          animation: 'sky-rotate 3600s linear infinite',
-          viewTransitionName: 'stars-field',
-        } as React.CSSProperties}
-      >
-        {stars.map((s, i) => (
-          <div key={i} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, opacity: s.maxOpacity }}>
-            <div
-              style={{
-                width: `${s.size}px`, height: `${s.size}px`,
-                background: s.color,
-                animation: s.isColored
-                  ? `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out, rainbow-cycle ${s.rainbowDur}s ${s.colorDelay}s infinite linear`
-                  : `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out`,
-              }}
-            />
-          </div>
-        ))}
-      </div>
+      {showStars && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            top: '-25vh', left: '-25vw',
+            width: '150vw', height: '150vh',
+            pointerEvents: 'none',
+            zIndex: 0,
+            mixBlendMode: 'screen',
+            transformOrigin: '50% 50%',
+            animation: 'sky-rotate 3600s linear infinite',
+            viewTransitionName: 'stars-field',
+          } as React.CSSProperties}
+        >
+          {stars.map((s, i) => (
+            <div key={i} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, opacity: s.maxOpacity }}>
+              <div
+                style={{
+                  width: `${s.size}px`, height: `${s.size}px`,
+                  background: s.color,
+                  animation: s.isColored
+                    ? `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out, rainbow-cycle ${s.rainbowDur}s ${s.colorDelay}s infinite linear`
+                    : `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out`,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Events layer */}
       <div
@@ -683,7 +797,7 @@ export function StarsBackground() {
         } as React.CSSProperties}
       >
         {/* Shooting star */}
-        {starEvent && (
+        {showStars && starEvent && (
           <div
             key={starEvent.key}
             style={{
@@ -706,7 +820,7 @@ export function StarsBackground() {
         )}
 
         {/* Airplane */}
-        {planeEvent && (
+        {showPlanes && planeEvent && (
           <div
             key={planeEvent.key}
             style={{
@@ -727,7 +841,7 @@ export function StarsBackground() {
         )}
 
         {/* Satellite */}
-        {satEvent && (
+        {showStars && satEvent && (
           <div
             key={satEvent.key}
             style={{
@@ -751,8 +865,8 @@ export function StarsBackground() {
           </div>
         )}
 
-        {/* Saturn */}
-        {saturnEvent && (
+        {/* Planet */}
+        {showPlanets && saturnEvent && (
           <div
             key={saturnEvent.key}
             style={{
@@ -764,12 +878,12 @@ export function StarsBackground() {
               ['--sty1' as string]: `${saturnEvent.y1}vh`,
             } as React.CSSProperties}
           >
-            <SaturnSVG />
+            <PlanetSprite />
           </div>
         )}
 
         {/* Comet */}
-        {cometEvent && (
+        {showComets && cometEvent && (
           <div
             key={cometEvent.key}
             style={{
@@ -787,11 +901,18 @@ export function StarsBackground() {
           </div>
         )}
 
-        {/* Spaceship — RAF-animated, always present */}
-        <RafShip />
-
 
       </div>
+
+      {/* Ship layer — above stars and events, normal blend mode */}
+      {showShips && (
+        <div
+          aria-hidden="true"
+          style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2 }}
+        >
+          <RafShip />
+        </div>
+      )}
     </>
   )
 }

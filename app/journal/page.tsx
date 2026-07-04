@@ -202,7 +202,7 @@ function EntryCard({
   const preview = content.trim().slice(0, 120) + (content.trim().length > 120 ? '…' : '')
 
   return (
-    <div className={`rounded-2xl border transition-colors ${
+    <div className={`rounded-2xl border transition-colors dashboard-card ${
       expanded
         ? 'border-accent/20 bg-ink-1/85'
         : 'border-ink-4/8 bg-ink-1/30 hover:border-ink-4/15 hover:bg-ink-1/50'

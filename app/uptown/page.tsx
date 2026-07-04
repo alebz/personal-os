@@ -213,7 +213,7 @@ function SectionCard({ title, note, total, colorClass = 'text-ink-3', children }
   title: string; note?: string; total?: number; colorClass?: string; children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 pt-3 pb-2 shadow-lg shadow-black/10 backdrop-blur-xl">
+    <div className="rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 pt-3 pb-2 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-baseline gap-1.5">
           <p className={`text-[10px] font-bold uppercase tracking-widest ${colorClass}`}>{title}</p>
@@ -600,7 +600,7 @@ function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
   const previsto = totalIngresos - totalEgresos
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
       <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Previsto final del mes</p>
       <p className={`text-4xl font-black tabular-nums ${previsto >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={previsto} /></p>
       <p className="mb-3 text-[10px] text-ink-3/50">Si cobras y pagas todo</p>
@@ -647,7 +647,7 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
   const saldoActual = (bal.starting_balance || 0) + cobrado - pagado
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
       <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo actual</p>
       <p className={`text-4xl font-black tabular-nums ${saldoActual >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={saldoActual} /></p>
       <p className="mb-3 text-[10px] text-ink-3/50">Lo que tienes según lo marcado</p>
@@ -699,7 +699,7 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
   const faltan = Math.max(0, FONDO_META - fondoTotal)
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl">
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
       <div className="mb-2 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Fondo Mantenimiento</p>
@@ -798,14 +798,14 @@ function UptownHistorialTab({ rents, expenses, nomina, extraIncome, extraExpense
           { label: 'Salido',  value: totalOut, cls: 'text-danger' },
           { label: 'Neto',    value: neto,     cls: neto >= 0 ? 'text-ok' : 'text-danger' },
         ].map(({ label, value, cls }) => (
-          <div key={label} className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl">
+          <div key={label} className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
             <p className={`mt-1 text-base font-bold tabular-nums ${cls}`}><Mxn v={value} /></p>
           </div>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5">
+      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
         {sorted.length === 0 ? (
           <p className="p-10 text-center text-sm italic text-ink-3">Sin movimientos registrados este mes</p>
         ) : (
@@ -1006,7 +1006,7 @@ function ValetTab({ month }: { month: string }) {
   return (
     <div className="space-y-4">
       {/* Resumen */}
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
         <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen Valet</p>
         <div className="space-y-3">
           <div>
