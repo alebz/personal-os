@@ -20,7 +20,7 @@ const SAT_SHADOW = '-4px 0 0 0 rgba(255,255,255,0.5), 4px 0 0 0 rgba(255,255,255
 
 // ─── Foozle ship assets ───────────────────────────────────────────────────────
 
-const _B = '/Foozle_2DS0011_Void_MainShip/Main Ship'
+const _B = '/Spaceships/Foozle_2DS0011_Void_MainShip/Main Ship'
 
 const SHIP_BASES = [
   `${_B}/Main Ship - Bases/PNGs/Main Ship - Base - Full health.png`,
@@ -49,7 +49,7 @@ const SHIP_WEAPONS = [
 // ─── Nairan enemy fleet assets ───────────────────────────────────────────────
 // Engine effects: all 8 frames (width/height = 8). Weapons/shields: width÷frameHeight.
 
-const _N = '/Foozle_2DS0013_Void_EnemyFleet_2/Nairan'
+const _N = '/Spaceships/Foozle_2DS0013_Void_EnemyFleet_2/Nairan'
 
 const NAIRAN_SHIPS = [
   { base: `${_N}/Designs - Base/PNGs/Nairan - Battlecruiser - Base.png`,
@@ -89,7 +89,7 @@ const NAIRAN_SHIPS = [
 // ─── Kla'ed enemy fleet assets ───────────────────────────────────────────────
 // Engine frames vary per ship (10 or 12). Weapons/shields: width÷frameHeight.
 
-const _K = "/Foozle_2DS0012_Void_EnemyFleet_1/Kla'ed"
+const _K = "/Spaceships/Foozle_2DS0012_Void_EnemyFleet_1/Kla'ed"
 
 const KLAED_SHIPS = [
   { base: `${_K}/Base/PNGs/Kla'ed - Battlecruiser - Base.png`,
@@ -138,6 +138,56 @@ type ShipCombo = {
   engineFrames: number
   weapon: ShipLayer | null
   shield: ShipLayer | null
+}
+
+// ─── Formation types and helpers ─────────────────────────────────────────────
+
+type FormationSlot   = { offsetX: number; offsetY: number }
+type FormationMember = { combo: ShipCombo; slot: FormationSlot; phaseOffset: number }
+
+const FORMATION_TYPES: FormationSlot[][] = [
+  // FILA INDIA — diagonal line (5 ships)
+  [0,1,2,3,4].map(i => ({ offsetX: -i * 65, offsetY: i * 20 })),
+  // TRIÁNGULO — V formation (5 ships)
+  [
+    { offsetX:    0, offsetY:   0 },
+    { offsetX:  -70, offsetY:  35 }, { offsetX:  -70, offsetY: -35 },
+    { offsetX: -140, offsetY:  70 }, { offsetX: -140, offsetY: -70 },
+  ],
+  // ESCUADRÓN — 2×3 grid (6 ships)
+  [
+    { offsetX:   0, offsetY: -60 }, { offsetX:   0, offsetY:   0 }, { offsetX:   0, offsetY: 60 },
+    { offsetX: -60, offsetY: -60 }, { offsetX: -60, offsetY:   0 }, { offsetX: -60, offsetY: 60 },
+  ],
+  // DIAMANTE — 4 ships
+  [
+    { offsetX:    0, offsetY:   0 },
+    { offsetX:  -60, offsetY:  40 }, { offsetX: -60, offsetY: -40 },
+    { offsetX: -120, offsetY:   0 },
+  ],
+]
+
+function randomFormationShip(fleet: 'nairan' | 'klaed', isLeader: boolean): ShipCombo {
+  if (fleet === 'nairan') {
+    const ship   = NAIRAN_SHIPS[Math.floor(Math.random() * NAIRAN_SHIPS.length)]
+    const weapon = isLeader ? ship.weapon : (ship.weapon && Math.random() < 0.70 ? ship.weapon : null)
+    const shield = isLeader ? ship.shield : (ship.shield && Math.random() < 0.40 ? ship.shield : null)
+    return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8, weapon, shield }
+  }
+  const ship   = KLAED_SHIPS[Math.floor(Math.random() * KLAED_SHIPS.length)]
+  const weapon = isLeader ? ship.weapon : (ship.weapon && Math.random() < 0.70 ? ship.weapon : null)
+  const shield = isLeader ? ship.shield : (ship.shield && Math.random() < 0.40 ? ship.shield : null)
+  return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames, weapon, shield }
+}
+
+function makeFormation(): FormationMember[] {
+  const fleet = Math.random() < 0.5 ? 'nairan' : 'klaed'
+  const slots = FORMATION_TYPES[Math.floor(Math.random() * FORMATION_TYPES.length)]
+  return slots.map((slot, i) => ({
+    combo:        randomFormationShip(fleet as 'nairan' | 'klaed', i === 0),
+    slot,
+    phaseOffset:  i * 0.8,
+  }))
 }
 
 function randomShip(fleet: Fleet = 'all'): ShipCombo {
@@ -247,17 +297,12 @@ function isNightTime(): boolean {
   return h >= 20 || h < 6
 }
 
-const RARE_COOLDOWN_MS = 8 * 60 * 1000 // 8 min minimum between rare events
-const lastRare: Record<string, number> = {}
-
 function pickEvent(night: boolean): string {
-  const now = Date.now()
   const pool = [
     { type: 'shooting-star', w: 28 },
     { type: 'airplane',      w: 24 },
     { type: 'satellite',     w: 18 },
-    { type: 'comet',         w: 14 },
-    { type: 'saturn', w: (now - (lastRare['saturn'] ?? 0) < RARE_COOLDOWN_MS) ? 0 : (night ? 4 : 2) },
+    { type: 'comet',         w: night ? 14 : 8 },
   ]
   const total = pool.reduce((s, e) => s + e.w, 0)
   let r = Math.random() * total
@@ -274,21 +319,70 @@ function edgePos(edge: number): [number, number] {
   }
 }
 
-// ─── Sprite: Planet (animated spritesheet, 50 frames) ────────────────────────
+// ─── Planet system ───────────────────────────────────────────────────────────
 
-function PlanetSprite() {
+const PLANETS = [
+  { id: 'teal',   src: '/celestial bodies/planet.png',        size: 160, speed: '4s'   },
+  { id: 'orange', src: '/celestial bodies/planet_orange.png', size: 100, speed: '3.5s' },
+  { id: 'blue',   src: '/celestial bodies/planet_blue.png',   size: 100, speed: '5s'   },
+  { id: 'green',  src: '/celestial bodies/planet_green.png',  size: 100, speed: '4.5s' },
+  { id: 'saturn', src: '/celestial bodies/saturn.png',        size: 160, speed: '6s'   },
+]
+
+function pickPlanetIdx(exclude: number): number {
+  if (PLANETS.length === 1) return 0
+  let i: number
+  do { i = Math.floor(Math.random() * PLANETS.length) } while (i === exclude)
+  return i
+}
+
+function OrbitingPlanet() {
+  const [idx, setIdx]           = useState(() => Math.floor(Math.random() * PLANETS.length))
+  const [visible, setVisible]   = useState(false)
+  const [cycleKey, setCycleKey] = useState(0)
+  const startX   = useRef(5  + Math.random() * 30)
+  const startY   = useRef(10 + Math.random() * 60)
+  const orbitDur = useRef(120 + Math.random() * 60)
+
+  useEffect(() => {
+    const dur = orbitDur.current
+    const t1 = setTimeout(() => setVisible(true), 50)
+    const t2 = setTimeout(() => setVisible(false), (dur - 2) * 1000)
+    const t3 = setTimeout(() => {
+      setIdx(prev => {
+        startX.current   = 5  + Math.random() * 30
+        startY.current   = 10 + Math.random() * 60
+        orbitDur.current = 120 + Math.random() * 60
+        return pickPlanetIdx(prev)
+      })
+      setCycleKey(k => k + 1)
+    }, dur * 1000)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [cycleKey])
+
+  const planet = PLANETS[idx]
   return (
-    <div style={{
-      width: 80,
-      height: 80,
-      backgroundImage: 'url(/planet.png)',
-      backgroundSize: '5000% 100%',
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: '0 0',
-      imageRendering: 'pixelated',
-      animation: 'planetSpin 3s steps(50) infinite',
-      borderRadius: '50%',
-    }} />
+    <div
+      key={cycleKey}
+      aria-hidden="true"
+      style={{
+        position:            'fixed',
+        left:                `${startX.current}vw`,
+        top:                 `${startY.current}vh`,
+        width:               planet.size,
+        height:              planet.size,
+        backgroundImage:     `url(${planet.src})`,
+        backgroundSize:      '5000% 100%',
+        backgroundRepeat:    'no-repeat',
+        backgroundPositionY: '0%',
+        imageRendering:      'pixelated',
+        animation:           `planetOrbit ${orbitDur.current}s linear infinite, planetSpin ${planet.speed} steps(50) infinite`,
+        opacity:             visible ? 1 : 0,
+        transition:          'opacity 2s ease',
+        pointerEvents:       'none',
+        zIndex:              1,
+      }}
+    />
   )
 }
 
@@ -362,10 +456,12 @@ function CometSVG() {
 //
 // Weapons are 48px-tall spritesheets; shown as static first frame in a 48×48 div.
 
-function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail' }: {
+function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, engineDelay = '0s' }: {
   combo: ShipCombo
   chaseRole?: 'fleeing' | 'chasing'
   trailId?: string
+  scale?: number
+  engineDelay?: string
 }) {
   const { base, engineImg, engineSheet, engineFrames, weapon, shield } = combo
   const flashDelay = useRef(Math.random() * 4).current
@@ -377,7 +473,7 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail' }: {
              : 'engineCycle4 0.5s steps(4, end) infinite'
 
   return (
-    <div style={{ position: 'relative', width: 48, height: 48, overflow: 'visible', filter: chaseRole ? 'brightness(1.2)' : undefined }}>
+    <div style={{ position: 'relative', width: 48, height: 48, overflow: 'visible', filter: chaseRole ? 'brightness(1.2)' : undefined, transform: scale !== 1 ? `scale(${scale})` : undefined, transformOrigin: '24px 24px' }}>
       <svg width="4" height="200" style={{ position: 'absolute', left: 22, top: -200, display: 'block', overflow: 'visible' }}>
         <defs>
           <linearGradient id={trailId} x1="0%" y1="0%" x2="0%" y2="100%">
@@ -396,6 +492,7 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail' }: {
         backgroundPosition: '0% 0%',
         imageRendering: 'pixelated',
         animation: anim,
+        animationDelay: engineDelay,
       }} />
       {/* Layer 2: Engine base static — Main Ship only */}
       {engineImg && (
@@ -445,11 +542,15 @@ function RafShip() {
   useEffect(() => { fleetRef.current  = shipFleet  }, [shipFleet])
   useEffect(() => { chasesRef.current = showChases }, [showChases])
 
-  const containerARef = useRef<HTMLDivElement>(null)
-  const containerBRef = useRef<HTMLDivElement>(null)
-  const comboARef     = useRef<ShipCombo>(randomShip(shipFleet))
-  const [keyA, setKeyA]               = useState(0)
-  const [chaseCombo, setChaseCombo]   = useState<ShipCombo | null>(null)
+  const containerARef   = useRef<HTMLDivElement>(null)
+  const containerBRef   = useRef<HTMLDivElement>(null)
+  const comboARef       = useRef<ShipCombo>(randomShip(shipFleet))
+  const [keyA, setKeyA]                         = useState(0)
+  const [chaseCombo, setChaseCombo]             = useState<ShipCombo | null>(null)
+  const [formation,  setFormation]              = useState<FormationMember[] | null>(null)
+  const formationComboRef                        = useRef<FormationMember[] | null>(null)
+  const formationRefs                            = useRef<(HTMLDivElement | null)[]>([])
+  const formPrevPositions                        = useRef<{ x: number; y: number }[]>([])
 
   useEffect(() => {
     let raf: number
@@ -480,8 +581,9 @@ function RafShip() {
     let bSecondary  = 0
     let bPrevX      = 0
     let bPrevY      = 0
-    let chaseActive = false
-    let bShown      = false
+    let chaseActive    = false
+    let formationActive = false
+    let bShown         = false
 
     function initChaseB() {
       const behind  = sA.dir === 'rtl' || sA.dir === 'btt' ? 960 : -960
@@ -492,27 +594,58 @@ function RafShip() {
       bShown        = false
     }
 
-    // Roll chase for first pass
-    chaseActive = chasesRef.current && Math.random() < 0.05
-    if (chaseActive) {
-      comboARef.current = randomShipForChase(true)
-      initChaseB()
-      setChaseCombo(randomShipForChase(false))
+    function initFormation(f: FormationMember[]) {
+      formationComboRef.current = f
+      setFormation(f)
+      formationRefs.current     = []
+      const isHoriz  = sA.dir === 'ltr' || sA.dir === 'rtl'
+      const tSign    = (sA.dir === 'ltr' || sA.dir === 'ttb') ? 1 : -1
+      const initWave = Math.sin(sA.primary * WAVE_FREQUENCY + sA.phase1) * WAVE_AMPLITUDE
+                     + Math.sin(sA.primary * WAVE_FREQUENCY * 2.3 + sA.phase2) * (WAVE_AMPLITUDE * 0.3)
+      const initSec  = sA.baseSecondary + initWave
+      formPrevPositions.current = f.map(m => {
+        const mp = sA.primary + tSign * m.slot.offsetX
+        const ms = initSec + m.slot.offsetY + Math.sin(mp * 0.006 + m.phaseOffset) * 12
+        return { x: isHoriz ? mp : ms, y: isHoriz ? ms : mp }
+      })
     }
 
-    function beginPass() {
-      Object.assign(sA, makePass())
-      chaseActive = chasesRef.current && Math.random() < 0.05
+    // Roll for first pass (85% single, 10% formation, 5% chase)
+    {
+      const roll  = Math.random()
+      chaseActive    = chasesRef.current && roll < 0.05
+      formationActive = !chaseActive && roll < 0.15
       if (chaseActive) {
         comboARef.current = randomShipForChase(true)
         initChaseB()
         setChaseCombo(randomShipForChase(false))
+      } else if (formationActive) {
+        initFormation(makeFormation())
+      }
+    }
+
+    function beginPass() {
+      Object.assign(sA, makePass())
+      const roll  = Math.random()
+      chaseActive    = chasesRef.current && roll < 0.05
+      formationActive = !chaseActive && roll < 0.15
+      if (chaseActive) {
+        comboARef.current = randomShipForChase(true)
+        initChaseB()
+        setChaseCombo(randomShipForChase(false))
+        formationComboRef.current = null
+        setFormation(null)
+      } else if (formationActive) {
+        initFormation(makeFormation())
+        setChaseCombo(null)
       } else {
         comboARef.current = randomShip(fleetRef.current)
         setChaseCombo(null)
+        formationComboRef.current = null
+        setFormation(null)
       }
       setKeyA(k => k + 1)
-      if (containerARef.current) containerARef.current.style.visibility = 'visible'
+      if (containerARef.current) containerARef.current.style.visibility = formationActive ? 'hidden' : 'visible'
     }
 
     function tick() {
@@ -526,25 +659,46 @@ function RafShip() {
       const ay         = sA.dir === 'ltr' || sA.dir === 'rtl' ? aSecondary  : sA.primary
       const angA       = Math.atan2(ay - sA.prevY, ax - sA.prevX) * (180 / Math.PI)
       sA.prevX = ax; sA.prevY = ay
-      if (containerARef.current) {
-        containerARef.current.style.transform = `translate(${ax}px, ${ay}px) rotate(${angA + 90}deg)`
-      }
 
-      if (chaseActive) {
-        bPrimary   += (sA.dir === 'rtl' || sA.dir === 'btt') ? -(SHIP_SPEED * 1.35) : (SHIP_SPEED * 1.35)
-        // Enforce 40px minimum gap on primary axis — B closes in but never catches A
-        const isReverse = sA.dir === 'rtl' || sA.dir === 'btt'
-        if (isReverse ? bPrimary - sA.primary < 320 : sA.primary - bPrimary < 320) {
-          bPrimary = sA.primary + (isReverse ? 320 : -320)
+      if (formationActive) {
+        if (containerARef.current) containerARef.current.style.visibility = 'hidden'
+        const isHoriz = sA.dir === 'ltr' || sA.dir === 'rtl'
+        const tSign   = (sA.dir === 'ltr' || sA.dir === 'ttb') ? 1 : -1
+        const members = formationComboRef.current
+        if (members) {
+          members.forEach((member, i) => {
+            const el = formationRefs.current[i]
+            if (!el) return
+            const mp   = sA.primary + tSign * member.slot.offsetX
+            const ms   = aSecondary + member.slot.offsetY + Math.sin(mp * 0.006 + member.phaseOffset) * 12
+            const mx   = isHoriz ? mp : ms
+            const my   = isHoriz ? ms : mp
+            const prev = formPrevPositions.current[i] ?? { x: mx - 0.1, y: my }
+            const ang  = Math.atan2(my - prev.y, mx - prev.x) * (180 / Math.PI)
+            formPrevPositions.current[i] = { x: mx, y: my }
+            el.style.transform  = `translate(${mx}px, ${my}px) rotate(${ang + 90}deg)`
+            el.style.visibility = 'visible'
+          })
         }
-        bSecondary += (aSecondary - bSecondary) * 0.02
-        const bx   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bPrimary   : bSecondary
-        const by   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bSecondary : bPrimary
-        const angB = Math.atan2(by - bPrevY, bx - bPrevX) * (180 / Math.PI)
-        bPrevX = bx; bPrevY = by
-        if (containerBRef.current) {
-          containerBRef.current.style.transform = `translate(${bx}px, ${by}px) rotate(${angB + 90}deg)`
-          if (!bShown) { containerBRef.current.style.visibility = 'visible'; bShown = true }
+      } else {
+        if (containerARef.current) {
+          containerARef.current.style.transform = `translate(${ax}px, ${ay}px) rotate(${angA + 90}deg)`
+        }
+        if (chaseActive) {
+          bPrimary   += (sA.dir === 'rtl' || sA.dir === 'btt') ? -(SHIP_SPEED * 1.35) : (SHIP_SPEED * 1.35)
+          const isReverse = sA.dir === 'rtl' || sA.dir === 'btt'
+          if (isReverse ? bPrimary - sA.primary < 320 : sA.primary - bPrimary < 320) {
+            bPrimary = sA.primary + (isReverse ? 320 : -320)
+          }
+          bSecondary += (aSecondary - bSecondary) * 0.02
+          const bx   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bPrimary   : bSecondary
+          const by   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bSecondary : bPrimary
+          const angB = Math.atan2(by - bPrevY, bx - bPrevX) * (180 / Math.PI)
+          bPrevX = bx; bPrevY = by
+          if (containerBRef.current) {
+            containerBRef.current.style.transform = `translate(${bx}px, ${by}px) rotate(${angB + 90}deg)`
+            if (!bShown) { containerBRef.current.style.visibility = 'visible'; bShown = true }
+          }
         }
       }
 
@@ -556,6 +710,7 @@ function RafShip() {
       if (exited) {
         if (containerARef.current) containerARef.current.style.visibility = 'hidden'
         if (containerBRef.current) containerBRef.current.style.visibility = 'hidden'
+        formationRefs.current.forEach(el => { if (el) el.style.visibility = 'hidden' })
         cooldownTimer = setTimeout(() => {
           if (!active) return
           beginPass()
@@ -585,6 +740,20 @@ function RafShip() {
           <FoozleShip key={'b' + keyA} combo={chaseCombo} chaseRole="chasing" trailId="foozle-trail-b" />
         </div>
       )}
+      {formation && formation.map((member, i) => (
+        <div
+          key={'f' + keyA + '_' + i}
+          ref={el => { formationRefs.current[i] = el }}
+          style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform', visibility: 'hidden' }}
+        >
+          <FoozleShip
+            combo={member.combo}
+            trailId={`foozle-trail-f${i}`}
+            scale={i === 0 ? 1.0 : 0.85}
+            engineDelay={`${i * 0.15}s`}
+          />
+        </div>
+      ))}
     </>
   )
 }
@@ -594,7 +763,6 @@ function RafShip() {
 type StarEvt   = { x: number; y: number; angle: number; key: string }
 type PlaneEvt  = { x0: number; y0: number; x1: number; y1: number; angle: number; duration: number; key: string }
 type SatEvt    = { y: number; rtl: boolean; key: string }
-type SaturnEvt = { x0: number; y0: number; x1: number; y1: number; duration: number; key: string }
 type CometEvt  = { x0: number; y0: number; x1: number; y1: number; angle: number; duration: number; key: string }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -605,9 +773,8 @@ export function StarsBackground() {
 
   const [starEvent,   setStarEvent]   = useState<StarEvt   | null>(null)
   const [planeEvent,  setPlaneEvent]  = useState<PlaneEvt  | null>(null)
-  const [satEvent,    setSatEvent]    = useState<SatEvt    | null>(null)
-  const [saturnEvent, setSaturnEvent] = useState<SaturnEvt | null>(null)
-  const [cometEvent,  setCometEvent]  = useState<CometEvt  | null>(null)
+  const [satEvent,   setSatEvent]   = useState<SatEvt  | null>(null)
+  const [cometEvent, setCometEvent] = useState<CometEvt | null>(null)
 
   const mountedRef    = useRef(true)
   const schedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -658,18 +825,6 @@ export function StarsBackground() {
       return 0
     }
 
-    function fireSaturn(): number {
-      const rtl = Math.random() < 0.5
-      const dur = 240 + Math.random() * 120
-      setSaturnEvent({
-        x0: rtl ? 110 : -15, y0: 5  + Math.random() * 35,
-        x1: rtl ? -15 : 110, y1: 10 + Math.random() * 35,
-        duration: dur, key: `saturn-${Date.now()}`,
-      })
-      setClear('saturn', () => setSaturnEvent(null), dur * 1000 + 2000)
-      return dur * 1000
-    }
-
     function fireComet(): number {
       const se = Math.floor(Math.random() * 4)
       let ee   = Math.floor(Math.random() * 3)
@@ -691,7 +846,6 @@ export function StarsBackground() {
         case 'satellite':     return fireSat()
         case 'airplane':      return firePlane()
         case 'comet':         return fireComet()
-        case 'saturn':        lastRare['saturn'] = Date.now(); return fireSaturn()
         default:              return 0
       }
     }
@@ -752,8 +906,15 @@ export function StarsBackground() {
           41%, 100% { opacity: 0; }
         }
         @keyframes planetSpin {
-          from { background-position: 0% 0; }
-          to   { background-position: 100% 0; }
+          from { background-position-x: 0%; }
+          to   { background-position-x: 100%; }
+        }
+        @keyframes planetOrbit {
+          0%   { transform: translate(0vw,  0vh);  }
+          25%  { transform: translate(30vw, -8vh); }
+          50%  { transform: translate(60vw,  0vh); }
+          75%  { transform: translate(30vw,  8vh); }
+          100% { transform: translate(0vw,  0vh);  }
         }
       `}</style>
       {showStars && (
@@ -865,23 +1026,6 @@ export function StarsBackground() {
           </div>
         )}
 
-        {/* Planet */}
-        {showPlanets && saturnEvent && (
-          <div
-            key={saturnEvent.key}
-            style={{
-              position: 'absolute', top: 0, left: 0,
-              animation: `saturn-travel ${saturnEvent.duration}s linear 1 forwards`,
-              ['--stx0' as string]: `${saturnEvent.x0}vw`,
-              ['--sty0' as string]: `${saturnEvent.y0}vh`,
-              ['--stx1' as string]: `${saturnEvent.x1}vw`,
-              ['--sty1' as string]: `${saturnEvent.y1}vh`,
-            } as React.CSSProperties}
-          >
-            <PlanetSprite />
-          </div>
-        )}
-
         {/* Comet */}
         {showComets && cometEvent && (
           <div
@@ -903,6 +1047,9 @@ export function StarsBackground() {
 
 
       </div>
+
+      {/* Planet layer — persistent orbiting planet, own layer (no screen blend) */}
+      {showPlanets && <OrbitingPlanet />}
 
       {/* Ship layer — above stars and events, normal blend mode */}
       {showShips && (

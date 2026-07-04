@@ -54,13 +54,14 @@ function loadState(): OSSettingsState {
   }
 }
 
+export const FONT_FAMILIES: Record<Font, string> = {
+  system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  pixel:  "'Press Start 2P', 'VT323', monospace",
+  mono:   "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+}
+
 function applyFont(font: Font) {
-  const map: Record<Font, string> = {
-    system: '',
-    pixel:  '"Press Start 2P", monospace',
-    mono:   '"Share Tech Mono", monospace',
-  }
-  document.documentElement.style.fontFamily = map[font]
+  document.documentElement.style.setProperty('--os-font', FONT_FAMILIES[font])
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────

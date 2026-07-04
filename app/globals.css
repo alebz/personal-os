@@ -125,6 +125,7 @@ input::placeholder { font-family: 'VT323', monospace; font-size: 20px; color: #5
 
 :root {
   color-scheme: dark;
+  --os-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 html {
@@ -134,8 +135,7 @@ html {
 
 body {
   min-height: 100dvh;
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--os-font);
   -webkit-font-smoothing: antialiased;
 }
 

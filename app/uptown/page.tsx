@@ -864,7 +864,7 @@ function ValetWeekCard({
   const complete = VALET_TENANTS.every(t => isPaid(t.id))
 
   return (
-    <div className={`rounded-xl border px-3 pt-3 pb-2 transition-colors ${
+    <div className={`dashboard-card rounded-xl border px-3 pt-3 pb-2 transition-colors ${
       complete && providerPaid ? 'border-ok/20 bg-ok/5' : 'border-ink-4/10 bg-ink-1/60 backdrop-blur-xl'
     }`}>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
