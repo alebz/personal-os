@@ -41,7 +41,17 @@
 @keyframes arcadeMarquee{0%{background-position:0% 0%;}100%{background-position:200% 0%;}}
 @keyframes glitterParticle{0%,85%,100%{opacity:0.15}90%{opacity:1}95%{opacity:0.3}}
 
-input::placeholder { font-family: 'VT323', monospace; font-size: 20px; color: #555555; opacity: 1; }
+input::placeholder { color: #555555; opacity: 1; }
+
+input, textarea {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-size: 14px !important;
+}
+
+input::placeholder, textarea::placeholder {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-size: 14px !important;
+}
 
 /* ── View Transitions ────────────────────────────────────────────────────────── */
 

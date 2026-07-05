@@ -22,7 +22,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Press+Start+2P&family=VT323&display=swap" />
         {/* Apply saved font before first paint to avoid flash */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var s=localStorage.getItem('os-settings');if(s){var f={system:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",pixel:"'Press Start 2P','VT323',monospace",mono:"'JetBrains Mono','Fira Code','Courier New',monospace"};var font=f[JSON.parse(s).font];if(font)document.documentElement.style.setProperty('--os-font',font);}}catch(e){}})();` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var s=localStorage.getItem('os-settings');if(s){var f={system:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",mono:"'JetBrains Mono','Fira Code','Courier New',monospace"};var font=f[JSON.parse(s).font]||f.system;document.documentElement.style.setProperty('--os-font',font);}}catch(e){}})();` }} />
       </head>
       <body className="bg-ink-0 text-ink-4 antialiased">
         <OSSettingsProvider>

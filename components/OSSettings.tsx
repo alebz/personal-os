@@ -193,7 +193,6 @@ export default function OSSettings() {
             <PillSelector<Font>
               options={[
                 { value: 'system', label: 'System' },
-                { value: 'pixel',  label: 'Pixel'  },
                 { value: 'mono',   label: 'Mono'   },
               ]}
               value={font}

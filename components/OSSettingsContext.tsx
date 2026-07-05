@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type Font  = 'system' | 'pixel' | 'mono'
+export type Font  = 'system' | 'mono'
 export type Fleet = 'all' | 'mainship' | 'nairan' | 'klaed' | 'nautolan'
 
 interface OSSettingsState {
@@ -45,7 +45,10 @@ const STORAGE_KEY = 'os-settings'
 function loadState(): OSSettingsState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    const base: OSSettingsState = raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS }
+    const parsed = raw ? JSON.parse(raw) : {}
+    // Migrate: 'pixel' font option was removed
+    if (parsed.font === 'pixel') parsed.font = 'system'
+    const base: OSSettingsState = raw ? { ...DEFAULTS, ...parsed } : { ...DEFAULTS }
     // Migrate legacy 'modo_discreto' key if no os-settings entry yet
     if (!raw && localStorage.getItem('modo_discreto') === 'true') base.discreto = true
     return base
@@ -56,7 +59,6 @@ function loadState(): OSSettingsState {
 
 export const FONT_FAMILIES: Record<Font, string> = {
   system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  pixel:  "'Press Start 2P', 'VT323', monospace",
   mono:   "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
 }
 

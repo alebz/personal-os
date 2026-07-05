@@ -205,19 +205,28 @@ type ShipCombo = {
 
 // ─── Agent system constants ───────────────────────────────────────────────────
 
-const CRUISE_SPEED   = 0.10   // px/ms
-const COMBAT_SPEED   = 0.065  // px/ms
-const PROJ_SPEED     = 0.30   // px/ms
+const CRUISE_SPEED   = 0.112  // px/ms  (-20%)
+const COMBAT_SPEED   = 0.083  // px/ms  (-20%)
+const PROJ_SPEED     = 0.45   // px/ms
 const PROJ_LIFE      = 2200   // ms
-const HIT_RADIUS     = 28     // px — projectile hit distance
-const DETECT_DIST    = 380    // px — combat trigger
+const HIT_RADIUS     = 20     // px — projectile hit distance
+const COLLIDE_DIST   = 30     // px — ship-to-ship collision
+const DETECT_DIST    = 600    // px — combat trigger
+const PRED_SHIP_MS   = 800    // ms — ship prediction look-ahead
+const PRED_SHIP_DIST = 80     // px — predicted collision threshold (ships)
+const PRED_PROJ_MS   = 600    // ms — projectile prediction look-ahead
+const PRED_PROJ_DIST = 40     // px — predicted close-pass threshold (projectiles)
+const MIN_SEP        = 25     // px — hard minimum ship separation
+const MIN_SHOT_MS    = 2500   // ms — minimum time between shots per ship
+const MAX_PROJS      = 12     // global projectile cap
 
 const _NP = `${_N}/Weapon Effects - Projectiles/PNGs`
 const _KP = `${_K}/Projectiles/PNGs`
 const _TP = `${_NTL}/Weapon Effects - Projectiles/PNGs`
-const NAIRAN_PROJ   = { src: `${_NP}/Nairan - Bolt.png`,         w: 45, h:  9 }
-const KLAED_PROJ    = { src: `${_KP}/Kla'ed - Bullet.png`,       w: 16, h: 16 }
-const NAUTOLAN_PROJ = { src: `${_TP}/Nautolan - Bullet.png`,      w: 72, h: 12 }
+// w/h = full spritesheet size; frames = number of animation frames; fw = single frame width
+const NAIRAN_PROJ   = { src: `${_NP}/Nairan - Bolt.png`,         w: 45, h:  9, frames: 5, fw:  9 }
+const KLAED_PROJ    = { src: `${_KP}/Kla'ed - Bullet.png`,       w: 16, h: 16, frames: 1, fw: 16 }
+const NAUTOLAN_PROJ = { src: `${_TP}/Nautolan - Bullet.png`,      w: 72, h: 12, frames: 6, fw: 12 }
 
 // ─── Agent types ─────────────────────────────────────────────────────────────
 
@@ -241,6 +250,7 @@ interface ShipAgent {
   state:        'cruising' | 'combat' | 'dying'
   hp:           number
   formOffset:   { x: number; y: number }  // local: x=forward, y=right
+  formationState: 'cruise' | 'combat_spread' | 'scatter'
   leaderId:     string | null
   targetId:     string | null
   lastShot:     number
@@ -248,6 +258,10 @@ interface ShipAgent {
   dyingStart:   number
   dyingDuration: number
   destruction:  DestructData | null
+  shieldHp:       number   // 0-3; hits remaining before shield breaks
+  shieldActive:   boolean
+  shieldCooldown: number   // timestamp when shield reactivates (0 = no cooldown)
+  lastShieldHit:  number   // timestamp of last shield absorb (for flash effect)
 }
 
 interface ProjData {
@@ -256,7 +270,7 @@ interface ProjData {
   x:            number; y: number
   vx:           number; vy: number
   born:         number
-  src:          string; w: number; h: number
+  src:          string; w: number; h: number; fw: number
 }
 
 interface ExpData {
@@ -278,14 +292,35 @@ function lerpAngle(a: number, b: number, t: number): number {
   return a + diff * t
 }
 
-// Local formation offsets: x = forward, y = right (perpendicular)
+// Project an agent's center position ms into the future
+function predictedCenter(a: ShipAgent, ms: number): { x: number; y: number } {
+  return { x: a.x + 24 + a.vx * ms, y: a.y + 24 + a.vy * ms }
+}
+
+// Segment intersection — returns true if segment p1→p2 crosses p3→p4
+function segmentsIntersect(
+  p1x: number, p1y: number, p2x: number, p2y: number,
+  p3x: number, p3y: number, p4x: number, p4y: number
+): boolean {
+  const d1x = p2x - p1x, d1y = p2y - p1y
+  const d2x = p4x - p3x, d2y = p4y - p3y
+  const cross = d1x * d2y - d1y * d2x
+  if (Math.abs(cross) < 0.0001) return false
+  const dx = p3x - p1x, dy = p3y - p1y
+  const t = (dx * d2y - dy * d2x) / cross
+  const u = (dx * d1y - dy * d1x) / cross
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1
+}
+
+// Local formation offsets: x = forward (negative = behind), y = right (perpendicular)
+// Cruise: tight arrow — 40px back per row, 25px lateral per row
 function fleetOffsets(count: number): { x: number; y: number }[] {
   if (count === 1) return [{ x: 0, y: 0 }]
   const offsets: { x: number; y: number }[] = [{ x: 0, y: 0 }]
   for (let i = 1; i < count; i++) {
     const side = i % 2 === 1 ? 1 : -1
     const row  = Math.ceil(i / 2)
-    offsets.push({ x: -row * 20, y: side * row * 65 })
+    offsets.push({ x: -row * 40, y: side * row * 25 })
   }
   return offsets
 }
@@ -567,12 +602,13 @@ function CometSVG() {
 
 // ─── Foozle composite ship ────────────────────────────────────────────────────
 
-function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, engineDelay = '0s' }: {
+function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, engineDelay = '0s', shieldRef }: {
   combo: ShipCombo
   chaseRole?: 'fleeing' | 'chasing'
   trailId?: string
   scale?: number
   engineDelay?: string
+  shieldRef?: React.RefCallback<HTMLDivElement>
 }) {
   const { base, engineImg, engineSheet, engineFrames, weapon, shield } = combo
   const flashDelay = useRef(Math.random() * 4).current
@@ -620,18 +656,21 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, eng
         }} />
       )}
       {shield && (
-        <div style={{
-          position: 'absolute', inset: 0, width: 48, height: 48,
-          backgroundImage: `url("${shield.sheet}")`,
-          backgroundSize: `${shield.frames * 100}% 100%`,
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: '0% 0%',
-          imageRendering: 'pixelated',
-          animation: chaseRole === 'fleeing'
-            ? `${shieldCycleAnim(shield.frames)}, shieldPanic 1.2s ease-in-out infinite`
-            : `${shieldCycleAnim(shield.frames)}, shieldFlash 6s ease-in-out infinite`,
-          animationDelay: chaseRole === 'fleeing' ? '0s, 0s' : `0s, ${flashDelay.toFixed(2)}s`,
-        }} />
+        <div
+          ref={shieldRef}
+          style={{
+            position: 'absolute', inset: 0, width: 48, height: 48,
+            backgroundImage: `url("${shield.sheet}")`,
+            backgroundSize: `${shield.frames * 100}% 100%`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: '0% 0%',
+            imageRendering: 'pixelated',
+            animation: chaseRole === 'fleeing'
+              ? `${shieldCycleAnim(shield.frames)}, shieldPanic 1.2s ease-in-out infinite`
+              : `${shieldCycleAnim(shield.frames)}, shieldFlash 6s ease-in-out infinite`,
+            animationDelay: chaseRole === 'fleeing' ? '0s, 0s' : `0s, ${flashDelay.toFixed(2)}s`,
+          }}
+        />
       )}
     </div>
   )
@@ -639,8 +678,10 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, eng
 
 // ─── Explosion sprite (one-shot destruction animation) ────────────────────────
 
+const SHIP_DISPLAY_SIZE = 48  // px — all ships render at this size
+
 function ExplosionSprite({ exp }: { exp: ExpData }) {
-  const { destruction: { sheet, frames, size }, x, y } = exp
+  const { destruction: { sheet, frames }, x, y } = exp
   const duration = (frames * 75) / 1000
   const toPos    = ((frames / (frames - 1)) * 100).toFixed(2)
   return (
@@ -648,10 +689,10 @@ function ExplosionSprite({ exp }: { exp: ExpData }) {
       aria-hidden="true"
       style={{
         position:         'absolute',
-        left:             x - size / 2 + 24,
-        top:              y - size / 2 + 24,
-        width:            size,
-        height:           size,
+        left:             x,
+        top:              y,
+        width:            SHIP_DISPLAY_SIZE,
+        height:           SHIP_DISPLAY_SIZE,
         backgroundImage:  `url("${sheet}")`,
         backgroundSize:   `${frames * 100}% 100%`,
         backgroundRepeat: 'no-repeat',
@@ -682,8 +723,9 @@ function SpaceSim() {
   const [projKeys,  setProjKeys]  = useState<string[]>([])
   const [expList,   setExpList]   = useState<ExpData[]>([])
 
-  const agentEls = useRef(new Map<string, HTMLDivElement>())
-  const projEls  = useRef(new Map<string, HTMLDivElement>())
+  const agentEls  = useRef(new Map<string, HTMLDivElement>())
+  const projEls   = useRef(new Map<string, HTMLDivElement>())
+  const shieldEls = useRef(new Map<string, HTMLDivElement>())
 
   useEffect(() => {
     let rafId: number
@@ -708,16 +750,17 @@ function SpaceSim() {
     function spawnFleet() {
       const W = window.innerWidth, H = window.innerHeight
       const type  = pickType()
-      const count = type === 'mainship' ? 1 : 1 + Math.floor(Math.random() * 3)
+      const count = type === 'mainship' ? 1 : 2 + Math.floor(Math.random() * 3)
       const fleetId = genId()
       const { x: sx, y: sy, angle } = edgeSpawn(W, H)
       const offsets = fleetOffsets(count)
 
       const newAgents: ShipAgent[] = offsets.map((off, i) => {
-        const isLeader = i === 0
-        const combo    = type === 'mainship'
+        const isLeader  = i === 0
+        const combo     = type === 'mainship'
           ? randomShip('mainship')
           : randomFormationShip(type, isLeader)
+        const hasShield = !!(combo.shield && (isLeader || Math.random() < 0.5))
         const cos = Math.cos(angle), sin = Math.sin(angle)
         const wx  = sx + cos * off.x - sin * off.y
         const wy  = sy + sin * off.x + cos * off.y
@@ -732,12 +775,17 @@ function SpaceSim() {
           state: 'cruising',
           hp: isLeader ? 3 : 2,
           formOffset: off,
+          formationState: 'cruise',
           leaderId: null,
           targetId: null,
           lastShot: 0,
           fireInterval: 1800 + Math.random() * 2400,
           dyingStart: 0, dyingDuration: 0,
           destruction: getDestructData(combo),
+          shieldHp: hasShield ? 1 + Math.floor(Math.random() * 3) : 0,
+          shieldActive: hasShield,
+          shieldCooldown: 0,
+          lastShieldHit: 0,
         }
       })
 
@@ -759,7 +807,7 @@ function SpaceSim() {
         x: owner.x + 24, y: owner.y + 24,
         vx: (dx/d) * PROJ_SPEED, vy: (dy/d) * PROJ_SPEED,
         born: performance.now(),
-        src: p.src, w: p.w, h: p.h,
+        src: p.src, w: p.w, h: p.h, fw: p.fw,
       })
       setProjKeys(prev => [...prev, id])
     }
@@ -789,11 +837,11 @@ function SpaceSim() {
       if (nextSpawn <= 0) {
         const activeFleets = new Set<string>()
         agents.current.forEach(a => { if (a.state !== 'dying') activeFleets.add(a.fleetId) })
-        if (activeFleets.size < 3) {
+        if (activeFleets.size < 4) {
           spawnFleet()
-          nextSpawn = 20000 + Math.random() * 20000
+          nextSpawn = 12000 + Math.random() * 8000
         } else {
-          nextSpawn = 5000
+          nextSpawn = 3000
         }
       }
 
@@ -814,11 +862,34 @@ function SpaceSim() {
           const lB = fB.find(a => a.isLeader && a.state !== 'dying')
           if (!lA || !lB) continue
           if (dist2D(lA.x, lA.y, lB.x, lB.y) < DETECT_DIST) {
-            fA.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lB.id } })
-            fB.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lA.id } })
+            fA.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lB.id; if (a.isLeader) a.formationState = 'combat_spread' } })
+            fB.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lA.id; if (a.isLeader) a.formationState = 'combat_spread' } })
           }
         }
       }
+
+      // Ship-to-ship collision — continuous detection catches tunneling ships
+      agents.current.forEach((aA, idA) => {
+        if (aA.state === 'dying') return
+        agents.current.forEach((aB, idB) => {
+          if (idA >= idB) return
+          if (aB.state === 'dying') return
+          if (aA.fleetType === aB.fleetType) return
+          const ax = aA.x + 24, ay = aA.y + 24
+          const bx = aB.x + 24, by = aB.y + 24
+          // Point check (current frame)
+          if (dist2D(ax, ay, bx, by) < COLLIDE_DIST) {
+            killAgent(aA, now); killAgent(aB, now); return
+          }
+          // Segment check — previous position → current position (catches tunneling)
+          if (segmentsIntersect(
+            ax - aA.vx * dt, ay - aA.vy * dt, ax, ay,
+            bx - aB.vx * dt, by - aB.vy * dt, bx, by
+          )) {
+            killAgent(aA, now); killAgent(aB, now)
+          }
+        })
+      })
 
       // Update agents
       let agentChanged = false
@@ -831,6 +902,13 @@ function SpaceSim() {
             agentChanged = true
           }
           return
+        }
+
+        // Shield reactivation after cooldown
+        if (!agent.shieldActive && agent.shieldCooldown > 0 && now >= agent.shieldCooldown && agent.combo.shield) {
+          agent.shieldActive = true
+          agent.shieldHp = 1
+          agent.shieldCooldown = 0
         }
 
         const leader = agent.leaderId ? agents.current.get(agent.leaderId) : null
@@ -849,21 +927,28 @@ function SpaceSim() {
                 if (d < bestD) { bestD = d; best = o }
               })
               if (best) { agent.targetId = (best as ShipAgent).id; target = best }
-              else { agent.state = 'cruising'; agent.targetId = null }
+              else { agent.state = 'cruising'; agent.targetId = null; agent.formationState = 'cruise' }
             }
 
             if (target) {
-              const desiredAngle = Math.atan2(target.y - agent.y, target.x - agent.x)
-              agent.angle = lerpAngle(agent.angle, desiredAngle, 0.025)
-              const d = dist2D(agent.x, agent.y, target.x, target.y)
-              const spd = d > 280 ? COMBAT_SPEED : d < 160 ? -COMBAT_SPEED * 0.4 : COMBAT_SPEED * 0.3
-              agent.vx = Math.cos(agent.angle) * spd
-              agent.vy = Math.sin(agent.angle) * spd
+              if (agent.hp === 1) {
+                // Survival instinct: low HP → flee, stop firing
+                const fleeAngle = Math.atan2(agent.y - target.y, agent.x - target.x)
+                agent.angle = lerpAngle(agent.angle, fleeAngle, 0.05)
+                agent.vx = Math.cos(agent.angle) * COMBAT_SPEED * 1.2
+                agent.vy = Math.sin(agent.angle) * COMBAT_SPEED * 1.2
+              } else {
+                const desiredAngle = Math.atan2(target.y - agent.y, target.x - agent.x)
+                agent.angle = lerpAngle(agent.angle, desiredAngle, 0.04)
+                agent.vx = Math.cos(agent.angle) * COMBAT_SPEED
+                agent.vy = Math.sin(agent.angle) * COMBAT_SPEED
 
-              if (now - agent.lastShot > agent.fireInterval) {
-                spawnProjectile(agent, target.x + 24, target.y + 24)
-                agent.lastShot = now
-                agent.fireInterval = 1800 + Math.random() * 2400
+                if (now - agent.lastShot > Math.max(agent.fireInterval, MIN_SHOT_MS)
+                    && projs.current.size < MAX_PROJS) {
+                  spawnProjectile(agent, target.x + 24, target.y + 24)
+                  agent.lastShot = now
+                  agent.fireInterval = 1200 + Math.random() * 1800
+                }
               }
             }
           } else {
@@ -880,11 +965,25 @@ function SpaceSim() {
           if (!activeLeader) {
             agent.isLeader = true
             agent.leaderId = null
+            agent.formationState = 'scatter'
           } else {
+            // Compute effective offset based on leader's formation state
+            const fState = activeLeader.formationState
+            let offX = agent.formOffset.x   // cruise: -row*40
+            let offY = agent.formOffset.y   // cruise: side*row*25
+            if (fState === 'combat_spread') {
+              const side = offY >= 0 ? 1 : -1
+              const row  = Math.round(Math.abs(offY) / 25) || 1
+              offX = 0               // flank position — not trailing
+              offY = side * row * 80 // spread wide laterally
+            } else if (fState === 'scatter') {
+              offX *= 2.5; offY *= 2.5
+            }
+
             // Rotate local offset by leader's angle → world target
             const cos = Math.cos(activeLeader.angle), sin = Math.sin(activeLeader.angle)
-            const tx  = activeLeader.x + cos * agent.formOffset.x - sin * agent.formOffset.y
-            const ty  = activeLeader.y + sin * agent.formOffset.x + cos * agent.formOffset.y
+            const tx  = activeLeader.x + cos * offX - sin * offY
+            const ty  = activeLeader.y + sin * offX + cos * offY
             const dx  = tx - agent.x, dy = ty - agent.y
             const d   = Math.sqrt(dx*dx + dy*dy)
 
@@ -904,31 +1003,93 @@ function SpaceSim() {
 
             if (agent.state === 'combat' && agent.targetId) {
               const target = agents.current.get(agent.targetId)
-              if (target && target.state !== 'dying' && now - agent.lastShot > agent.fireInterval) {
+              if (target && target.state !== 'dying'
+                  && now - agent.lastShot > Math.max(agent.fireInterval, MIN_SHOT_MS)
+                  && projs.current.size < MAX_PROJS) {
                 spawnProjectile(agent, target.x + 24, target.y + 24)
                 agent.lastShot = now
-                agent.fireInterval = 2400 + Math.random() * 3000
+                agent.fireInterval = 1500 + Math.random() * 1500
               }
             }
           }
         }
 
+        // ── Predictive collision avoidance (ship-to-ship) ──────────────────────
+        {
+          const myFut = predictedCenter(agent, PRED_SHIP_MS)
+          agents.current.forEach(other => {
+            if (other.id === agent.id || other.state === 'dying') return
+            const otFut = predictedCenter(other, PRED_SHIP_MS)
+            const pd = dist2D(myFut.x, myFut.y, otFut.x, otFut.y)
+            if (pd >= PRED_SHIP_DIST) return
+            const imminence = 1 - pd / PRED_SHIP_DIST
+            const sameFleet = other.fleetId === agent.fleetId
+            const forceMag  = 0.06 * imminence * (sameFleet ? 1.0 : 0.5)
+            // Collision normal (predicted)
+            const nx = (myFut.x - otFut.x) / (pd || 1)
+            const ny = (myFut.y - otFut.y) / (pd || 1)
+            // Perpendicular options — prefer larger |Y| component for Y-axis evasion
+            const p1x = -ny, p1y = nx
+            const p2x =  ny, p2y = -nx
+            const ex = Math.abs(p1y) >= Math.abs(p2y) ? p1x : p2x
+            const ey = Math.abs(p1y) >= Math.abs(p2y) ? p1y : p2y
+            agent.vx += ex * forceMag
+            agent.vy += ey * forceMag
+          })
+        }
+
+        // ── Predictive projectile evasion ───────────────────────────────────────
+        projs.current.forEach(proj => {
+          if (proj.ownerFleetId === agent.fleetId) return
+          const projFutX = proj.x + proj.vx * PRED_PROJ_MS
+          const projFutY = proj.y + proj.vy * PRED_PROJ_MS
+          const agFutX   = agent.x + 24 + agent.vx * PRED_PROJ_MS
+          const agFutY   = agent.y + 24 + agent.vy * PRED_PROJ_MS
+          if (dist2D(agFutX, agFutY, projFutX, projFutY) >= PRED_PROJ_DIST) return
+          // Evade perpendicular to projectile direction, on the side away from it
+          const projLen = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy) || 1
+          const px = -proj.vy / projLen
+          const py =  proj.vx / projLen
+          const sign = px * (agent.x + 24 - proj.x) + py * (agent.y + 24 - proj.y) >= 0 ? 1 : -1
+          agent.vx += px * sign * 0.04
+          agent.vy += py * sign * 0.04
+        })
+
         agent.x += agent.vx * dt
         agent.y += agent.vy * dt
 
-        // Out-of-bounds culling
-        const m = 300
-        if (agent.x < -m || agent.x > W + m || agent.y < -m || agent.y > H + m) {
-          toRemoveAgents.push(agent.id)
-          agentChanged = true
-          return
-        }
+        // Screen wrap — re-enter from opposite edge
+        const m = 60
+        if      (agent.x > W + m) agent.x = -m
+        else if (agent.x < -m)    agent.x = W + m
+        if      (agent.y > H + m) agent.y = -m
+        else if (agent.y < -m)    agent.y = H + m
+
+        // ── Hard minimum separation (position correction, not force) ────────────
+        agents.current.forEach(other => {
+          if (other.id === agent.id || other.state === 'dying') return
+          const dx = agent.x - other.x, dy = agent.y - other.y
+          const d  = Math.sqrt(dx * dx + dy * dy) || 0.01
+          if (d < MIN_SEP) {
+            const push = (MIN_SEP - d) * 0.5
+            agent.x += (dx / d) * push
+            agent.y += (dy / d) * push
+          }
+        })
 
         // Update DOM
         const el = agentEls.current.get(agent.id)
         if (el) {
           el.style.transform  = `translate(${agent.x}px,${agent.y}px) rotate(${agent.angle * 180/Math.PI + 90}deg)`
           el.style.visibility = 'visible'
+        }
+
+        // Update shield visibility
+        const shieldEl = shieldEls.current.get(agent.id)
+        if (shieldEl) {
+          shieldEl.style.opacity = !agent.shieldActive ? '0'
+            : now - agent.lastShieldHit < 150         ? '0.3'
+            : '1'
         }
       })
 
@@ -947,8 +1108,18 @@ function SpaceSim() {
           if (hit || agent.fleetId === proj.ownerFleetId || agent.state === 'dying') return
           if (dist2D(proj.x, proj.y, agent.x + 24, agent.y + 24) < HIT_RADIUS) {
             hit = true
-            agent.hp--
-            if (agent.hp <= 0) killAgent(agent, now)
+            if (agent.shieldActive && agent.shieldHp > 0) {
+              // Shield absorbs the hit
+              agent.shieldHp--
+              agent.lastShieldHit = now
+              if (agent.shieldHp <= 0) {
+                agent.shieldActive = false
+                agent.shieldCooldown = now + 8000
+              }
+            } else {
+              agent.hp--
+              if (agent.hp <= 0) killAgent(agent, now)
+            }
             toRemoveProjs.push(proj.id)
             projChanged = true
           }
@@ -967,6 +1138,20 @@ function SpaceSim() {
       let expChanged = false
       exps.current.forEach((exp, id) => {
         if (now - exp.born > exp.destruction.frames * 75 + 400) { exps.current.delete(id); expChanged = true }
+      })
+
+      // Despawn fully-defeated fleets so their slots open for new spawns
+      // (explosion sprites live in exps.current independently, so early agent removal is safe)
+      const fleetAllDying = new Map<string, boolean>()
+      agents.current.forEach(a => {
+        const cur = fleetAllDying.get(a.fleetId)
+        fleetAllDying.set(a.fleetId, cur !== false && a.state === 'dying')
+      })
+      fleetAllDying.forEach((allDying, fleetId) => {
+        if (!allDying) return
+        agents.current.forEach((a, id) => {
+          if (a.fleetId === fleetId) { toRemoveAgents.push(id); agentChanged = true }
+        })
       })
 
       // Apply removals
@@ -999,6 +1184,7 @@ function SpaceSim() {
               combo={agent.combo}
               trailId={`t-${id}`}
               chaseRole={agent.state === 'combat' ? 'chasing' : undefined}
+              shieldRef={el => { if (el) shieldEls.current.set(id, el); else shieldEls.current.delete(id) }}
             />
           </div>
         )
@@ -1010,10 +1196,17 @@ function SpaceSim() {
           <div
             key={id}
             ref={el => { if (el) projEls.current.set(id, el); else projEls.current.delete(id) }}
-            style={{ position: 'absolute', top: 0, left: 0, transformOrigin: `${proj.w/2}px ${proj.h/2}px`, willChange: 'transform' }}
-          >
-            <img src={proj.src} width={proj.w} height={proj.h} alt="" style={{ display: 'block', imageRendering: 'pixelated' }} />
-          </div>
+            style={{
+              position: 'absolute', top: 0, left: 0,
+              width: proj.fw, height: proj.h,
+              backgroundImage: `url("${proj.src}")`,
+              backgroundSize: `${proj.w}px ${proj.h}px`,
+              backgroundPosition: '0 0',
+              imageRendering: 'pixelated',
+              transformOrigin: `${proj.fw/2}px ${proj.h/2}px`,
+              willChange: 'transform',
+            }}
+          />
         )
       })}
       {expList.map(exp => <ExplosionSprite key={exp.id} exp={exp} />)}
