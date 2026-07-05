@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Font  = 'system' | 'pixel' | 'mono'
-export type Fleet = 'all' | 'mainship' | 'nairan' | 'klaed'
+export type Fleet = 'all' | 'mainship' | 'nairan' | 'klaed' | 'nautolan'
 
 interface OSSettingsState {
   font:        Font

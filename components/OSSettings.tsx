@@ -219,6 +219,7 @@ export default function OSSettings() {
                     { value: 'mainship', label: 'Main'      },
                     { value: 'nairan',   label: 'Nairan'    },
                     { value: 'klaed',    label: "Kla'ed"    },
+                    { value: 'nautolan', label: 'Nautolan'  },
                   ]}
                   value={shipFleet}
                   onChange={v => set('shipFleet', v)}

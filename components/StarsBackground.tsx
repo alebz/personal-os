@@ -36,8 +36,6 @@ const SHIP_ENGINES = [
   { img: `${_B}/Main Ship - Engines/PNGs/Main Ship - Engines - Supercharged Engine.png`,   sheet: `${_B}/Main Ship - Engine Effects/PNGs/Main Ship - Engines - Supercharged Engine - Spritesheet.png`,   frames: 4 },
 ]
 
-// Weapons: horizontal spritesheets, 48px tall per frame (same as ship base)
-// frames = totalWidth / 48
 const SHIP_WEAPONS = [
   { sheet: `${_B}/Main Ship - Weapons/PNGs/Main Ship - Weapons - Auto Cannon.png`,  frames:  7 },
   { sheet: `${_B}/Main Ship - Weapons/PNGs/Main Ship - Weapons - Big Space Gun.png`, frames: 12 },
@@ -45,131 +43,285 @@ const SHIP_WEAPONS = [
   { sheet: `${_B}/Main Ship - Weapons/PNGs/Main Ship - Weapons - Zapper.png`,        frames: 14 },
 ]
 
-
 // ─── Nairan enemy fleet assets ───────────────────────────────────────────────
-// Engine effects: all 8 frames (width/height = 8). Weapons/shields: width÷frameHeight.
 
 const _N = '/Spaceships/Foozle_2DS0013_Void_EnemyFleet_2/Nairan'
+const _ND = `${_N}/Destruction/PNGs`
 
 const NAIRAN_SHIPS = [
   { base: `${_N}/Designs - Base/PNGs/Nairan - Battlecruiser - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Battlecruiser - Engine.png`,
     weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Battlecruiser - Weapons.png`,  frames:  9 },
-    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Battlecruiser - Shield.png`,   frames:  8 } },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Battlecruiser - Shield.png`,   frames:  8 },
+    destruction: { sheet: `${_ND}/Nairan - Battlecruiser  -  Destruction.png`,   frames: 18, size: 128 } },
   { base: `${_N}/Designs - Base/PNGs/Nairan - Bomber - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Bomber - Engine.png`,
     weapon: null,
-    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Bomber - Shield.png`,          frames: 10 } },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Bomber - Shield.png`,          frames: 10 },
+    destruction: { sheet: `${_ND}/Nairan - Bomber -  Destruction.png`,           frames: 16, size: 64 } },
   { base: `${_N}/Designs - Base/PNGs/Nairan - Dreadnought - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Dreadnought - Engine.png`,
     weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Dreadnought - Weapons.png`,    frames: 34 },
-    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Dreadnought - Shield.png`,     frames:  8 } },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Dreadnought - Shield.png`,     frames:  8 },
+    destruction: { sheet: `${_ND}/Nairan - Dreadnought -  Destruction.png`,      frames: 18, size: 128 } },
   { base: `${_N}/Designs - Base/PNGs/Nairan - Fighter - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Fighter - Engine.png`,
     weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Fighter - Weapons.png`,        frames: 28 },
-    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Fighter - Shield.png`,         frames: 20 } },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Fighter - Shield.png`,         frames: 20 },
+    destruction: { sheet: `${_ND}/Nairan - Fighter -  Destruction.png`,          frames: 18, size: 64 } },
   { base: `${_N}/Designs - Base/PNGs/Nairan - Frigate - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Frigate - Engine.png`,
     weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Frigate - Weapons.png`,        frames:  5 },
-    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Frigate - Shield.png`,         frames:  8 } },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Frigate - Shield.png`,         frames:  8 },
+    destruction: { sheet: `${_ND}/Nairan - Frigate -  Destruction.png`,          frames: 16, size: 64 } },
   { base: `${_N}/Designs - Base/PNGs/Nairan - Scout - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Scout - Engine.png`,
     weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Scout - Weapons.png`,          frames:  6 },
-    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Scout - Shield.png`,           frames: 18 } },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Scout - Shield.png`,           frames: 18 },
+    destruction: { sheet: `${_ND}/Nairan - Scout -  Destruction.png`,            frames: 16, size: 64 } },
   { base: `${_N}/Designs - Base/PNGs/Nairan - Support Ship - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Support Ship - Engine.png`,
     weapon: null,
-    shield: null },
+    shield: null,
+    destruction: { sheet: `${_ND}/Nairan - Support Ship -  Destruction.png`,     frames: 16, size: 64 } },
   { base: `${_N}/Designs - Base/PNGs/Nairan - Torpedo Ship - Base.png`,
     engineSheet: `${_N}/Engine Effects/PNGs/Nairan - Torpedo Ship - Engine.png`,
     weapon: { sheet: `${_N}/Weapons/PNGs/Nairan - Torpedo Ship - Weapons.png`,   frames: 12 },
-    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Torpedo Ship - Shield.png`,    frames:  8 } },
+    shield: { sheet: `${_N}/Shields/PNGs/Nairan - Torpedo Ship - Shield.png`,    frames:  8 },
+    destruction: { sheet: `${_ND}/Nairan - Torpedo Ship -  Destruction.png`,     frames: 16, size: 64 } },
 ]
 
 // ─── Kla'ed enemy fleet assets ───────────────────────────────────────────────
-// Engine frames vary per ship (10 or 12). Weapons/shields: width÷frameHeight.
 
 const _K = "/Spaceships/Foozle_2DS0012_Void_EnemyFleet_1/Kla'ed"
+const _KD = `${_K}/Destruction/PNGs`
 
 const KLAED_SHIPS = [
   { base: `${_K}/Base/PNGs/Kla'ed - Battlecruiser - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Battlecruiser - Engine.png`,  engineFrames: 12,
     weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Battlecruiser - Weapons.png`, frames: 30 },
-    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Battlecruiser - Shield.png`,   frames: 16 } },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Battlecruiser - Shield.png`,   frames: 16 },
+    destruction: { sheet: `${_KD}/Kla'ed - Battlecruiser - Destruction.png`,    frames: 14, size: 128 } },
   { base: `${_K}/Base/PNGs/Kla'ed - Bomber - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Bomber - Engine.png`,         engineFrames: 10,
     weapon: null,
-    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Bomber - Shield.png`,          frames:  6 } },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Bomber - Shield.png`,          frames:  6 },
+    destruction: { sheet: `${_KD}/Kla'ed - Bomber - Destruction.png`,           frames:  8, size: 64 } },
   { base: `${_K}/Base/PNGs/Kla'ed - Dreadnought - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Dreadnought - Engine.png`,    engineFrames: 12,
     weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Dreadnought - Weapons.png`,   frames: 60 },
-    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Dreadnought - Shield.png`,     frames: 10 } },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Dreadnought - Shield.png`,     frames: 10 },
+    destruction: { sheet: `${_KD}/Kla'ed - Dreadnought - Destruction.png`,      frames: 12, size: 128 } },
   { base: `${_K}/Base/PNGs/Kla'ed - Fighter - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Fighter - Engine.png`,        engineFrames: 10,
     weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Fighter - Weapons.png`,       frames:  6 },
-    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Fighter - Shield.png`,         frames: 10 } },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Fighter - Shield.png`,         frames: 10 },
+    destruction: { sheet: `${_KD}/Kla'ed - Fighter - Destruction.png`,          frames:  9, size: 64 } },
   { base: `${_K}/Base/PNGs/Kla'ed - Frigate - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Frigate - Engine.png`,        engineFrames: 12,
     weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Frigate - Weapons.png`,       frames:  6 },
-    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Frigate - Shield.png`,         frames: 40 } },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Frigate - Shield.png`,         frames: 40 },
+    destruction: { sheet: `${_KD}/Kla'ed - Frigate - Destruction.png`,          frames:  9, size: 64 } },
   { base: `${_K}/Base/PNGs/Kla'ed - Scout - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Scout - Engine.png`,          engineFrames: 10,
     weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Scout - Weapons.png`,         frames:  6 },
-    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Scout - Shield.png`,           frames: 14 } },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Scout - Shield.png`,           frames: 14 },
+    destruction: { sheet: `${_KD}/Kla'ed - Scout - Destruction.png`,            frames: 10, size: 64 } },
   { base: `${_K}/Base/PNGs/Kla'ed - Support ship - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Support ship - Engine.png`,   engineFrames: 10,
     weapon: null,
-    shield: null },
+    shield: null,
+    destruction: { sheet: `${_KD}/Kla'ed - Support ship - Destruction.png`,     frames: 10, size: 64 } },
   { base: `${_K}/Base/PNGs/Kla'ed - Torpedo Ship - Base.png`,
     engineSheet: `${_K}/Engine/PNGs/Kla'ed - Torpedo Ship - Engine.png`,   engineFrames: 10,
     weapon: { sheet: `${_K}/Weapons/PNGs/Kla'ed - Torpedo Ship - Weapons.png`,  frames: 16 },
-    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Torpedo Ship - Shield.png`,    frames: 10 } },
+    shield: { sheet: `${_K}/Shield/PNGs/Kla'ed - Torpedo Ship - Shield.png`,    frames: 10 },
+    destruction: { sheet: `${_KD}/Kla'ed - Torpedo Ship - Destruction.png`,     frames: 10, size: 64 } },
 ]
 
-const SHIP_SPEED     = 2.4
-const WAVE_AMPLITUDE = 16
-const WAVE_FREQUENCY = 0.004
+// ─── Nautolan enemy fleet assets ─────────────────────────────────────────────
+
+const _NTL  = '/Spaceships/Foozle_2DS0014_Void_EnemyFleet_3/Nautolan'
+const _NTLB = `${_NTL}/Designs - Base/PNGs`
+const _NTLE = `${_NTL}/Engine Effects/PNGs`
+const _NTLW = `${_NTL}/Weapons/PNGs`
+const _NTLS = `${_NTL}/Shields/PNGs`
+const _NTLD = `${_NTL}/Destruction/PNGs`
+
+const NAUTOLAN_SHIPS = [
+  { base: `${_NTLB}/Nautolan Ship - Battlecruiser - Base.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Battlecruiser - Engine Effect.png`,
+    weapon: { sheet: `${_NTLW}/Nautolan Ship - Battlecruiser - Weapons.png`, frames:  9 },
+    shield: { sheet: `${_NTLS}/Nautolan Ship - Battlecruiser - Shield.png`,  frames: 11 },
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Battlecruiser.png`,       frames: 13, size: 128 } },
+  { base: `${_NTLB}/Nautolan Ship - Bomber - Base.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Bomber - Engine Effect.png`,
+    weapon: null,
+    shield: { sheet: `${_NTLS}/Nautolan Ship - Bomber - Shield.png`,         frames: 10 },
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Bomber.png`,              frames: 10, size: 64 } },
+  { base: `${_NTLB}/Nautolan Ship - Dreadnought - Base.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Dreadnought - Engine Effect.png`,
+    weapon: { sheet: `${_NTLW}/Nautolan Ship - Dreadnought - Weapons.png`,   frames: 35 },
+    shield: { sheet: `${_NTLS}/Nautolan Ship - Dreadnought - Shield.png`,    frames: 20 },
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Dreadnought.png`,         frames: 12, size: 128 } },
+  { base: `${_NTLB}/Nautolan Ship - Fighter - Base.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Fighter - Engine Effect.png`,
+    weapon: { sheet: `${_NTLW}/Nautolan Ship - Fighter - Weapons.png`,       frames:  9 },
+    shield: { sheet: `${_NTLS}/Nautolan Ship - Fighter - Shield.png`,        frames: 10 },
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Fighter.png`,             frames:  9, size: 64 } },
+  { base: `${_NTLB}/Nautolan Ship - Frigate - Base.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Frigate - Engine Effect.png`,
+    weapon: { sheet: `${_NTLW}/Nautolan Ship - Frigate - Weapons.png`,       frames:  9 },
+    shield: { sheet: `${_NTLS}/Nautolan Ship - Frigate - Shield.png`,        frames: 36 },
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Frigate.png`,             frames:  9, size: 64 } },
+  { base: `${_NTLB}/Nautolan Ship - Scout - Base.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Scout - Engine Effect.png`,
+    weapon: { sheet: `${_NTLW}/Nautolan Ship - Scout - Weapons.png`,         frames:  7 },
+    shield: { sheet: `${_NTLS}/Nautolan Ship - Scout - Shield.png`,          frames: 13 },
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Scout.png`,               frames:  9, size: 64 } },
+  { base: `${_NTLB}/Nautolan Ship - Support - Base.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Support - Engine Effect.png`,
+    weapon: null,
+    shield: null,
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Support.png`,             frames:  8, size: 64 } },
+  { base: `${_NTLB}/Nautolan Ship - Torpedo Ship.png`,
+    engineSheet: `${_NTLE}/Nautolan Ship - Torpedo Ship - Engine Effect.png`,
+    weapon: { sheet: `${_NTLW}/Nautolan Ship - Torpedo Ship - Weapons.png`,  frames: 16 },
+    shield: { sheet: `${_NTLS}/Nautolan Ship - Torpedo Ship - Shield.png`,   frames:  8 },
+    destruction: { sheet: `${_NTLD}/Nautolan Ship - Torpedo Ship.png`,        frames:  8, size: 64 } },
+]
+
+// ─── Ship combo types ─────────────────────────────────────────────────────────
 
 type ShipLayer = { sheet: string; frames: number }
 type ShipCombo = {
   base: string
-  engineImg: string | null   // Main Ship static engine layer; null for Nairan
+  engineImg: string | null
   engineSheet: string
   engineFrames: number
   weapon: ShipLayer | null
   shield: ShipLayer | null
 }
 
-// ─── Formation types and helpers ─────────────────────────────────────────────
+// ─── Agent system constants ───────────────────────────────────────────────────
 
-type FormationSlot   = { offsetX: number; offsetY: number }
-type FormationMember = { combo: ShipCombo; slot: FormationSlot; phaseOffset: number }
+const CRUISE_SPEED   = 0.10   // px/ms
+const COMBAT_SPEED   = 0.065  // px/ms
+const PROJ_SPEED     = 0.30   // px/ms
+const PROJ_LIFE      = 2200   // ms
+const HIT_RADIUS     = 28     // px — projectile hit distance
+const DETECT_DIST    = 380    // px — combat trigger
 
-const FORMATION_TYPES: FormationSlot[][] = [
-  // FILA INDIA — diagonal line (5 ships)
-  [0,1,2,3,4].map(i => ({ offsetX: -i * 65, offsetY: i * 20 })),
-  // TRIÁNGULO — V formation (5 ships)
-  [
-    { offsetX:    0, offsetY:   0 },
-    { offsetX:  -70, offsetY:  35 }, { offsetX:  -70, offsetY: -35 },
-    { offsetX: -140, offsetY:  70 }, { offsetX: -140, offsetY: -70 },
-  ],
-  // ESCUADRÓN — 2×3 grid (6 ships)
-  [
-    { offsetX:   0, offsetY: -60 }, { offsetX:   0, offsetY:   0 }, { offsetX:   0, offsetY: 60 },
-    { offsetX: -60, offsetY: -60 }, { offsetX: -60, offsetY:   0 }, { offsetX: -60, offsetY: 60 },
-  ],
-  // DIAMANTE — 4 ships
-  [
-    { offsetX:    0, offsetY:   0 },
-    { offsetX:  -60, offsetY:  40 }, { offsetX: -60, offsetY: -40 },
-    { offsetX: -120, offsetY:   0 },
-  ],
-]
+const _NP = `${_N}/Weapon Effects - Projectiles/PNGs`
+const _KP = `${_K}/Projectiles/PNGs`
+const _TP = `${_NTL}/Weapon Effects - Projectiles/PNGs`
+const NAIRAN_PROJ   = { src: `${_NP}/Nairan - Bolt.png`,         w: 45, h:  9 }
+const KLAED_PROJ    = { src: `${_KP}/Kla'ed - Bullet.png`,       w: 16, h: 16 }
+const NAUTOLAN_PROJ = { src: `${_TP}/Nautolan - Bullet.png`,      w: 72, h: 12 }
 
-function randomFormationShip(fleet: 'nairan' | 'klaed', isLeader: boolean): ShipCombo {
+// ─── Agent types ─────────────────────────────────────────────────────────────
+
+type AgentFleetType = 'nairan' | 'klaed' | 'nautolan' | 'mainship'
+
+interface DestructData { sheet: string; frames: number; size: number }
+
+interface ShipAgent {
+  id:           string
+  fleetId:      string
+  fleetType:    AgentFleetType
+  isLeader:     boolean
+  combo:        ShipCombo
+  x:            number
+  y:            number
+  vx:           number    // px/ms
+  vy:           number
+  angle:        number    // radians, 0=right, π/2=down
+  cruiseAngle:  number    // initial heading for wave reference
+  wavePhase:    number
+  state:        'cruising' | 'combat' | 'dying'
+  hp:           number
+  formOffset:   { x: number; y: number }  // local: x=forward, y=right
+  leaderId:     string | null
+  targetId:     string | null
+  lastShot:     number
+  fireInterval: number
+  dyingStart:   number
+  dyingDuration: number
+  destruction:  DestructData | null
+}
+
+interface ProjData {
+  id:           string
+  ownerFleetId: string
+  x:            number; y: number
+  vx:           number; vy: number
+  born:         number
+  src:          string; w: number; h: number
+}
+
+interface ExpData {
+  id:          string
+  x:           number; y: number
+  destruction: DestructData
+  born:        number
+}
+
+// ─── Agent helpers ────────────────────────────────────────────────────────────
+
+function dist2D(ax: number, ay: number, bx: number, by: number): number {
+  const dx = ax - bx, dy = ay - by
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
+function lerpAngle(a: number, b: number, t: number): number {
+  const diff = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+  return a + diff * t
+}
+
+// Local formation offsets: x = forward, y = right (perpendicular)
+function fleetOffsets(count: number): { x: number; y: number }[] {
+  if (count === 1) return [{ x: 0, y: 0 }]
+  const offsets: { x: number; y: number }[] = [{ x: 0, y: 0 }]
+  for (let i = 1; i < count; i++) {
+    const side = i % 2 === 1 ? 1 : -1
+    const row  = Math.ceil(i / 2)
+    offsets.push({ x: -row * 20, y: side * row * 65 })
+  }
+  return offsets
+}
+
+function getDestructData(combo: ShipCombo): DestructData | null {
+  const n = NAIRAN_SHIPS.find(s => s.base === combo.base)
+  if (n) return n.destruction
+  const k = KLAED_SHIPS.find(s => s.base === combo.base)
+  if (k) return k.destruction
+  const t = NAUTOLAN_SHIPS.find(s => s.base === combo.base)
+  if (t) return t.destruction
+  return null
+}
+
+function edgeSpawn(W: number, H: number): { x: number; y: number; angle: number } {
+  const edge = Math.floor(Math.random() * 4)
+  const m = 120
+  switch (edge) {
+    case 0: return { x: m + Math.random() * (W - m*2), y: -m,   angle:  Math.PI / 2 + (Math.random()-0.5)*0.5 }
+    case 1: return { x: W + m, y: m + Math.random() * (H - m*2), angle: Math.PI     + (Math.random()-0.5)*0.5 }
+    case 2: return { x: m + Math.random() * (W - m*2), y: H + m, angle: -Math.PI / 2 + (Math.random()-0.5)*0.5 }
+    default: return { x: -m,  y: m + Math.random() * (H - m*2), angle:                 (Math.random()-0.5)*0.5 }
+  }
+}
+
+// ─── Ship combo pickers ───────────────────────────────────────────────────────
+
+function randomFormationShip(fleet: 'nairan' | 'klaed' | 'nautolan', isLeader: boolean): ShipCombo {
   if (fleet === 'nairan') {
     const ship   = NAIRAN_SHIPS[Math.floor(Math.random() * NAIRAN_SHIPS.length)]
+    const weapon = isLeader ? ship.weapon : (ship.weapon && Math.random() < 0.70 ? ship.weapon : null)
+    const shield = isLeader ? ship.shield : (ship.shield && Math.random() < 0.40 ? ship.shield : null)
+    return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8, weapon, shield }
+  }
+  if (fleet === 'nautolan') {
+    const ship   = NAUTOLAN_SHIPS[Math.floor(Math.random() * NAUTOLAN_SHIPS.length)]
     const weapon = isLeader ? ship.weapon : (ship.weapon && Math.random() < 0.70 ? ship.weapon : null)
     const shield = isLeader ? ship.shield : (ship.shield && Math.random() < 0.40 ? ship.shield : null)
     return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8, weapon, shield }
@@ -178,16 +330,6 @@ function randomFormationShip(fleet: 'nairan' | 'klaed', isLeader: boolean): Ship
   const weapon = isLeader ? ship.weapon : (ship.weapon && Math.random() < 0.70 ? ship.weapon : null)
   const shield = isLeader ? ship.shield : (ship.shield && Math.random() < 0.40 ? ship.shield : null)
   return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames, weapon, shield }
-}
-
-function makeFormation(): FormationMember[] {
-  const fleet = Math.random() < 0.5 ? 'nairan' : 'klaed'
-  const slots = FORMATION_TYPES[Math.floor(Math.random() * FORMATION_TYPES.length)]
-  return slots.map((slot, i) => ({
-    combo:        randomFormationShip(fleet as 'nairan' | 'klaed', i === 0),
-    slot,
-    phaseOffset:  i * 0.8,
-  }))
 }
 
 function randomShip(fleet: Fleet = 'all'): ShipCombo {
@@ -209,44 +351,35 @@ function randomShip(fleet: Fleet = 'all'): ShipCombo {
     const shield = ship.shield && Math.random() < 0.50 ? ship.shield : null
     return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames, weapon, shield }
   }
+  const pickNautolan = () => {
+    const ship   = NAUTOLAN_SHIPS[Math.floor(Math.random() * NAUTOLAN_SHIPS.length)]
+    const weapon = ship.weapon && Math.random() < 0.65 ? ship.weapon : null
+    const shield = ship.shield && Math.random() < 0.50 ? ship.shield : null
+    return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8, weapon, shield }
+  }
   if (fleet === 'mainship') return pickMain()
   if (fleet === 'nairan')   return pickNairan()
   if (fleet === 'klaed')    return pickKlaed()
-  // 'all': weighted random (Main 25%, Nairan 37.5%, Kla'ed 37.5%)
+  if (fleet === 'nautolan') return pickNautolan()
+  // 'all': weighted (Main 20%, Nairan 26.7%, Kla'ed 26.7%, Nautolan 26.7%)
   const r = Math.random()
-  if (r < 0.25)  return pickMain()
-  if (r < 0.625) return pickNairan()
-  return pickKlaed()
-}
-
-function randomShipForChase(forFleeing: boolean): ShipCombo {
-  const r = Math.random()
-  if (r < 0.25) {
-    const base   = SHIP_BASES[Math.floor(Math.random() * SHIP_BASES.length)]
-    const engine = SHIP_ENGINES[Math.floor(Math.random() * SHIP_ENGINES.length)]
-    const weapon = !forFleeing ? SHIP_WEAPONS[Math.floor(Math.random() * SHIP_WEAPONS.length)] : null
-    return { base, engineImg: engine.img, engineSheet: engine.sheet, engineFrames: engine.frames, weapon, shield: null }
-  }
-  if (r < 0.625) {
-    const ship = NAIRAN_SHIPS[Math.floor(Math.random() * NAIRAN_SHIPS.length)]
-    return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: 8,
-      weapon: !forFleeing ? ship.weapon : null,
-      shield: forFleeing ? ship.shield : null }
-  }
-  const ship = KLAED_SHIPS[Math.floor(Math.random() * KLAED_SHIPS.length)]
-  return { base: ship.base, engineImg: null, engineSheet: ship.engineSheet, engineFrames: ship.engineFrames,
-    weapon: !forFleeing ? ship.weapon : null,
-    shield: forFleeing ? ship.shield : null }
+  if (r < 0.20)  return pickMain()
+  if (r < 0.467) return pickNairan()
+  if (r < 0.733) return pickKlaed()
+  return pickNautolan()
 }
 
 function shieldCycleAnim(frames: number): string {
   const kf = frames === 6  ? 'shieldCycle6'
            : frames === 8  ? 'engineCycle8'
            : frames === 10 ? 'engineCycle10'
+           : frames === 11 ? 'shieldCycle11'
+           : frames === 13 ? 'shieldCycle13'
            : frames === 14 ? 'shieldCycle14'
            : frames === 16 ? 'shieldCycle16'
            : frames === 18 ? 'shieldCycle18'
            : frames === 20 ? 'shieldCycle20'
+           : frames === 36 ? 'shieldCycle36'
            : frames === 40 ? 'shieldCycle40'
            : 'engineCycle8'
   return `${kf} 0.4s steps(${frames}, end) infinite`
@@ -386,9 +519,8 @@ function OrbitingPlanet() {
   )
 }
 
-// ─── SVG: Comet (pixel-art, rect-only) ───────────────────────────────────────
+// ─── SVG: Comet ───────────────────────────────────────────────────────────────
 
-// Spark positions in the tail: [x, y, duration, delay, color]
 const COMET_SPARKS: [number, number, string, string, string][] = [
   [3,  4, '0.44s', '0.00s', '#fff8a0'],
   [7,  3, '0.38s', '0.20s', '#ffe880'],
@@ -400,7 +532,6 @@ const COMET_SPARKS: [number, number, string, string, string][] = [
 ]
 
 function CometSVG() {
-  // Head at right (x=27), tail tapers left. SCALE=1 → 28×9px (half of previous 56×18).
   const COLORS = [
     '#1c1a08', '#1c1a08', '#1c1a08', '#1c1a08',
     '#2e2c10', '#2e2c10', '#2e2c10', '#2e2c10',
@@ -416,14 +547,11 @@ function CometSVG() {
       style={{ display: 'block', imageRendering: 'pixelated' }}
       shapeRendering="crispEdges"
     >
-      {/* Main tail body */}
       {COLORS.map((color, x) => {
         const halfH = Math.max(1, Math.round((x / 27) * 4))
         return <rect key={x} x={x} y={4 - halfH} width={1} height={halfH * 2} fill={color} shapeRendering="crispEdges" />
       })}
-      {/* White core at head */}
       <rect x={27} y={4} width={1} height={1} fill="white" shapeRendering="crispEdges" />
-      {/* Tail sparkles — pixels that flicker at staggered intervals */}
       {COMET_SPARKS.map(([x, y, dur, del, c]) => (
         <rect
           key={`s${x}${y}`}
@@ -438,23 +566,6 @@ function CometSVG() {
 }
 
 // ─── Foozle composite ship ────────────────────────────────────────────────────
-//
-// Sprite nose points RIGHT by default.
-// Orientation + banking are handled entirely by the flight keyframes injected
-// per-pass (scaleX(-1) for LTR, scaleX(1) for RTL, small rotate() for banking).
-//
-// Trail extends RIGHT in local space so it appears BEHIND after scaleX flip:
-//   LTR (scaleX(-1)) → trail flips to LEFT  = behind the ship ✓
-//   RTL (scaleX(+1)) → trail stays at RIGHT = behind the ship ✓
-//
-// All spritesheets clipped via background-image so only first frame (or animated
-// frame sequence) is visible — no bleed from adjacent frames.
-//
-// Engine effect frames are 48×96 (natural). Container is 48×48, so we use
-// background-size: N*100% 200% to render at natural 96px height; the 48px
-// container clips to the top 48px = ship-body overlay only (no squish artifact).
-//
-// Weapons are 48px-tall spritesheets; shown as static first frame in a 48×48 div.
 
 function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, engineDelay = '0s' }: {
   combo: ShipCombo
@@ -483,7 +594,6 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, eng
         </defs>
         <line x1="2" y1="0" x2="2" y2="200" stroke={`url(#${trailId})`} strokeDasharray="3 6" strokeWidth="2" />
       </svg>
-      {/* Layer 1: Engine effect (animated spritesheet) */}
       <div style={{
         position: 'absolute', inset: 0, width: 48, height: 48,
         backgroundImage: `url("${engineSheet}")`,
@@ -494,13 +604,10 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, eng
         animation: anim,
         animationDelay: engineDelay,
       }} />
-      {/* Layer 2: Engine base static — Main Ship only */}
       {engineImg && (
         <img src={engineImg} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
       )}
-      {/* Layer 3: Ship base */}
       <img src={base} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
-      {/* Layer 4: Weapon — chasing ships get a red tint */}
       {weapon && (
         <div style={{
           position: 'absolute', inset: 0, width: 48, height: 48,
@@ -512,7 +619,6 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, eng
           filter: chaseRole === 'chasing' ? 'brightness(1.2) hue-rotate(20deg)' : undefined,
         }} />
       )}
-      {/* Layer 5: Shield — flashes on/off; panic mode for fleeing chase ships */}
       {shield && (
         <div style={{
           position: 'absolute', inset: 0, width: 48, height: 48,
@@ -531,229 +637,386 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, eng
   )
 }
 
-// ─── RAF ship (constant-speed, sine-wave path, nose tracks heading) ──────────
+// ─── Explosion sprite (one-shot destruction animation) ────────────────────────
 
-type ShipDir = 'ltr' | 'rtl' | 'ttb' | 'btt'
+function ExplosionSprite({ exp }: { exp: ExpData }) {
+  const { destruction: { sheet, frames, size }, x, y } = exp
+  const duration = (frames * 75) / 1000
+  const toPos    = ((frames / (frames - 1)) * 100).toFixed(2)
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position:         'absolute',
+        left:             x - size / 2 + 24,
+        top:              y - size / 2 + 24,
+        width:            size,
+        height:           size,
+        backgroundImage:  `url("${sheet}")`,
+        backgroundSize:   `${frames * 100}% 100%`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: '0% 0%',
+        imageRendering:   'pixelated',
+        animation:        `destructTo${toPos.replace('.', '_')} ${duration}s steps(${frames}, end) 1 forwards`,
+        pointerEvents:    'none',
+        zIndex:           3,
+      }}
+    />
+  )
+}
 
-function RafShip() {
-  const { shipFleet, showChases } = useOSSettings()
-  const fleetRef      = useRef<Fleet>(shipFleet)
-  const chasesRef     = useRef(showChases)
-  useEffect(() => { fleetRef.current  = shipFleet  }, [shipFleet])
-  useEffect(() => { chasesRef.current = showChases }, [showChases])
+// ─── Space simulation (autonomous agents) ────────────────────────────────────
 
-  const containerARef   = useRef<HTMLDivElement>(null)
-  const containerBRef   = useRef<HTMLDivElement>(null)
-  const comboARef       = useRef<ShipCombo>(randomShip(shipFleet))
-  const [keyA, setKeyA]                         = useState(0)
-  const [chaseCombo, setChaseCombo]             = useState<ShipCombo | null>(null)
-  const [formation,  setFormation]              = useState<FormationMember[] | null>(null)
-  const formationComboRef                        = useRef<FormationMember[] | null>(null)
-  const formationRefs                            = useRef<(HTMLDivElement | null)[]>([])
-  const formPrevPositions                        = useRef<{ x: number; y: number }[]>([])
+function SpaceSim() {
+  const { shipFleet } = useOSSettings()
+  const fleetRef = useRef<Fleet>(shipFleet)
+  useEffect(() => { fleetRef.current = shipFleet }, [shipFleet])
+
+  const agents   = useRef(new Map<string, ShipAgent>())
+  const projs    = useRef(new Map<string, ProjData>())
+  const exps     = useRef(new Map<string, ExpData>())
+  const nextId   = useRef(0)
+  const genId    = () => String(++nextId.current)
+
+  const [agentKeys, setAgentKeys] = useState<string[]>([])
+  const [projKeys,  setProjKeys]  = useState<string[]>([])
+  const [expList,   setExpList]   = useState<ExpData[]>([])
+
+  const agentEls = useRef(new Map<string, HTMLDivElement>())
+  const projEls  = useRef(new Map<string, HTMLDivElement>())
 
   useEffect(() => {
-    let raf: number
-    let cooldownTimer: ReturnType<typeof setTimeout> | null = null
+    let rafId: number
+    let lastTime = performance.now()
+    let nextSpawn = 1500
     let active = true
 
-    function makePass() {
-      const dirs: ShipDir[] = ['ltr', 'rtl', 'ttb', 'btt']
-      const dir = dirs[Math.floor(Math.random() * 4)]
+    function pickType(): AgentFleetType {
+      const fl = fleetRef.current
+      if (fl === 'mainship') return 'mainship'
+      if (fl === 'nairan')   return 'nairan'
+      if (fl === 'klaed')    return 'klaed'
+      if (fl === 'nautolan') return 'nautolan'
+      // 'all': three enemy factions equally likely; mainship rare solo
+      const r = Math.random()
+      if (r < 0.05)  return 'mainship'
+      if (r < 0.37)  return 'nairan'
+      if (r < 0.69)  return 'klaed'
+      return 'nautolan'
+    }
+
+    function spawnFleet() {
       const W = window.innerWidth, H = window.innerHeight
-      let primary: number, baseSecondary: number
-      if (dir === 'ltr')      { primary = -100;    baseSecondary = 100 + Math.random() * (H - 200) }
-      else if (dir === 'rtl') { primary = W + 100; baseSecondary = 100 + Math.random() * (H - 200) }
-      else if (dir === 'ttb') { primary = -100;    baseSecondary = 100 + Math.random() * (W - 200) }
-      else                    { primary = H + 100; baseSecondary = 100 + Math.random() * (W - 200) }
-      const phase1 = Math.random() * Math.PI * 2
-      const phase2 = Math.random() * Math.PI * 2
-      const wave0  = Math.sin(primary * WAVE_FREQUENCY + phase1) * WAVE_AMPLITUDE
-                   + Math.sin(primary * WAVE_FREQUENCY * 2.3 + phase2) * (WAVE_AMPLITUDE * 0.3)
-      const sec0   = baseSecondary + wave0
-      const prevX  = dir === 'ltr' || dir === 'rtl' ? primary : sec0
-      const prevY  = dir === 'ltr' || dir === 'rtl' ? sec0    : primary
-      return { dir, primary, baseSecondary, phase1, phase2, prevX, prevY }
-    }
+      const type  = pickType()
+      const count = type === 'mainship' ? 1 : 1 + Math.floor(Math.random() * 3)
+      const fleetId = genId()
+      const { x: sx, y: sy, angle } = edgeSpawn(W, H)
+      const offsets = fleetOffsets(count)
 
-    const sA = makePass()
-    let bPrimary    = 0
-    let bSecondary  = 0
-    let bPrevX      = 0
-    let bPrevY      = 0
-    let chaseActive    = false
-    let formationActive = false
-    let bShown         = false
-
-    function initChaseB() {
-      const behind  = sA.dir === 'rtl' || sA.dir === 'btt' ? 960 : -960
-      bPrimary      = sA.primary + behind
-      bSecondary    = sA.baseSecondary
-      bPrevX        = sA.dir === 'ltr' || sA.dir === 'rtl' ? bPrimary   : bSecondary
-      bPrevY        = sA.dir === 'ltr' || sA.dir === 'rtl' ? bSecondary : bPrimary
-      bShown        = false
-    }
-
-    function initFormation(f: FormationMember[]) {
-      formationComboRef.current = f
-      setFormation(f)
-      formationRefs.current     = []
-      const isHoriz  = sA.dir === 'ltr' || sA.dir === 'rtl'
-      const tSign    = (sA.dir === 'ltr' || sA.dir === 'ttb') ? 1 : -1
-      const initWave = Math.sin(sA.primary * WAVE_FREQUENCY + sA.phase1) * WAVE_AMPLITUDE
-                     + Math.sin(sA.primary * WAVE_FREQUENCY * 2.3 + sA.phase2) * (WAVE_AMPLITUDE * 0.3)
-      const initSec  = sA.baseSecondary + initWave
-      formPrevPositions.current = f.map(m => {
-        const mp = sA.primary + tSign * m.slot.offsetX
-        const ms = initSec + m.slot.offsetY + Math.sin(mp * 0.006 + m.phaseOffset) * 12
-        return { x: isHoriz ? mp : ms, y: isHoriz ? ms : mp }
+      const newAgents: ShipAgent[] = offsets.map((off, i) => {
+        const isLeader = i === 0
+        const combo    = type === 'mainship'
+          ? randomShip('mainship')
+          : randomFormationShip(type, isLeader)
+        const cos = Math.cos(angle), sin = Math.sin(angle)
+        const wx  = sx + cos * off.x - sin * off.y
+        const wy  = sy + sin * off.x + cos * off.y
+        return {
+          id: genId(), fleetId, fleetType: type, isLeader,
+          combo,
+          x: wx, y: wy,
+          vx: Math.cos(angle) * CRUISE_SPEED,
+          vy: Math.sin(angle) * CRUISE_SPEED,
+          angle, cruiseAngle: angle,
+          wavePhase: Math.random() * Math.PI * 2,
+          state: 'cruising',
+          hp: isLeader ? 3 : 2,
+          formOffset: off,
+          leaderId: null,
+          targetId: null,
+          lastShot: 0,
+          fireInterval: 1800 + Math.random() * 2400,
+          dyingStart: 0, dyingDuration: 0,
+          destruction: getDestructData(combo),
+        }
       })
+
+      const leaderId = newAgents[0].id
+      newAgents.slice(1).forEach(a => { a.leaderId = leaderId })
+      newAgents.forEach(a => agents.current.set(a.id, a))
+      setAgentKeys(prev => [...prev, ...newAgents.map(a => a.id)])
     }
 
-    // Roll for first pass (85% single, 10% formation, 5% chase)
-    {
-      const roll  = Math.random()
-      chaseActive    = chasesRef.current && roll < 0.05
-      formationActive = !chaseActive && roll < 0.15
-      if (chaseActive) {
-        comboARef.current = randomShipForChase(true)
-        initChaseB()
-        setChaseCombo(randomShipForChase(false))
-      } else if (formationActive) {
-        initFormation(makeFormation())
+    function spawnProjectile(owner: ShipAgent, tx: number, ty: number) {
+      const dx = tx - owner.x, dy = ty - owner.y
+      const d  = Math.sqrt(dx*dx + dy*dy) || 1
+      const p  = owner.fleetType === 'nairan'   ? NAIRAN_PROJ
+               : owner.fleetType === 'nautolan' ? NAUTOLAN_PROJ
+               : KLAED_PROJ
+      const id = genId()
+      projs.current.set(id, {
+        id, ownerFleetId: owner.fleetId,
+        x: owner.x + 24, y: owner.y + 24,
+        vx: (dx/d) * PROJ_SPEED, vy: (dy/d) * PROJ_SPEED,
+        born: performance.now(),
+        src: p.src, w: p.w, h: p.h,
+      })
+      setProjKeys(prev => [...prev, id])
+    }
+
+    function killAgent(agent: ShipAgent, now: number) {
+      if (agent.state === 'dying') return
+      agent.state = 'dying'
+      agent.dyingStart = now
+      agent.dyingDuration = (agent.destruction?.frames ?? 16) * 75
+      const el = agentEls.current.get(agent.id)
+      if (el) el.style.visibility = 'hidden'
+      if (agent.destruction) {
+        const exp: ExpData = { id: genId(), x: agent.x, y: agent.y, destruction: agent.destruction, born: now }
+        exps.current.set(exp.id, exp)
+        setExpList([...exps.current.values()])
       }
     }
 
-    function beginPass() {
-      Object.assign(sA, makePass())
-      const roll  = Math.random()
-      chaseActive    = chasesRef.current && roll < 0.05
-      formationActive = !chaseActive && roll < 0.15
-      if (chaseActive) {
-        comboARef.current = randomShipForChase(true)
-        initChaseB()
-        setChaseCombo(randomShipForChase(false))
-        formationComboRef.current = null
-        setFormation(null)
-      } else if (formationActive) {
-        initFormation(makeFormation())
-        setChaseCombo(null)
-      } else {
-        comboARef.current = randomShip(fleetRef.current)
-        setChaseCombo(null)
-        formationComboRef.current = null
-        setFormation(null)
-      }
-      setKeyA(k => k + 1)
-      if (containerARef.current) containerARef.current.style.visibility = formationActive ? 'hidden' : 'visible'
-    }
+    function tick(now: number) {
+      const dt = Math.min(now - lastTime, 50)
+      lastTime = now
 
-    function tick() {
       const W = window.innerWidth, H = window.innerHeight
 
-      sA.primary += (sA.dir === 'rtl' || sA.dir === 'btt') ? -SHIP_SPEED : SHIP_SPEED
-      const waveA      = Math.sin(sA.primary * WAVE_FREQUENCY + sA.phase1) * WAVE_AMPLITUDE
-                       + Math.sin(sA.primary * WAVE_FREQUENCY * 2.3 + sA.phase2) * (WAVE_AMPLITUDE * 0.3)
-      const aSecondary = sA.baseSecondary + waveA
-      const ax         = sA.dir === 'ltr' || sA.dir === 'rtl' ? sA.primary  : aSecondary
-      const ay         = sA.dir === 'ltr' || sA.dir === 'rtl' ? aSecondary  : sA.primary
-      const angA       = Math.atan2(ay - sA.prevY, ax - sA.prevX) * (180 / Math.PI)
-      sA.prevX = ax; sA.prevY = ay
+      // Fleet spawning
+      nextSpawn -= dt
+      if (nextSpawn <= 0) {
+        const activeFleets = new Set<string>()
+        agents.current.forEach(a => { if (a.state !== 'dying') activeFleets.add(a.fleetId) })
+        if (activeFleets.size < 3) {
+          spawnFleet()
+          nextSpawn = 20000 + Math.random() * 20000
+        } else {
+          nextSpawn = 5000
+        }
+      }
 
-      if (formationActive) {
-        if (containerARef.current) containerARef.current.style.visibility = 'hidden'
-        const isHoriz = sA.dir === 'ltr' || sA.dir === 'rtl'
-        const tSign   = (sA.dir === 'ltr' || sA.dir === 'ttb') ? 1 : -1
-        const members = formationComboRef.current
-        if (members) {
-          members.forEach((member, i) => {
-            const el = formationRefs.current[i]
-            if (!el) return
-            const mp   = sA.primary + tSign * member.slot.offsetX
-            const ms   = aSecondary + member.slot.offsetY + Math.sin(mp * 0.006 + member.phaseOffset) * 12
-            const mx   = isHoriz ? mp : ms
-            const my   = isHoriz ? ms : mp
-            const prev = formPrevPositions.current[i] ?? { x: mx - 0.1, y: my }
-            const ang  = Math.atan2(my - prev.y, mx - prev.x) * (180 / Math.PI)
-            formPrevPositions.current[i] = { x: mx, y: my }
-            el.style.transform  = `translate(${mx}px, ${my}px) rotate(${ang + 90}deg)`
-            el.style.visibility = 'visible'
-          })
-        }
-      } else {
-        if (containerARef.current) {
-          containerARef.current.style.transform = `translate(${ax}px, ${ay}px) rotate(${angA + 90}deg)`
-        }
-        if (chaseActive) {
-          bPrimary   += (sA.dir === 'rtl' || sA.dir === 'btt') ? -(SHIP_SPEED * 1.35) : (SHIP_SPEED * 1.35)
-          const isReverse = sA.dir === 'rtl' || sA.dir === 'btt'
-          if (isReverse ? bPrimary - sA.primary < 320 : sA.primary - bPrimary < 320) {
-            bPrimary = sA.primary + (isReverse ? 320 : -320)
-          }
-          bSecondary += (aSecondary - bSecondary) * 0.02
-          const bx   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bPrimary   : bSecondary
-          const by   = sA.dir === 'ltr' || sA.dir === 'rtl' ? bSecondary : bPrimary
-          const angB = Math.atan2(by - bPrevY, bx - bPrevX) * (180 / Math.PI)
-          bPrevX = bx; bPrevY = by
-          if (containerBRef.current) {
-            containerBRef.current.style.transform = `translate(${bx}px, ${by}px) rotate(${angB + 90}deg)`
-            if (!bShown) { containerBRef.current.style.visibility = 'visible'; bShown = true }
+      // Group agents by fleet for combat detection
+      const fleetMap = new Map<string, ShipAgent[]>()
+      agents.current.forEach(a => {
+        if (!fleetMap.has(a.fleetId)) fleetMap.set(a.fleetId, [])
+        fleetMap.get(a.fleetId)!.push(a)
+      })
+
+      const fleetIds = [...fleetMap.keys()]
+      for (let i = 0; i < fleetIds.length; i++) {
+        for (let j = i + 1; j < fleetIds.length; j++) {
+          const fA = fleetMap.get(fleetIds[i])!
+          const fB = fleetMap.get(fleetIds[j])!
+          if (fA[0].fleetType === fB[0].fleetType) continue
+          const lA = fA.find(a => a.isLeader && a.state !== 'dying')
+          const lB = fB.find(a => a.isLeader && a.state !== 'dying')
+          if (!lA || !lB) continue
+          if (dist2D(lA.x, lA.y, lB.x, lB.y) < DETECT_DIST) {
+            fA.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lB.id } })
+            fB.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lA.id } })
           }
         }
       }
 
-      const exited = sA.dir === 'ltr' ? ax > W + 100
-                   : sA.dir === 'rtl' ? ax < -100
-                   : sA.dir === 'ttb' ? ay > H + 100
-                   : ay < -100
+      // Update agents
+      let agentChanged = false
+      const toRemoveAgents: string[] = []
 
-      if (exited) {
-        if (containerARef.current) containerARef.current.style.visibility = 'hidden'
-        if (containerBRef.current) containerBRef.current.style.visibility = 'hidden'
-        formationRefs.current.forEach(el => { if (el) el.style.visibility = 'hidden' })
-        cooldownTimer = setTimeout(() => {
-          if (!active) return
-          beginPass()
-          raf = requestAnimationFrame(tick)
-        }, (15 + Math.random() * 10) * 1000)
-        return
-      }
+      agents.current.forEach(agent => {
+        if (agent.state === 'dying') {
+          if (now - agent.dyingStart > agent.dyingDuration + 200) {
+            toRemoveAgents.push(agent.id)
+            agentChanged = true
+          }
+          return
+        }
 
-      raf = requestAnimationFrame(tick)
+        const leader = agent.leaderId ? agents.current.get(agent.leaderId) : null
+
+        if (agent.isLeader || !agent.leaderId) {
+          // ── Leader / solo steering ──
+          if (agent.state === 'combat') {
+            let target = agent.targetId ? agents.current.get(agent.targetId) : null
+            if (!target || target.state === 'dying') {
+              // Find nearest living enemy
+              let best: ShipAgent | null = null, bestD = Infinity
+              agents.current.forEach(o => {
+                if (o.fleetType === agent.fleetType) return
+                if (o.state === 'dying') return
+                const d = dist2D(agent.x, agent.y, o.x, o.y)
+                if (d < bestD) { bestD = d; best = o }
+              })
+              if (best) { agent.targetId = (best as ShipAgent).id; target = best }
+              else { agent.state = 'cruising'; agent.targetId = null }
+            }
+
+            if (target) {
+              const desiredAngle = Math.atan2(target.y - agent.y, target.x - agent.x)
+              agent.angle = lerpAngle(agent.angle, desiredAngle, 0.025)
+              const d = dist2D(agent.x, agent.y, target.x, target.y)
+              const spd = d > 280 ? COMBAT_SPEED : d < 160 ? -COMBAT_SPEED * 0.4 : COMBAT_SPEED * 0.3
+              agent.vx = Math.cos(agent.angle) * spd
+              agent.vy = Math.sin(agent.angle) * spd
+
+              if (now - agent.lastShot > agent.fireInterval) {
+                spawnProjectile(agent, target.x + 24, target.y + 24)
+                agent.lastShot = now
+                agent.fireInterval = 1800 + Math.random() * 2400
+              }
+            }
+          } else {
+            // Cruising: sine-wave oscillation around cruise heading
+            agent.wavePhase += dt * 0.0006
+            const targetAngle = agent.cruiseAngle + Math.sin(agent.wavePhase) * 0.12
+            agent.angle = lerpAngle(agent.angle, targetAngle, 0.03)
+            agent.vx = Math.cos(agent.angle) * CRUISE_SPEED
+            agent.vy = Math.sin(agent.angle) * CRUISE_SPEED
+          }
+        } else {
+          // ── Wing: follow leader ──
+          const activeLeader = leader && leader.state !== 'dying' ? leader : null
+          if (!activeLeader) {
+            agent.isLeader = true
+            agent.leaderId = null
+          } else {
+            // Rotate local offset by leader's angle → world target
+            const cos = Math.cos(activeLeader.angle), sin = Math.sin(activeLeader.angle)
+            const tx  = activeLeader.x + cos * agent.formOffset.x - sin * agent.formOffset.y
+            const ty  = activeLeader.y + sin * agent.formOffset.x + cos * agent.formOffset.y
+            const dx  = tx - agent.x, dy = ty - agent.y
+            const d   = Math.sqrt(dx*dx + dy*dy)
+
+            if (d > 8) {
+              agent.angle = lerpAngle(agent.angle, Math.atan2(dy, dx), 0.08)
+              const spd = d > 80 ? CRUISE_SPEED * 1.4 : CRUISE_SPEED * (0.5 + d/80 * 0.5)
+              agent.vx = Math.cos(agent.angle) * spd
+              agent.vy = Math.sin(agent.angle) * spd
+            } else {
+              agent.angle = lerpAngle(agent.angle, activeLeader.angle, 0.1)
+              agent.vx = activeLeader.vx
+              agent.vy = activeLeader.vy
+            }
+
+            agent.state    = activeLeader.state
+            agent.targetId = activeLeader.targetId
+
+            if (agent.state === 'combat' && agent.targetId) {
+              const target = agents.current.get(agent.targetId)
+              if (target && target.state !== 'dying' && now - agent.lastShot > agent.fireInterval) {
+                spawnProjectile(agent, target.x + 24, target.y + 24)
+                agent.lastShot = now
+                agent.fireInterval = 2400 + Math.random() * 3000
+              }
+            }
+          }
+        }
+
+        agent.x += agent.vx * dt
+        agent.y += agent.vy * dt
+
+        // Out-of-bounds culling
+        const m = 300
+        if (agent.x < -m || agent.x > W + m || agent.y < -m || agent.y > H + m) {
+          toRemoveAgents.push(agent.id)
+          agentChanged = true
+          return
+        }
+
+        // Update DOM
+        const el = agentEls.current.get(agent.id)
+        if (el) {
+          el.style.transform  = `translate(${agent.x}px,${agent.y}px) rotate(${agent.angle * 180/Math.PI + 90}deg)`
+          el.style.visibility = 'visible'
+        }
+      })
+
+      // Update projectiles
+      let projChanged = false
+      const toRemoveProjs: string[] = []
+
+      projs.current.forEach(proj => {
+        if (now - proj.born > PROJ_LIFE) { toRemoveProjs.push(proj.id); projChanged = true; return }
+        proj.x += proj.vx * dt
+        proj.y += proj.vy * dt
+
+        // Hit detection
+        let hit = false
+        agents.current.forEach(agent => {
+          if (hit || agent.fleetId === proj.ownerFleetId || agent.state === 'dying') return
+          if (dist2D(proj.x, proj.y, agent.x + 24, agent.y + 24) < HIT_RADIUS) {
+            hit = true
+            agent.hp--
+            if (agent.hp <= 0) killAgent(agent, now)
+            toRemoveProjs.push(proj.id)
+            projChanged = true
+          }
+        })
+
+        if (!hit) {
+          const el = projEls.current.get(proj.id)
+          if (el) {
+            const deg = Math.atan2(proj.vy, proj.vx) * 180 / Math.PI
+            el.style.transform = `translate(${proj.x}px,${proj.y}px) rotate(${deg}deg)`
+          }
+        }
+      })
+
+      // Expire explosions
+      let expChanged = false
+      exps.current.forEach((exp, id) => {
+        if (now - exp.born > exp.destruction.frames * 75 + 400) { exps.current.delete(id); expChanged = true }
+      })
+
+      // Apply removals
+      toRemoveAgents.forEach(id => { agents.current.delete(id); agentEls.current.delete(id) })
+      toRemoveProjs.forEach(id => { projs.current.delete(id); projEls.current.delete(id) })
+
+      if (agentChanged) setAgentKeys([...agents.current.keys()])
+      if (projChanged)  setProjKeys([...projs.current.keys()])
+      if (expChanged)   setExpList([...exps.current.values()])
+
+      if (active) rafId = requestAnimationFrame(tick)
     }
 
-    raf = requestAnimationFrame(tick)
-    return () => {
-      active = false
-      cancelAnimationFrame(raf)
-      if (cooldownTimer !== null) clearTimeout(cooldownTimer)
-    }
+    rafId = requestAnimationFrame(tick)
+    return () => { active = false; cancelAnimationFrame(rafId) }
   }, [])
 
   return (
     <>
-      <div ref={containerARef} style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform' }}>
-        <FoozleShip key={'a' + keyA} combo={comboARef.current} chaseRole={chaseCombo ? 'fleeing' : undefined} trailId="foozle-trail-a" />
-      </div>
-      {chaseCombo && (
-        <div ref={containerBRef} style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform', visibility: 'hidden' }}>
-          <FoozleShip key={'b' + keyA} combo={chaseCombo} chaseRole="chasing" trailId="foozle-trail-b" />
-        </div>
-      )}
-      {formation && formation.map((member, i) => (
-        <div
-          key={'f' + keyA + '_' + i}
-          ref={el => { formationRefs.current[i] = el }}
-          style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform', visibility: 'hidden' }}
-        >
-          <FoozleShip
-            combo={member.combo}
-            trailId={`foozle-trail-f${i}`}
-            scale={i === 0 ? 1.0 : 0.85}
-            engineDelay={`${i * 0.15}s`}
-          />
-        </div>
-      ))}
+      {agentKeys.map(id => {
+        const agent = agents.current.get(id)
+        if (!agent) return null
+        return (
+          <div
+            key={id}
+            ref={el => { if (el) agentEls.current.set(id, el); else agentEls.current.delete(id) }}
+            style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '24px 24px', willChange: 'transform', visibility: 'hidden' }}
+          >
+            <FoozleShip
+              combo={agent.combo}
+              trailId={`t-${id}`}
+              chaseRole={agent.state === 'combat' ? 'chasing' : undefined}
+            />
+          </div>
+        )
+      })}
+      {projKeys.map(id => {
+        const proj = projs.current.get(id)
+        if (!proj) return null
+        return (
+          <div
+            key={id}
+            ref={el => { if (el) projEls.current.set(id, el); else projEls.current.delete(id) }}
+            style={{ position: 'absolute', top: 0, left: 0, transformOrigin: `${proj.w/2}px ${proj.h/2}px`, willChange: 'transform' }}
+          >
+            <img src={proj.src} width={proj.w} height={proj.h} alt="" style={{ display: 'block', imageRendering: 'pixelated' }} />
+          </div>
+        )
+      })}
+      {expList.map(exp => <ExplosionSprite key={exp.id} exp={exp} />)}
     </>
   )
 }
@@ -780,14 +1043,12 @@ export function StarsBackground() {
   const schedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clearTimers    = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
-  // ── Stars (generated once on mount) ───────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true
     setStars(generateStars(Date.now()))
     return () => { mountedRef.current = false }
   }, [])
 
-  // ── Weighted event scheduler ───────────────────────────────────────────────
   useEffect(() => {
     function setClear(key: string, fn: () => void, delay: number) {
       if (clearTimers.current[key]) clearTimeout(clearTimers.current[key])
@@ -795,12 +1056,7 @@ export function StarsBackground() {
     }
 
     function fireStar(): number {
-      setStarEvent({
-        x: 10 + Math.random() * 70,
-        y: 10 + Math.random() * 70,
-        angle: 18 + Math.random() * 44,
-        key: `star-${Date.now()}`,
-      })
+      setStarEvent({ x: 10 + Math.random() * 70, y: 10 + Math.random() * 70, angle: 18 + Math.random() * 44, key: `star-${Date.now()}` })
       setClear('star', () => setStarEvent(null), 1400)
       return 0
     }
@@ -851,7 +1107,7 @@ export function StarsBackground() {
     }
 
     function scheduleNext(extraMs = 0) {
-      const gap = (20 + Math.random() * 40) * 1000  // 20–60 s
+      const gap = (20 + Math.random() * 40) * 1000
       schedTimerRef.current = setTimeout(() => {
         if (!mountedRef.current) return
         const extra = fireEvent(pickEvent(isNightTime()))
@@ -860,73 +1116,56 @@ export function StarsBackground() {
     }
 
     scheduleNext(5000)
-
     return () => {
       if (schedTimerRef.current) clearTimeout(schedTimerRef.current)
       Object.values(clearTimers.current).forEach(clearTimeout)
     }
   }, [])
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        @keyframes engineCycle4 {
-          from { background-position: 0% 0%; }
-          to   { background-position: 133.33% 0%; }
-        }
-        @keyframes engineCycle7 {
-          from { background-position: 0% 0%; }
-          to   { background-position: 116.67% 0%; }
-        }
-        @keyframes engineCycle8 {
-          from { background-position: 0% 0%; }
-          to   { background-position: 114.29% 0%; }
-        }
-        @keyframes engineCycle10 {
-          from { background-position: 0% 0%; }
-          to   { background-position: 111.11% 0%; }
-        }
-        @keyframes engineCycle12 {
-          from { background-position: 0% 0%; }
-          to   { background-position: 109.09% 0%; }
-        }
+        @keyframes engineCycle4  { from { background-position: 0% 0%; } to { background-position: 133.33% 0%; } }
+        @keyframes engineCycle7  { from { background-position: 0% 0%; } to { background-position: 116.67% 0%; } }
+        @keyframes engineCycle8  { from { background-position: 0% 0%; } to { background-position: 114.29% 0%; } }
+        @keyframes engineCycle10 { from { background-position: 0% 0%; } to { background-position: 111.11% 0%; } }
+        @keyframes engineCycle12 { from { background-position: 0% 0%; } to { background-position: 109.09% 0%; } }
         @keyframes shieldCycle6  { from { background-position: 0% 0%; } to { background-position: 120.00% 0%; } }
+        @keyframes shieldCycle11 { from { background-position: 0% 0%; } to { background-position: 110.00% 0%; } }
+        @keyframes shieldCycle13 { from { background-position: 0% 0%; } to { background-position: 108.33% 0%; } }
         @keyframes shieldCycle14 { from { background-position: 0% 0%; } to { background-position: 107.69% 0%; } }
         @keyframes shieldCycle16 { from { background-position: 0% 0%; } to { background-position: 106.67% 0%; } }
         @keyframes shieldCycle18 { from { background-position: 0% 0%; } to { background-position: 105.88% 0%; } }
         @keyframes shieldCycle20 { from { background-position: 0% 0%; } to { background-position: 105.26% 0%; } }
+        @keyframes shieldCycle36 { from { background-position: 0% 0%; } to { background-position: 102.86% 0%; } }
         @keyframes shieldCycle40 { from { background-position: 0% 0%; } to { background-position: 102.56% 0%; } }
-        @keyframes shieldFlash {
-          0%, 20%   { opacity: 1; }
-          21%, 100% { opacity: 0; }
-        }
-        @keyframes shieldPanic {
-          0%, 40%   { opacity: 1; }
-          41%, 100% { opacity: 0; }
-        }
-        @keyframes planetSpin {
-          from { background-position-x: 0%; }
-          to   { background-position-x: 100%; }
-        }
-        @keyframes planetOrbit {
+        @keyframes shieldFlash  { 0%, 20%   { opacity: 1; } 21%, 100% { opacity: 0; } }
+        @keyframes shieldPanic  { 0%, 40%   { opacity: 1; } 41%, 100% { opacity: 0; } }
+        @keyframes planetSpin   { from { background-position-x: 0%; } to { background-position-x: 100%; } }
+        @keyframes planetOrbit  {
           0%   { transform: translate(0vw,  0vh);  }
           25%  { transform: translate(30vw, -8vh); }
           50%  { transform: translate(60vw,  0vh); }
           75%  { transform: translate(30vw,  8vh); }
           100% { transform: translate(0vw,  0vh);  }
         }
+        @keyframes destructTo108_33 { from { background-position: 0% 0%; } to { background-position: 108.33% 0%; } }
+        @keyframes destructTo114_29 { from { background-position: 0% 0%; } to { background-position: 114.29% 0%; } }
+        @keyframes destructTo112_50 { from { background-position: 0% 0%; } to { background-position: 112.50% 0%; } }
+        @keyframes destructTo111_11 { from { background-position: 0% 0%; } to { background-position: 111.11% 0%; } }
+        @keyframes destructTo109_09 { from { background-position: 0% 0%; } to { background-position: 109.09% 0%; } }
+        @keyframes destructTo107_69 { from { background-position: 0% 0%; } to { background-position: 107.69% 0%; } }
+        @keyframes destructTo106_67 { from { background-position: 0% 0%; } to { background-position: 106.67% 0%; } }
+        @keyframes destructTo105_88 { from { background-position: 0% 0%; } to { background-position: 105.88% 0%; } }
       `}</style>
+
       {showStars && (
         <div
           aria-hidden="true"
           style={{
-            position: 'fixed',
-            top: '-25vh', left: '-25vw',
+            position: 'fixed', top: '-25vh', left: '-25vw',
             width: '150vw', height: '150vh',
-            pointerEvents: 'none',
-            zIndex: 0,
-            mixBlendMode: 'screen',
+            pointerEvents: 'none', zIndex: 0, mixBlendMode: 'screen',
             transformOrigin: '50% 50%',
             animation: 'sky-rotate 3600s linear infinite',
             viewTransitionName: 'stars-field',
@@ -934,21 +1173,18 @@ export function StarsBackground() {
         >
           {stars.map((s, i) => (
             <div key={i} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, opacity: s.maxOpacity }}>
-              <div
-                style={{
-                  width: `${s.size}px`, height: `${s.size}px`,
-                  background: s.color,
-                  animation: s.isColored
-                    ? `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out, rainbow-cycle ${s.rainbowDur}s ${s.colorDelay}s infinite linear`
-                    : `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out`,
-                }}
-              />
+              <div style={{
+                width: `${s.size}px`, height: `${s.size}px`,
+                background: s.color,
+                animation: s.isColored
+                  ? `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out, rainbow-cycle ${s.rainbowDur}s ${s.colorDelay}s infinite linear`
+                  : `star-blink ${s.blinkDur}s ${s.blinkDelay}s infinite ease-in-out`,
+              }} />
             </div>
           ))}
         </div>
       )}
 
-      {/* Events layer */}
       <div
         aria-hidden="true"
         style={{
@@ -957,40 +1193,20 @@ export function StarsBackground() {
           viewTransitionName: 'stars-events',
         } as React.CSSProperties}
       >
-        {/* Shooting star */}
         {showStars && starEvent && (
-          <div
-            key={starEvent.key}
-            style={{
-              position: 'absolute',
-              left: `${starEvent.x}%`, top: `${starEvent.y}%`,
-              transform: `rotate(${starEvent.angle}deg)`,
-              transformOrigin: 'center',
-            }}
-          >
-            <div
-              style={{
-                width: '2px', height: '2px',
-                background: 'rgba(255,255,255,0.05)',
-                boxShadow: SHOOT_TRAIL,
-                imageRendering: 'pixelated',
-                animation: 'shooting-star 1.2s linear 1 forwards',
-              }}
-            />
+          <div key={starEvent.key} style={{ position: 'absolute', left: `${starEvent.x}%`, top: `${starEvent.y}%`, transform: `rotate(${starEvent.angle}deg)`, transformOrigin: 'center' }}>
+            <div style={{ width: '2px', height: '2px', background: 'rgba(255,255,255,0.05)', boxShadow: SHOOT_TRAIL, imageRendering: 'pixelated', animation: 'shooting-star 1.2s linear 1 forwards' }} />
           </div>
         )}
 
-        {/* Airplane */}
         {showPlanes && planeEvent && (
           <div
             key={planeEvent.key}
             style={{
               position: 'absolute', top: 0, left: 0,
               animation: `plane-travel ${planeEvent.duration}s linear 1 forwards`,
-              ['--px0' as string]: `${planeEvent.x0}vw`,
-              ['--py0' as string]: `${planeEvent.y0}vh`,
-              ['--px1' as string]: `${planeEvent.x1}vw`,
-              ['--py1' as string]: `${planeEvent.y1}vh`,
+              ['--px0' as string]: `${planeEvent.x0}vw`, ['--py0' as string]: `${planeEvent.y0}vh`,
+              ['--px1' as string]: `${planeEvent.x1}vw`, ['--py1' as string]: `${planeEvent.y1}vh`,
             } as React.CSSProperties}
           >
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', transform: `rotate(${planeEvent.angle}deg)` }}>
@@ -1001,42 +1217,22 @@ export function StarsBackground() {
           </div>
         )}
 
-        {/* Satellite */}
         {showStars && satEvent && (
-          <div
-            key={satEvent.key}
-            style={{
-              position: 'absolute',
-              top: `${satEvent.y}%`, left: 0,
-              animation: `${satEvent.rtl ? 'sat-h-rtl' : 'sat-h'} 45s linear 1 forwards`,
-            }}
-          >
+          <div key={satEvent.key} style={{ position: 'absolute', top: `${satEvent.y}%`, left: 0, animation: `${satEvent.rtl ? 'sat-h-rtl' : 'sat-h'} 45s linear 1 forwards` }}>
             <div style={{ animation: 'sat-v 45s ease-in-out 1 forwards' }}>
-              <div
-                style={{
-                  width: '3px', height: '3px',
-                  background: 'rgba(255,255,255,0.9)',
-                  boxShadow: SAT_SHADOW,
-                  imageRendering: 'pixelated',
-                  transform: 'rotate(22deg)',
-                  animation: 'sat-glow 4s ease-in-out infinite',
-                }}
-              />
+              <div style={{ width: '3px', height: '3px', background: 'rgba(255,255,255,0.9)', boxShadow: SAT_SHADOW, imageRendering: 'pixelated', transform: 'rotate(22deg)', animation: 'sat-glow 4s ease-in-out infinite' }} />
             </div>
           </div>
         )}
 
-        {/* Comet */}
         {showComets && cometEvent && (
           <div
             key={cometEvent.key}
             style={{
               position: 'absolute', top: 0, left: 0,
               animation: `comet-travel ${cometEvent.duration}s ease-in-out 1 forwards`,
-              ['--cx0' as string]: `${cometEvent.x0}vw`,
-              ['--cy0' as string]: `${cometEvent.y0}vh`,
-              ['--cx1' as string]: `${cometEvent.x1}vw`,
-              ['--cy1' as string]: `${cometEvent.y1}vh`,
+              ['--cx0' as string]: `${cometEvent.x0}vw`, ['--cy0' as string]: `${cometEvent.y0}vh`,
+              ['--cx1' as string]: `${cometEvent.x1}vw`, ['--cy1' as string]: `${cometEvent.y1}vh`,
             } as React.CSSProperties}
           >
             <div style={{ transform: `rotate(${cometEvent.angle}deg)`, transformOrigin: '27px 4px' }}>
@@ -1044,20 +1240,16 @@ export function StarsBackground() {
             </div>
           </div>
         )}
-
-
       </div>
 
-      {/* Planet layer — persistent orbiting planet, own layer (no screen blend) */}
       {showPlanets && <OrbitingPlanet />}
 
-      {/* Ship layer — above stars and events, normal blend mode */}
       {showShips && (
         <div
           aria-hidden="true"
           style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2 }}
         >
-          <RafShip />
+          <SpaceSim />
         </div>
       )}
     </>
