@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 export type OSSection = { label: string; color: string; href: string; content?: ReactNode }
 
 /* ─────────── PERILLAS DE FEEL (idénticas al prototipo afinado) ─────────── */
-const RADIUS_MULT      = 3.0   // tamaño del tambor (× alto de pantalla)
+const RADIUS_MULT      = 4.5   // tamaño del tambor (× alto de pantalla). MÁS = más aire entre secciones
 const PITCH_DEG        = 16    // grados entre secciones
 const PERSP_MULT       = 1.4   // perspectiva (× alto)
 const DRAG_SENS        = 0.11  // seguimiento del arrastre
@@ -105,7 +105,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         const net = X * PITCH_DEG - rot.current
         const a = Math.abs(net)
         el.style.transform = `rotateX(${net}deg) translateZ(${R}px)`
-        el.style.opacity = String(a > PITCH_DEG * 2.6 ? 0 : Math.max(0, 1 - (a / (PITCH_DEG * 2)) * 0.92))
+        el.style.opacity = String(a >= PITCH_DEG * 0.75 ? 0 : a <= PITCH_DEG * 0.5 ? 1 : 1 - (a - PITCH_DEG * 0.5) / (PITCH_DEG * 0.25))
         el.style.zIndex = String(200 - Math.round(a))
         el.style.pointerEvents = a < PITCH_DEG * 0.6 ? 'auto' : 'none'
       })
@@ -127,12 +127,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         let node: HTMLElement | null = e.target as HTMLElement
         while (node && node !== face.parentElement) {
           const oy = getComputedStyle(node).overflowY
-          if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) {
-            const atTop = node.scrollTop <= 0
-            const atBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 1
-            if (!((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom))) return
-            break
-          }
+          if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return
           node = node.parentElement
         }
       }
