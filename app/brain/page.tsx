@@ -570,22 +570,10 @@ export default function BrainPage() {
 
   return (
     <Shell>
-      <main className="mx-auto max-w-3xl px-6 py-8">
-
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-ink-4">🧠 Cerebro</h1>
-          <p className="mt-1 text-sm text-ink-3">
-            {mode === 'patterns'
-              ? 'Motor de detección de patrones — identifica tendencias en tu vida'
-              : mode === 'notas'
-              ? 'Bóveda de referencia permanente — datos que nunca expiran'
-              : 'Busca en tu memoria semántica o pregunta algo'}
-          </p>
-        </div>
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 pb-[40vh]">
 
         {/* Mode toggle */}
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           {MODE_META.map(({ id, label }) => (
             <button
               key={id}
@@ -765,29 +753,6 @@ export default function BrainPage() {
               </>
             )}
 
-            {/* Empty states */}
-            {mode !== 'patterns' && !hasSearched && !loading && (
-              <div className="py-20 text-center">
-                <p className="mb-3 text-4xl">🔮</p>
-                <p className="text-sm text-ink-3">
-                  Todo lo que capturas — notas, tareas, contactos — vive aquí.<br />
-                  Busca o pregunta en lenguaje natural.
-                </p>
-              </div>
-            )}
-
-            {mode === 'patterns' && !hasAnalyzed && !loading && (
-              <div className="py-20 text-center">
-                <p className="mb-3 text-4xl">🔮</p>
-                <p className="text-sm text-ink-3">
-                  El motor analiza tendencias, correlaciones y temas recurrentes<br />
-                  a través de todas tus memorias — tareas, journal, hábitos y más.
-                </p>
-                <p className="mt-3 text-xs text-ink-3/50">
-                  Opcionalmente enfoca el análisis con una palabra clave.
-                </p>
-              </div>
-            )}
           </>
         )}
 

@@ -59,7 +59,15 @@
       "Bash(awk -F: '$1 > 488')",
       "Bash(grep -n \"mxn\\(\\\\|{mxn\\\\|data-sensitive\\\\|MXN\\\\|\\\\$\" /Users/alexmateo/personal-os/app/uptown/page.tsx)",
       "Bash(grep -n \"mxn\\(\\\\|{mxn\\\\|\\\\$[0-9]\" /Users/alexmateo/personal-os/app/uptown/page.tsx)",
-      "Bash(xargs ls)"
+      "Bash(xargs ls)",
+      "Skill(run)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(osascript *)",
+      "Bash(sips -g pixelWidth -g pixelHeight \"public/Spaceships/Foozle_2DS0016_Void_PickupsPack/Engines/PNGs/Pickup Icon - Engines - Base Engine.png\")",
+      "Bash(sips *)",
+      "Bash(perl -i -pe 's/\\\\bagentRs\\\\.turnRate\\\\b/agent.turnRate/g; s/\\\\brs\\\\.turnRate\\\\b/agent.turnRate/g' components/StarsBackground.tsx)",
+      "Bash(rm -f /tmp/personal-os-dev.log)",
+      "Bash(PORT=3000 npm run dev)"
     ]
   }
 }

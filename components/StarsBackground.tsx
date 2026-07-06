@@ -205,8 +205,9 @@ type ShipCombo = {
 
 // ─── Agent system constants ───────────────────────────────────────────────────
 
-const CRUISE_SPEED   = 0.112  // px/ms  (-20%)
-const COMBAT_SPEED   = 0.083  // px/ms  (-20%)
+const CRUISE_SPEED   = 0.045  // px/ms  (forward-only, 40% of original)
+const COMBAT_SPEED   = 0.033  // px/ms  (forward-only, 40% of original)
+const COMBAT_RATIO   = COMBAT_SPEED / CRUISE_SPEED  // combat speed relative to cruise
 const PROJ_SPEED     = 0.45   // px/ms
 const PROJ_LIFE      = 2200   // ms
 const HIT_RADIUS     = 20     // px — projectile hit distance
@@ -217,16 +218,122 @@ const PRED_SHIP_DIST = 80     // px — predicted collision threshold (ships)
 const PRED_PROJ_MS   = 600    // ms — projectile prediction look-ahead
 const PRED_PROJ_DIST = 40     // px — predicted close-pass threshold (projectiles)
 const MIN_SEP        = 25     // px — hard minimum ship separation
-const MIN_SHOT_MS    = 2500   // ms — minimum time between shots per ship
-const MAX_PROJS      = 12     // global projectile cap
+const MAX_SHIPS      = 8      // hard cap on total active ships
+const MAX_PROJS      = 6      // global projectile cap
 
-const _NP = `${_N}/Weapon Effects - Projectiles/PNGs`
-const _KP = `${_K}/Projectiles/PNGs`
-const _TP = `${_NTL}/Weapon Effects - Projectiles/PNGs`
+type RaceBehavior = 'aggressive' | 'tactical' | 'tank' | 'survivor'
+
+const RACE_STATS = {
+  klaed: {
+    speedMult: 1.3, hp: 2, shieldStrength: 1, shieldRecharge: 4000,
+    fireInterval: 1200, hitRadius: 15, behavior: 'aggressive' as RaceBehavior,
+    retreatThreshold: 1, optimalRange: 0, minRange: 80, maxRange: 150,
+    turnRate: 0.003,
+  },
+  nairan: {
+    speedMult: 1.0, hp: 2, shieldStrength: 2, shieldRecharge: 8000,
+    fireInterval: 2000, hitRadius: 20, behavior: 'tactical' as RaceBehavior,
+    retreatThreshold: 2, optimalRange: 250, minRange: 200, maxRange: 300,
+    turnRate: 0.002,
+  },
+  nautolan: {
+    speedMult: 0.8, hp: 3, shieldStrength: 3, shieldRecharge: 6000,
+    fireInterval: 3000, hitRadius: 25, behavior: 'tank' as RaceBehavior,
+    retreatThreshold: 0, optimalRange: 0, minRange: 120, maxRange: 180,
+    turnRate: 0.0015,
+  },
+  mainship: {
+    speedMult: 1.4, hp: 4, shieldStrength: 1, shieldRecharge: 5000,
+    fireInterval: 2000, hitRadius: 15, behavior: 'survivor' as RaceBehavior,
+    retreatThreshold: 2, optimalRange: 0, minRange: 250, maxRange: 350,
+    turnRate: 0.002,
+  },
+} as const
+
+const _NP  = `${_N}/Weapon Effects - Projectiles/PNGs`
+const _KP  = `${_K}/Projectiles/PNGs`
+const _TP  = `${_NTL}/Weapon Effects - Projectiles/PNGs`
+const _MSW = '/Spaceships/Foozle_2DS0011_Void_MainShip/Main ship weapons/PNGs'
 // w/h = full spritesheet size; frames = number of animation frames; fw = single frame width
-const NAIRAN_PROJ   = { src: `${_NP}/Nairan - Bolt.png`,         w: 45, h:  9, frames: 5, fw:  9 }
-const KLAED_PROJ    = { src: `${_KP}/Kla'ed - Bullet.png`,       w: 16, h: 16, frames: 1, fw: 16 }
-const NAUTOLAN_PROJ = { src: `${_TP}/Nautolan - Bullet.png`,      w: 72, h: 12, frames: 6, fw: 12 }
+const NAIRAN_PROJ   = { src: `${_NP}/Nairan - Rocket.png`,                                   w: 36, h: 16, frames: 4, fw:  9, maxRange: 300 }
+const KLAED_PROJ    = { src: `${_KP}/Kla'ed - Big Bullet.png`,                               w: 32, h: 16, frames: 4, fw:  8, maxRange: 300 }
+const NAUTOLAN_PROJ = { src: `${_TP}/Nautolan - Rocket.png`,                                  w: 96, h: 32, frames: 6, fw: 16, maxRange: 350 }
+const MAINSHIP_PROJ = { src: `${_MSW}/Main ship weapon - Projectile - Rocket.png`,            w: 96, h: 32, frames: 6, fw: 16, maxRange: 400 }
+
+// ─── Pickup assets ───────────────────────────────────────────────────────────
+
+const _PK = '/Spaceships/Foozle_2DS0016_Void_PickupsPack'
+
+const ENGINE_PICKUPS = [
+  { key: 'base',         src: `${_PK}/Engines/PNGs/Pickup Icon - Engines - Base Engine.png`,         speedMult: 1.1  },
+  { key: 'bigpulse',     src: `${_PK}/Engines/PNGs/Pickup Icon - Engines - Big Pulse Engine.png`,    speedMult: 1.2  },
+  { key: 'burst',        src: `${_PK}/Engines/PNGs/Pickup Icon - Engines - Burst Engine.png`,        speedMult: 1.35 },
+  { key: 'supercharged', src: `${_PK}/Engines/PNGs/Pickup Icon - Engines - Supercharged Engine.png`, speedMult: 1.5  },
+] as const
+const SHIELD_PICKUPS = [
+  { key: 'front',         src: `${_PK}/Shield Generators/PNGs/Pickup Icon - Shield Generator - Front Shield.png`,            strength: 1,   duration: 15000 },
+  { key: 'frontside',     src: `${_PK}/Shield Generators/PNGs/Pickup Icon - Shield Generator - Front and Side Shield.png`,   strength: 2,   duration: 12000 },
+  { key: 'allaround',     src: `${_PK}/Shield Generators/PNGs/Pickup Icon - Shield Generator - All around shield.png`,       strength: 3,   duration: 10000 },
+  { key: 'invincibility', src: `${_PK}/Shield Generators/PNGs/Pickup Icon - Shield Generator - Invincibility Shield.png`,   strength: 999, duration:  5000 },
+] as const
+const WEAPON_PICKUPS = [
+  { key: 'autocannon',  src: `${_PK}/Weapons/PNGs/Pickup Icon - Weapons - Auto Cannons.png`,       fireInterval:  800 },
+  { key: 'bigspacegun', src: `${_PK}/Weapons/PNGs/Pickup Icon - Weapons - Big Space Gun 2000.png`, fireInterval: 2000 },
+  { key: 'rocket',      src: `${_PK}/Weapons/PNGs/Pickup Icon - Weapons - Rocket.png`,             fireInterval: 1500 },
+  { key: 'zapper',      src: `${_PK}/Weapons/PNGs/Pickup Icon - Weapons - Zapper.png`,             fireInterval:  600 },
+] as const
+
+// ─── STAT SYSTEM ───────────────────────────────────────────────────────────────
+
+const BASE_SPEED = 0.008  // px/ms per speed-stat point
+
+const RACE_BASE = {
+  klaed:    { speed: 7, armor: 3, turnRate: 8, fireRate: 7, aggression: 9 },
+  nairan:   { speed: 5, armor: 5, turnRate: 5, fireRate: 5, aggression: 5 },
+  nautolan: { speed: 3, armor: 8, turnRate: 3, fireRate: 3, aggression: 6 },
+  mainship: { speed: 8, armor: 4, turnRate: 9, fireRate: 5, aggression: 4 },
+} as const
+
+type EngineKey = 'none' | 'base' | 'bigpulse' | 'burst' | 'supercharged'
+type ShieldKey = 'none' | 'front' | 'frontside' | 'allaround' | 'invincibility'
+type WeaponKey = 'none' | 'autocannon' | 'bigspacegun' | 'rocket' | 'zapper'
+
+const ENGINE_MODS: Record<EngineKey, { speed: number; turn: number; armor: number }> = {
+  none:         { speed: 0,  turn:  0, armor:  0 },
+  base:         { speed: 1,  turn:  0, armor:  0 },
+  bigpulse:     { speed: 2,  turn: -1, armor:  0 },
+  burst:        { speed: 3,  turn: -2, armor:  0 },
+  supercharged: { speed: 4,  turn: -3, armor: -1 },
+}
+const SHIELD_MODS: Record<ShieldKey, { armor: number; speed: number; turn: number; shieldHp: number }> = {
+  none:          { armor: 0, speed:  0, turn:  0, shieldHp: 0 },
+  front:         { armor: 1, speed:  0, turn:  0, shieldHp: 2 },
+  frontside:     { armor: 2, speed: -1, turn:  0, shieldHp: 3 },
+  allaround:     { armor: 3, speed: -2, turn: -1, shieldHp: 4 },
+  invincibility: { armor: 5, speed: -3, turn: -2, shieldHp: 8 },
+}
+const WEAPON_MODS: Record<WeaponKey, { fireRate: number; damage: number; range: number; splash: boolean }> = {
+  none:        { fireRate:  0, damage: 0, range: 0,   splash: false },
+  autocannon:  { fireRate:  3, damage: 1, range: 300, splash: false },
+  bigspacegun: { fireRate: -2, damage: 4, range: 400, splash: false },
+  rocket:      { fireRate: -1, damage: 3, range: 350, splash: true  },
+  zapper:      { fireRate:  2, damage: 2, range: 200, splash: false },
+}
+
+// Per-race engine tint so fleets are distinguishable from afar
+const RACE_HUE: Record<AgentFleetType, number> = {
+  klaed: 0, nairan: 180, nautolan: 90, mainship: 270,
+}
+
+// Dynamic pickup event table — rolled every 30s
+const PICKUP_EVENTS = [
+  { name: 'normal',   weight: 40, engines: 1, shields: 1, weapons: 1 },
+  { name: 'armament', weight: 20, engines: 0, shields: 0, weapons: 3 },
+  { name: 'defense',  weight: 20, engines: 0, shields: 3, weapons: 0 },
+  { name: 'motorush', weight: 10, engines: 3, shields: 0, weapons: 0 },
+  { name: 'scarcity', weight: 10, engines: 0, shields: 0, weapons: 1 },
+] as const
+type PickupEventName = typeof PICKUP_EVENTS[number]['name']
 
 // ─── Agent types ─────────────────────────────────────────────────────────────
 
@@ -245,12 +352,17 @@ interface ShipAgent {
   vx:           number    // px/ms
   vy:           number
   angle:        number    // radians, 0=right, π/2=down
-  cruiseAngle:  number    // initial heading for wave reference
-  wavePhase:    number
-  state:        'cruising' | 'combat' | 'dying'
+  cruiseAngle:  number    // straight-line heading for cruising
+  wavePhase:    number    // sine wave accumulator
+  state:        'cruising' | 'engaging' | 'retreating' | 'regrouping' | 'pickup_seeking' | 'dying'
   hp:           number
-  formOffset:   { x: number; y: number }  // local: x=forward, y=right
-  formationState: 'cruise' | 'combat_spread' | 'scatter'
+  wingSlot:     number    // 0=leader, 1,2,3…=wing index for orbit offset
+  wingAngle:    number    // orbit angle accumulator (wings only)
+  retreatStart:     number    // timestamp when retreating began (0 if not retreating)
+  retreatThreshold: number    // hp value at which to retreat (0 = never)
+  hitRadius:        number    // projectile hit detection radius
+  respawnAt:        number    // mainship respawn timestamp (0 = no respawn pending)
+  prevHp:           number    // previous HP for damage-state sprite updates
   leaderId:     string | null
   targetId:     string | null
   lastShot:     number
@@ -258,19 +370,118 @@ interface ShipAgent {
   dyingStart:   number
   dyingDuration: number
   destruction:  DestructData | null
-  shieldHp:       number   // 0-3; hits remaining before shield breaks
+  shieldHp:       number
   shieldActive:   boolean
-  shieldCooldown: number   // timestamp when shield reactivates (0 = no cooldown)
-  lastShieldHit:  number   // timestamp of last shield absorb (for flash effect)
+  shieldCooldown: number
+  lastShieldHit:  number
+  homeEdge:        number  // 0=top 1=right 2=bottom 3=left -1=random
+  lastTargetUpdate: number
+  regroupStart:    number
+  hasWeapon:          boolean
+  seekingPickupId:    string | null
+  engineBonus:        number  // multiplier from engine pickup (1.0 = none)
+  engineBonusExpiry:  number  // ms timestamp (0 = no bonus)
+  shieldPickupExpiry: number  // ms timestamp (0 = no expiry)
+  fireStopUntil:      number  // stop thrusting for 1.5s after firing (0 = no stop)
+  // ── Stat system (computed by computeStats) ──
+  engineType:  EngineKey
+  shieldType:  ShieldKey
+  weaponType:  WeaponKey
+  maxSpeed:    number   // px/ms cruise speed
+  maxHp:       number   // computed armor
+  turnRate:    number   // rad/ms
+  damage:      number   // projectile damage
+  range:       number   // weapon range (px)
+  splash:      boolean  // rocket splash damage
+  // ── Ancient Races Ecosystem ──
+  spiralUntil:   number  // klaed post-kill victory spiral (0 = none)
+  engagePauseUntil: number  // nairan pre-engage assessment pause (0 = none)
+  respectUntil:  number  // klaed slowed in mourning near fallen kin (0 = none)
+  vengeanceUntil: number // klaed +aggression after mourning (0 = none)
+  targetLockedUntil: number  // commit to current target/pickup until this time (anti-thrash)
 }
 
 interface ProjData {
-  id:           string
-  ownerFleetId: string
-  x:            number; y: number
-  vx:           number; vy: number
-  born:         number
-  src:          string; w: number; h: number; fw: number
+  id:             string
+  ownerFleetId:   string
+  ownerFleetType: AgentFleetType
+  hitRadius:      number
+  x:              number; y: number
+  ox:             number; oy: number
+  vx:             number; vy: number
+  born:           number
+  maxRange:       number
+  src:            string; w: number; h: number; fw: number
+  dead:           boolean
+  damage:         number
+  splash:         boolean
+  ownerId:        string  // killer attribution (victory spiral)
+}
+
+interface BattleScore {
+  klaed:          number
+  nairan:         number
+  nautolan:       number
+  mainshipDeaths: number
+}
+
+// ─── Ancient Races Ecosystem types ─────────────────────────────────────────────
+
+type WarFleet = 'klaed' | 'nairan' | 'nautolan'
+const WAR_FLEETS: WarFleet[] = ['klaed', 'nairan', 'nautolan']
+
+// Damage/kills dealt BY each fleet AGAINST each rival (grudge fuel)
+type WarMemory = Record<WarFleet, Record<WarFleet, number>>
+
+function emptyWarMemory(): WarMemory {
+  return {
+    klaed:    { klaed: 0, nairan: 0, nautolan: 0 },
+    nairan:   { klaed: 0, nairan: 0, nautolan: 0 },
+    nautolan: { klaed: 0, nairan: 0, nautolan: 0 },
+  }
+}
+
+// Ships lost per fleet per zone (4 cols × 3 rows = 12 zones)
+const ZONE_COLS = 4, ZONE_ROWS = 3, ZONE_COUNT = ZONE_COLS * ZONE_ROWS
+type ZoneMemory = Record<WarFleet, number[]>
+function emptyZoneMemory(): ZoneMemory {
+  return { klaed: new Array(ZONE_COUNT).fill(0), nairan: new Array(ZONE_COUNT).fill(0), nautolan: new Array(ZONE_COUNT).fill(0) }
+}
+function zoneIndexOf(x: number, y: number, W: number, H: number): number {
+  const col = Math.max(0, Math.min(ZONE_COLS - 1, Math.floor(x / (W / ZONE_COLS))))
+  const row = Math.max(0, Math.min(ZONE_ROWS - 1, Math.floor(y / (H / ZONE_ROWS))))
+  return row * ZONE_COLS + col
+}
+
+// Drifting wreckage left behind by a destroyed ship
+interface WreckData {
+  id:        string
+  base:      string
+  fleetType: AgentFleetType
+  x:         number; y: number
+  vx:        number; vy: number
+  angle:     number
+  born:      number
+}
+const WRECK_LIFE = 25000   // ms visible
+const WRECK_FADE = 5000    // ms fade at end
+const MAX_WRECKS = 6
+
+// Snapshot of ecosystem state surfaced to the HUD (updated every 5s, not per-frame)
+interface EcoState {
+  dominant: WarFleet | null
+  underdog: WarFleet | null
+  grudge:   Record<WarFleet, WarFleet | null>
+  alliance: Record<WarFleet, WarFleet | null>
+  active:   Record<WarFleet, boolean>
+}
+function emptyEcoState(): EcoState {
+  return {
+    dominant: null, underdog: null,
+    grudge:   { klaed: null, nairan: null, nautolan: null },
+    alliance: { klaed: null, nairan: null, nautolan: null },
+    active:   { klaed: false, nairan: false, nautolan: false },
+  }
 }
 
 interface ExpData {
@@ -278,6 +489,24 @@ interface ExpData {
   x:           number; y: number
   destruction: DestructData
   born:        number
+}
+
+interface PickupData {
+  id:   string
+  type: 'engine' | 'shield' | 'weapon'
+  key:  string  // equip key (matches ENGINE/SHIELD/WEAPON_MODS)
+  src:  string
+  glowColor: string
+  x:    number; y: number
+  born: number
+  speedMult:          number  // engine
+  shieldStrength:     number  // shield
+  shieldDuration:     number  // shield
+  pickupFireInterval: number  // weapon
+}
+
+interface CollectFlash {
+  id: string; x: number; y: number; src: string
 }
 
 // ─── Agent helpers ────────────────────────────────────────────────────────────
@@ -290,6 +519,39 @@ function dist2D(ax: number, ay: number, bx: number, by: number): number {
 function lerpAngle(a: number, b: number, t: number): number {
   const diff = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI
   return a + diff * t
+}
+// Never turn more than ~4.5° in a single frame, no matter what rate is requested.
+// Guards against the turnRate×dt×multiplier product blowing up into an axis-spin.
+const MAX_TURN_PER_FRAME = 0.08  // radians
+function clampTurn(cur: number, tgt: number, max: number): number {
+  // Normalize the difference to the shortest signed path in [-π, π] BEFORE clamping,
+  // so the ship always takes the short way around (never a 350° long-way spin).
+  const diff = ((tgt - cur + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+  const cap  = Math.min(max, MAX_TURN_PER_FRAME)
+  return cur + Math.max(-cap, Math.min(cap, diff))
+}
+
+// Recompute a ship's derived stats from race base + equipped engine/shield/weapon.
+// Call on spawn and after every pickup collection.
+function computeStats(ship: ShipAgent) {
+  const base = RACE_BASE[ship.fleetType]
+  const eng  = ENGINE_MODS[ship.engineType || 'none']
+  const shd  = SHIELD_MODS[ship.shieldType || 'none']
+  const wpn  = WEAPON_MODS[ship.weaponType || 'none']
+
+  const totalSpeed    = base.speed    + eng.speed + shd.speed
+  const totalArmor    = base.armor    + eng.armor + shd.armor
+  const totalTurn     = base.turnRate + eng.turn  + shd.turn
+  const totalFireRate = base.fireRate + wpn.fireRate
+
+  ship.maxSpeed     = Math.max(1, totalSpeed)    * BASE_SPEED
+  ship.maxHp        = Math.max(1, totalArmor)
+  ship.turnRate     = Math.max(0.001, totalTurn) * 0.003
+  ship.fireInterval = Math.max(500, 4000 - totalFireRate * 300)
+  ship.damage       = Math.max(1, wpn.damage)
+  ship.range        = wpn.range || 0
+  ship.splash       = wpn.splash
+  ship.shieldHp     = shd.shieldHp
 }
 
 // Project an agent's center position ms into the future
@@ -310,6 +572,24 @@ function segmentsIntersect(
   const t = (dx * d2y - dy * d2x) / cross
   const u = (dx * d1y - dy * d1x) / cross
   return t >= 0 && t <= 1 && u >= 0 && u <= 1
+}
+
+// Heading angle pointing toward home edge (away from battle)
+function homeAngle(edge: number): number {
+  if (edge === 1) return 0           // right
+  if (edge === 3) return Math.PI     // left
+  if (edge === 0) return -Math.PI / 2 // up (top)
+  if (edge === 2) return  Math.PI / 2 // down (bottom)
+  return 0
+}
+
+// Whether agent has reached within 100px of its home edge
+function atHomeEdge(agent: ShipAgent, W: number, H: number): boolean {
+  if (agent.homeEdge === 1) return agent.x + 24 > W - 100
+  if (agent.homeEdge === 3) return agent.x + 24 < 100
+  if (agent.homeEdge === 0) return agent.y + 24 < 100
+  if (agent.homeEdge === 2) return agent.y + 24 > H - 100
+  return false
 }
 
 // Local formation offsets: x = forward (negative = behind), y = right (perpendicular)
@@ -602,13 +882,15 @@ function CometSVG() {
 
 // ─── Foozle composite ship ────────────────────────────────────────────────────
 
-function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, engineDelay = '0s', shieldRef }: {
+function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, engineDelay = '0s', engineHue = 0, shieldRef, baseRef }: {
   combo: ShipCombo
   chaseRole?: 'fleeing' | 'chasing'
   trailId?: string
   scale?: number
   engineDelay?: string
+  engineHue?: number
   shieldRef?: React.RefCallback<HTMLDivElement>
+  baseRef?: React.RefCallback<HTMLImageElement>
 }) {
   const { base, engineImg, engineSheet, engineFrames, weapon, shield } = combo
   const flashDelay = useRef(Math.random() * 4).current
@@ -639,11 +921,12 @@ function FoozleShip({ combo, chaseRole, trailId = 'foozle-trail', scale = 1, eng
         imageRendering: 'pixelated',
         animation: anim,
         animationDelay: engineDelay,
+        filter: engineHue ? `hue-rotate(${engineHue}deg)` : undefined,
       }} />
       {engineImg && (
         <img src={engineImg} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
       )}
-      <img src={base} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
+      <img ref={baseRef} src={base} style={{ position: 'absolute', inset: 0, width: 48, height: 48, imageRendering: 'pixelated' }} alt="" />
       {weapon && (
         <div style={{
           position: 'absolute', inset: 0, width: 48, height: 48,
@@ -708,6 +991,55 @@ function ExplosionSprite({ exp }: { exp: ExpData }) {
 
 // ─── Space simulation (autonomous agents) ────────────────────────────────────
 
+const FLEET_SHORT: Record<WarFleet, string> = { klaed: 'KLA', nairan: 'NAI', nautolan: 'NAU' }
+
+function ScoreHUD({ score, eco }: { score: BattleScore; eco: EcoState }) {
+  const entries: { key: WarFleet; label: string; color: string; dot: string }[] = [
+    { key: 'klaed',    label: "KLA'ED  ", color: '#e05050', dot: '🔴' },
+    { key: 'nairan',   label: 'NAIRAN  ', color: '#5080e0', dot: '🔵' },
+    { key: 'nautolan', label: 'NAUTOLAN', color: '#d4a820', dot: '🟡' },
+  ]
+  const max = Math.max(score.klaed, score.nairan, score.nautolan, 1)
+
+  // One compact indicator per fleet reflecting its current ecosystem role
+  const indicatorFor = (key: WarFleet): { text: string; color: string } => {
+    if (!eco.active[key])          return { text: '💀', color: '#888' }
+    if (eco.dominant === key)      return { text: '👑 DOMINANTE', color: '#ffd23f' }
+    const ally = eco.alliance[key]
+    if (ally)                      return { text: `🤝 vs ${FLEET_SHORT[ally]}`, color: '#66d9a0' }
+    const gr = eco.grudge[key]
+    if (gr)                        return { text: `⚔ vs ${FLEET_SHORT[gr]}`, color: '#e88' }
+    return { text: '', color: '#888' }
+  }
+
+  return (
+    <div style={{ position: 'fixed', top: 80, left: 16, zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
+      {entries.map(({ key, label, color, dot }) => {
+        const val = score[key]
+        const pct = val / max * 100
+        const isDom = eco.dominant === key
+        const ind = indicatorFor(key)
+        return (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, opacity: isDom ? 1 : 0.6 }}>
+            <span style={{ fontSize: 8 }}>{dot}</span>
+            <span style={{ fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.06em', color: isDom ? '#fff' : '#999', width: 62 }}>{label}</span>
+            <div style={{ width: 44, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.4s ease' }} />
+            </div>
+            <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#999', width: 26, textAlign: 'right' }}>{val}</span>
+            <span style={{ fontFamily: 'monospace', fontSize: 8, letterSpacing: '0.04em', color: ind.color, width: 84, whiteSpace: 'nowrap' }}>{ind.text}</span>
+          </div>
+        )
+      })}
+      {score.mainshipDeaths > 0 && (
+        <div style={{ marginTop: 6, fontFamily: 'monospace', fontSize: 8, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.04em' }}>
+          Main Ship destroyed: {score.mainshipDeaths}×
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SpaceSim() {
   const { shipFleet } = useOSSettings()
   const fleetRef = useRef<Fleet>(shipFleet)
@@ -724,14 +1056,75 @@ function SpaceSim() {
   const [expList,   setExpList]   = useState<ExpData[]>([])
 
   const agentEls  = useRef(new Map<string, HTMLDivElement>())
-  const projEls   = useRef(new Map<string, HTMLDivElement>())
+  const projEls   = useRef(new Map<string, HTMLElement>())
   const shieldEls = useRef(new Map<string, HTMLDivElement>())
+  const baseEls   = useRef(new Map<string, HTMLImageElement>())
+  const pickups   = useRef(new Map<string, PickupData>())
+  const pickupEls = useRef(new Map<string, HTMLDivElement>())
+  const wrecks    = useRef(new Map<string, WreckData>())
+  const wreckEls  = useRef(new Map<string, HTMLElement>())
 
+  const [pickupKeys,     setPickupKeys]     = useState<string[]>([])
+  const [collectFlashes, setCollectFlashes] = useState<CollectFlash[]>([])
+  const [wreckKeys,      setWreckKeys]      = useState<string[]>([])
+
+  // ── Ancient Races Ecosystem persistent memory ──
+  const warMemoryRef = useRef<WarMemory>(emptyWarMemory())
+  const zoneMemRef   = useRef<ZoneMemory>(emptyZoneMemory())
+  const [ecoState, setEcoState] = useState<EcoState>(emptyEcoState)
+
+  const EMPTY_SCORE: BattleScore = { klaed: 0, nairan: 0, nautolan: 0, mainshipDeaths: 0 }
+  const [battleScore, setBattleScore] = useState<BattleScore>(() => {
+    try { const s = localStorage.getItem('battle-score'); return s ? { ...EMPTY_SCORE, ...JSON.parse(s) } : EMPTY_SCORE }
+    catch { return EMPTY_SCORE }
+  })
+  const bsRef            = useRef<BattleScore>(battleScore)
   useEffect(() => {
     let rafId: number
     let lastTime = performance.now()
-    let nextSpawn = 1500
     let active = true
+    let nextBalanceCheck = 0  // fires on first tick
+    let nextRegularWave  = 0  // set after initial spawns
+    let nautilanEdge     = 0  // alternates TOP / BOTTOM for nautolan
+    const revengeQueue: { type: AgentFleetType; triggerAt: number; size: number }[] = []
+    const fleetRetreating         = new Set<string>()
+    const fleetRetreatingCooldown = new Map<string, number>()
+    const fleetOriginalCounts     = new Map<string, number>()
+    // Dynamic pickup-event state (rolled every 30s)
+    let nextPickupEvent  = 0                            // timestamp of next event roll
+    let pickupEventName: PickupEventName = 'normal'
+    let pickupScramble   = false                        // true during 'scarcity' events
+
+    // ── Ancient Races Ecosystem state ──
+    try { const w = localStorage.getItem('war-memory'); if (w) warMemoryRef.current = { ...emptyWarMemory(), ...JSON.parse(w) } } catch {}
+    try { const z = localStorage.getItem('zone-memory'); if (z) zoneMemRef.current = { ...emptyZoneMemory(), ...JSON.parse(z) } } catch {}
+    const warMemory = warMemoryRef.current
+    const zoneMem   = zoneMemRef.current
+    let dominantFleet: WarFleet | null = null
+    let underdogFleet: WarFleet | null = null
+    let ghostAlliance = false                                   // true while a fleet is dominant
+    const grudge: Record<WarFleet, WarFleet | null> = { klaed: null, nairan: null, nautolan: null }
+    const zoneContested: Record<WarFleet, boolean[]> = {
+      klaed: new Array(ZONE_COUNT).fill(false), nairan: new Array(ZONE_COUNT).fill(false), nautolan: new Array(ZONE_COUNT).fill(false),
+    }
+    let nextDominanceCheck = 0   // every 5s
+    let nextWarDecay       = performance.now() + 60000   // every 60s
+    let nextZoneDecay      = performance.now() + 300000  // every 5min
+
+    const isWarFleet = (ft: AgentFleetType): ft is WarFleet => ft !== 'mainship'
+    // Two ships are enemies unless same fleet, or bound by a ghost-alliance truce.
+    // The main ship is everyone's enemy and never allied.
+    function isEnemy(a: AgentFleetType, b: AgentFleetType): boolean {
+      if (a === b) return false
+      if (a === 'mainship' || b === 'mainship') return true
+      if (ghostAlliance && a !== dominantFleet && b !== dominantFleet) return false
+      return true
+    }
+    // Recompute contested zones for a fleet after its loss counters change
+    function refreshContested(ft: WarFleet) {
+      for (let i = 0; i < ZONE_COUNT; i++) zoneContested[ft][i] = zoneMem[ft][i] >= 3
+    }
+    WAR_FLEETS.forEach(refreshContested)
 
     function pickType(): AgentFleetType {
       const fl = fleetRef.current
@@ -747,51 +1140,105 @@ function SpaceSim() {
       return 'nautolan'
     }
 
-    function spawnFleet() {
-      const W = window.innerWidth, H = window.innerHeight
-      const type  = pickType()
-      const count = type === 'mainship' ? 1 : 2 + Math.floor(Math.random() * 3)
-      const fleetId = genId()
-      const { x: sx, y: sy, angle } = edgeSpawn(W, H)
-      const offsets = fleetOffsets(count)
+    function typedEdgeSpawn(type: AgentFleetType, W: number, H: number): { x: number; y: number; angle: number; homeEdge: number } {
+      const m = 120
+      if (type === 'klaed') {
+        return { x: W + m, y: m + Math.random() * (H - m * 2), angle: Math.PI + (Math.random() - 0.5) * 0.4, homeEdge: 1 }
+      }
+      if (type === 'nairan') {
+        return { x: -m, y: m + Math.random() * (H - m * 2), angle: (Math.random() - 0.5) * 0.4, homeEdge: 3 }
+      }
+      if (type === 'nautolan') {
+        const fromTop = (nautilanEdge++ % 2 === 0)
+        return fromTop
+          ? { x: m + Math.random() * (W - m * 2), y: -m,    angle:  Math.PI / 2 + (Math.random() - 0.5) * 0.4, homeEdge: 0 }
+          : { x: m + Math.random() * (W - m * 2), y: H + m, angle: -Math.PI / 2 + (Math.random() - 0.5) * 0.4, homeEdge: 2 }
+      }
+      return { ...edgeSpawn(W, H), homeEdge: -1 }
+    }
 
-      const newAgents: ShipAgent[] = offsets.map((off, i) => {
-        const isLeader  = i === 0
-        const combo     = type === 'mainship'
-          ? randomShip('mainship')
-          : randomFormationShip(type, isLeader)
-        const hasShield = !!(combo.shield && (isLeader || Math.random() < 0.5))
-        const cos = Math.cos(angle), sin = Math.sin(angle)
-        const wx  = sx + cos * off.x - sin * off.y
-        const wy  = sy + sin * off.x + cos * off.y
+    function spawnFleet(type?: AgentFleetType, count?: number, inSpeedMult?: number) {
+      const W = window.innerWidth, H = window.innerHeight
+      const ft      = type ?? pickType()
+      if (agents.current.size >= MAX_SHIPS) return
+      const headroom = MAX_SHIPS - agents.current.size
+      // Underdog recruits reserves: desperate waves bring +1 ship
+      const underdogBonus = ft === underdogFleet ? 1 : 0
+      const sz      = Math.min(
+        (count !== undefined ? count : (ft === 'mainship' ? 1 : 1 + Math.floor(Math.random() * 2))) + underdogBonus,
+        2 + underdogBonus, headroom
+      )
+      const spawn   = typedEdgeSpawn(ft, W, H)
+      const { x: sx, y: sy, angle } = spawn
+      const fleetId = genId()
+
+      const raceStats = RACE_STATS[ft as keyof typeof RACE_STATS] || RACE_STATS.klaed
+      const spdScale  = inSpeedMult ?? 1.0
+      const newAgents: ShipAgent[] = Array.from({ length: sz }, (_, i) => {
+        const isLeader    = i === 0
+        const fullCombo   = ft === 'mainship' ? randomShip('mainship') : randomFormationShip(ft as 'nairan' | 'klaed' | 'nautolan', isLeader)
+        // All ships spawn with no equipment — must collect pickups
+        const combo       = { ...fullCombo, weapon: null, shield: null }
+        const spreadAngle = angle + (i === 0 ? 0 : (Math.random() - 0.5) * 0.4)
+        const spreadDist  = i * 60
         return {
-          id: genId(), fleetId, fleetType: type, isLeader,
+          id: genId(), fleetId, fleetType: ft, isLeader,
           combo,
-          x: wx, y: wy,
-          vx: Math.cos(angle) * CRUISE_SPEED,
-          vy: Math.sin(angle) * CRUISE_SPEED,
+          x: sx + Math.cos(spreadAngle + Math.PI / 2) * spreadDist,
+          y: sy + Math.sin(spreadAngle + Math.PI / 2) * spreadDist,
+          vx: Math.cos(angle) * CRUISE_SPEED * raceStats.speedMult * spdScale,
+          vy: Math.sin(angle) * CRUISE_SPEED * raceStats.speedMult * spdScale,
           angle, cruiseAngle: angle,
           wavePhase: Math.random() * Math.PI * 2,
           state: 'cruising',
-          hp: isLeader ? 3 : 2,
-          formOffset: off,
-          formationState: 'cruise',
+          hp: raceStats.hp, prevHp: raceStats.hp,
+          wingSlot: i,
+          wingAngle: Math.random() * Math.PI * 2,
+          retreatStart: 0,
+          retreatThreshold: raceStats.retreatThreshold,
+          hitRadius: raceStats.hitRadius,
+          respawnAt: 0,
           leaderId: null,
           targetId: null,
           lastShot: 0,
-          fireInterval: 1800 + Math.random() * 2400,
+          fireInterval: raceStats.fireInterval,
           dyingStart: 0, dyingDuration: 0,
           destruction: getDestructData(combo),
-          shieldHp: hasShield ? 1 + Math.floor(Math.random() * 3) : 0,
-          shieldActive: hasShield,
+          shieldHp: 0,
+          shieldActive: false,
           shieldCooldown: 0,
           lastShieldHit: 0,
+          homeEdge: spawn.homeEdge,
+          lastTargetUpdate: 0,
+          regroupStart: 0,
+          hasWeapon: false,
+          seekingPickupId: null,
+          engineBonus: 1.0,
+          engineBonusExpiry: 0,
+          shieldPickupExpiry: 0,
+          fireStopUntil: 0,
+          engineType: 'none' as EngineKey,
+          shieldType: 'none' as ShieldKey,
+          weaponType: 'none' as WeaponKey,
+          maxSpeed: CRUISE_SPEED, maxHp: raceStats.hp, turnRate: raceStats.turnRate,
+          damage: 1, range: 0, splash: false,
+          spiralUntil: 0, engagePauseUntil: 0, respectUntil: 0, vengeanceUntil: 0,
+          targetLockedUntil: 0,
         }
+      })
+
+      // Derive stats from race base + (empty) equipment; align hp & velocity
+      newAgents.forEach(a => {
+        computeStats(a)
+        a.hp = a.maxHp; a.prevHp = a.maxHp
+        a.vx = Math.cos(a.angle) * a.maxSpeed * spdScale
+        a.vy = Math.sin(a.angle) * a.maxSpeed * spdScale
       })
 
       const leaderId = newAgents[0].id
       newAgents.slice(1).forEach(a => { a.leaderId = leaderId })
       newAgents.forEach(a => agents.current.set(a.id, a))
+      fleetOriginalCounts.set(fleetId, sz)
       setAgentKeys(prev => [...prev, ...newAgents.map(a => a.id)])
     }
 
@@ -800,23 +1247,100 @@ function SpaceSim() {
       const d  = Math.sqrt(dx*dx + dy*dy) || 1
       const p  = owner.fleetType === 'nairan'   ? NAIRAN_PROJ
                : owner.fleetType === 'nautolan' ? NAUTOLAN_PROJ
+               : owner.fleetType === 'mainship' ? MAINSHIP_PROJ
                : KLAED_PROJ
       const id = genId()
+      const ox = owner.x + 24, oy = owner.y + 24
       projs.current.set(id, {
-        id, ownerFleetId: owner.fleetId,
-        x: owner.x + 24, y: owner.y + 24,
+        id, ownerFleetId: owner.fleetId, ownerFleetType: owner.fleetType,
+        hitRadius: owner.hitRadius,
+        x: ox, y: oy, ox, oy,
         vx: (dx/d) * PROJ_SPEED, vy: (dy/d) * PROJ_SPEED,
         born: performance.now(),
+        maxRange: owner.range > 0 ? owner.range : p.maxRange,
         src: p.src, w: p.w, h: p.h, fw: p.fw,
+        dead: false,
+        damage: owner.damage, splash: owner.splash,
+        ownerId: owner.id,
       })
       setProjKeys(prev => [...prev, id])
     }
 
-    function killAgent(agent: ShipAgent, now: number) {
+    function awardKill(killerType: AgentFleetType, victimIsLeader: boolean, victimFleetType: AgentFleetType) {
+      if (killerType === 'mainship') return
+      const pts = victimFleetType === 'mainship' ? 5 : (victimIsLeader ? 5 : 1)
+      const bs  = bsRef.current
+      const next: BattleScore = {
+        klaed:          bs.klaed    + (killerType === 'klaed'    ? pts : 0),
+        nairan:         bs.nairan   + (killerType === 'nairan'   ? pts : 0),
+        nautolan:       bs.nautolan + (killerType === 'nautolan' ? pts : 0),
+        mainshipDeaths: bs.mainshipDeaths + (victimFleetType === 'mainship' ? 1 : 0),
+      }
+      bsRef.current = next
+      localStorage.setItem('battle-score', JSON.stringify(next))
+      setBattleScore(next)
+      // War memory: killer fleet's grudge fuel against the victim fleet grows
+      if (isWarFleet(killerType) && isWarFleet(victimFleetType)) {
+        warMemory[killerType][victimFleetType] += pts
+        localStorage.setItem('war-memory', JSON.stringify(warMemory))
+      }
+    }
+
+    // Leave drifting wreckage at a ship's grave (capped at MAX_WRECKS, oldest evicted)
+    function spawnWreck(agent: ShipAgent, now: number) {
+      if (wrecks.current.size >= MAX_WRECKS) {
+        let oldestId: string | null = null, oldestBorn = Infinity
+        wrecks.current.forEach(w => { if (w.born < oldestBorn) { oldestBorn = w.born; oldestId = w.id } })
+        if (oldestId) { wrecks.current.delete(oldestId); wreckEls.current.delete(oldestId) }
+      }
+      const id = genId()
+      const drift = Math.random() * Math.PI * 2
+      wrecks.current.set(id, {
+        id, base: agent.combo.base, fleetType: agent.fleetType,
+        x: agent.x, y: agent.y,
+        vx: Math.cos(drift) * 0.002, vy: Math.sin(drift) * 0.002,  // 2px/s
+        angle: (Math.random() - 0.5) * 0.6, born: now,
+      })
+      setWreckKeys([...wrecks.current.keys()])
+    }
+
+    function respawnMainship(agent: ShipAgent, now: number) {
+      const W = window.innerWidth, H = window.innerHeight
+      const { x, y, angle } = edgeSpawn(W, H)
+      const newCombo = randomShip('mainship')
+      agent.combo       = newCombo
+      agent.x = x; agent.y = y
+      agent.angle = angle; agent.cruiseAngle = angle
+      agent.wavePhase   = Math.random() * Math.PI * 2
+      agent.state       = 'cruising'
+      agent.respawnAt   = 0
+      agent.targetId    = null; agent.retreatStart = 0
+      agent.lastShot    = 0
+      agent.shieldHp    = 0
+      agent.shieldActive = false; agent.shieldCooldown = 0; agent.lastShieldHit = 0
+      agent.hasWeapon   = false; agent.combo = { ...newCombo, weapon: null, shield: null }
+      agent.fireStopUntil = 0; agent.seekingPickupId = null
+      agent.spiralUntil = 0; agent.engagePauseUntil = 0; agent.respectUntil = 0; agent.vengeanceUntil = 0
+      agent.targetLockedUntil = 0
+      // Reset equipment and recompute stats
+      agent.engineType = 'none'; agent.shieldType = 'none'; agent.weaponType = 'none'
+      computeStats(agent)
+      agent.hp = agent.maxHp; agent.prevHp = agent.maxHp
+      agent.vx = Math.cos(angle) * agent.maxSpeed
+      agent.vy = Math.sin(angle) * agent.maxSpeed
+      const el = agentEls.current.get(agent.id)
+      if (el) el.style.visibility = 'visible'
+      const baseEl = baseEls.current.get(agent.id)
+      if (baseEl) baseEl.src = SHIP_BASES[0]
+    }
+
+    function killAgent(agent: ShipAgent, now: number, killerType?: AgentFleetType, killerId?: string) {
       if (agent.state === 'dying') return
       agent.state = 'dying'
+      agent.vx = 0; agent.vy = 0
       agent.dyingStart = now
       agent.dyingDuration = (agent.destruction?.frames ?? 16) * 75
+      if (agent.fleetType === 'mainship') agent.respawnAt = now + 8000
       const el = agentEls.current.get(agent.id)
       if (el) el.style.visibility = 'hidden'
       if (agent.destruction) {
@@ -824,6 +1348,85 @@ function SpaceSim() {
         exps.current.set(exp.id, exp)
         setExpList([...exps.current.values()])
       }
+      // Battle relic — leave wreckage where the ship fell
+      if (agent.fleetType !== 'mainship') spawnWreck(agent, now)
+      // Emotional territory — record the loss in this zone (memory of where kin fell)
+      if (isWarFleet(agent.fleetType)) {
+        const W = window.innerWidth, H = window.innerHeight
+        const zi = zoneIndexOf(agent.x + 24, agent.y + 24, W, H)
+        zoneMem[agent.fleetType][zi] += 1
+        refreshContested(agent.fleetType)
+        localStorage.setItem('zone-memory', JSON.stringify(zoneMem))
+      }
+      if (killerType) awardKill(killerType, agent.isLeader, agent.fleetType)
+      // Kla'ed victory spiral — the killer celebrates with a defiant spin
+      if (killerType === 'klaed' && killerId) {
+        const killer = agents.current.get(killerId)
+        if (killer && killer.state !== 'dying') killer.spiralUntil = now + 800
+      }
+      // Nairan chain of command — when a leader falls, the wing pulls back to regroup
+      if (agent.isLeader && agent.fleetType === 'nairan') {
+        let newLeader: ShipAgent | null = null
+        agents.current.forEach(b => {
+          if (b.fleetId !== agent.fleetId || b.id === agent.id || b.state === 'dying') return
+          if (!newLeader) newLeader = b
+          b.state = 'retreating'; b.retreatStart = now
+        })
+        if (newLeader) { (newLeader as ShipAgent).isLeader = true; (newLeader as ShipAgent).leaderId = null }
+      }
+      if (agent.isLeader && agent.fleetType !== 'mainship') {
+        revengeQueue.push({ type: agent.fleetType, triggerAt: now + 5000, size: 1 })
+      }
+    }
+
+    function spawnPickup(type: 'engine' | 'shield' | 'weapon', now: number) {
+      const W = window.innerWidth, H = window.innerHeight
+      const m = 100
+      const x = m + Math.random() * (W - m * 2)
+      const y = m + Math.random() * (H - m * 2)
+      const id = genId()
+      let src = '', key = 'none', speedMult = 1.0, shieldStrength = 1, shieldDuration = 0, pickupFireInterval = 800
+      if (type === 'engine') {
+        const e = ENGINE_PICKUPS[Math.floor(Math.random() * ENGINE_PICKUPS.length)]
+        src = e.src; key = e.key; speedMult = e.speedMult
+      } else if (type === 'shield') {
+        const s = SHIELD_PICKUPS[Math.floor(Math.random() * SHIELD_PICKUPS.length)]
+        src = s.src; key = s.key; shieldStrength = s.strength; shieldDuration = s.duration
+      } else {
+        const w = WEAPON_PICKUPS[Math.floor(Math.random() * WEAPON_PICKUPS.length)]
+        src = w.src; key = w.key; pickupFireInterval = w.fireInterval
+      }
+      const glowColor = type === 'engine'
+        ? 'drop-shadow(0 0 6px rgba(255,180,50,0.9)) drop-shadow(0 0 12px rgba(255,140,20,0.5))'
+        : type === 'shield'
+        ? 'drop-shadow(0 0 6px rgba(100,200,255,0.9)) drop-shadow(0 0 12px rgba(60,160,255,0.5))'
+        : 'drop-shadow(0 0 6px rgba(255,80,80,0.9)) drop-shadow(0 0 12px rgba(220,40,40,0.5))'
+      const pk: PickupData = { id, type, key, src, glowColor, x, y, born: now, speedMult, shieldStrength, shieldDuration, pickupFireInterval }
+      pickups.current.set(id, pk)
+      setPickupKeys(prev => [...prev, id])
+    }
+
+    function collectPickup(agent: ShipAgent, pickup: PickupData, now: number) {
+      if (pickup.type === 'weapon') {
+        agent.weaponType = pickup.key as WeaponKey
+        agent.hasWeapon = true
+      } else if (pickup.type === 'shield') {
+        agent.shieldType = pickup.key as ShieldKey
+        agent.shieldActive = true
+        agent.shieldCooldown = 0
+        agent.shieldPickupExpiry = pickup.shieldDuration > 0 ? now + pickup.shieldDuration : 0
+      } else {
+        agent.engineType = pickup.key as EngineKey
+      }
+      // Recompute all derived stats from the new equipment loadout
+      computeStats(agent)
+      if (agent.hp > agent.maxHp) agent.hp = agent.maxHp
+      pickups.current.delete(pickup.id)
+      pickupEls.current.delete(pickup.id)
+      setPickupKeys([...pickups.current.keys()])
+      setCollectFlashes(prev => [...prev, { id: genId(), x: pickup.x, y: pickup.y, src: pickup.src }])
+      agent.seekingPickupId = null
+      agent.state = 'cruising'
     }
 
     function tick(now: number) {
@@ -832,244 +1435,667 @@ function SpaceSim() {
 
       const W = window.innerWidth, H = window.innerHeight
 
-      // Fleet spawning
-      nextSpawn -= dt
-      if (nextSpawn <= 0) {
-        const activeFleets = new Set<string>()
-        agents.current.forEach(a => { if (a.state !== 'dying') activeFleets.add(a.fleetId) })
-        if (activeFleets.size < 4) {
-          spawnFleet()
-          nextSpawn = 12000 + Math.random() * 8000
-        } else {
-          nextSpawn = 3000
-        }
-      }
-
-      // Group agents by fleet for combat detection
-      const fleetMap = new Map<string, ShipAgent[]>()
-      agents.current.forEach(a => {
-        if (!fleetMap.has(a.fleetId)) fleetMap.set(a.fleetId, [])
-        fleetMap.get(a.fleetId)!.push(a)
-      })
-
-      const fleetIds = [...fleetMap.keys()]
-      for (let i = 0; i < fleetIds.length; i++) {
-        for (let j = i + 1; j < fleetIds.length; j++) {
-          const fA = fleetMap.get(fleetIds[i])!
-          const fB = fleetMap.get(fleetIds[j])!
-          if (fA[0].fleetType === fB[0].fleetType) continue
-          const lA = fA.find(a => a.isLeader && a.state !== 'dying')
-          const lB = fB.find(a => a.isLeader && a.state !== 'dying')
-          if (!lA || !lB) continue
-          if (dist2D(lA.x, lA.y, lB.x, lB.y) < DETECT_DIST) {
-            fA.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lB.id; if (a.isLeader) a.formationState = 'combat_spread' } })
-            fB.forEach(a => { if (a.state === 'cruising') { a.state = 'combat'; a.targetId = lA.id; if (a.isLeader) a.formationState = 'combat_spread' } })
+      // ── GALCON SPAWN SYSTEM ─────────────────────────────────────────────────
+      // Balance check every 3s: fleet-wide retreat trigger + reinforcement
+      if (now >= nextBalanceCheck) {
+        nextBalanceCheck = now + 3000
+        const factions: AgentFleetType[] = ['klaed', 'nairan', 'nautolan']
+        const activeCounts: Partial<Record<AgentFleetType, number>> = {}
+        let totalActive = 0
+        agents.current.forEach(a => {
+          if (a.state === 'dying' || a.state === 'regrouping' || a.fleetType === 'mainship') return
+          activeCounts[a.fleetType] = (activeCounts[a.fleetType] ?? 0) + 1
+          totalActive++
+        })
+        // Fleet-wide retreat: any fleet ≤ 40% of original count
+        const checkedFleets = new Set<string>()
+        agents.current.forEach(a => {
+          if (a.fleetType === 'mainship' || checkedFleets.has(a.fleetId)) return
+          checkedFleets.add(a.fleetId)
+          if (fleetRetreating.has(a.fleetId)) return
+          if ((fleetRetreatingCooldown.get(a.fleetId) ?? 0) > now) return
+          const original = fleetOriginalCounts.get(a.fleetId) ?? 0
+          if (original < 3) return
+          let alive = 0
+          agents.current.forEach(b => { if (b.fleetId === a.fleetId && b.state !== 'dying') alive++ })
+          if (alive / original <= 0.4) {
+            fleetRetreating.add(a.fleetId)
+            fleetRetreatingCooldown.set(a.fleetId, now + 60000)
+            agents.current.forEach(b => {
+              if (b.fleetId !== a.fleetId || b.state === 'dying') return
+              b.state = 'retreating'; b.retreatStart = now
+              if (b.shieldType !== 'none' && b.shieldCooldown === 0) {
+                b.shieldActive = true; b.shieldHp = SHIELD_MODS[b.shieldType].shieldHp
+              }
+            })
           }
+        })
+        // Balance reinforcement: only if screen is nearly empty
+        if (totalActive < 4) {
+          const weakest = factions.reduce((a, b) => (activeCounts[a] ?? 0) <= (activeCounts[b] ?? 0) ? a : b)
+          spawnFleet(weakest)
         }
       }
+      // Regular wave every 20-30s: spawn for weakest faction
+      if (now >= nextRegularWave && nextRegularWave > 0) {
+        nextRegularWave = now + 25000 + Math.random() * 10000
+        const factions: AgentFleetType[] = ['klaed', 'nairan', 'nautolan']
+        const activeCounts: Partial<Record<AgentFleetType, number>> = {}
+        agents.current.forEach(a => {
+          if (a.state === 'dying' || a.fleetType === 'mainship') return
+          activeCounts[a.fleetType] = (activeCounts[a.fleetType] ?? 0) + 1
+        })
+        const weakest = factions.reduce((a, b) => (activeCounts[a] ?? 0) <= (activeCounts[b] ?? 0) ? a : b)
+        spawnFleet(weakest)
+      }
+      // Revenge waves: oversized fast wave 5s after a leader is killed
+      for (let i = revengeQueue.length - 1; i >= 0; i--) {
+        const rv = revengeQueue[i]
+        if (now >= rv.triggerAt) { spawnFleet(rv.type, rv.size, 1.5); revengeQueue.splice(i, 1) }
+      }
+      // ── DYNAMIC PICKUP EVENTS ─────────────────────────────────────────────────
+      // Every 30s roll a weighted event that dictates what spawns for the period.
+      if (now >= nextPickupEvent) {
+        nextPickupEvent = now + 30000
+        // Weighted random event selection
+        const total = PICKUP_EVENTS.reduce((s, e) => s + e.weight, 0)
+        let r = Math.random() * total
+        let ev: typeof PICKUP_EVENTS[number] = PICKUP_EVENTS[0]
+        for (const e of PICKUP_EVENTS) { r -= e.weight; if (r <= 0) { ev = e; break } }
+        pickupEventName = ev.name
+        pickupScramble  = ev.name === 'scarcity'
+        // Clear leftover pickups from the previous event
+        pickups.current.clear()
+        pickupEls.current.clear()
+        // Spawn the event's loadout simultaneously
+        for (let i = 0; i < ev.engines; i++) spawnPickup('engine', now)
+        for (let i = 0; i < ev.shields; i++) spawnPickup('shield', now)
+        for (let i = 0; i < ev.weapons; i++) spawnPickup('weapon', now)
+        setPickupKeys([...pickups.current.keys()])
+      }
 
-      // Ship-to-ship collision — continuous detection catches tunneling ships
+      // Ship-to-ship collision — 2 damage each, segment intersection for tunneling
       agents.current.forEach((aA, idA) => {
         if (aA.state === 'dying') return
         agents.current.forEach((aB, idB) => {
-          if (idA >= idB) return
-          if (aB.state === 'dying') return
-          if (aA.fleetType === aB.fleetType) return
+          if (idA >= idB || aB.state === 'dying' || !isEnemy(aA.fleetType, aB.fleetType)) return
           const ax = aA.x + 24, ay = aA.y + 24
           const bx = aB.x + 24, by = aB.y + 24
-          // Point check (current frame)
-          if (dist2D(ax, ay, bx, by) < COLLIDE_DIST) {
-            killAgent(aA, now); killAgent(aB, now); return
-          }
-          // Segment check — previous position → current position (catches tunneling)
-          if (segmentsIntersect(
-            ax - aA.vx * dt, ay - aA.vy * dt, ax, ay,
-            bx - aB.vx * dt, by - aB.vy * dt, bx, by
-          )) {
-            killAgent(aA, now); killAgent(aB, now)
-          }
+          const collide = dist2D(ax, ay, bx, by) < COLLIDE_DIST
+            || segmentsIntersect(ax - aA.vx*dt, ay - aA.vy*dt, ax, ay, bx - aB.vx*dt, by - aB.vy*dt, bx, by)
+          if (!collide) return
+          aA.hp -= 2; aB.hp -= 2
+          if (aA.hp <= 0) killAgent(aA, now)
+          if (aB.hp <= 0) killAgent(aB, now)
         })
       })
 
-      // Update agents
+      // ── WAR MEMORY DECAY: old grudges fade 5% every 60s ──
+      if (now >= nextWarDecay) {
+        nextWarDecay = now + 60000
+        WAR_FLEETS.forEach(a => WAR_FLEETS.forEach(b => { warMemory[a][b] *= 0.95 }))
+        localStorage.setItem('war-memory', JSON.stringify(warMemory))
+      }
+      // ── ZONE MEMORY DECAY: contested ground cools 10% every 5min ──
+      if (now >= nextZoneDecay) {
+        nextZoneDecay = now + 300000
+        WAR_FLEETS.forEach(ft => { for (let i = 0; i < ZONE_COUNT; i++) zoneMem[ft][i] *= 0.9; refreshContested(ft) })
+        localStorage.setItem('zone-memory', JSON.stringify(zoneMem))
+      }
+
+      // ── POWER CYCLES + GHOST ALLIANCES + GRUDGE TARGETING (every 5s) ──
+      if (now >= nextDominanceCheck) {
+        nextDominanceCheck = now + 5000
+        const bs = bsRef.current
+        const bsTotal = bs.klaed + bs.nairan + bs.nautolan
+        // Dominance share → dominant (>0.45) and underdog (<0.20)
+        if (bsTotal > 0) {
+          const hiScore = Math.max(bs.klaed, bs.nairan, bs.nautolan)
+          const loScore = Math.min(bs.klaed, bs.nairan, bs.nautolan)
+          const fleetOf = (score: number, prefer: WarFleet[]): WarFleet =>
+            prefer.find(f => bs[f] === score) as WarFleet
+          dominantFleet = hiScore / bsTotal > 0.45 ? fleetOf(hiScore, WAR_FLEETS) : null
+          underdogFleet = loScore / bsTotal < 0.20 ? fleetOf(loScore, WAR_FLEETS) : null
+        } else {
+          dominantFleet = null; underdogFleet = null
+        }
+        // Ghost alliance hysteresis: forms at >0.45 share, dissolves below 0.40
+        const domShare = dominantFleet && bsTotal > 0 ? bs[dominantFleet] / bsTotal : 0
+        if (dominantFleet && domShare > 0.45) ghostAlliance = true
+        else if (!dominantFleet || domShare < 0.40) ghostAlliance = false
+
+        // Grudge targeting: hunt whoever wronged you most — unless a tyrant must fall
+        const active: Record<WarFleet, boolean> = { klaed: false, nairan: false, nautolan: false }
+        agents.current.forEach(a => { if (a.state !== 'dying' && isWarFleet(a.fleetType)) active[a.fleetType] = true })
+        WAR_FLEETS.forEach(ft => {
+          const rivals = WAR_FLEETS.filter(o => o !== ft)
+          if (ghostAlliance && dominantFleet && ft !== dominantFleet) {
+            grudge[ft] = dominantFleet  // ghost alliance overrides personal vendetta
+          } else {
+            grudge[ft] = rivals[0]
+            if (warMemory[ft][rivals[1]] > warMemory[ft][grudge[ft] as WarFleet]) grudge[ft] = rivals[1]
+            if (warMemory[ft][rivals[0]] === 0 && warMemory[ft][rivals[1]] === 0) grudge[ft] = null
+          }
+        })
+        // Surface a snapshot to the HUD (low-frequency re-render)
+        setEcoState({
+          dominant: dominantFleet, underdog: underdogFleet,
+          grudge: { ...grudge },
+          alliance: {
+            klaed:    ghostAlliance && dominantFleet && dominantFleet !== 'klaed'    ? dominantFleet : null,
+            nairan:   ghostAlliance && dominantFleet && dominantFleet !== 'nairan'   ? dominantFleet : null,
+            nautolan: ghostAlliance && dominantFleet && dominantFleet !== 'nautolan' ? dominantFleet : null,
+          },
+          active,
+        })
+      }
+      // Underdog desperation: +25% speed (survival adrenaline)
+      const speedBoost = (ft: AgentFleetType) => ft === underdogFleet ? 1.25 : 1.0
+
+      // Update agents — FSM: CRUISING → ENGAGING → RETREATING → DYING
       let agentChanged = false
       const toRemoveAgents: string[] = []
 
+      // Active ship count per fleet type (for last-survivor berserk) — computed once/frame
+      const fleetActive: Partial<Record<AgentFleetType, number>> = {}
+      agents.current.forEach(a => { if (a.state !== 'dying') fleetActive[a.fleetType] = (fleetActive[a.fleetType] ?? 0) + 1 })
+
       agents.current.forEach(agent => {
         if (agent.state === 'dying') {
-          if (now - agent.dyingStart > agent.dyingDuration + 200) {
-            toRemoveAgents.push(agent.id)
-            agentChanged = true
+          // Main ship: schedule respawn instead of permanent removal
+          if (agent.fleetType === 'mainship' && agent.respawnAt > 0) {
+            if (now >= agent.respawnAt) { respawnMainship(agent, now); agentChanged = true }
+            return
           }
+          if (now - agent.dyingStart > agent.dyingDuration + 200) { toRemoveAgents.push(agent.id); agentChanged = true }
           return
         }
 
-        // Shield reactivation after cooldown
-        if (!agent.shieldActive && agent.shieldCooldown > 0 && now >= agent.shieldCooldown && agent.combo.shield) {
-          agent.shieldActive = true
-          agent.shieldHp = 1
-          agent.shieldCooldown = 0
+        const agentRs = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+        // Nautolan juggernaut: Invincibility Shield → straight-line advance, ignores evasion
+        const juggernaut = agent.fleetType === 'nautolan' && agent.shieldType === 'invincibility'
+
+        // ── Ecosystem context for this ship (cheap per-frame lookups) ──
+        const isDom    = dominantFleet === agent.fleetType   // arrogant tyrant
+        const isUnder  = underdogFleet === agent.fleetType   // desperate survivor
+        const berserk  = agent.fleetType === 'klaed' && (fleetActive.klaed ?? 0) === 1  // last kla'ed alive
+        const zoneC    = isWarFleet(agent.fleetType) && zoneContested[agent.fleetType][zoneIndexOf(agent.x + 24, agent.y + 24, W, H)]
+        const respectMul = now < agent.respectUntil ? 0.5 : 1   // mourning slowdown
+        // Aggression: dominant +2, contested ground +1, post-mourning vengeance +1, berserk +3
+        const aggro = (isDom ? 2 : 0) + (zoneC ? 1 : 0) + (now < agent.vengeanceUntil ? 1 : 0) + (berserk ? 3 : 0)
+        // Retreat suppression: tyrants, berserkers never retreat; contested ground stiffens resolve
+        const noRetreat = isDom || berserk
+        const effRetreatThreshold = zoneC ? Math.max(0, agent.retreatThreshold - 1) : agent.retreatThreshold
+
+        // ── REGROUPING ──────────────────────────────────────────────────────────
+        if (agent.state === 'regrouping') {
+          const regroupDur = 4000
+          // Cluster toward fleet center
+          let fcx = 0, fcy = 0, fc = 0
+          agents.current.forEach(a => {
+            if (a.fleetId === agent.fleetId && a.state === 'regrouping') { fcx += a.x + 24; fcy += a.y + 24; fc++ }
+          })
+          if (fc > 1) {
+            fcx /= fc; fcy /= fc
+            const rdx = fcx - (agent.x + 24), rdy = fcy - (agent.y + 24)
+            const rd  = Math.sqrt(rdx * rdx + rdy * rdy) || 1
+            if (rd > 30) {
+              agent.angle = clampTurn(agent.angle, Math.atan2(rdy, rdx), agent.turnRate * dt)
+              agent.vx = Math.cos(agent.angle) * 0.05; agent.vy = Math.sin(agent.angle) * 0.05
+            } else { agent.vx = 0; agent.vy = 0 }
+          } else { agent.vx = 0; agent.vy = 0 }
+
+          if (now - agent.regroupStart >= regroupDur) {
+            computeStats(agent)
+            agent.hp = agent.maxHp; agent.prevHp = agent.maxHp
+            if (agent.shieldType !== 'none') { agent.shieldActive = true; agent.shieldHp = SHIELD_MODS[agent.shieldType].shieldHp; agent.shieldCooldown = 0 }
+            const toCenter = Math.atan2(H / 2 - (agent.y + 24), W / 2 - (agent.x + 24))
+            agent.cruiseAngle = toCenter
+            agent.angle = clampTurn(agent.angle, toCenter, agent.turnRate * dt)
+            agent.vx = Math.cos(agent.angle) * agent.maxSpeed
+            agent.vy = Math.sin(agent.angle) * agent.maxSpeed
+            agent.state = 'cruising'; agent.regroupStart = 0; agent.retreatStart = 0
+            fleetOriginalCounts.set(agent.fleetId, fleetOriginalCounts.get(agent.fleetId) ?? 0)
+            agentChanged = true
+          }
+          agent.x += agent.vx * dt; agent.y += agent.vy * dt
+          const el2 = agentEls.current.get(agent.id)
+          if (el2) { el2.style.transform = `translate(${agent.x}px,${agent.y}px) rotate(${agent.angle * 180 / Math.PI + 90}deg)`; el2.style.visibility = 'visible' }
+          return
         }
 
-        const leader = agent.leaderId ? agents.current.get(agent.leaderId) : null
+        // Engine bonus expiry
+        if (agent.engineBonusExpiry > 0 && now >= agent.engineBonusExpiry) {
+          agent.engineBonus = 1.0; agent.engineBonusExpiry = 0
+        }
+        // Shield pickup expiry — the shield generator wears off entirely; stats revert
+        if (agent.shieldPickupExpiry > 0 && now >= agent.shieldPickupExpiry) {
+          agent.shieldActive = false; agent.shieldPickupExpiry = 0; agent.shieldCooldown = 0
+          agent.shieldType = 'none'; computeStats(agent)
+        }
+        // Shield reactivation after damage cooldown (shield type retained)
+        if (!agent.shieldActive && agent.shieldCooldown > 0 && now >= agent.shieldCooldown && agent.shieldType !== 'none') {
+          agent.shieldActive = true; agent.shieldHp = SHIELD_MODS[agent.shieldType].shieldHp; agent.shieldCooldown = 0
+        }
+        // Pickup priority — race-specific ordering of what a ship hunts for.
+        //   klaed:    weapon only, and ignores pickups entirely once armed (kill > loot)
+        //   nairan:   weapon → shield (seeks shield before engaging)
+        //   nautolan: shield → weapon (craves All-Around / Invincibility)
+        //   mainship: engine → weapon → shield (speed is survival)
+        // Scarcity events set a global scramble flag so everyone rushes the lone pickup.
+        if (!fleetRetreating.has(agent.fleetId)) {
+          const needsWeapon = agent.weaponType === 'none'
+          const needsShield = agent.shieldType === 'none'
+          const needsEngine = agent.engineType === 'none'
+          let priority: PickupData['type'][]
+          if (agent.fleetType === 'klaed')         priority = needsWeapon ? ['weapon'] : []
+          else if (agent.fleetType === 'nautolan') priority = ['shield', 'weapon']
+          else if (agent.fleetType === 'mainship') priority = ['engine', 'weapon', 'shield']
+          else                                     priority = ['weapon', 'shield']
+          // During a scarcity scramble, everyone chases whatever pickup exists
+          if (pickupScramble) priority = ['weapon', 'shield', 'engine']
+          // Underdog desperation: grab anything to survive, even mid-fight
+          if (isUnder) priority = ['engine', 'weapon', 'shield']
 
-        if (agent.isLeader || !agent.leaderId) {
-          // ── Leader / solo steering ──
-          if (agent.state === 'combat') {
-            let target = agent.targetId ? agents.current.get(agent.targetId) : null
-            if (!target || target.state === 'dying') {
-              // Find nearest living enemy
-              let best: ShipAgent | null = null, bestD = Infinity
+          const wants = (t: PickupData['type']) =>
+            (t === 'weapon' && needsWeapon) || (t === 'shield' && needsShield) || (t === 'engine' && needsEngine) || pickupScramble
+
+          let chosen: PickupData | null = null
+          for (const t of priority) {
+            if (!wants(t)) continue
+            let bestPk: PickupData | null = null, bestPkD = Infinity
+            pickups.current.forEach(p => {
+              if (p.type !== t) return
+              const d = dist2D(agent.x+24, agent.y+24, p.x, p.y)
+              if (d < bestPkD) { bestPkD = d; bestPk = p }
+            })
+            if (bestPk) { chosen = bestPk; break }
+          }
+          // Underdogs prioritize pickups over combat and will break off an engagement.
+          // Commit to a chosen pickup for ≥2s so ships don't oscillate between two of them.
+          if (chosen && (agent.state !== 'engaging' || isUnder) && now >= agent.targetLockedUntil) {
+            agent.seekingPickupId = (chosen as PickupData).id; agent.state = 'pickup_seeking'
+            agent.targetLockedUntil = now + 2000
+          }
+          // Clear pickup seeking if pickup gone or need satisfied
+          if (agent.state === 'pickup_seeking') {
+            const seekTarget = agent.seekingPickupId ? pickups.current.get(agent.seekingPickupId) : undefined
+            const satisfied = !seekTarget
+              || (seekTarget.type === 'weapon' && !needsWeapon)
+              || (seekTarget.type === 'shield' && !needsShield && !pickupScramble)
+              || (seekTarget.type === 'engine' && !needsEngine && !pickupScramble)
+            if (satisfied) { agent.seekingPickupId = null; agent.state = 'cruising' }
+          }
+        }
+
+        // HP damage-state sprite update (main ship only)
+        if (agent.fleetType === 'mainship' && agent.hp !== agent.prevHp) {
+          agent.prevHp = agent.hp
+          const hpIdx = Math.max(0, Math.min(SHIP_BASES.length - 1, agent.maxHp - agent.hp))
+          const baseEl = baseEls.current.get(agent.id)
+          if (baseEl) baseEl.src = SHIP_BASES[hpIdx]
+        }
+
+        // ── BATTLE RELIC REACTIONS (racial reverence for the dead) ──
+        if (agent.fleetType === 'klaed') {
+          // Honor the fallen: slow near kin wreckage, then vengeance-fuelled
+          if (now >= agent.respectUntil && now >= agent.vengeanceUntil) {
+            let mourn = false
+            wrecks.current.forEach(w => {
+              if (mourn || w.fleetType !== 'klaed') return
+              if (dist2D(agent.x + 24, agent.y + 24, w.x + 24, w.y + 24) < 100) mourn = true
+            })
+            if (mourn) { agent.respectUntil = now + 2000; agent.vengeanceUntil = now + 12000 }
+          }
+        } else if (agent.fleetType === 'nautolan') {
+          // Contempt: divert slightly to trample enemy wreckage on the path
+          let bw: WreckData | null = null, bd = 60
+          wrecks.current.forEach(w => {
+            if (w.fleetType === 'nautolan') return
+            const d = dist2D(agent.x + 24, agent.y + 24, w.x + 24, w.y + 24)
+            if (d < bd) { bd = d; bw = w }
+          })
+          if (bw) {
+            const wa = Math.atan2(((bw as WreckData).y + 24) - (agent.y + 24), ((bw as WreckData).x + 24) - (agent.x + 24))
+            agent.cruiseAngle = lerpAngle(agent.cruiseAngle, wa, 0.3)
+          }
+        }
+
+        // ── VICTORY SPIRAL (kla'ed celebrates a kill with a defiant spin) ──
+        if (now < agent.spiralUntil) {
+          agent.angle += 0.00785 * dt   // ~1 full revolution over 0.8s
+          const s = agent.maxSpeed * 0.4
+          agent.vx = Math.cos(agent.angle) * s
+          agent.vy = Math.sin(agent.angle) * s
+
+        // ── PICKUP_SEEKING ──────────────────────────────────────────────────────
+        } else if (agent.state === 'pickup_seeking') {
+          const spd = agent.maxSpeed * 1.1 * speedBoost(agent.fleetType) * respectMul
+          const pkTarget = agent.seekingPickupId ? pickups.current.get(agent.seekingPickupId) : null
+          if (!pkTarget) {
+            agent.seekingPickupId = null; agent.state = 'cruising'
+          } else {
+            const pdx = pkTarget.x - (agent.x+24), pdy = pkTarget.y - (agent.y+24)
+            const pd  = Math.sqrt(pdx*pdx + pdy*pdy) || 1
+            if (pd < 20) {
+              collectPickup(agent, pkTarget, now)
+            } else {
+              // Rotate toward pickup, move forward
+              let desiredAngle = Math.atan2(pdy, pdx)
+              // Unarmed: rotate away from any enemy within 100px (takes priority)
               agents.current.forEach(o => {
-                if (o.fleetType === agent.fleetType) return
-                if (o.state === 'dying') return
-                const d = dist2D(agent.x, agent.y, o.x, o.y)
-                if (d < bestD) { bestD = d; best = o }
+                if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying') return
+                const ed = dist2D(agent.x+24, agent.y+24, o.x+24, o.y+24)
+                if (ed < 100) desiredAngle = Math.atan2((agent.y+24)-(o.y+24), (agent.x+24)-(o.x+24))
               })
-              if (best) { agent.targetId = (best as ShipAgent).id; target = best }
-              else { agent.state = 'cruising'; agent.targetId = null; agent.formationState = 'cruise' }
+              agent.angle = clampTurn(agent.angle, desiredAngle, agent.turnRate * dt)
+              agent.vx = Math.cos(agent.angle) * spd
+              agent.vy = Math.sin(agent.angle) * spd
             }
+          }
+        // ── CRUISING ────────────────────────────────────────────────────────────
+        } else if (agent.state === 'cruising') {
+          const spd = agent.maxSpeed * speedBoost(agent.fleetType) * respectMul
+          agent.wavePhase += 0.0006 * dt
+          const waveAngle = agent.cruiseAngle + Math.sin(agent.wavePhase) * 0.12
+          agent.angle = clampTurn(agent.angle, waveAngle, agent.turnRate * dt)
+          agent.vx = Math.cos(agent.angle) * spd
+          agent.vy = Math.sin(agent.angle) * spd
 
-            if (target) {
-              if (agent.hp === 1) {
-                // Survival instinct: low HP → flee, stop firing
-                const fleeAngle = Math.atan2(agent.y - target.y, agent.x - target.x)
-                agent.angle = lerpAngle(agent.angle, fleeAngle, 0.05)
-                agent.vx = Math.cos(agent.angle) * COMBAT_SPEED * 1.2
-                agent.vy = Math.sin(agent.angle) * COMBAT_SPEED * 1.2
+          // Higher aggression = spot & commit to enemies from farther away
+          const detectRange = 500 + aggro * 40
+          let hasEnemy = false
+          agents.current.forEach(o => {
+            if (hasEnemy || !isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying') return
+            if (dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24) < detectRange) hasEnemy = true
+          })
+          if (hasEnemy) {
+            agent.state = 'engaging'
+            // Nairan discipline: the whole wing pauses 1s to assess before committing
+            if (agent.fleetType === 'nairan') {
+              const until = now + 1000
+              agents.current.forEach(f => { if (f.fleetId === agent.fleetId && f.engagePauseUntil < now) f.engagePauseUntil = until })
+            }
+          }
+
+        // ── ENGAGING ────────────────────────────────────────────────────────────
+        } else if (agent.state === 'engaging') {
+          const rs  = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+          // Kla'ed rampage: Burst Engine → +20% speed, never retreats
+          const rampage = agent.fleetType === 'klaed' && agent.engineType === 'burst'
+          // Berserk last-survivor +50%; mourning slows to 50%
+          const spd = agent.maxSpeed * COMBAT_RATIO * (rampage ? 1.2 : 1) * (berserk ? 1.5 : 1) * respectMul * speedBoost(agent.fleetType)
+          // Nairan pre-engage assessment: hold fire & position while the wing gathers
+          const paused = agent.fleetType === 'nairan' && now < agent.engagePauseUntil
+
+          if (agent.isLeader || !agent.leaderId) {
+            // Retreat rules per race + ecosystem overrides:
+            //  klaed  — only hp==1 & no shield;  nairan — hp ≤ threshold;  nautolan — never
+            //  dominant arrogance & berserk never retreat; contested ground stiffens resolve
+            const klaedHold = agent.fleetType === 'klaed' && (rampage || agent.shieldActive)
+            const wantRetreat = !noRetreat && !klaedHold && effRetreatThreshold > 0 && agent.hp <= effRetreatThreshold
+            if (wantRetreat) {
+              agent.state = 'retreating'; agent.retreatStart = now
+            } else {
+
+              // Priority target selection — commit to a target for ≥2s (anti-thrash)
+              if (!agent.targetId || now >= agent.targetLockedUntil) {
+                agent.lastTargetUpdate = now
+                agent.targetLockedUntil = now + 2000
+                const myGrudge = isWarFleet(agent.fleetType) ? grudge[agent.fleetType] : null
+                let hpOneT: ShipAgent | null = null,    hpOneD   = Infinity
+                let noShieldT: ShipAgent | null = null, noShieldD = Infinity
+                let leaderT: ShipAgent | null = null,   leaderD   = Infinity
+                let nearestT: ShipAgent | null = null,  nearestD  = Infinity
+                let mainT: ShipAgent | null = null,     mainD     = Infinity
+                let grudgeT: ShipAgent | null = null,   grudgeD   = Infinity
+                agents.current.forEach(o => {
+                  if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying' || o.state === 'regrouping') return
+                  const d = dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24)
+                  if (d < nearestD) { nearestD = d; nearestT = o }
+                  if (o.hp === 1 && d < hpOneD) { hpOneD = d; hpOneT = o }
+                  if (!o.shieldActive && d < noShieldD) { noShieldD = d; noShieldT = o }
+                  if (o.isLeader && d < leaderD) { leaderD = d; leaderT = o }
+                  if (o.fleetType === 'mainship' && d < 400 && d < mainD) { mainD = d; mainT = o }
+                  if (myGrudge && o.fleetType === myGrudge && d < grudgeD) { grudgeD = d; grudgeT = o }
+                })
+                const selT = (hpOneT ?? noShieldT ?? leaderT ?? nearestT) as ShipAgent | null
+                // Berserk ignores tactics (nearest); else the grudge fleet takes priority (vendetta)
+                const finalT = berserk ? nearestT
+                  : (mainT && agent.fleetType !== 'mainship') ? mainT as ShipAgent
+                  : (grudgeT ?? selT)
+                agent.targetId = finalT ? finalT.id : null
+              }
+              let target = agent.targetId ? agents.current.get(agent.targetId) ?? null : null
+              if (target && (target.state === 'dying' || target.state === 'regrouping')) { target = null; agent.targetId = null }
+
+              if (!target) {
+                agent.state = 'cruising'; agent.targetId = null
               } else {
-                const desiredAngle = Math.atan2(target.y - agent.y, target.x - agent.x)
-                agent.angle = lerpAngle(agent.angle, desiredAngle, 0.04)
-                agent.vx = Math.cos(agent.angle) * COMBAT_SPEED
-                agent.vy = Math.sin(agent.angle) * COMBAT_SPEED
+                const tx = target.x + 24, ty = target.y + 24
+                const dx = tx - (agent.x + 24), dy = ty - (agent.y + 24)
+                const d  = Math.sqrt(dx*dx + dy*dy) || 1
+                agent.angle = lerpAngle(agent.angle, Math.atan2(dy, dx), 0.05)
 
-                if (now - agent.lastShot > Math.max(agent.fireInterval, MIN_SHOT_MS)
-                    && projs.current.size < MAX_PROJS) {
-                  spawnProjectile(agent, target.x + 24, target.y + 24)
-                  agent.lastShot = now
-                  agent.fireInterval = 1200 + Math.random() * 1800
+                // Check if any ship is inside minimum spacing — rotate away and suppress fire
+                let tooClose = false
+                let repulseAngle = agent.angle
+                agents.current.forEach(other => {
+                  if (other.id === agent.id || other.state === 'dying') return
+                  const odx = agent.x + 24 - (other.x + 24)
+                  const ody = agent.y + 24 - (other.y + 24)
+                  const od  = Math.sqrt(odx*odx + ody*ody) || 1
+                  if (od < rs.minRange) {
+                    tooClose = true
+                    repulseAngle = Math.atan2(ody, odx)
+                  }
+                })
+
+                const firingStop = now < agent.fireStopUntil
+                const drag = Math.pow(0.999, dt)
+
+                if (tooClose) {
+                  agent.angle = clampTurn(agent.angle, repulseAngle, agent.turnRate * dt * 3)
+                  agent.vx = Math.cos(agent.angle) * spd
+                  agent.vy = Math.sin(agent.angle) * spd
+                } else if (rs.behavior === 'aggressive') {
+                  // Orbit target: turn toward it beyond maxRange, arc perpendicular in-band
+                  const desiredAngle = d > rs.maxRange
+                    ? Math.atan2(dy, dx)
+                    : Math.atan2(dy, dx) + Math.PI / 2
+                  agent.angle = clampTurn(agent.angle, desiredAngle, agent.turnRate * dt)
+                  if (firingStop) { agent.vx *= drag; agent.vy *= drag }
+                  else { agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd }
+                  if (agent.hasWeapon && now - agent.lastShot > agent.fireInterval && projs.current.size < MAX_PROJS) {
+                    spawnProjectile(agent, tx, ty); agent.lastShot = now; agent.fireStopUntil = now + 1500
+                  }
+
+                } else if (rs.behavior === 'tactical') {
+                  // Hold range band; arc perpendicular in-band. Nairan holds while assessing.
+                  const desiredAngle = d > rs.maxRange
+                    ? Math.atan2(dy, dx)
+                    : Math.atan2(dy, dx) + Math.PI / 2
+                  agent.angle = clampTurn(agent.angle, desiredAngle, agent.turnRate * dt)
+                  if (firingStop || paused) { agent.vx *= drag; agent.vy *= drag }
+                  else { agent.vx = Math.cos(agent.angle) * spd * 0.8; agent.vy = Math.sin(agent.angle) * spd * 0.8 }
+                  if (!paused && agent.hasWeapon && now - agent.lastShot > agent.fireInterval && projs.current.size < MAX_PROJS) {
+                    spawnProjectile(agent, tx, ty); agent.lastShot = now; agent.fireStopUntil = now + 1500
+                  }
+
+                } else if (rs.behavior === 'tank') {
+                  // Nautolan: inexorable constant advance — never slows to fire (the plague marches)
+                  agent.angle = clampTurn(agent.angle, Math.atan2(dy, dx), agent.turnRate * dt)
+                  agent.vx = Math.cos(agent.angle) * spd * 0.6
+                  agent.vy = Math.sin(agent.angle) * spd * 0.6
+                  if (agent.hasWeapon && now - agent.lastShot > agent.fireInterval && projs.current.size < MAX_PROJS) {
+                    spawnProjectile(agent, tx, ty); agent.lastShot = now; agent.fireStopUntil = now + 1500
+                  }
+
+                } else {
+                  // 'survivor' (mainship): evade or counter-attack if cornered
+                  const nearEnemies: ShipAgent[] = []
+                  agents.current.forEach(o => {
+                    if (o.fleetType === 'mainship' || o.state === 'dying') return
+                    if (dist2D(agent.x+24, agent.y+24, o.x+24, o.y+24) < 300) nearEnemies.push(o)
+                  })
+                  if (nearEnemies.length === 0) {
+                    agent.state = 'cruising'
+                  } else {
+                    const angles = nearEnemies.map(e => Math.atan2(e.y+24-(agent.y+24), e.x+24-(agent.x+24)))
+                    const sorted = [...angles].sort((a, b) => a - b)
+                    let maxGap = sorted.length > 1 ? sorted[0] + Math.PI*2 - sorted[sorted.length-1] : Math.PI*2
+                    for (let i = 0; i < sorted.length - 1; i++) maxGap = Math.max(maxGap, sorted[i+1] - sorted[i])
+                    // Engage a lone enemy (if armed); flee any group of 2+ unless fully surrounded
+                    const surrounded  = maxGap < Math.PI
+                    const engageOne   = nearEnemies.length === 1 && agent.hasWeapon
+                    const cornered    = engageOne || surrounded
+
+                    if (cornered) {
+                      // Counter-attack nearest — turn toward, move forward
+                      const closest = nearEnemies.reduce((a, b) =>
+                        dist2D(agent.x+24, agent.y+24, a.x+24, a.y+24) < dist2D(agent.x+24, agent.y+24, b.x+24, b.y+24) ? a : b)
+                      agent.targetId = closest.id
+                      const cdx = closest.x+24-(agent.x+24), cdy = closest.y+24-(agent.y+24)
+                      agent.angle = clampTurn(agent.angle, Math.atan2(cdy, cdx), agent.turnRate * dt)
+                      const firingStop2 = now < agent.fireStopUntil
+                      if (firingStop2) { agent.vx *= Math.pow(0.999, dt); agent.vy *= Math.pow(0.999, dt) }
+                      else { agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd }
+                      if (agent.hasWeapon && now - agent.lastShot > agent.fireInterval && projs.current.size < MAX_PROJS && now >= agent.fireStopUntil) {
+                        spawnProjectile(agent, closest.x+24, closest.y+24); agent.lastShot = now; agent.fireStopUntil = now + 1500
+                      }
+                    } else {
+                      // Flee toward open space — turn away from average threat vector
+                      let avgDx = 0, avgDy = 0
+                      nearEnemies.forEach(e => {
+                        const ex = e.x+24-(agent.x+24), ey = e.y+24-(agent.y+24)
+                        const el = Math.sqrt(ex*ex + ey*ey) || 1
+                        avgDx += ex/el; avgDy += ey/el
+                      })
+                      const al = Math.sqrt(avgDx*avgDx + avgDy*avgDy) || 1
+                      agent.angle = clampTurn(agent.angle, Math.atan2(-avgDy/al, -avgDx/al), agent.turnRate * dt)
+                      agent.vx = Math.cos(agent.angle) * spd * 1.2
+                      agent.vy = Math.sin(agent.angle) * spd * 1.2
+                      agent.targetId = null
+                    }
+                  }
                 }
               }
             }
-          } else {
-            // Cruising: sine-wave oscillation around cruise heading
-            agent.wavePhase += dt * 0.0006
-            const targetAngle = agent.cruiseAngle + Math.sin(agent.wavePhase) * 0.12
-            agent.angle = lerpAngle(agent.angle, targetAngle, 0.03)
-            agent.vx = Math.cos(agent.angle) * CRUISE_SPEED
-            agent.vy = Math.sin(agent.angle) * CRUISE_SPEED
-          }
-        } else {
-          // ── Wing: follow leader ──
-          const activeLeader = leader && leader.state !== 'dying' ? leader : null
-          if (!activeLeader) {
-            agent.isLeader = true
-            agent.leaderId = null
-            agent.formationState = 'scatter'
-          } else {
-            // Compute effective offset based on leader's formation state
-            const fState = activeLeader.formationState
-            let offX = agent.formOffset.x   // cruise: -row*40
-            let offY = agent.formOffset.y   // cruise: side*row*25
-            if (fState === 'combat_spread') {
-              const side = offY >= 0 ? 1 : -1
-              const row  = Math.round(Math.abs(offY) / 25) || 1
-              offX = 0               // flank position — not trailing
-              offY = side * row * 80 // spread wide laterally
-            } else if (fState === 'scatter') {
-              offX *= 2.5; offY *= 2.5
-            }
 
-            // Rotate local offset by leader's angle → world target
-            const cos = Math.cos(activeLeader.angle), sin = Math.sin(activeLeader.angle)
-            const tx  = activeLeader.x + cos * offX - sin * offY
-            const ty  = activeLeader.y + sin * offX + cos * offY
-            const dx  = tx - agent.x, dy = ty - agent.y
-            const d   = Math.sqrt(dx*dx + dy*dy)
-
-            if (d > 8) {
-              agent.angle = lerpAngle(agent.angle, Math.atan2(dy, dx), 0.08)
-              const spd = d > 80 ? CRUISE_SPEED * 1.4 : CRUISE_SPEED * (0.5 + d/80 * 0.5)
-              agent.vx = Math.cos(agent.angle) * spd
-              agent.vy = Math.sin(agent.angle) * spd
+          } else {
+            // Wing: orbit around leader
+            const leader = agents.current.get(agent.leaderId)
+            if (!leader || leader.state === 'dying') {
+              agent.isLeader = true; agent.leaderId = null
             } else {
-              agent.angle = lerpAngle(agent.angle, activeLeader.angle, 0.1)
-              agent.vx = activeLeader.vx
-              agent.vy = activeLeader.vy
-            }
+              agent.wingAngle += 0.0012 * dt
+              // Dominant arrogance: formation discipline -50% (wings drift much wider)
+              const baseRadius = rs.behavior === 'tank' ? 30 : agent.wingSlot <= 2 ? 70 : 90
+              const wingRadius = baseRadius * (isDom ? 1.5 : 1)
+              const slotOffset = (agent.wingSlot - 1) * (Math.PI / 3)
+              const orbitAngle = agent.wingAngle + slotOffset
+              const tx = leader.x + 24 + Math.cos(orbitAngle) * wingRadius - 24
+              const ty = leader.y + 24 + Math.sin(orbitAngle) * wingRadius - 24
+              const dx = tx - agent.x, dy = ty - agent.y
+              const d  = Math.sqrt(dx*dx + dy*dy) || 1
+              const catchAngle = Math.atan2(dy, dx)
+              agent.angle = clampTurn(agent.angle, catchAngle, agent.turnRate * dt * 1.5)
+              const catchSpd = Math.min(d * 0.1, spd * 1.5)
+              agent.vx = Math.cos(agent.angle) * catchSpd
+              agent.vy = Math.sin(agent.angle) * catchSpd
 
-            agent.state    = activeLeader.state
-            agent.targetId = activeLeader.targetId
+              agent.state = leader.state
+              // Wing target: inherit leader if within 200px of leader, else pick own
+              const dToLeader = dist2D(agent.x + 24, agent.y + 24, leader.x + 24, leader.y + 24)
+              if (dToLeader <= 200) {
+                agent.targetId = leader.targetId
+              } else if (!agent.targetId || now >= agent.targetLockedUntil) {
+                agent.lastTargetUpdate = now
+                agent.targetLockedUntil = now + 2000
+                let wNearestT: ShipAgent | null = null, wNearestD = Infinity
+                agents.current.forEach(o => {
+                  if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying' || o.state === 'regrouping') return
+                  const d = dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24)
+                  if (d < wNearestD) { wNearestD = d; wNearestT = o }
+                })
+                agent.targetId = wNearestT ? (wNearestT as ShipAgent).id : leader.targetId
+              }
 
-            if (agent.state === 'combat' && agent.targetId) {
-              const target = agents.current.get(agent.targetId)
-              if (target && target.state !== 'dying'
-                  && now - agent.lastShot > Math.max(agent.fireInterval, MIN_SHOT_MS)
-                  && projs.current.size < MAX_PROJS) {
-                spawnProjectile(agent, target.x + 24, target.y + 24)
-                agent.lastShot = now
-                agent.fireInterval = 1500 + Math.random() * 1500
+              if (agent.state === 'engaging' && agent.targetId) {
+                const wt = agents.current.get(agent.targetId)
+                if (wt && wt.state !== 'dying' && wt.state !== 'regrouping' && agent.hasWeapon && now - agent.lastShot > agent.fireInterval && projs.current.size < MAX_PROJS && now >= agent.fireStopUntil) {
+                  spawnProjectile(agent, wt.x + 24, wt.y + 24); agent.lastShot = now; agent.fireStopUntil = now + 1500
+                }
+              }
+
+              // Wing retreats when leader reaches retreat threshold (tank wings never retreat)
+              if (rs.retreatThreshold > 0 && leader.hp <= rs.retreatThreshold && agent.state !== 'retreating') {
+                agent.state = 'retreating'; agent.retreatStart = now
               }
             }
           }
+
+        // ── RETREATING ──────────────────────────────────────────────────────────
+        } else if (agent.state === 'retreating') {
+          const rs = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+          if (fleetRetreating.has(agent.fleetId)) {
+            // Fleet-wide retreat: turn toward home edge, move forward
+            const spd = agent.maxSpeed * 1.4 * speedBoost(agent.fleetType)
+            const ha  = homeAngle(agent.homeEdge)
+            agent.angle = clampTurn(agent.angle, ha, agent.turnRate * dt)
+            agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd
+          } else {
+            // Individual HP-based retreat: turn away from nearest enemy, move forward
+            const spd = agent.maxSpeed * COMBAT_RATIO * 1.2 * speedBoost(agent.fleetType)
+            let retreatFrom: ShipAgent | null = null, nearD = Infinity
+            agents.current.forEach(o => {
+              if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying') return
+              const d = dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24)
+              if (d < nearD) { nearD = d; retreatFrom = o }
+            })
+            if (retreatFrom) {
+              const dx = agent.x - (retreatFrom as ShipAgent).x, dy = agent.y - (retreatFrom as ShipAgent).y
+              const awayAngle = Math.atan2(dy, dx)
+              agent.angle = clampTurn(agent.angle, awayAngle, agent.turnRate * dt)
+            }
+            agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd
+            const retreatMs = rs.behavior === 'tactical' ? 4000 : 5000
+            if (now - agent.retreatStart > retreatMs) { agent.state = 'cruising'; agent.retreatStart = 0 }
+          }
         }
 
-        // ── Predictive collision avoidance (ship-to-ship) ──────────────────────
-        {
-          const myFut = predictedCenter(agent, PRED_SHIP_MS)
+        // ── Collision avoidance — rotate angle away, then recompute forward velocity ──
+        // Juggernaut ignores all evasion and plows straight ahead.
+        if (!juggernaut) {
+          let avoidAngle = agent.angle
           agents.current.forEach(other => {
             if (other.id === agent.id || other.state === 'dying') return
-            const otFut = predictedCenter(other, PRED_SHIP_MS)
-            const pd = dist2D(myFut.x, myFut.y, otFut.x, otFut.y)
-            if (pd >= PRED_SHIP_DIST) return
-            const imminence = 1 - pd / PRED_SHIP_DIST
+            const dx = agent.x + 24 - (other.x + 24)
+            const dy = agent.y + 24 - (other.y + 24)
+            const d  = Math.sqrt(dx*dx + dy*dy) || 1
+            if (d >= 60) return
             const sameFleet = other.fleetId === agent.fleetId
-            const forceMag  = 0.06 * imminence * (sameFleet ? 1.0 : 0.5)
-            // Collision normal (predicted)
-            const nx = (myFut.x - otFut.x) / (pd || 1)
-            const ny = (myFut.y - otFut.y) / (pd || 1)
-            // Perpendicular options — prefer larger |Y| component for Y-axis evasion
-            const p1x = -ny, p1y = nx
-            const p2x =  ny, p2y = -nx
-            const ex = Math.abs(p1y) >= Math.abs(p2y) ? p1x : p2x
-            const ey = Math.abs(p1y) >= Math.abs(p2y) ? p1y : p2y
-            agent.vx += ex * forceMag
-            agent.vy += ey * forceMag
+            const turn = (60 - d) / 60 * agent.turnRate * dt * (sameFleet ? 4 : 2)
+            avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), turn)
           })
+          if (avoidAngle !== agent.angle) {
+            const curSpd = Math.sqrt(agent.vx*agent.vx + agent.vy*agent.vy)
+            agent.angle = avoidAngle
+            agent.vx = Math.cos(agent.angle) * curSpd
+            agent.vy = Math.sin(agent.angle) * curSpd
+          }
         }
 
-        // ── Predictive projectile evasion ───────────────────────────────────────
-        projs.current.forEach(proj => {
-          if (proj.ownerFleetId === agent.fleetId) return
-          const projFutX = proj.x + proj.vx * PRED_PROJ_MS
-          const projFutY = proj.y + proj.vy * PRED_PROJ_MS
-          const agFutX   = agent.x + 24 + agent.vx * PRED_PROJ_MS
-          const agFutY   = agent.y + 24 + agent.vy * PRED_PROJ_MS
-          if (dist2D(agFutX, agFutY, projFutX, projFutY) >= PRED_PROJ_DIST) return
-          // Evade perpendicular to projectile direction, on the side away from it
-          const projLen = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy) || 1
-          const px = -proj.vy / projLen
-          const py =  proj.vx / projLen
-          const sign = px * (agent.x + 24 - proj.x) + py * (agent.y + 24 - proj.y) >= 0 ? 1 : -1
-          agent.vx += px * sign * 0.04
-          agent.vy += py * sign * 0.04
-        })
+        const clamp50 = (v: number) => Math.max(-50, Math.min(50, v))
+        agent.x += clamp50(agent.vx * dt)
+        agent.y += clamp50(agent.vy * dt)
 
-        agent.x += agent.vx * dt
-        agent.y += agent.vy * dt
-
-        // Screen wrap — re-enter from opposite edge
-        const m = 60
-        if      (agent.x > W + m) agent.x = -m
-        else if (agent.x < -m)    agent.x = W + m
-        if      (agent.y > H + m) agent.y = -m
-        else if (agent.y < -m)    agent.y = H + m
-
-        // ── Hard minimum separation (position correction, not force) ────────────
+        // Hard minimum separation — position correction after move, prevents overlap
         agents.current.forEach(other => {
           if (other.id === agent.id || other.state === 'dying') return
-          const dx = agent.x - other.x, dy = agent.y - other.y
-          const d  = Math.sqrt(dx * dx + dy * dy) || 0.01
+          const dx = agent.x + 24 - (other.x + 24)
+          const dy = agent.y + 24 - (other.y + 24)
+          const d  = Math.sqrt(dx*dx + dy*dy) || 0.01
           if (d < MIN_SEP) {
             const push = (MIN_SEP - d) * 0.5
             agent.x += (dx / d) * push
@@ -1077,14 +2103,29 @@ function SpaceSim() {
           }
         })
 
-        // Update DOM
+        // Retreating ships despawn when they clear their home edge; others wrap
+        const m = 60
+        if (agent.x < -m || agent.x > W + m || agent.y < -m || agent.y > H + m) {
+          if (agent.state === 'retreating') {
+            toRemoveAgents.push(agent.id); agentChanged = true; return
+          }
+          if      (agent.x > W + m) agent.x = -m
+          else if (agent.x < -m)    agent.x = W + m
+          if      (agent.y > H + m) agent.y = -m
+          else if (agent.y < -m)    agent.y = H + m
+        }
+
+        // DOM update
         const el = agentEls.current.get(agent.id)
         if (el) {
           el.style.transform  = `translate(${agent.x}px,${agent.y}px) rotate(${agent.angle * 180/Math.PI + 90}deg)`
           el.style.visibility = 'visible'
+          // Power-cycle visual cue: tyrants/berserkers glow bright, underdogs dim
+          const bright = berserk ? 1.6 : isDom ? 1.3 : isUnder ? 0.8 : 1
+          el.style.filter = bright === 1 ? '' : `brightness(${bright})`
         }
 
-        // Update shield visibility
+        // Shield visibility
         const shieldEl = shieldEls.current.get(agent.id)
         if (shieldEl) {
           shieldEl.style.opacity = !agent.shieldActive ? '0'
@@ -1093,43 +2134,82 @@ function SpaceSim() {
         }
       })
 
+      // Fleet-wide retreat → regroup transition: all survivors reached home edge
+      fleetRetreating.forEach(fleetId => {
+        const survivors: ShipAgent[] = []
+        let allAtEdge = true
+        agents.current.forEach(a => {
+          if (a.fleetId !== fleetId || a.state === 'dying') return
+          survivors.push(a)
+          if (!atHomeEdge(a, W, H)) allAtEdge = false
+        })
+        if (survivors.length > 0 && allAtEdge) {
+          fleetRetreating.delete(fleetId)
+          survivors.forEach(a => { a.state = 'regrouping'; a.regroupStart = now; a.vx = 0; a.vy = 0 })
+          agentChanged = true
+        }
+      })
+
       // Update projectiles
       let projChanged = false
       const toRemoveProjs: string[] = []
 
       projs.current.forEach(proj => {
-        if (now - proj.born > PROJ_LIFE) { toRemoveProjs.push(proj.id); projChanged = true; return }
+        if (proj.dead) return
+        if (now - proj.born > PROJ_LIFE) { proj.dead = true; toRemoveProjs.push(proj.id); projChanged = true; return }
         proj.x += proj.vx * dt
         proj.y += proj.vy * dt
+        if (dist2D(proj.x, proj.y, proj.ox, proj.oy) > proj.maxRange) { proj.dead = true; toRemoveProjs.push(proj.id); projChanged = true; return }
 
-        // Hit detection
-        let hit = false
+        // Hit detection — once hit, mark dead immediately so no further damage.
+        // Ghost-alliance truce: projectiles pass harmlessly through allied fleets.
         agents.current.forEach(agent => {
-          if (hit || agent.fleetId === proj.ownerFleetId || agent.state === 'dying') return
-          if (dist2D(proj.x, proj.y, agent.x + 24, agent.y + 24) < HIT_RADIUS) {
-            hit = true
+          if (proj.dead || agent.fleetId === proj.ownerFleetId || agent.state === 'dying' || agent.state === 'regrouping') return
+          if (!isEnemy(proj.ownerFleetType, agent.fleetType)) return
+          if (dist2D(proj.x, proj.y, agent.x + 24, agent.y + 24) < proj.hitRadius) {
+            proj.dead = true
+            const hitEl = projEls.current.get(proj.id)
+            if (hitEl) hitEl.style.transform = 'translate(-999px,-999px)'
             if (agent.shieldActive && agent.shieldHp > 0) {
-              // Shield absorbs the hit
-              agent.shieldHp--
+              agent.shieldHp -= proj.damage
               agent.lastShieldHit = now
               if (agent.shieldHp <= 0) {
+                const rs = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
                 agent.shieldActive = false
-                agent.shieldCooldown = now + 8000
+                agent.shieldCooldown = now + rs.shieldRecharge
               }
             } else {
-              agent.hp--
-              if (agent.hp <= 0) killAgent(agent, now)
+              agent.hp -= proj.damage
+              if (agent.hp <= 0) killAgent(agent, now, proj.ownerFleetType, proj.ownerId)
+            }
+            // Rocket splash: everyone within 40px of impact takes 1 damage (friend or foe)
+            if (proj.splash) {
+              const ix = agent.x + 24, iy = agent.y + 24
+              agents.current.forEach(other => {
+                if (other.id === agent.id || other.state === 'dying' || other.state === 'regrouping') return
+                if (dist2D(ix, iy, other.x + 24, other.y + 24) > 40) return
+                if (other.shieldActive && other.shieldHp > 0) {
+                  other.shieldHp -= 1; other.lastShieldHit = now
+                  if (other.shieldHp <= 0) {
+                    const ors = RACE_STATS[other.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+                    other.shieldActive = false; other.shieldCooldown = now + ors.shieldRecharge
+                  }
+                } else {
+                  other.hp -= 1
+                  if (other.hp <= 0) killAgent(other, now, proj.ownerFleetType)
+                }
+              })
             }
             toRemoveProjs.push(proj.id)
             projChanged = true
           }
         })
 
-        if (!hit) {
+        if (!proj.dead) {
           const el = projEls.current.get(proj.id)
           if (el) {
             const deg = Math.atan2(proj.vy, proj.vx) * 180 / Math.PI
-            el.style.transform = `translate(${proj.x}px,${proj.y}px) rotate(${deg}deg)`
+            el.style.transform = `translate(${proj.x - proj.fw / 2}px,${proj.y - proj.h / 2}px) rotate(${deg}deg)`
           }
         }
       })
@@ -1139,6 +2219,21 @@ function SpaceSim() {
       exps.current.forEach((exp, id) => {
         if (now - exp.born > exp.destruction.frames * 75 + 400) { exps.current.delete(id); expChanged = true }
       })
+
+      // Battle relics — wreckage drifts, fades over its last 5s, despawns at 25s
+      let wreckChanged = false
+      wrecks.current.forEach((w, id) => {
+        const age = now - w.born
+        if (age > WRECK_LIFE) { wrecks.current.delete(id); wreckEls.current.delete(id); wreckChanged = true; return }
+        w.x += w.vx * dt; w.y += w.vy * dt
+        const el = wreckEls.current.get(id)
+        if (el) {
+          const fade = age > WRECK_LIFE - WRECK_FADE ? (WRECK_LIFE - age) / WRECK_FADE : 1
+          el.style.transform = `translate(${w.x}px,${w.y}px) rotate(${w.angle * 180 / Math.PI}deg)`
+          el.style.opacity = String(0.4 * fade)
+        }
+      })
+      if (wreckChanged) setWreckKeys([...wrecks.current.keys()])
 
       // Despawn fully-defeated fleets so their slots open for new spawns
       // (explosion sprites live in exps.current independently, so early agent removal is safe)
@@ -1165,12 +2260,36 @@ function SpaceSim() {
       if (active) rafId = requestAnimationFrame(tick)
     }
 
+    // Initial spawn: guarantee at least 2 different factions
+    const factionPool: AgentFleetType[] = ['klaed', 'nairan', 'nautolan']
+    const f1 = factionPool[Math.floor(Math.random() * 3)]
+    const f2 = factionPool.filter(f => f !== f1)[Math.floor(Math.random() * 2)]
+    spawnFleet(f1); spawnFleet(f2)
+    nextRegularWave = performance.now() + 25000 + Math.random() * 10000
     rafId = requestAnimationFrame(tick)
     return () => { active = false; cancelAnimationFrame(rafId) }
   }, [])
 
   return (
     <>
+      {wreckKeys.map(id => {
+        const w = wrecks.current.get(id)
+        if (!w) return null
+        return (
+          <img
+            key={id}
+            src={w.base}
+            alt=""
+            ref={el => { if (el) wreckEls.current.set(id, el); else wreckEls.current.delete(id) }}
+            style={{
+              position: 'absolute', top: 0, left: 0, width: 48, height: 48,
+              imageRendering: 'pixelated', transformOrigin: '24px 24px',
+              willChange: 'transform', opacity: 0.4, zIndex: 0, pointerEvents: 'none',
+              transform: `translate(${w.x}px,${w.y}px) rotate(${w.angle * 180 / Math.PI}deg)`,
+            }}
+          />
+        )
+      })}
       {agentKeys.map(id => {
         const agent = agents.current.get(id)
         if (!agent) return null
@@ -1183,8 +2302,10 @@ function SpaceSim() {
             <FoozleShip
               combo={agent.combo}
               trailId={`t-${id}`}
-              chaseRole={agent.state === 'combat' ? 'chasing' : undefined}
+              chaseRole={agent.state === 'engaging' ? 'chasing' : undefined}
+              engineHue={RACE_HUE[agent.fleetType]}
               shieldRef={el => { if (el) shieldEls.current.set(id, el); else shieldEls.current.delete(id) }}
+              baseRef={el => { if (el) baseEls.current.set(id, el); else baseEls.current.delete(id) }}
             />
           </div>
         )
@@ -1193,23 +2314,66 @@ function SpaceSim() {
         const proj = projs.current.get(id)
         if (!proj) return null
         return (
-          <div
+          <img
             key={id}
+            src={proj.src}
+            alt=""
             ref={el => { if (el) projEls.current.set(id, el); else projEls.current.delete(id) }}
             style={{
               position: 'absolute', top: 0, left: 0,
               width: proj.fw, height: proj.h,
-              backgroundImage: `url("${proj.src}")`,
-              backgroundSize: `${proj.w}px ${proj.h}px`,
-              backgroundPosition: '0 0',
+              objectFit: 'none',
+              objectPosition: '0 0',
               imageRendering: 'pixelated',
-              transformOrigin: `${proj.fw/2}px ${proj.h/2}px`,
+              transformOrigin: 'center center',
               willChange: 'transform',
+              transform: 'translate(-999px,-999px)',
             }}
           />
         )
       })}
       {expList.map(exp => <ExplosionSprite key={exp.id} exp={exp} />)}
+      {pickupKeys.map(id => {
+        const pk = pickups.current.get(id)
+        if (!pk) return null
+        return (
+          <div
+            key={id}
+            ref={el => { if (el) pickupEls.current.set(id, el as HTMLDivElement); else pickupEls.current.delete(id) }}
+            style={{ position: 'absolute', left: pk.x - 16, top: pk.y - 16, pointerEvents: 'none', animation: 'pickup-float 3s ease-in-out infinite' }}
+          >
+            <img
+              src={pk.src}
+              alt=""
+              style={{
+                width: '32px',
+                height: '32px',
+                objectFit: 'none',
+                objectPosition: '0 0',
+                imageRendering: 'pixelated',
+                filter: pk.glowColor,
+              }}
+            />
+          </div>
+        )
+      })}
+      {collectFlashes.map(cf => (
+        <div
+          key={cf.id}
+          style={{
+            position: 'absolute',
+            left: cf.x - 16, top: cf.y - 16,
+            width: 32, height: 32,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            animation: 'pickup-collect 500ms ease-out forwards',
+          }}
+          onAnimationEnd={() => setCollectFlashes(prev => prev.filter(f => f.id !== cf.id))}
+        >
+          <img src={cf.src} style={{ width: 32, height: 32, objectFit: 'none', objectPosition: '0 0', imageRendering: 'pixelated' }} alt="" />
+        </div>
+      ))}
+      <ScoreHUD score={battleScore} eco={ecoState} />
     </>
   )
 }
