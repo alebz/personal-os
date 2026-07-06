@@ -71,7 +71,8 @@
       "Bash(grep -v '^$')",
       "Bash(perl -i -pe 's/aimAngle \\\\+ Math\\\\.PI \\\\/ 2/aimAngle + Math.PI \\\\/ 5/g' components/StarsBackground.tsx)",
       "Bash(perl -i -pe 's/agent\\\\.turnRate \\\\* dt/turnCap * dt/g' components/StarsBackground.tsx)",
-      "Bash(grep -n \"el.style.transform = \\\\`translate\\(\\\\${proj.x}\" components/StarsBackground.tsx)"
+      "Bash(grep -n \"el.style.transform = \\\\`translate\\(\\\\${proj.x}\" components/StarsBackground.tsx)",
+      "Bash(awk -F: '$1>2400 && $1<3260')"
     ]
   }
 }

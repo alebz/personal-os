@@ -363,11 +363,11 @@ const RACE_HUE: Record<AgentFleetType, number> = {
 
 // Dynamic pickup event table — rolled every 30s
 const PICKUP_EVENTS = [
-  { name: 'normal',   weight: 40, engines: 1, shields: 1, weapons: 1 },
-  { name: 'armament', weight: 20, engines: 0, shields: 0, weapons: 3 },
-  { name: 'defense',  weight: 20, engines: 0, shields: 3, weapons: 0 },
-  { name: 'motorush', weight: 10, engines: 3, shields: 0, weapons: 0 },
-  { name: 'scarcity', weight: 10, engines: 0, shields: 0, weapons: 1 },
+  { name: 'normal',   weight: 40, engines: 2, shields: 2, weapons: 3 },
+  { name: 'armament', weight: 20, engines: 0, shields: 1, weapons: 5 },
+  { name: 'defense',  weight: 20, engines: 1, shields: 5, weapons: 1 },
+  { name: 'motorush', weight: 10, engines: 5, shields: 0, weapons: 1 },
+  { name: 'scarcity', weight: 10, engines: 0, shields: 0, weapons: 2 },
 ] as const
 
 // ─── Agent types ─────────────────────────────────────────────────────────────
@@ -507,6 +507,7 @@ interface WreckData {
 const WRECK_LIFE = 34000   // ms visible
 const WRECK_FADE = 13000   // ms slow fade-out at the end
 const MAX_WRECKS = 6
+const PICKUP_FADE = 700   // ms — pickups fade out (like wreckage) when cleared
 
 // Snapshot of ecosystem state surfaced to the HUD (updated every 5s, not per-frame)
 interface EcoState {
@@ -554,6 +555,8 @@ interface PickupData {
   x:    number; y: number
   vx:   number; vy: number  // drift like an asteroid (bounces off edges)
   born: number
+  expireAt: number          // each pickup lives its own lifespan (staggered despawn)
+  fadeStart: number         // >0 → fading out before removal
   speedMult:          number  // engine
   shieldStrength:     number  // shield
   shieldDuration:     number  // shield
@@ -920,6 +923,7 @@ const ASTEROID_EXPLODE: DestructData = {
   sheet: '/Spaceships/Foozle_2DS0015_Void_EnvironmentPack/Asteroids/PNGs/Asteroid 01 - Explode.png',
   frames: 8, size: 96,
 }
+const MAX_PICKUPS      = 11   // cap on pickups on the field at once
 const MAX_ASTEROIDS    = 7    // ambient count kept drifting
 const ASTEROID_HARD_CAP = 18  // never exceed (ambient + belts)
 const ASTEROID_DMG     = 3    // serious blast damage to nearby ships
@@ -1228,49 +1232,141 @@ function ExplosionSprite({ exp }: { exp: ExpData }) {
 
 const FLEET_SHORT: Record<WarFleet, string> = { klaed: 'KLA', nairan: 'NAI', nautolan: 'NAU' }
 
-function ScoreHUD({ score, eco }: { score: BattleScore; eco: EcoState }) {
-  const entries: { key: WarFleet; label: string; color: string; dot: string }[] = [
-    { key: 'klaed',    label: "KLA'ED  ", color: '#e05050', dot: '🔴' },
-    { key: 'nairan',   label: 'NAIRAN  ', color: '#5080e0', dot: '🔵' },
-    { key: 'nautolan', label: 'NAUTOLAN', color: '#d4a820', dot: '🟡' },
-  ]
-  const max = Math.max(score.klaed, score.nairan, score.nautolan, 1)
+// Ship archetype detection (for the live per-family type breakdown in the HUD)
+const SHIP_CLASSES = ['Battlecruiser', 'Bomber', 'Dreadnought', 'Fighter', 'Frigate', 'Scout', 'Support', 'Torpedo']
+const CLASS_ABBR: Record<string, string> = {
+  Battlecruiser: 'BCR', Bomber: 'BMB', Dreadnought: 'DRN', Fighter: 'FTR',
+  Frigate: 'FRG', Scout: 'SCT', Support: 'SUP', Torpedo: 'TRP', Flagship: 'FLG',
+}
+function shipClassName(base: string): string {
+  for (const c of SHIP_CLASSES) if (base.includes(c)) return c
+  return base.includes('Main Ship') ? 'Flagship' : '—'
+}
+type FleetStat = { alive: number; types: Record<string, number> }
+type ShipStats = Record<WarFleet, FleetStat>
+function emptyShipStats(): ShipStats {
+  return { klaed: { alive: 0, types: {} }, nairan: { alive: 0, types: {} }, nautolan: { alive: 0, types: {} } }
+}
 
-  // One compact indicator per fleet reflecting its current ecosystem role
-  const indicatorFor = (key: WarFleet): { text: string; color: string } => {
-    if (!eco.active[key])          return { text: '💀', color: '#888' }
-    if (eco.dominant === key)      return { text: '👑 DOMINANTE', color: '#ffd23f' }
-    const ally = eco.alliance[key]
-    if (ally)                      return { text: `🤝 vs ${FLEET_SHORT[ally]}`, color: '#66d9a0' }
-    const gr = eco.grudge[key]
-    if (gr)                        return { text: `⚔ vs ${FLEET_SHORT[gr]}`, color: '#e88' }
-    return { text: '', color: '#888' }
+// Game ship-base sprites reused as tiny class icons in the scoreboard (className → path)
+const SHIP_ICON: Record<WarFleet, Record<string, string>> = { klaed: {}, nairan: {}, nautolan: {} }
+KLAED_SHIPS.forEach(s => { SHIP_ICON.klaed[shipClassName(s.base)] = s.base })
+NAIRAN_SHIPS.forEach(s => { SHIP_ICON.nairan[shipClassName(s.base)] = s.base })
+NAUTOLAN_SHIPS.forEach(s => { SHIP_ICON.nautolan[shipClassName(s.base)] = s.base })
+
+// Pixel-art faction emblems (grid + palette) — ported from the Scoreboard HUD design
+const EMBLEMS: Record<WarFleet, { pal: Record<string, string>; grid: string[] }> = {
+  klaed: { pal: { r: '#e0473a', d: '#8a2a22', y: '#f2c744' }, grid: [
+    '..rr..r..rr..', '..rr..r..rr..', '..rr..r..rr..', '..rr.rrr.rr..', '.rrrrryrrrrr.',
+    '..rrrryrrrr..', '...rrryrrr...', '....rryrr....', '.....ryr.....', '.....ryr.....',
+    '....rryrr....', '...rr.y.rr...', '..r...y...r..'] },
+  nautolan: { pal: { t: '#c0a165', s: '#8a7038', g: '#54d06a' }, grid: [
+    '..t.......t..', '...tt...tt...', '....ttttt....', '..ttttttttt..', '..tt.sgs.tt..',
+    '..ttssgsstt..', '..ttttttttt..', '...tt.g.tt...', '...t..g..t...', '..t..ggg..t..',
+    '.t...g.g...t.', '.....g.g.....', '....g...g....'] },
+  nairan: { pal: { g: '#74b94b', d: '#3c7a34', a: '#e8a13a' }, grid: [
+    '......a......', '.....gag.....', '....ggagg....', '...gg.a.gg...', '..gg..a..gg..',
+    '.gg...a...gg.', '.g....a....g.', '.g....a....g.', '......a......', '.....ggg.....',
+    '.....g.g.....', '....gg.gg....', '...gg...gg...'] },
+}
+function FleetEmblem({ grid, pal, size = 38 }: { grid: string[]; pal: Record<string, string>; size?: number }) {
+  const h = grid.length, w = grid[0].length, O = '#0a0c10'
+  const at = (x: number, y: number) => (x >= 0 && y >= 0 && x < w && y < h && grid[y][x] !== '.') ? pal[grid[y][x]] : undefined
+  const cells: React.ReactElement[] = []
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!at(x, y) && (at(x-1,y)||at(x+1,y)||at(x,y-1)||at(x,y+1)||at(x-1,y-1)||at(x+1,y-1)||at(x-1,y+1)||at(x+1,y+1)))
+      cells.push(<rect key={'o'+x+'-'+y} x={x} y={y} width={1.02} height={1.02} fill={O} />)
   }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const f = at(x, y); if (f) cells.push(<rect key={x+'-'+y} x={x} y={y} width={1.02} height={1.02} fill={f} />)
+  }
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width={size} height={size}
+      style={{ imageRendering: 'pixelated', shapeRendering: 'crispEdges', display: 'block', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.55))' }}>
+      {cells}
+    </svg>
+  )
+}
+
+const FLEET_META: Record<WarFleet, { name: string; cm: string; ca: string }> = {
+  klaed:    { name: "KLA'ED",   cm: '#e0473a', ca: '#f2c744' },
+  nautolan: { name: 'NAUTOLAN', cm: '#b9975a', ca: '#54d06a' },
+  nairan:   { name: 'NAIRAN',   cm: '#74b94b', ca: '#e8a13a' },
+}
+
+interface KillEntry { id: string; txt: string; col: string }
+
+// Pixel-art CRT scoreboard (ported from the Scoreboard HUD design), driven by live sim data
+function ScoreHUD({ ships, log }: { ships: ShipStats; log: KillEntry[] }) {
+  const fleets: WarFleet[] = ['klaed', 'nautolan', 'nairan']
+  const ROW_H = 88
+  const orderIdx: Record<WarFleet, number> = { klaed: 0, nautolan: 1, nairan: 2 }
+  // Ranked by live ship count — the fleet with the most ships rises to the top (rows slide)
+  const ranked = [...fleets].sort((a, b) => (ships[b].alive - ships[a].alive) || (orderIdx[a] - orderIdx[b]))
+  const rankOf: Record<string, number> = {}; ranked.forEach((f, i) => { rankOf[f] = i })
+  const maxAlive = Math.max(1, ships.klaed.alive, ships.nautolan.alive, ships.nairan.alive)
+  const totalAlive = ships.klaed.alive + ships.nautolan.alive + ships.nairan.alive
+  const latest = log[0]
 
   return (
-    <div style={{ position: 'fixed', top: 80, left: 16, zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
-      {entries.map(({ key, label, color, dot }) => {
-        const val = score[key]
-        const pct = val / max * 100
-        const isDom = eco.dominant === key
-        const ind = indicatorFor(key)
-        return (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, opacity: isDom ? 1 : 0.6 }}>
-            <span style={{ fontSize: 8 }}>{dot}</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.06em', color: isDom ? '#fff' : '#999', width: 62 }}>{label}</span>
-            <div style={{ width: 44, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
-              <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.4s ease' }} />
-            </div>
-            <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#999', width: 26, textAlign: 'right' }}>{Math.round(val)}</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 8, letterSpacing: '0.04em', color: ind.color, width: 84, whiteSpace: 'nowrap' }}>{ind.text}</span>
-          </div>
-        )
-      })}
-      {score.mainshipDeaths > 0 && (
-        <div style={{ marginTop: 6, fontFamily: 'monospace', fontSize: 8, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.04em' }}>
-          Main Ship destroyed: {score.mainshipDeaths}×
+    <div style={{ position: 'fixed', top: 70, left: 12, zIndex: 50, pointerEvents: 'none', userSelect: 'none', transform: 'scale(0.7)', transformOrigin: 'top left' }}>
+      <div style={{ position: 'relative', width: 406, background: '#0a0c10', border: '1px solid #1e2532', borderRadius: 6, boxShadow: '0 22px 60px rgba(0,0,0,.6), inset 0 0 60px rgba(0,0,0,.5)', overflow: 'hidden', fontFamily: "'Silkscreen', system-ui, sans-serif" }}>
+        {/* header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px', borderBottom: '1px solid #171d27' }}>
+          <span style={{ fontFamily: "'Silkscreen'", fontSize: 8.5, letterSpacing: '1.5px', color: '#5b6b7d' }}>FLEET&nbsp;STATUS</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'Silkscreen'", fontSize: 8.5, color: '#37424f', letterSpacing: '1px' }}>{totalAlive}&nbsp;ACTIVE<i style={{ width: 5, height: 5, borderRadius: 1, background: '#4fd06a', boxShadow: '0 0 6px #4fd06a', animation: 'livedot 1.4s infinite', display: 'inline-block' }} /></span>
         </div>
-      )}
+        {/* rows */}
+        <div style={{ position: 'relative', height: ROW_H * 3 }}>
+          {fleets.map(key => {
+            const st = ships[key]; const m = FLEET_META[key]; const em = EMBLEMS[key]; const rank = rankOf[key]
+            const classes = Object.entries(st.types).sort((a, b) => b[1] - a[1]).slice(0, 5)
+            return (
+              <div key={key} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: ROW_H, transform: `translateY(${rank * ROW_H}px)`, transition: 'transform .55s cubic-bezier(.22,.61,.36,1)', borderBottom: '1px solid #12171e' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: '100%', padding: '0 15px' }}>
+                  <span style={{ fontFamily: "'VT323'", fontSize: 28, lineHeight: 1, color: m.cm, width: 22, textAlign: 'center' }}>{String(rank + 1).padStart(2, '0')}</span>
+                  <div style={{ width: 38, height: 38, flex: 'none' }}><FleetEmblem grid={em.grid} pal={em.pal} size={38} /></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontFamily: "'Silkscreen'", fontSize: 11, color: '#e8edf2' }}>{m.name}</span>
+                      <span style={{ fontFamily: "'Silkscreen'", fontSize: 7, letterSpacing: '1px', color: m.ca, opacity: rank === 0 && st.alive > 0 ? 1 : 0 }}>LEAD</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginTop: 9, height: 22, overflow: 'hidden' }}>
+                      {classes.length === 0
+                        ? <span style={{ fontFamily: "'VT323'", fontSize: 16, color: '#3a4552' }}>—</span>
+                        : classes.map(([cls, n]) => (
+                          <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <div style={{ width: 26, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                              {SHIP_ICON[key][cls]
+                                ? <div title={cls} style={{ width: 26, height: 22, backgroundImage: `url("${SHIP_ICON[key][cls]}")`, backgroundSize: '160%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />
+                                : <span style={{ fontFamily: "'Silkscreen'", fontSize: 7, color: '#5b6b7d' }}>{CLASS_ABBR[cls] || cls.slice(0, 3)}</span>}
+                            </div>
+                            <span style={{ fontFamily: "'VT323'", fontSize: 16, lineHeight: 1, color: '#aeb9c6' }}>{n}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flex: 'none' }}>
+                    <span style={{ fontFamily: "'VT323'", fontSize: 32, lineHeight: 0.78, color: m.cm }}>{st.alive}</span>
+                    <span style={{ fontFamily: "'Silkscreen'", fontSize: 6.5, color: '#48566a', letterSpacing: '1px' }}>SHIPS</span>
+                  </div>
+                </div>
+                <div style={{ position: 'absolute', left: 0, bottom: 0, height: 2, width: `${Math.round(st.alive / maxAlive * 100)}%`, background: m.cm, opacity: 0.55, transition: 'width .5s' }} />
+              </div>
+            )
+          })}
+        </div>
+        {/* kill-feed log */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 15px', borderTop: '1px solid #171d27', fontFamily: "'VT323'", fontSize: 16 }}>
+          <span style={{ color: '#3f4b5a' }}>&gt;</span>
+          <span style={{ color: latest ? latest.col : '#5b6b7d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{latest ? latest.txt : 'SYSTEMS ONLINE'}</span>
+          <span style={{ color: '#4a5a6b', animation: 'blink 1s steps(1) infinite', marginLeft: 'auto' }}>_</span>
+        </div>
+        {/* CRT overlays */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, background: 'repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.30) 2px 3px)', animation: 'crtflick 3.5s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, background: 'radial-gradient(130% 100% at 50% 42%,rgba(0,0,0,0) 58%,rgba(0,0,0,.5) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, boxShadow: 'inset 0 0 0 1px rgba(120,160,200,.04)' }} />
+      </div>
     </div>
   )
 }
@@ -1312,6 +1408,8 @@ function SpaceSim() {
   const warMemoryRef = useRef<WarMemory>(emptyWarMemory())
   const zoneMemRef   = useRef<ZoneMemory>(emptyZoneMemory())
   const [ecoState, setEcoState] = useState<EcoState>(emptyEcoState)
+  const [shipStats, setShipStats] = useState<ShipStats>(emptyShipStats)
+  const [killLog,   setKillLog]   = useState<KillEntry[]>([])
 
   const EMPTY_SCORE: BattleScore = { klaed: 0, nairan: 0, nautolan: 0, mainshipDeaths: 0 }
   const [battleScore, setBattleScore] = useState<BattleScore>(() => {
@@ -1337,6 +1435,8 @@ function SpaceSim() {
     // Dynamic pickup-event state (rolled every 30s)
     let nextPickupEvent  = 0                            // timestamp of next event roll
     let pickupScramble   = false                        // true during 'scarcity' events
+    // Staggered spawns: an event queues its pickups to appear at spread-out times
+    const pickupSpawnQueue: { type: 'engine' | 'shield' | 'weapon'; at: number }[] = []
 
     // ── Ancient Races Ecosystem state ──
     try { const w = localStorage.getItem('war-memory'); if (w) warMemoryRef.current = { ...emptyWarMemory(), ...JSON.parse(w) } } catch {}
@@ -1351,6 +1451,7 @@ function SpaceSim() {
       klaed: new Array(ZONE_COUNT).fill(false), nairan: new Array(ZONE_COUNT).fill(false), nautolan: new Array(ZONE_COUNT).fill(false),
     }
     let nextDominanceCheck = 0   // every 5s
+    let nextStatsUpdate    = 0   // every ~1s — live ship counts for the HUD
     let nextWarDecay       = performance.now() + 60000   // every 60s
     let nextScoreDecay     = performance.now() + 60000   // every 60s
     let nextZoneDecay      = performance.now() + 300000  // every 5min
@@ -1739,6 +1840,19 @@ function SpaceSim() {
       }
       // Battle relic — leave wreckage where the ship fell
       if (agent.fleetType !== 'mainship') spawnWreck(agent, now)
+      // Kill-feed for the scoreboard HUD
+      {
+        const cls = shipClassName(agent.combo.base)
+        let txt: string, col: string
+        if (agent.fleetType === 'mainship') { txt = 'FLAGSHIP DESTROYED'; col = '#ffd23f' }
+        else {
+          const name = FLEET_META[agent.fleetType].name
+          col = FLEET_META[agent.fleetType].cm
+          const big = cls === 'Dreadnought' || cls === 'Battlecruiser'
+          txt = big ? `CAPITAL SHIP DOWN · ${name}` : `${CLASS_ABBR[cls] || cls} DESTROYED · ${name}`
+        }
+        setKillLog(prev => [{ id: genId(), txt, col }, ...prev].slice(0, 8))
+      }
       // Emotional territory — record the loss in this zone (memory of where kin fell)
       if (isWarFleet(agent.fleetType)) {
         const W = window.innerWidth, H = window.innerHeight
@@ -1786,13 +1900,14 @@ function SpaceSim() {
         src = w.src; key = w.key; pickupFireInterval = w.fireInterval
       }
       const glowColor = type === 'engine'
-        ? 'drop-shadow(0 0 6px rgba(255,180,50,0.9)) drop-shadow(0 0 12px rgba(255,140,20,0.5))'
+        ? 'drop-shadow(0 0 2px rgba(255,170,60,0.5))'
         : type === 'shield'
-        ? 'drop-shadow(0 0 6px rgba(100,200,255,0.9)) drop-shadow(0 0 12px rgba(60,160,255,0.5))'
-        : 'drop-shadow(0 0 6px rgba(255,80,80,0.9)) drop-shadow(0 0 12px rgba(220,40,40,0.5))'
+        ? 'drop-shadow(0 0 2px rgba(100,190,255,0.5))'
+        : 'drop-shadow(0 0 2px rgba(255,90,90,0.5))'
       const drift = Math.random() * Math.PI * 2
       const dspd  = 0.004 + Math.random() * 0.006   // slow drift, like an asteroid
-      const pk: PickupData = { id, type, key, src, glowColor, x, y, vx: Math.cos(drift) * dspd, vy: Math.sin(drift) * dspd, born: now, speedMult, shieldStrength, shieldDuration, pickupFireInterval }
+      const life  = 12000 + Math.random() * 12000   // 12–24s individual lifespan (staggered)
+      const pk: PickupData = { id, type, key, src, glowColor, x, y, vx: Math.cos(drift) * dspd, vy: Math.sin(drift) * dspd, born: now, expireAt: now + life, fadeStart: 0, speedMult, shieldStrength, shieldDuration, pickupFireInterval }
       pickups.current.set(id, pk)
       setPickupKeys(prev => [...prev, id])
     }
@@ -1908,14 +2023,19 @@ function SpaceSim() {
         let ev: typeof PICKUP_EVENTS[number] = PICKUP_EVENTS[0]
         for (const e of PICKUP_EVENTS) { r -= e.weight; if (r <= 0) { ev = e; break } }
         pickupScramble  = ev.name === 'scarcity'
-        // Clear leftover pickups from the previous event
-        pickups.current.clear()
-        pickupEls.current.clear()
-        // Spawn the event's loadout simultaneously
-        for (let i = 0; i < ev.engines; i++) spawnPickup('engine', now)
-        for (let i = 0; i < ev.shields; i++) spawnPickup('shield', now)
-        for (let i = 0; i < ev.weapons; i++) spawnPickup('weapon', now)
-        setPickupKeys([...pickups.current.keys()])
+        // Queue the event's loadout to appear at STAGGERED times (not all at once).
+        // Old pickups aren't cleared — each one lives out its own lifespan and fades on its own.
+        const enqueue = (type: 'engine' | 'shield' | 'weapon', n: number) => {
+          for (let i = 0; i < n; i++) pickupSpawnQueue.push({ type, at: now + Math.random() * 7000 })
+        }
+        enqueue('engine', ev.engines); enqueue('shield', ev.shields); enqueue('weapon', ev.weapons)
+      }
+      // Drip queued pickups in as their time comes (retry while the field is full)
+      for (let i = pickupSpawnQueue.length - 1; i >= 0; i--) {
+        const q = pickupSpawnQueue[i]
+        if (now < q.at) continue
+        if (pickups.current.size < MAX_PICKUPS) { spawnPickup(q.type, now); pickupSpawnQueue.splice(i, 1) }
+        else if (now > q.at + 15000) pickupSpawnQueue.splice(i, 1)   // give up if it waited too long
       }
 
       // Ship-to-ship collision — if any two ships touch, BOTH explode, regardless of
@@ -1961,6 +2081,20 @@ function SpaceSim() {
         nextZoneDecay = now + 300000
         WAR_FLEETS.forEach(ft => { for (let i = 0; i < ZONE_COUNT; i++) zoneMem[ft][i] *= 0.9; refreshContested(ft) })
         localStorage.setItem('zone-memory', JSON.stringify(zoneMem))
+      }
+
+      // ── LIVE SHIP STATS for the HUD (every ~1s so the counts feel alive) ──
+      if (now >= nextStatsUpdate) {
+        nextStatsUpdate = now + 900
+        const stats = emptyShipStats()
+        agents.current.forEach(a => {
+          if (a.state === 'dying' || !isWarFleet(a.fleetType)) return
+          const s = stats[a.fleetType]
+          s.alive++
+          const cls = shipClassName(a.combo.base)
+          s.types[cls] = (s.types[cls] ?? 0) + 1
+        })
+        setShipStats(stats)
       }
 
       // ── POWER CYCLES + GHOST ALLIANCES + GRUDGE TARGETING (every 5s) ──
@@ -2131,15 +2265,16 @@ function SpaceSim() {
             if (!wants(t)) continue
             let bestPk: PickupData | null = null, bestPkD = Infinity
             pickups.current.forEach(p => {
-              if (p.type !== t) return
+              if (p.type !== t || p.fadeStart > 0) return
               const d = dist2D(agent.x+24, agent.y+24, p.x, p.y)
               if (d < bestPkD) { bestPkD = d; bestPk = p }
             })
             if (bestPk) { chosen = bestPk; break }
           }
-          // Underdogs prioritize pickups over combat and will break off an engagement.
-          // Commit to a chosen pickup for ≥2s so ships don't oscillate between two of them.
-          if (chosen && (agent.state !== 'engaging' || isUnder) && now >= agent.targetLockedUntil) {
+          // Break off combat for a pickup when: it's an underdog, OR the ship is UNARMED and
+          // this is a weapon (a weaponless ship is useless in a fight, so it goes to arm up).
+          const breakOff = agent.state !== 'engaging' || isUnder || ((chosen as PickupData | null)?.type === 'weapon' && needsWeapon)
+          if (chosen && breakOff && now >= agent.targetLockedUntil) {
             agent.seekingPickupId = (chosen as PickupData).id; agent.state = 'pickup_seeking'
             agent.targetLockedUntil = now + 2000
           }
@@ -2198,12 +2333,12 @@ function SpaceSim() {
         } else if (agent.state === 'pickup_seeking') {
           const spd = agent.maxSpeed * 1.1 * speedBoost(agent.fleetType) * respectMul
           const pkTarget = agent.seekingPickupId ? pickups.current.get(agent.seekingPickupId) : null
-          if (!pkTarget) {
+          if (!pkTarget || pkTarget.fadeStart > 0) {
             agent.seekingPickupId = null; agent.state = 'cruising'
           } else {
             const pdx = pkTarget.x - (agent.x+24), pdy = pkTarget.y - (agent.y+24)
             const pd  = Math.sqrt(pdx*pdx + pdy*pdy) || 1
-            if (pd < 20) {
+            if (pd < 22) {
               collectPickup(agent, pkTarget, now)
             } else {
               // Rotate toward pickup, move forward
@@ -2786,16 +2921,37 @@ function SpaceSim() {
       })
       if (astChanged) setAsteroidKeys([...asteroids.current.keys()])
 
-      // Pickups drift like asteroids, bouncing off the screen edges so they stay in play
+      // Pickups drift like asteroids, bounce off edges, fade when cleared, and are
+      // grabbed on CONTACT by any ship that needs them (not only ships actively seeking).
+      let pickupChanged = false
       pickups.current.forEach((pk, id) => {
+        const el = pickupEls.current.get(id)
+        if (pk.fadeStart > 0) {
+          const f = 1 - (now - pk.fadeStart) / PICKUP_FADE
+          if (f <= 0) { pickups.current.delete(id); pickupEls.current.delete(id); pickupChanged = true; return }
+          if (el) el.style.opacity = String(f)
+          return
+        }
+        if (now >= pk.expireAt) { pk.fadeStart = now; return }   // this one's lifespan is up — fade it out
         pk.x += pk.vx * dt; pk.y += pk.vy * dt
         if (pk.x < 40)      { pk.x = 40;      pk.vx = Math.abs(pk.vx) }
         if (pk.x > W - 40)  { pk.x = W - 40;  pk.vx = -Math.abs(pk.vx) }
         if (pk.y < 60)      { pk.y = 60;      pk.vy = Math.abs(pk.vy) }
         if (pk.y > H - 40)  { pk.y = H - 40;  pk.vy = -Math.abs(pk.vy) }
-        const el = pickupEls.current.get(id)
-        if (el) el.style.transform = `translate(${pk.x - 16}px,${pk.y - 16}px)`
+        // Contact pickup — a ship that wants this type and touches it grabs it, any state
+        let taker: ShipAgent | null = null
+        agents.current.forEach(a => {
+          if (taker || a.state === 'dying' || a.state === 'regrouping') return
+          const wants = pickupScramble
+            || (pk.type === 'weapon' && a.weaponType === 'none')
+            || (pk.type === 'shield' && a.shieldType === 'none')
+            || (pk.type === 'engine' && a.engineType === 'none')
+          if (wants && dist2D(pk.x, pk.y, a.x + 24, a.y + 24) < 28) taker = a
+        })
+        if (taker) { collectPickup(taker, pk, now); return }
+        if (el) el.style.transform = `translate(${pk.x - 10}px,${pk.y - 10}px)`
       })
+      if (pickupChanged) setPickupKeys([...pickups.current.keys()])
 
       // Despawn fully-defeated fleets so their slots open for new spawns
       // (explosion sprites live in exps.current independently, so early agent removal is safe)
@@ -2921,21 +3077,22 @@ function SpaceSim() {
           <div
             key={id}
             ref={el => { if (el) pickupEls.current.set(id, el as HTMLDivElement); else pickupEls.current.delete(id) }}
-            style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', willChange: 'transform', transform: `translate(${pk.x - 16}px,${pk.y - 16}px)` }}
+            style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', willChange: 'transform', transform: `translate(${pk.x - 10}px,${pk.y - 10}px)` }}
           >
-            <img
-              src={pk.src}
-              alt=""
-              style={{
-                width: '32px',
-                height: '32px',
-                objectFit: 'none',
-                objectPosition: '0 0',
+            {/* middle layer: one-shot spawn pop (scale) — kept separate so it doesn't fight the float bob */}
+            <div style={{ width: 20, height: 20, transformOrigin: 'center', animation: 'pickup-spawn 0.42s ease-out' }}>
+              {/* 15-frame sheet (480×32) scaled so a single 20px frame shows */}
+              <div style={{
+                width: 20, height: 20,
+                backgroundImage: `url("${pk.src}")`,
+                backgroundSize: '300px 20px',
+                backgroundPosition: '0 0',
+                backgroundRepeat: 'no-repeat',
                 imageRendering: 'pixelated',
                 filter: pk.glowColor,
                 animation: 'pickup-float 3s ease-in-out infinite',
-              }}
-            />
+              }} />
+            </div>
           </div>
         )
       })}
@@ -2944,21 +3101,20 @@ function SpaceSim() {
           key={cf.id}
           style={{
             position: 'absolute',
-            left: cf.x - 16, top: cf.y - 16,
-            width: 32, height: 32,
-            overflow: 'hidden',
+            left: cf.x - 10, top: cf.y - 10,
+            width: 20, height: 20,
             pointerEvents: 'none',
             animation: 'pickup-collect 500ms ease-out forwards',
           }}
           onAnimationEnd={() => setCollectFlashes(prev => prev.filter(f => f.id !== cf.id))}
         >
-          <img src={cf.src} style={{ width: 32, height: 32, objectFit: 'none', objectPosition: '0 0', imageRendering: 'pixelated' }} alt="" />
+          <div style={{ width: 20, height: 20, backgroundImage: `url("${cf.src}")`, backgroundSize: '300px 20px', backgroundPosition: '0 0', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }} />
         </div>
       ))}
       {hits.map(h => (
         <HitSpark key={h.id} x={h.x} y={h.y} onDone={() => setHits(prev => prev.filter(f => f.id !== h.id))} />
       ))}
-      <ScoreHUD score={battleScore} eco={ecoState} />
+      <ScoreHUD ships={shipStats} log={killLog} />
     </>
   )
 }
@@ -3195,7 +3351,7 @@ export function StarsBackground() {
       {showShips && (
         <div
           aria-hidden="true"
-          style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2 }}
+          style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }}
         >
           <SpaceSim />
         </div>

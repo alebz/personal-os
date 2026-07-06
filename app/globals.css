@@ -41,6 +41,11 @@
 @keyframes arcadeMarquee{0%{background-position:0% 0%;}100%{background-position:200% 0%;}}
 @keyframes glitterParticle{0%,85%,100%{opacity:0.15}90%{opacity:1}95%{opacity:0.3}}
 @keyframes pickup-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes pickup-spawn{0%{transform:scale(0);opacity:0}55%{transform:scale(1.25);opacity:1}100%{transform:scale(1)}}
+/* Scoreboard HUD (pixel-art CRT) */
+@keyframes blink{50%{opacity:0}}
+@keyframes livedot{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes crtflick{0%,100%{opacity:.20}50%{opacity:.26}}
 @keyframes pickup-collect{0%{transform:scale(1);opacity:1}100%{transform:scale(2.2);opacity:0}}
 
 /* ── Pixel-art projectile animations (inner sprite layers only) ── */
