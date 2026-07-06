@@ -6,11 +6,23 @@ import type { CalEvent } from '@/app/api/calendar/route'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const EVENT_COLORS = ['#7c6ef0', '#e05c7e', '#2db87a', '#e08c3a', '#3ab8d4']
+// Events captured inside the OS (quick-add) render in a single accent hue so they
+// stand out from read-only iCal events, which keep a stable per-uid colour.
+const CAPTURED_COLOR = '#8b7bff'
 
 function eventColor(uid: string): string {
+  if (uid.startsWith('captured:')) return CAPTURED_COLOR
   let h = 0
   for (let i = 0; i < uid.length; i++) h = ((h << 5) - h + uid.charCodeAt(i)) | 0
   return EVENT_COLORS[Math.abs(h) % EVENT_COLORS.length]
+}
+
+// ── Birthday easter egg ─────────────────────────────────────────────────────
+// Matti — 28 July, a Leo. His own turn around the sun gets gold + a sparkle.
+const BIRTHDAY = { month: 6, day: 28 } // month is 0-indexed: 6 = July
+
+function isBirthday(d: Date): boolean {
+  return d.getMonth() === BIRTHDAY.month && d.getDate() === BIRTHDAY.day
 }
 
 function localDateKey(d: Date): string {
@@ -72,8 +84,18 @@ export default function CalendarCard() {
   const [adding,   setAdding]   = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
 
+  function rangeForView(year: number, month: number): { from: string; to: string } {
+    const gridCells = buildGridCells(year, month)
+    return {
+      from: localDateKey(gridCells[0].date),
+      to:   localDateKey(gridCells[gridCells.length - 1].date),
+    }
+  }
+
   function fetchEvents() {
-    return fetch('/api/calendar')
+    const { from, to } = rangeForView(viewYear, viewMonth)
+    setFetchError(null)
+    return fetch(`/api/calendar?from=${from}&to=${to}`)
       .then(r => r.json())
       .then((data: CalEvent[] | { error: string }) => {
         if ('error' in data) setFetchError(data.error)
@@ -83,7 +105,11 @@ export default function CalendarCard() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchEvents() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Refetch whenever the visible month changes (also covers initial mount).
+  useEffect(() => {
+    setLoading(true)
+    fetchEvents()
+  }, [viewYear, viewMonth]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function prevMonth() {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
@@ -95,6 +121,12 @@ export default function CalendarCard() {
     if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
     else setViewMonth(m => m + 1)
     setSelected(null)
+  }
+
+  function goToday() {
+    setViewYear(today.getFullYear())
+    setViewMonth(today.getMonth())
+    setSelected(todayKey)
   }
 
   async function handleAddEvent(e: React.FormEvent) {
@@ -144,9 +176,19 @@ export default function CalendarCard() {
           </svg>
         </button>
 
-        <h2 className="text-base font-semibold tracking-wide text-ink-4">
-          {MONTHS[viewMonth]} {viewYear}
-        </h2>
+        <div className="flex flex-col items-center">
+          <h2 className="text-base font-semibold tracking-wide text-ink-4">
+            {MONTHS[viewMonth]} {viewYear}
+          </h2>
+          {(viewYear !== today.getFullYear() || viewMonth !== today.getMonth()) && (
+            <button
+              onClick={goToday}
+              className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-accent/70 transition-colors hover:text-accent"
+            >
+              Hoy
+            </button>
+          )}
+        </div>
 
         <button
           onClick={nextMonth}
@@ -185,6 +227,7 @@ export default function CalendarCard() {
           const cellEvents = byDate.get(key) ?? []
           const hasEvents  = !loading && cellEvents.length > 0
           const overflow   = cellEvents.length - 2
+          const bday       = isCurrentMonth && isBirthday(date)
 
           return (
             <button
@@ -202,14 +245,37 @@ export default function CalendarCard() {
                     ? 'rgba(255,255,255,0.015)'
                     : 'transparent',
               }}
-              className="flex flex-col items-center rounded-lg pt-1 pb-0.5 px-0.5 transition-colors hover:bg-ink-4/5"
+              className="relative flex flex-col items-center rounded-lg pt-1 pb-0.5 px-0.5 transition-colors hover:bg-ink-4/5"
             >
-              <span className={[
-                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums',
-                isToday   ? 'bg-accent text-white font-bold' : '',
-                !isToday && isCurrentMonth  ? 'text-ink-4 font-medium' : '',
-                !isToday && !isCurrentMonth ? 'text-ink-3' : '',
-              ].join(' ')}>
+              {bday && (
+                <svg
+                  aria-hidden
+                  viewBox="0 0 7 7"
+                  className="pointer-events-none absolute right-0.5 top-0 h-3.5 w-3.5"
+                  style={{ shapeRendering: 'crispEdges', imageRendering: 'pixelated', animation: 'bday-twinkle 1.2s steps(3, jump-none) alternate infinite' }}
+                >
+                  <rect x="3" y="0" width="1" height="7" fill="#ffd76a" />
+                  <rect x="0" y="3" width="7" height="1" fill="#ffd76a" />
+                  <rect x="2" y="2" width="3" height="3" fill="#fff2c4" />
+                  <rect x="3" y="3" width="1" height="1" fill="#ffffff" />
+                </svg>
+              )}
+
+              <span
+                className={[
+                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums',
+                  bday ? 'font-bold' : '',
+                  !bday && isToday   ? 'bg-accent text-white font-bold' : '',
+                  !bday && !isToday && isCurrentMonth  ? 'text-ink-4 font-medium' : '',
+                  !bday && !isToday && !isCurrentMonth ? 'text-ink-3' : '',
+                ].join(' ')}
+                style={bday ? {
+                  background: '#f0b53a',
+                  color: '#3a2400',
+                  boxShadow: '0 0 0 1px #7a4e12, 0 0 0 2px #ffe08a',
+                } : undefined}
+                title={bday ? '¡Tu cumpleaños! 🎂' : undefined}
+              >
                 {date.getDate()}
               </span>
 
@@ -250,6 +316,13 @@ export default function CalendarCard() {
               </svg>
             </button>
           </div>
+
+          {selected && isBirthday(new Date(selected + 'T12:00:00')) && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-300/25 bg-amber-300/10 px-2.5 py-2 text-[11px] font-medium text-amber-200/90">
+              <span className="text-sm">🎂</span>
+              <span>¡Feliz vuelta al sol, Matti! Que sea un gran año, Leo 🦁</span>
+            </div>
+          )}
 
           {/* Events list */}
           {loading ? (

@@ -43,6 +43,13 @@
 @keyframes pickup-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes pickup-collect{0%{transform:scale(1);opacity:1}100%{transform:scale(2.2);opacity:0}}
 
+/* ── Pixel-art projectile animations (inner sprite layers only) ── */
+@keyframes proj-flicker{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes ember{0%,100%{opacity:.9}50%{opacity:.15}}
+@keyframes rocket-flame{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes laser-flicker{0%{opacity:1}33%{opacity:.6}66%{opacity:.85}100%{opacity:.5}}
+@keyframes hit-spark{0%{transform:scale(.35);opacity:1}45%{opacity:.95}100%{transform:scale(1.7);opacity:0}}
+
 input::placeholder { color: #555555; opacity: 1; }
 
 input, textarea {
@@ -284,3 +291,9 @@ body {
   40%, 60%  { opacity: 1; }
 }
 
+
+/* Birthday sparkle — gentle twinkle on the day-of cell (28 Jul) */
+@keyframes bday-sparkle {
+  0%, 100% { opacity: 0.5;  transform: scale(0.85) rotate(0deg);  }
+  50%      { opacity: 1;    transform: scale(1.15) rotate(18deg); }
+}

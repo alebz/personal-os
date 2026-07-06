@@ -67,7 +67,11 @@
       "Bash(sips *)",
       "Bash(perl -i -pe 's/\\\\bagentRs\\\\.turnRate\\\\b/agent.turnRate/g; s/\\\\brs\\\\.turnRate\\\\b/agent.turnRate/g' components/StarsBackground.tsx)",
       "Bash(rm -f /tmp/personal-os-dev.log)",
-      "Bash(PORT=3000 npm run dev)"
+      "Bash(PORT=3000 npm run dev)",
+      "Bash(grep -v '^$')",
+      "Bash(perl -i -pe 's/aimAngle \\\\+ Math\\\\.PI \\\\/ 2/aimAngle + Math.PI \\\\/ 5/g' components/StarsBackground.tsx)",
+      "Bash(perl -i -pe 's/agent\\\\.turnRate \\\\* dt/turnCap * dt/g' components/StarsBackground.tsx)",
+      "Bash(grep -n \"el.style.transform = \\\\`translate\\(\\\\${proj.x}\" components/StarsBackground.tsx)"
     ]
   }
 }
