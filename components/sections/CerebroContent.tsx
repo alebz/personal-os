@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -319,7 +320,7 @@ function NoteModal({
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave()
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -413,7 +414,8 @@ function NoteModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -568,10 +570,10 @@ export default function CerebroContent() {
   const hasAnswer      = answer.length > 0
 
   return (
-      <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 pb-[40vh]">
+      <main className="mx-auto flex h-full max-w-3xl flex-col px-6 pt-6">
 
         {/* Mode toggle */}
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex shrink-0 flex-wrap gap-2">
           {MODE_META.map(({ id, label }) => (
             <button
               key={id}
@@ -589,6 +591,7 @@ export default function CerebroContent() {
         </div>
 
         {/* ── NOTAS MODE ─────────────────────────────────────────────────── */}
+        <div className="flex-1 min-h-0 overflow-y-auto pb-[40vh] pt-2">
         {mode === 'notas' && (
           <>
             {/* Search + new note */}
@@ -755,6 +758,8 @@ export default function CerebroContent() {
         )}
 
         {/* ── NOTE MODAL ─────────────────────────────────────────────────── */}
+        </div>
+
         {noteModal !== null && (
           <NoteModal
             note={noteModal === 'new' ? null : noteModal}

@@ -83,7 +83,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         const a = Math.abs(net)
         el.style.opacity = String(a > PITCH_DEG * 2.6 ? 0 : Math.max(0.06, 1 - (a / (PITCH_DEG * 2)) * 0.92))
         el.style.zIndex = String(100 - Math.round(a))
-        el.style.pointerEvents = a < PITCH_DEG * 0.5 ? 'auto' : 'none'
+        el.style.pointerEvents = (!sec.content && a < PITCH_DEG * 0.5) ? 'auto' : 'none'
 
         const near = Math.max(0, 1 - a / (PITCH_DEG * 2.5))
         const dTransform = `rotateX(${net}deg) translateZ(120px) scale(${0.9 + near * 0.3})`
@@ -107,7 +107,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         el.style.transform = `rotateX(${net}deg) translateZ(${R}px)`
         el.style.opacity = String(a > PITCH_DEG * 2.6 ? 0 : Math.max(0, 1 - (a / (PITCH_DEG * 2)) * 0.92))
         el.style.zIndex = String(200 - Math.round(a))
-        el.style.pointerEvents = a < PITCH_DEG * 0.5 ? 'auto' : 'none'
+        el.style.pointerEvents = a < PITCH_DEG * 0.6 ? 'auto' : 'none'
       })
     }
 
@@ -122,6 +122,20 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
     }
 
     const onWheel = (e: WheelEvent) => {
+      const face = (e.target as HTMLElement)?.closest?.('.os-cface') as HTMLElement | null
+      if (face) {
+        let node: HTMLElement | null = e.target as HTMLElement
+        while (node && node !== face.parentElement) {
+          const oy = getComputedStyle(node).overflowY
+          if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) {
+            const atTop = node.scrollTop <= 0
+            const atBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 1
+            if (!((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom))) return
+            break
+          }
+          node = node.parentElement
+        }
+      }
       e.preventDefault()
       const now = performance.now()
       accum.current += e.deltaY
@@ -133,7 +147,10 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
       if (dir * vel.current < 0) vel.current = 0   // reverso: mata el látigo del momentum
       target.current += dir * SUBSTEP
     }
-    const onDown = (e: PointerEvent) => { dragging.current = true; moved.current = false; lastY.current = e.clientY; vel.current = 0; scene.setPointerCapture(e.pointerId) }
+    const onDown = (e: PointerEvent) => {
+      if ((e.target as HTMLElement)?.closest?.('.os-cface')) return   // no secuestres el puntero sobre contenido interactivo
+      dragging.current = true; moved.current = false; lastY.current = e.clientY; vel.current = 0; scene.setPointerCapture(e.pointerId)
+    }
     const onMove = (e: PointerEvent) => {
       if (!dragging.current) return
       const dy = e.clientY - lastY.current
@@ -175,7 +192,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         .os-face { position: absolute; inset: 0; transform-style: preserve-3d; -webkit-backface-visibility: hidden; backface-visibility: hidden;
           display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; text-align: center; cursor: pointer; will-change: transform, opacity; }
         .os-face--live { cursor: default; }
-        .os-cface { position: absolute; inset: 0; transform-style: preserve-3d; -webkit-backface-visibility: hidden; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; overflow: hidden; will-change: transform, opacity; }
+        .os-cface { position: absolute; inset: 0; transform-style: preserve-3d; -webkit-backface-visibility: hidden; backface-visibility: hidden; overflow-y: auto; overflow-x: hidden; will-change: transform, opacity; }
         .os-cface, .os-cface * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
         .os-sub { font-size: 12px; letter-spacing: .28em; text-transform: uppercase; color: var(--color-ink-3); }
         .os-name { font-size: 44px; font-weight: 700; }

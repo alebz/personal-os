@@ -383,10 +383,10 @@ export default function DiarioContent() {
   const groups = groupByDate(entries)
 
   return (
-      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+      <main className="mx-auto flex h-full max-w-2xl flex-col px-4 pt-6 sm:px-6">
 
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex shrink-0 items-center justify-between">
           <h1 className="text-xl font-semibold text-ink-4">Diario</h1>
           <button
             onClick={() => void createEntry()}
@@ -398,6 +398,7 @@ export default function DiarioContent() {
           </button>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto pb-[40vh]">
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
@@ -443,6 +444,7 @@ export default function DiarioContent() {
             ))}
           </div>
         )}
+        </div>
       </main>
   )
 }
