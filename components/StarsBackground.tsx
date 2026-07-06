@@ -228,31 +228,17 @@ const MUZZLE_DUR     = 260    // ms — one-shot weapon firing (muzzle) animatio
 
 type RaceBehavior = 'aggressive' | 'tactical' | 'tank' | 'survivor'
 
-const RACE_STATS = {
-  klaed: {
-    speedMult: 1.3, hp: 2, shieldStrength: 1, shieldRecharge: 4000,
-    fireInterval: 1200, hitRadius: 15, behavior: 'aggressive' as RaceBehavior,
-    retreatThreshold: 1, optimalRange: 0, minRange: 80, maxRange: 150,
-    turnRate: 0.003,
-  },
-  nairan: {
-    speedMult: 1.0, hp: 2, shieldStrength: 2, shieldRecharge: 8000,
-    fireInterval: 2000, hitRadius: 20, behavior: 'tactical' as RaceBehavior,
-    retreatThreshold: 2, optimalRange: 250, minRange: 200, maxRange: 300,
-    turnRate: 0.002,
-  },
-  nautolan: {
-    speedMult: 0.8, hp: 3, shieldStrength: 3, shieldRecharge: 6000,
-    fireInterval: 3000, hitRadius: 25, behavior: 'tank' as RaceBehavior,
-    retreatThreshold: 0, optimalRange: 0, minRange: 120, maxRange: 180,
-    turnRate: 0.0015,
-  },
-  mainship: {
-    speedMult: 1.4, hp: 4, shieldStrength: 1, shieldRecharge: 5000,
-    fireInterval: 2000, hitRadius: 15, behavior: 'survivor' as RaceBehavior,
-    retreatThreshold: 2, optimalRange: 0, minRange: 250, maxRange: 350,
-    turnRate: 0.002,
-  },
+// ─── Unified race table — SINGLE SOURCE OF TRUTH for per-race stats ────────────
+// speed / armor / turnRate / fireRate are base stat POINTS (0–10). Equipment
+// (ENGINE/SHIELD/WEAPON_MODS) adds to them and computeStats() turns the totals
+// into real px/ms & hp values. The remaining fields are static combat/behaviour
+// params the FSM reads live. Every value here is tunable and actually used — no
+// dead fields. (Replaces the former split RACE_STATS + RACE_BASE tables.)
+const RACE = {
+  klaed:    { speed: 7, armor: 3, turnRate: 8, fireRate: 7, behavior: 'aggressive', minRange:  80, maxRange: 150, retreatThreshold: 1, hitRadius: 15, shieldRecharge: 4000 },
+  nairan:   { speed: 5, armor: 5, turnRate: 5, fireRate: 5, behavior: 'tactical',   minRange: 200, maxRange: 300, retreatThreshold: 2, hitRadius: 20, shieldRecharge: 8000 },
+  nautolan: { speed: 3, armor: 8, turnRate: 3, fireRate: 3, behavior: 'tank',       minRange: 120, maxRange: 180, retreatThreshold: 0, hitRadius: 25, shieldRecharge: 6000 },
+  mainship: { speed: 8, armor: 4, turnRate: 9, fireRate: 5, behavior: 'survivor',   minRange: 250, maxRange: 350, retreatThreshold: 2, hitRadius: 15, shieldRecharge: 5000 },
 } as const
 
 // Projectiles are now rendered as self-contained pixel-art SVG sprites (see
@@ -286,13 +272,7 @@ const WEAPON_PICKUPS = [
 // ─── STAT SYSTEM ───────────────────────────────────────────────────────────────
 
 const BASE_SPEED = 0.0095  // px/ms per speed-stat point (ships a touch faster)
-
-const RACE_BASE = {
-  klaed:    { speed: 7, armor: 3, turnRate: 8, fireRate: 7, aggression: 9 },
-  nairan:   { speed: 5, armor: 5, turnRate: 5, fireRate: 5, aggression: 5 },
-  nautolan: { speed: 3, armor: 8, turnRate: 3, fireRate: 3, aggression: 6 },
-  mainship: { speed: 8, armor: 4, turnRate: 9, fireRate: 5, aggression: 4 },
-} as const
+// (base stat points now live in the unified RACE table above — computeStats reads them)
 
 // Per-family flight character: serpentine "wiggle", formation shape/tightness, parking.
 //  klaed = loose & jittery (fly like a chaotic swarm, rarely hold still)
@@ -615,7 +595,7 @@ function clampTurn(cur: number, tgt: number, max: number): number {
 // Recompute a ship's derived stats from race base + equipped engine/shield/weapon.
 // Call on spawn and after every pickup collection.
 function computeStats(ship: ShipAgent) {
-  const base = RACE_BASE[ship.fleetType]
+  const base = RACE[ship.fleetType]
   const eng  = ENGINE_MODS[ship.engineType || 'none']
   const shd  = SHIELD_MODS[ship.shieldType || 'none']
   const wpn  = WEAPON_MODS[ship.weaponType || 'none']
@@ -1518,7 +1498,7 @@ function SpaceSim() {
       const { x: sx, y: sy, angle } = spawn
       const fleetId = genId()
 
-      const raceStats = RACE_STATS[ft as keyof typeof RACE_STATS] || RACE_STATS.klaed
+      const raceStats = RACE[ft as keyof typeof RACE] || RACE.klaed
       const spdScale  = inSpeedMult ?? 1.0
       const newAgents: ShipAgent[] = Array.from({ length: sz }, (_, i) => {
         const isLeader    = i === 0
@@ -1535,14 +1515,12 @@ function SpaceSim() {
           equipShield: fullCombo.shield ?? factionDefaultShield(ft),
           x: sx + Math.cos(spreadAngle + Math.PI / 2) * spreadDist,
           y: sy + Math.sin(spreadAngle + Math.PI / 2) * spreadDist,
-          vx: Math.cos(angle) * CRUISE_SPEED * raceStats.speedMult * spdScale,
-          vy: Math.sin(angle) * CRUISE_SPEED * raceStats.speedMult * spdScale,
-          avx: Math.cos(angle) * CRUISE_SPEED * raceStats.speedMult * spdScale,
-          avy: Math.sin(angle) * CRUISE_SPEED * raceStats.speedMult * spdScale,
+          vx: 0, vy: 0,    // real velocity is set from computed maxSpeed just below
+          avx: 0, avy: 0,
           angle, cruiseAngle: angle,
           wavePhase: Math.random() * Math.PI * 2,
           state: 'cruising',
-          hp: raceStats.hp, prevHp: raceStats.hp,
+          hp: 1, prevHp: 1,   // set from computed maxHp just below
           wingSlot: i,
           wingAngle: Math.random() * Math.PI * 2,
           retreatStart: 0,
@@ -1552,7 +1530,7 @@ function SpaceSim() {
           leaderId: null,
           targetId: null,
           lastShot: 0,
-          fireInterval: raceStats.fireInterval,
+          fireInterval: 2000,   // set by computeStats just below
           dyingStart: 0, dyingDuration: 0,
           destruction: getDestructData(combo),
           shieldHp: 0,
@@ -1569,7 +1547,7 @@ function SpaceSim() {
           engineType: 'none' as EngineKey,
           shieldType: 'none' as ShieldKey,
           weaponType: 'none' as WeaponKey,
-          maxSpeed: CRUISE_SPEED, maxHp: raceStats.hp, turnRate: raceStats.turnRate,
+          maxSpeed: 0, maxHp: 1, turnRate: 0,   // all set by computeStats just below
           damage: 1, range: 0, splash: false, sizeSpeedMult: 1,
           spiralUntil: 0, engagePauseUntil: 0, respectUntil: 0, vengeanceUntil: 0,
           targetLockedUntil: 0,
@@ -1775,7 +1753,7 @@ function SpaceSim() {
         if (agent.shieldActive && agent.shieldHp > 0) {
           agent.shieldHp -= ASTEROID_DMG; agent.lastShieldHit = now
           if (agent.shieldHp <= 0) {
-            const rs = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+            const rs = RACE[agent.fleetType as keyof typeof RACE] || RACE.klaed
             agent.shieldActive = false; agent.shieldCooldown = now + rs.shieldRecharge
           }
         } else {
@@ -2170,7 +2148,6 @@ function SpaceSim() {
           return
         }
 
-        const agentRs = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
         // Nautolan juggernaut: Invincibility Shield → straight-line advance, ignores evasion
         const juggernaut = agent.fleetType === 'nautolan' && agent.shieldType === 'invincibility'
 
@@ -2429,7 +2406,7 @@ function SpaceSim() {
 
         // ── ENGAGING ────────────────────────────────────────────────────────────
         } else if (agent.state === 'engaging') {
-          const rs  = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+          const rs  = RACE[agent.fleetType as keyof typeof RACE] || RACE.klaed
           // Kla'ed rampage: Burst Engine → +20% speed, never retreats
           const rampage = agent.fleetType === 'klaed' && agent.engineType === 'burst'
           // Berserk last-survivor +50%; mourning slows to 50%
@@ -2649,7 +2626,7 @@ function SpaceSim() {
 
         // ── RETREATING ──────────────────────────────────────────────────────────
         } else if (agent.state === 'retreating') {
-          const rs = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+          const rs = RACE[agent.fleetType as keyof typeof RACE] || RACE.klaed
           if (fleetRetreating.has(agent.fleetId)) {
             // Fleet-wide retreat: turn toward home edge, move forward
             const spd = agent.maxSpeed * 1.4 * speedBoost(agent.fleetType)
@@ -2807,7 +2784,7 @@ function SpaceSim() {
               agent.shieldHp -= proj.damage
               agent.lastShieldHit = now
               if (agent.shieldHp <= 0) {
-                const rs = RACE_STATS[agent.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+                const rs = RACE[agent.fleetType as keyof typeof RACE] || RACE.klaed
                 agent.shieldActive = false
                 agent.shieldCooldown = now + rs.shieldRecharge
               }
@@ -2825,7 +2802,7 @@ function SpaceSim() {
                 if (other.shieldActive && other.shieldHp > 0) {
                   other.shieldHp -= 1; other.lastShieldHit = now
                   if (other.shieldHp <= 0) {
-                    const ors = RACE_STATS[other.fleetType as keyof typeof RACE_STATS] || RACE_STATS.klaed
+                    const ors = RACE[other.fleetType as keyof typeof RACE] || RACE.klaed
                     other.shieldActive = false; other.shieldCooldown = now + ors.shieldRecharge
                   }
                 } else {
