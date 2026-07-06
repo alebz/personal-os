@@ -213,7 +213,8 @@ const COMBAT_RATIO   = COMBAT_SPEED / CRUISE_SPEED  // combat speed relative to 
 const PROJ_SPEED     = 0.45   // px/ms
 const PROJ_LIFE      = 2200   // ms
 const HIT_RADIUS     = 20     // px — projectile hit distance
-const COLLIDE_DIST   = 30     // px — ship-to-ship collision
+const COLLIDE_DIST   = 30     // px — ship-to-ship contact distance
+const RAM_DMG        = 2      // damage each ship takes in an ENEMY ram (same-fleet just shove apart)
 const DETECT_DIST    = 600    // px — combat trigger
 const PRED_SHIP_MS   = 800    // ms — ship prediction look-ahead
 const PRED_SHIP_DIST = 80     // px — predicted collision threshold (ships)
@@ -280,15 +281,15 @@ const BASE_SPEED = 0.0095  // px/ms per speed-stat point (ships a touch faster)
 // (base stat points now live in the unified RACE table above — computeStats reads them)
 
 // Per-family flight character: serpentine "wiggle", formation shape/tightness, parking.
-//  klaed = loose & jittery (fly like a chaotic swarm, rarely hold still)
+//  klaed = disciplined attack spearhead (tight arrow, crisp, presses the advance)
 //  nairan = disciplined tight V (loves to form up and park in formation)
 //  nautolan = rigid steady wall/phalanx
 //  mainship = lone erratic evader
-type FlightShape = 'v' | 'wall' | 'loose' | 'solo'
+type FlightShape = 'v' | 'wall' | 'loose' | 'arrow' | 'solo'
 const FLIGHT: Record<AgentFleetType, {
   wiggleAmp: number; wiggleFreq: number; spacing: number; shape: FlightShape; parkChance: number
 }> = {
-  klaed:    { wiggleAmp: 0.34, wiggleFreq: 0.0017, spacing: 1.4,  shape: 'loose', parkChance: 0.12 },
+  klaed:    { wiggleAmp: 0.07, wiggleFreq: 0.0012, spacing: 1.0,  shape: 'arrow', parkChance: 0.10 },
   nairan:   { wiggleAmp: 0.10, wiggleFreq: 0.0009, spacing: 0.9,  shape: 'v',     parkChance: 0.55 },
   nautolan: { wiggleAmp: 0.06, wiggleFreq: 0.0007, spacing: 1.05, shape: 'wall',  parkChance: 0.40 },
   mainship: { wiggleAmp: 0.30, wiggleFreq: 0.0019, spacing: 1.0,  shape: 'solo',  parkChance: 0.15 },
@@ -297,7 +298,7 @@ const FLIGHT: Record<AgentFleetType, {
 // Formation slot offsets in ship-local frame (x = forward/back, y = lateral). Slot 0 = leader.
 // Shape + spacing come from the family; the number of slots grows with the fleet size.
 function formationSlots(count: number, shape: FlightShape, spacing: number): { x: number; y: number }[] {
-  const S = 46 * spacing
+  const S = 54 * spacing   // slot pitch (>ship width, so a tight formation still leaves breathing room)
   const slots: { x: number; y: number }[] = [{ x: 0, y: 0 }]
   for (let i = 1; i < count; i++) {
     const side = i % 2 === 1 ? 1 : -1
@@ -306,12 +307,14 @@ function formationSlots(count: number, shape: FlightShape, spacing: number): { x
       slots.push({ x: -8 * row, y: side * row * S })              // abreast phalanx
     } else if (shape === 'loose') {
       slots.push({ x: -row * S * (0.7 + (i % 3) * 0.25), y: side * row * S * 0.9 })  // scattered wedge
+    } else if (shape === 'arrow') {
+      slots.push({ x: -row * S * 1.3, y: side * row * S * 0.45 })  // sharp swept-back spearhead
     } else {
-      slots.push({ x: -row * S, y: side * row * S * 0.68 })       // tight V / arrow
+      slots.push({ x: -row * S, y: side * row * S * 0.68 })       // tight V
     }
   }
-  // 4 ships → close the wedge into a diamond (last one dead-centre behind)
-  if (count === 4 && shape !== 'wall') slots[3] = { x: -2 * S, y: 0 }
+  // 4 ships → close a V into a diamond (arrow stays a 4-deep spear)
+  if (count === 4 && shape !== 'wall' && shape !== 'arrow') slots[3] = { x: -2 * S, y: 0 }
   return slots
 }
 
@@ -1963,6 +1966,21 @@ function SpaceSim() {
       setAgentKeys([...agents.current.keys()])  // force re-render so the new gear shows
     }
 
+    // A ramming hit — soaks the shield first, then hull; only lethal if it empties the hull.
+    function ramDamage(agent: ShipAgent, now: number) {
+      if (agent.shieldActive && agent.shieldHp > 0) {
+        agent.shieldHp -= RAM_DMG; agent.lastShieldHit = now
+        if (agent.shieldHp <= 0) {
+          const rs = RACE[agent.fleetType as keyof typeof RACE] || RACE.klaed
+          agent.shieldActive = false; agent.shieldCooldown = now + rs.shieldRecharge
+        }
+      } else {
+        agent.hp -= RAM_DMG
+        spawnHit(agent.x + 24, agent.y + 24)
+        if (agent.hp <= 0) killAgent(agent, now)   // ram death — no killerType (mutual), no score
+      }
+    }
+
     function tick(now: number) {
       const dt = Math.min(now - lastTime, 50)
       lastTime = now
@@ -2059,8 +2077,9 @@ function SpaceSim() {
         else if (now > q.at + 15000) pickupSpawnQueue.splice(i, 1)   // give up if it waited too long
       }
 
-      // Ship-to-ship collision — if any two ships touch, BOTH explode, regardless of
-      // fleet (this is also how ally-overlap is resolved: they can't stack, they detonate).
+      // Ship-to-ship contact. Same-fleet ships DON'T kill each other — they just shove apart
+      // (formation jostling isn't a death sentence). Enemies RAM: both take real damage and
+      // bounce off, so a collision death now means someone's hull ran out, not a cheap brush.
       // Regrouping ships are exempt so a fleet can safely re-form.
       agents.current.forEach((aA, idA) => {
         if (aA.state === 'dying' || aA.state === 'regrouping') return
@@ -2068,11 +2087,20 @@ function SpaceSim() {
           if (idA >= idB || aB.state === 'dying' || aB.state === 'regrouping') return
           const ax = aA.x + 24, ay = aA.y + 24
           const bx = aB.x + 24, by = aB.y + 24
-          const collide = dist2D(ax, ay, bx, by) < COLLIDE_DIST
+          const d = dist2D(ax, ay, bx, by)
+          const collide = d < COLLIDE_DIST
             || segmentsIntersect(ax - aA.avx*dt, ay - aA.avy*dt, ax, ay, bx - aB.avx*dt, by - aB.avy*dt, bx, by)
           if (!collide) return
-          killAgent(aA, now)
-          killAgent(aB, now)
+          // Shove the pair apart so they can't stack (each moves half the overlap; smooth, not a teleport)
+          let nx = ax - bx, ny = ay - by
+          const nd = Math.hypot(nx, ny)
+          if (nd < 0.5) { nx = Math.cos(aA.angle); ny = Math.sin(aA.angle) }   // exact overlap → split along heading
+          else { nx /= nd; ny /= nd }
+          const push = (COLLIDE_DIST - Math.min(d, COLLIDE_DIST)) / 2 + 1
+          aA.x += nx * push; aA.y += ny * push
+          aB.x -= nx * push; aB.y -= ny * push
+          if (aA.fleetId === aB.fleetId) return   // same family: bump, no blood
+          ramDamage(aA, now); ramDamage(aB, now)  // enemies: mutual ram damage (lethal only if wounded)
         })
       })
 
@@ -2455,6 +2483,24 @@ function SpaceSim() {
           const parked = !!park && now < park.until
           const isLead = agent.isLeader || !agent.leaderId || !leader || leader.state === 'dying'
 
+          // ── Detect enemies; advance in formation, break to combat only in firing range ──
+          const detectRange = 500 + aggro * 40
+          const engageRange = (RACE[agent.fleetType as keyof typeof RACE]?.maxRange ?? 150) + 70
+          let nearEnemy: ShipAgent | null = null, nearED = Infinity
+          agents.current.forEach(o => {
+            if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying') return
+            const d = dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24)
+            if (d < nearED) { nearED = d; nearEnemy = o }
+          })
+          const enemyNear = !!nearEnemy && nearED < detectRange
+          // Leader steers the WHOLE group at the nearest foe while still out of range: the
+          // formation holds shape and advances, instead of everyone breaking off at first sight.
+          if (isLead && enemyNear && nearED > engageRange && nearEnemy) {
+            const ne = nearEnemy as ShipAgent
+            agent.cruiseAngle = lerpAngle(agent.cruiseAngle, Math.atan2(ne.y + 24 - (agent.y + 24), ne.x + 24 - (agent.x + 24)), 0.09)
+            fleetPark.delete(agent.fleetId)
+          }
+
           if (isLead) {
             if (parked && park) {
               // Hold station at the parked anchor, tumbling gently in place
@@ -2477,7 +2523,7 @@ function SpaceSim() {
               // Decide to station the whole fleet when it's calm out
               if (now >= agent.nextParkCheck) {
                 agent.nextParkCheck = now + 5000 + Math.random() * 5000
-                if (!parked && Math.random() < fl.parkChance) {
+                if (!parked && !enemyNear && Math.random() < fl.parkChance) {
                   fleetPark.set(agent.fleetId, { until: now + 5000 + Math.random() * 7000, x: agent.x, y: agent.y, heading: agent.angle })
                 }
               }
@@ -2502,16 +2548,14 @@ function SpaceSim() {
             agent.cruiseAngle = leader.cruiseAngle
           }
 
-          // Higher aggression = spot & commit to enemies from farther away
-          const detectRange = 500 + aggro * 40
-          let hasEnemy = false
-          agents.current.forEach(o => {
-            if (hasEnemy || !isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying') return
-            if (dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24) < detectRange) hasEnemy = true
-          })
-          if (hasEnemy) {
+          // Break the formation into individual combat once in firing range (leader), or the
+          // moment the leader commits (wings follow their leader into the attack together).
+          const commit = isLead
+            ? (enemyNear && nearED <= engageRange)
+            : ((!!leader && leader.state === 'engaging') || (enemyNear && nearED <= engageRange))
+          if (commit) {
             agent.state = 'engaging'
-            fleetPark.delete(agent.fleetId)   // battle stations — un-park to fight
+            fleetPark.delete(agent.fleetId)   // battle stations
             // Nairan discipline: the whole wing pauses 1s to assess before committing
             if (agent.fleetType === 'nairan') {
               const until = now + 1000
@@ -2780,6 +2824,19 @@ function SpaceSim() {
             if (d >= 60) return
             const sameFleet = other.fleetId === agent.fleetId
             const turn = (60 - d) / 60 * turnCap * dt * (sameFleet ? 4 : 2)
+            avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), turn)
+          })
+          // Asteroids are lethal and NOT in agents.current — swerve wide of any rock ahead.
+          asteroids.current.forEach(ast => {
+            const acx = ast.x + ast.size / 2, acy = ast.y + ast.size / 2
+            const dx = agent.x + 24 - acx, dy = agent.y + 24 - acy
+            const d  = Math.sqrt(dx * dx + dy * dy) || 1
+            const danger = ast.size / 2 + 82        // rock radius + a generous berth
+            if (d >= danger) return
+            // ignore rocks well behind the ship's heading (don't curve back toward one already passed)
+            const facing = (Math.cos(agent.angle) * -dx + Math.sin(agent.angle) * -dy) / d
+            if (facing < -0.25) return
+            const turn = (danger - d) / danger * turnCap * dt * 5   // urgent — hard swerve when close
             avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), turn)
           })
           if (avoidAngle !== agent.angle) {

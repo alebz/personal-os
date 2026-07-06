@@ -15,6 +15,8 @@ const DAMP             = 0.78  // amortiguación. Menos = frena más (sin rebote
 const STEP_COOLDOWN    = 150   // ms entre clics de la rueda (1 notch = 1 sub-paso)
 const STEPS_PER_SCREEN = 4     // clics para cruzar una sección. Más = menos sensible
 const WHEEL_THRESHOLD   = 40    // cuánto hay que rodar para que "haga clic" un paso. MÁS = menos sensible
+const CONTENT_STEP        = 55    // px que avanza el scroll por notch. MENOS = pasos más cortos
+const CONTENT_SCROLL_EASE = 0.32  // frenado del scroll. MÁS = frena más corto/seco; MENOS = más resbaladizo
 /* ─────────────────────────────────────────────────────────────────────── */
 
 const SLOTS = [-2, -1, 0, 1, 2]
@@ -58,6 +60,9 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
   const lastY = useRef(0)
   const lastStep = useRef(0)
   const accum = useRef(0)
+  const scrollEl = useRef<HTMLElement | null>(null)
+  const scrollTgt = useRef(0)
+  const scrollAccum = useRef(0)
   const centerRef = useRef(0)
 
   useEffect(() => {
@@ -117,6 +122,12 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         vel.current *= DAMP
         rot.current += vel.current
       }
+      const s = scrollEl.current
+      if (s) {
+        const diff = scrollTgt.current - s.scrollTop
+        if (Math.abs(diff) > 0.5) s.scrollTop += diff * CONTENT_SCROLL_EASE
+        else { s.scrollTop = scrollTgt.current; scrollEl.current = null }
+      }
       render()
       raf = requestAnimationFrame(tick)
     }
@@ -127,7 +138,17 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         let node: HTMLElement | null = e.target as HTMLElement
         while (node && node !== face.parentElement) {
           const oy = getComputedStyle(node).overflowY
-          if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return
+          if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) {
+            e.preventDefault()
+            scrollAccum.current += e.deltaY
+            if (Math.abs(scrollAccum.current) < 15) return
+            const dir = scrollAccum.current > 0 ? 1 : -1
+            scrollAccum.current = 0
+            if (scrollEl.current !== node) { scrollEl.current = node; scrollTgt.current = node.scrollTop }
+            const max = node.scrollHeight - node.clientHeight
+            scrollTgt.current = Math.max(0, Math.min(max, scrollTgt.current + dir * CONTENT_STEP))
+            return
+          }
           node = node.parentElement
         }
       }
