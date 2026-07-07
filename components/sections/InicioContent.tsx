@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import CalendarCard from '@/components/CalendarCard'
-import QuickCaptureCard from '@/components/QuickCaptureCard'
 import FinancePulseCard from '@/components/FinancePulseCard'
 import HabitTracker from '@/components/HabitTracker'
 import Clock from '@/components/Clock'
@@ -135,9 +134,6 @@ export default function InicioContent() {
       <Hero />
 
       <div className="flex-1 min-h-0 space-y-4 overflow-y-auto pb-8">
-        {/* Captura rápida */}
-        <QuickCaptureCard />
-
         {/* Calendario */}
         <CalendarCard />
 

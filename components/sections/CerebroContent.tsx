@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import UniversalCapture from '@/components/UniversalCapture'
+import { formatTime, moodEmoji, type JournalEntry } from '@/components/sections/DiarioContent'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,7 +24,7 @@ interface Note {
   updated_at: string
 }
 
-type Mode = 'search' | 'ask' | 'patterns' | 'notas'
+type Mode = 'search' | 'ask' | 'patterns' | 'notas' | 'diario'
 
 interface Evidence {
   type:  string
@@ -90,6 +92,7 @@ const MODE_META: { id: Mode; label: string }[] = [
   { id: 'ask',         label: '✨ Preguntar'   },
   { id: 'patterns',    label: '🔮 Patrones'    },
   { id: 'notas',       label: '📋 Notas'       },
+  { id: 'diario',      label: '📓 Diario'      },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -441,6 +444,12 @@ export default function CerebroContent() {
   const [notesLoaded, setNotesLoaded] = useState(false)
   const [noteSearch,  setNoteSearch]  = useState('')
   const [noteModal,   setNoteModal]   = useState<Note | 'new' | null>(null)
+  const [vaultOpen,   setVaultOpen]   = useState(false)   // consultation hub collapsed by default
+
+  // Journal history (read from the same /api/journal the Diario section uses)
+  const [journal,       setJournal]       = useState<JournalEntry[]>([])
+  const [journalLoaded, setJournalLoaded] = useState(false)
+  const [journalExpand, setJournalExpand] = useState<string | null>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
@@ -476,6 +485,16 @@ export default function CerebroContent() {
   function handleNoteDeleted(id: string) {
     setNotes(prev => prev.filter(n => n.id !== id))
   }
+
+  // Load journal history once when switching to the Diario tab
+  useEffect(() => {
+    if (mode !== 'diario' || journalLoaded) return
+    fetch('/api/journal')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setJournal(data) })
+      .finally(() => setJournalLoaded(true))
+  }, [mode, journalLoaded])
+
 
   // Memory search / patterns handlers
   async function loadPatterns() {
@@ -572,6 +591,20 @@ export default function CerebroContent() {
   return (
       <main className="mx-auto flex h-full max-w-3xl flex-col px-6 pt-6">
 
+        {/* Universal capture — the one writing box for the whole OS */}
+        <div className="mb-3 shrink-0"><UniversalCapture /></div>
+
+        {/* Consultation hub (search · ask · patterns · notes vault) — collapsed by default */}
+        <button
+          type="button"
+          onClick={() => setVaultOpen(o => !o)}
+          className="mb-3 flex shrink-0 items-center gap-2 self-start rounded-full border border-ink-4/10 bg-ink-1/60 px-3 py-1.5 text-xs text-ink-3 transition-colors hover:text-ink-4"
+        >
+          <span>{vaultOpen ? '▾' : '▸'}</span>
+          <span>Consultar el vault — buscar · preguntar · patrones · notas</span>
+        </button>
+
+        {vaultOpen && (<>
         {/* Mode toggle */}
         <div className="mb-4 flex shrink-0 flex-wrap gap-2">
           {MODE_META.map(({ id, label }) => (
@@ -645,8 +678,43 @@ export default function CerebroContent() {
           </>
         )}
 
+        {/* ── DIARIO MODE — journal history (read from the same /api/journal) ──── */}
+        {mode === 'diario' && (
+          !journalLoaded ? (
+            <div className="flex justify-center py-16">
+              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+            </div>
+          ) : journal.length === 0 ? (
+            <div className="py-20 text-center">
+              <p className="mb-3 text-4xl">📓</p>
+              <p className="text-sm text-ink-3">Aún no hay entradas en tu diario.</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {[...journal].sort((a, b) => b.created_at.localeCompare(a.created_at)).map(entry => {
+                const open  = journalExpand === entry.id
+                const stamp = `${new Date(entry.entry_date + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} ${formatTime(entry.created_at)}`
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => setJournalExpand(id => (id === entry.id ? null : entry.id))}
+                    className="flex w-full items-start gap-2 rounded-lg border border-ink-4/8 bg-ink-1/40 px-2.5 py-1.5 text-left transition-colors hover:bg-ink-1/70"
+                  >
+                    <span className="shrink-0 text-sm leading-tight">{moodEmoji(entry.mood) || '·'}</span>
+                    <span className={`min-w-0 flex-1 whitespace-pre-wrap text-xs leading-snug text-ink-3 ${open ? '' : 'line-clamp-1'}`}>
+                      {entry.content?.trim() || <span className="italic text-ink-2/50">(sin texto)</span>}
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap pt-0.5 text-[10px] tabular-nums text-ink-2/50">{stamp}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )
+        )}
+
         {/* ── SEARCH / ASK / PATTERNS MODE ──────────────────────────────── */}
-        {mode !== 'notas' && (
+        {mode !== 'notas' && mode !== 'diario' && (
           <>
             <form onSubmit={handleSubmit} className="mb-8">
               <div className="relative">
@@ -757,9 +825,10 @@ export default function CerebroContent() {
           </>
         )}
 
-        {/* ── NOTE MODAL ─────────────────────────────────────────────────── */}
         </div>
+        </>)}
 
+        {/* ── NOTE MODAL ─────────────────────────────────────────────────── */}
         {noteModal !== null && (
           <NoteModal
             note={noteModal === 'new' ? null : noteModal}
