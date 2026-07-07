@@ -17,7 +17,7 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-function Clock({ color = '#F59E0B' }: { color?: string }) {
+function Clock({ color = '#F59E0B', scale = 1 }: { color?: string; scale?: number }) {
   const [now,   setNow]   = useState<Date | null>(null)
   const [colon, setColon] = useState(true)
 
@@ -27,7 +27,7 @@ function Clock({ color = '#F59E0B' }: { color?: string }) {
     return () => clearInterval(id)
   }, [])
 
-  if (!now) return <div style={{ width: 220, height: 88 }} aria-hidden />
+  if (!now) return <div style={{ width: 220 * scale, height: 88 * scale }} aria-hidden />
 
   const h24    = now.getHours()
   const h12    = h24 % 12 || 12
@@ -51,18 +51,18 @@ function Clock({ color = '#F59E0B' }: { color?: string }) {
     <div style={{ userSelect: 'none', position: 'relative' }}>
 
       {/* Time + AM/PM row */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 * scale }}>
 
         {/* Segment display — ghost + real layered */}
         <div style={{ position: 'relative', lineHeight: 1 }}>
           {/* Ghost (all-segments dim) */}
-          <div style={{ fontFamily: LCD, fontSize: 28, color: ghost, lineHeight: 1, transition }}>
+          <div style={{ fontFamily: LCD, fontSize: 28 * scale, color: ghost, lineHeight: 1, transition }}>
             88:88:88
           </div>
 
           {/* Real time */}
           <div style={{
-            fontFamily: LCD, fontSize: 28, color,
+            fontFamily: LCD, fontSize: 28 * scale, color,
             textShadow: glow, lineHeight: 1,
             position: 'absolute', top: 0, left: 0,
             transition,
@@ -78,11 +78,11 @@ function Clock({ color = '#F59E0B' }: { color?: string }) {
         {/* AM/PM */}
         <div style={{
           fontFamily: '"Share Tech Mono", monospace',
-          fontSize: 8,
+          fontSize: 8 * scale,
           letterSpacing: '0.1em',
           color: dimText,
           textShadow: dimGlow,
-          marginBottom: 3,
+          marginBottom: 3 * scale,
           transition,
         }}>
           {ampm}
@@ -96,12 +96,12 @@ function Clock({ color = '#F59E0B' }: { color?: string }) {
         left: 0,
         right: 0,
         fontFamily: '"Share Tech Mono", monospace',
-        fontSize: 9,
+        fontSize: 9 * scale,
         letterSpacing: '0.22em',
         color: dimText,
         textShadow: dimGlow,
         textAlign: 'center',
-        marginTop: 4,
+        marginTop: 4 * scale,
         transition,
         whiteSpace: 'nowrap',
       }}>

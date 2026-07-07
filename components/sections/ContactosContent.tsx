@@ -545,6 +545,9 @@ export default function ContactosContent() {
   const [catFilter, setCatFilter]     = useState<string | null>(null)
   const [drawer, setDrawer]           = useState<Drawer | null>(null)
   const [showCatMgr, setShowCatMgr]  = useState(false)
+  const [listOpen, setListOpen]       = useState(true)
+  const [filterOpen, setFilterOpen]   = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
   const [sort, setSort] = useState<Sort>(() => {
     try { return (localStorage.getItem('contacts:sort') as Sort) ?? 'alpha' } catch { return 'alpha' }
   })
@@ -552,6 +555,15 @@ export default function ContactosContent() {
   useEffect(() => {
     try { localStorage.setItem('contacts:sort', sort) } catch {}
   }, [sort])
+
+  useEffect(() => {
+    if (!filterOpen) return
+    function onClick(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [filterOpen])
 
   const load = useCallback(async () => {
     setError(null)
@@ -643,14 +655,17 @@ export default function ContactosContent() {
       <main className="mx-auto flex h-full max-w-3xl flex-col px-6 pt-6 pb-4">
         {/* Header */}
         <div className="mb-6 flex shrink-0 items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-4">Contactos</h1>
-            {!loading && (
-              <p className="text-xs text-ink-3">
-                {contacts.length} persona{contacts.length !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
+          <button onClick={() => setListOpen(o => !o)} className="flex items-center gap-2 text-left">
+            <svg viewBox="0 0 12 12" className={`h-3 w-3 shrink-0 text-ink-3/50 transition-transform ${listOpen ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-4">Contactos</h1>
+              {!loading && (
+                <p className="text-xs text-ink-3">
+                  {contacts.length} persona{contacts.length !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+          </button>
           <button
             onClick={() => setDrawer({ mode: 'create' })}
             className="rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
@@ -668,38 +683,46 @@ export default function ContactosContent() {
             className="w-full rounded-xl border border-ink-4/10 bg-ink-1/85 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            {/* Category pills + manage button */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Filtros dropdown */}
+            <div ref={filterRef} className="relative">
               <button
-                onClick={() => setCatFilter(null)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  catFilter === null
-                    ? 'border-accent/30 bg-accent/10 text-accent'
+                onClick={() => setFilterOpen(o => !o)}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                  catFilter
+                    ? catCls(catFilter)
                     : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
                 }`}
               >
-                Todos
+                <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M1 3h12M3 7h8M5 11h4" strokeLinecap="round" /></svg>
+                {catFilter ? `${catEmoji(catFilter)} ${catFilter}` : 'Filtros'}
+                <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 transition-transform ${filterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
-              {catNames.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setCatFilter(prev => (prev === cat ? null : cat))}
-                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                    catFilter === cat
-                      ? catCls(cat)
-                      : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
-                  }`}
-                >
-                  {catEmoji(cat)} {cat}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowCatMgr(true)}
-                className="rounded-full border border-ink-4/10 px-2.5 py-1 text-[10px] text-ink-3 transition-colors hover:border-ink-4/20 hover:text-ink-4"
-                title="Gestionar categorías"
-              >
-                ⚙ Categorías
-              </button>
+              {filterOpen && (
+                <div className="absolute left-0 top-full z-20 mt-1.5 w-56 rounded-xl border border-ink-4/10 bg-ink-0 p-1.5 shadow-2xl">
+                  <button
+                    onClick={() => { setCatFilter(null); setFilterOpen(false) }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-ink-2/20 ${catFilter === null ? 'text-accent' : 'text-ink-4'}`}
+                  >
+                    Todos {catFilter === null && '✓'}
+                  </button>
+                  {catNames.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => { setCatFilter(prev => (prev === cat ? null : cat)); setFilterOpen(false) }}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-ink-2/20 ${catFilter === cat ? 'text-accent' : 'text-ink-4'}`}
+                    >
+                      <span>{catEmoji(cat)} {cat}</span>
+                      {catFilter === cat && <span>✓</span>}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => { setShowCatMgr(true); setFilterOpen(false) }}
+                    className="mt-1 flex w-full items-center gap-1.5 rounded-lg border-t border-ink-4/10 px-3 pt-2 pb-1 text-[11px] text-ink-3 transition-colors hover:text-ink-4"
+                  >
+                    ⚙ Gestionar categorías
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Sort control */}
@@ -738,7 +761,7 @@ export default function ContactosContent() {
               {search || catFilter ? 'Sin resultados.' : '¡Agrega tu primer contacto!'}
             </p>
           </div>
-        ) : (
+        ) : listOpen ? (
           <div className="max-h-[55vh] overflow-y-auto rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             {sort === 'tipo'
               ? groupByType(filtered, catNames).map(({ cat, items }) => (
@@ -758,7 +781,7 @@ export default function ContactosContent() {
                 ))
             }
           </div>
-        )}
+        ) : null}
         </div>
       </main>
 

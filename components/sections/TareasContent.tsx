@@ -530,11 +530,15 @@ function CategoryView({
 
 function EntityManager({
   entities,
+  activeFilter,
+  onFilter,
   onCreate,
   onRename,
   onDelete,
 }: {
   entities: Entity[]
+  activeFilter: string | null
+  onFilter: (name: string | null) => void
   onCreate: (name: string) => Promise<void>
   onRename: (id: string, name: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -569,10 +573,19 @@ function EntityManager({
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-1.5">
       <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-ink-2">
-        Entidades
+        Filtrar
       </span>
+
+      <button
+        onClick={() => onFilter(null)}
+        className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+          activeFilter === null ? 'border-accent/30 bg-accent/10 text-accent' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+        }`}
+      >
+        Todas
+      </button>
 
       {entities.map((e) =>
         editingId === e.id ? (
@@ -590,8 +603,8 @@ function EntityManager({
             style={{ width: Math.max(80, editingName.length * 8 + 28) }}
           />
         ) : (
-          <div key={e.id} className="group flex items-center gap-0.5 rounded-full border border-ink-4/10 bg-ink-1/85 py-0.5 pl-2.5 pr-1">
-            <span className="text-xs text-ink-3">{e.name}</span>
+          <div key={e.id} className={`group flex items-center gap-0.5 rounded-full border py-0.5 pl-2.5 pr-1 ${activeFilter === e.name ? 'border-accent/30 bg-accent/10' : 'border-ink-4/10 bg-ink-1/85'}`}>
+            <button onClick={() => onFilter(activeFilter === e.name ? null : e.name)} className={`text-xs transition-colors ${activeFilter === e.name ? 'font-medium text-accent' : 'text-ink-3 hover:text-ink-4'}`}>{e.name}</button>
             <button
               onClick={() => { setEditingId(e.id); setEditingName(e.name) }}
               className="rounded-full p-0.5 text-ink-2 opacity-0 transition-all group-hover:opacity-100 hover:text-ink-4"
@@ -861,6 +874,9 @@ export default function TareasContent() {
   const [view, setView] = useState<View>('kanban')
   const [drawerTask, setDrawerTask] = useState<Task | null>(null)
   const [creating, setCreating] = useState(false)
+  const [entityFilter, setEntityFilter] = useState<string | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
 
   const loadAll = useCallback(async () => {
     setLoadError(null)
@@ -880,6 +896,15 @@ export default function TareasContent() {
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  useEffect(() => {
+    if (!filterOpen) return
+    function onClick(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [filterOpen])
 
   function handleAdd(task: Task) {
     setTasks((prev) => [task, ...prev])
@@ -942,7 +967,8 @@ export default function TareasContent() {
     setTasks((prev) => prev.map((t) => (t.entity_id === id ? { ...t, entity_id: null } : t)))
   }
 
-  const openCount = tasks.filter((t) => !t.completed_at).length
+  const visibleTasks = entityFilter ? tasks.filter((t) => t.entity_name === entityFilter) : tasks
+  const openCount = visibleTasks.filter((t) => !t.completed_at).length
 
   const VIEWS: { id: View; label: string }[] = [
     { id: 'kanban', label: 'Kanban' },
@@ -989,12 +1015,30 @@ export default function TareasContent() {
         </div>
 
         {!loading && (
-          <EntityManager
-            entities={entities}
-            onCreate={handleCreateEntity}
-            onRename={handleRenameEntity}
-            onDelete={handleDeleteEntity}
-          />
+          <div ref={filterRef} className="relative mt-3 w-fit">
+            <button
+              onClick={() => setFilterOpen((o) => !o)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                entityFilter ? 'border-accent/30 bg-accent/10 text-accent' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+              }`}
+            >
+              <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M1 3h12M3 7h8M5 11h4" strokeLinecap="round" /></svg>
+              {entityFilter ?? 'Filtros'}
+              <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 transition-transform ${filterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            {filterOpen && (
+              <div className="absolute left-0 top-full z-20 mt-1.5 w-80 rounded-xl border border-ink-4/10 bg-ink-0 p-3 shadow-2xl">
+                <EntityManager
+                  entities={entities}
+                  activeFilter={entityFilter}
+                  onFilter={setEntityFilter}
+                  onCreate={handleCreateEntity}
+                  onRename={handleRenameEntity}
+                  onDelete={handleDeleteEntity}
+                />
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -1014,13 +1058,13 @@ export default function TareasContent() {
         ) : (
           <>
             {view === 'kanban' && (
-              <KanbanView tasks={tasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
+              <KanbanView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
             )}
             {view === 'smart' && (
-              <SmartView allTasks={tasks} onToggle={handleToggle} onClickTask={setDrawerTask} />
+              <SmartView allTasks={visibleTasks} onToggle={handleToggle} onClickTask={setDrawerTask} />
             )}
             {view === 'category' && (
-              <CategoryView tasks={tasks} entities={entities} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
+              <CategoryView tasks={visibleTasks} entities={entities} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
             )}
           </>
         )}

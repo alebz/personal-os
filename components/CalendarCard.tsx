@@ -360,7 +360,7 @@ export default function CalendarCard() {
               value={addTime}
               onChange={e => setAddTime(e.target.value)}
               disabled={adding}
-              className="w-[72px] shrink-0 rounded border border-ink-4/20 bg-ink-0/60 px-1.5 py-1 text-xs text-ink-4 outline-none focus:border-accent/50"
+              className="w-[104px] shrink-0 rounded border border-ink-4/20 bg-ink-0/60 px-1.5 py-1 text-xs text-ink-4 outline-none focus:border-accent/50"
             />
             <button
               type="submit"

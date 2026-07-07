@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import OSSettings from '@/components/OSSettings'
 
 export type OSSection = { label: string; color: string; href: string; content?: ReactNode }
 
@@ -76,6 +77,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
     const onResize = () => { H = window.innerHeight; R = H * RADIUS_MULT; scene.style.perspective = (H * PERSP_MULT) + 'px' }
 
     const render = () => {
+      ;(window as unknown as { __osScroll?: number }).__osScroll = rot.current
       const c = Math.round(rot.current / PITCH_DEG)
       if (c !== centerRef.current) { centerRef.current = c; setCenter(c) }
       if (deckRef.current) deckRef.current.style.transform = `translateZ(${-R}px)`
@@ -133,6 +135,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
     }
 
     const onWheel = (e: WheelEvent) => {
+      if ((e.target as HTMLElement)?.closest?.('.os-settings-root')) return   // deja que el panel de ajustes scrollee normal
       const face = (e.target as HTMLElement)?.closest?.('.os-cface') as HTMLElement | null
       if (face) {
         let node: HTMLElement | null = e.target as HTMLElement
@@ -164,7 +167,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
       target.current += dir * SUBSTEP
     }
     const onDown = (e: PointerEvent) => {
-      if ((e.target as HTMLElement)?.closest?.('.os-cface')) return   // no secuestres el puntero sobre contenido interactivo
+      if ((e.target as HTMLElement)?.closest?.('.os-cface, .os-settings-root')) return   // no secuestres el puntero sobre contenido interactivo
       dragging.current = true; moved.current = false; lastY.current = e.clientY; vel.current = 0; scene.setPointerCapture(e.pointerId)
     }
     const onMove = (e: PointerEvent) => {
@@ -258,13 +261,6 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         ) : null)}
       </div>
 
-      <div className="os-dots left">
-        <div className="os-dots-deck">
-          {SLOTS.map((_, k) => (
-            <i key={k} ref={el => { dotRefs.current[k] = el }} />
-          ))}
-        </div>
-      </div>
       <div className="os-dots right">
         <div className="os-dots-deck">
           {SLOTS.map((_, k) => (
@@ -273,9 +269,9 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         </div>
       </div>
 
-      <div className="os-kicker">Personal OS · rueda / arrastra / ↑ ↓</div>
       <div className="os-vig top" />
       <div className="os-vig bot" />
+      <div className="os-settings-root"><OSSettings /></div>
     </div>
   )
 }

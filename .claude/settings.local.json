@@ -74,7 +74,8 @@
       "Bash(grep -n \"el.style.transform = \\\\`translate\\(\\\\${proj.x}\" components/StarsBackground.tsx)",
       "Bash(awk -F: '$1>2400 && $1<3260')",
       "Bash(sed -n '/^interface ProjData/,/^}/p' components/StarsBackground.tsx)",
-      "Bash(sed -n '/function weaponKind/,/^}/p' components/StarsBackground.tsx)"
+      "Bash(sed -n '/function weaponKind/,/^}/p' components/StarsBackground.tsx)",
+      "Bash(cd *)"
     ]
   }
 }
