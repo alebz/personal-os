@@ -219,7 +219,6 @@ const SEP_RADIUS     = 64     // px — personal space every ship actively keeps
 const SEP_TURN       = 5.5    // how hard a ship BANKS away from a crowding neighbour (× its speed-capped turn rate)
 const REGEN_DELAY    = 5000   // ms of no hull damage before a ship starts patching up (must also be clear of enemies)
 const REGEN_INTERVAL = 3500   // ms per +1 HP while safe — slow, so wounds still matter in a fight
-const MAX_SHIPS      = 20     // hard cap on total active ships (tall 3× field → multiple fronts)
 const MAX_PROJS      = 18     // global projectile cap (room for 6-shot salvos + bursts + beams)
 const SALVO_SHOTS    = 6      // torpedo salvo — projectiles per volley (matches the 6-tube sprite)
 const SALVO_CHARGES  = 2      // salvos a torpedo ship holds; refilled by a weapon pickup
@@ -293,6 +292,20 @@ const FLIGHT: Record<AgentFleetType, {
   nairan:   { wiggleAmp: 0.10, wiggleFreq: 0.0009, spacing: 0.9,  shape: 'v',     parkChance: 0.22 },
   nautolan: { wiggleAmp: 0.06, wiggleFreq: 0.0007, spacing: 1.05, shape: 'wall',  parkChance: 0.18 },
   mainship: { wiggleAmp: 0.30, wiggleFreq: 0.0019, spacing: 1.0,  shape: 'solo',  parkChance: 0.15 },
+}
+
+// Pilot character per race — cómo una PERSONA en la cabina evita colisiones.
+//  perceive: qué tan lejos mira (px);  lookAheadMs: cuánto predice hacia el futuro (reaccionar temprano/tarde)
+//  margin: la distancia de paso que le gusta (chica = tarde/apretado);  reactMs: tiempo entre escaneos
+//  commitMs: cuánto sostiene un banco;  bank: qué tan fuerte jala el stick. Todo se escala por el skill de la nave.
+const PILOT: Record<AgentFleetType, {
+  perceive: number; lookAheadMs: number; margin: number
+  reactMs: number; commitMs: number; bank: number
+}> = {
+  klaed:    { perceive: 520, lookAheadMs: 820,  margin: 30, reactMs:  70, commitMs: 360, bank: 0.95 }, // as: tarde, seco, limpio
+  nairan:   { perceive: 640, lookAheadMs: 1500, margin: 88, reactMs: 120, commitMs: 900, bank: 0.50 }, // disciplinado: temprano, amplio, ordenado
+  nautolan: { perceive: 540, lookAheadMs: 1000, margin: 52, reactMs: 150, commitMs: 560, bank: 0.70 }, // mixto: el skill varía por nave
+  mainship: { perceive: 520, lookAheadMs: 820,  margin: 40, reactMs:  90, commitMs: 420, bank: 0.85 },
 }
 
 // Formation slot offsets in ship-local frame (x = forward/back, y = lateral). Slot 0 = leader.
@@ -430,6 +443,11 @@ interface ShipAgent {
   mainRespawnsLeft: number   // mainship only: bounded revivals before it truly departs
   muzzleStart:      number   // timestamp of last shot, drives the weapon firing animation (0 = idle)
   nextParkCheck:    number   // leader: next time it may decide to park the fleet
+  // ── Pilot: anticipatory collision avoidance (flies like a person, not a force field) ──
+  pilotSkill:       number   // 0..1 — timing, cleanness, reaction; varies per ship for mixed races
+  evadeUntil:       number   // committed to an evasive bank until this ms timestamp
+  evadeAngle:       number   // world-heading being banked toward during the current evade
+  nextEvadeCheck:   number   // won't re-scan for threats before this (reaction time)
   // ── Morale (0..1) — the seam the drama layer will read (routs, rally, standoffs).
   //    Evolves from contagion + local balance + kin deaths; not yet wired to behaviour/visuals. ──
   morale:           number
@@ -1445,8 +1463,13 @@ function SpaceSim() {
   const wreckEls  = useRef(new Map<string, HTMLElement>())
   const asteroids   = useRef(new Map<string, AsteroidData>())
   const asteroidEls = useRef(new Map<string, HTMLElement>())
+  // Capture beacons (spawner objectives) + per-faction ship caps (grown by capturing beacons).
+  const beacons     = useRef(new Map<string, { id: string; x: number; y: number; born: number }>())
+  const beaconEls   = useRef(new Map<string, HTMLDivElement>())
+  const factionCap  = useRef<Record<WarFleet, number>>({ klaed: 1, nairan: 1, nautolan: 1 })
 
   const [pickupKeys,     setPickupKeys]     = useState<string[]>([])
+  const [beaconKeys,     setBeaconKeys]     = useState<string[]>([])
   const [collectFlashes, setCollectFlashes] = useState<CollectFlash[]>([])
   const [wreckKeys,      setWreckKeys]      = useState<string[]>([])
   const [hits,           setHits]           = useState<HitData[]>([])
@@ -1476,11 +1499,10 @@ function SpaceSim() {
     let lastTime = performance.now()
     let active = true
     let nextBalanceCheck = 0  // fires on first tick
-    let nextRegularWave  = 0  // set after initial spawns
     let nautilanEdge     = 0  // alternates TOP / BOTTOM for nautolan
     let nextAsteroidSpawn = performance.now() + 6000   // first hazard drifts in ~6s
     let nextAsteroidBelt  = performance.now() + 35000  // first belt ~35s in
-    const revengeQueue: { type: AgentFleetType; triggerAt: number; size: number }[] = []
+    let nextBeaconSpawn  = 0  // capture-beacon respawn timer (fires on first tick)
     let prevMode: BattleMode | null = null   // detect mode switches (null → init on first tick)
     const fleetRetreating         = new Set<string>()
     const fleetRetreatingCooldown = new Map<string, number>()
@@ -1512,7 +1534,6 @@ function SpaceSim() {
     let nextWarDecay       = performance.now() + 60000   // every 60s
     let nextScoreDecay     = performance.now() + 60000   // every 60s
     let nextZoneDecay      = performance.now() + 300000  // every 5min
-    let nextMainshipWindow = performance.now() + 30000   // first solo-survivor chance ~30s in
 
     const isWarFleet = (ft: AgentFleetType): ft is WarFleet => ft !== 'mainship'
     // Two ships are enemies unless same fleet, or bound by a ghost-alliance truce.
@@ -1566,14 +1587,12 @@ function SpaceSim() {
     function spawnFleet(type?: AgentFleetType, count?: number, inSpeedMult?: number) {
       const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
       const ft      = type ?? pickType()
-      if (agents.current.size >= MAX_SHIPS) return
-      const headroom = MAX_SHIPS - agents.current.size
-      // Underdog recruits reserves: desperate waves bring +1 ship
-      const underdogBonus = ft === underdogFleet ? 1 : 0
-      const sz      = Math.min(
-        (count !== undefined ? count : (ft === 'mainship' ? 1 : 2 + Math.floor(Math.random() * 3))) + underdogBonus,
-        4 + underdogBonus, headroom
-      )
+      // Per-faction cap: a faction fields at most its earned cap (grown only by capturing beacons).
+      const cap  = isWarFleet(ft) ? factionCap.current[ft as WarFleet] : 1
+      let live = 0; agents.current.forEach(a => { if (a.fleetType === ft && a.state !== 'dying') live++ })
+      const headroom = cap - live
+      if (headroom <= 0) return
+      const sz      = Math.min(count !== undefined ? count : 1, headroom)
       const spawn   = typedEdgeSpawn(ft, W, H)
       const { x: sx, y: sy, angle } = spawn
       const fleetId = genId()
@@ -1636,6 +1655,11 @@ function SpaceSim() {
           mainRespawnsLeft: ft === 'mainship' ? 2 : 0,
           muzzleStart: 0,
           nextParkCheck: performance.now() + 8000 + Math.random() * 8000,
+          pilotSkill: ft === 'nautolan' ? 0.25 + Math.random() * 0.75
+                    : ft === 'klaed'    ? 0.88 + Math.random() * 0.10
+                    : ft === 'nairan'   ? 0.93 + Math.random() * 0.06
+                    : 0.85,
+          evadeUntil: 0, evadeAngle: 0, nextEvadeCheck: 0,
           morale: 0.7,   // confident but with room to swell (rally) or crack (rout)
         }
       })
@@ -1993,9 +2017,13 @@ function SpaceSim() {
         })
         if (newLeader) { (newLeader as ShipAgent).isLeader = true; (newLeader as ShipAgent).leaderId = null }
       }
-      if (agent.isLeader && agent.fleetType !== 'mainship') {
-        revengeQueue.push({ type: agent.fleetType, triggerAt: now + 5000, size: 1 })
-      }
+    }
+
+    function spawnBeacon() {
+      const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
+      const id = genId()
+      beacons.current.set(id, { id, x: W * (0.15 + Math.random() * 0.7), y: H * (0.08 + Math.random() * 0.84), born: Math.random() * Math.PI * 2 })
+      setBeaconKeys([...beacons.current.keys()])
     }
 
     function spawnPickup(type: 'engine' | 'shield' | 'weapon', now: number) {
@@ -2084,13 +2112,6 @@ function SpaceSim() {
       if (now >= nextBalanceCheck) {
         nextBalanceCheck = now + 3000
         fleetPark.forEach((v, k) => { if (now > v.until + 30000) fleetPark.delete(k) })  // prune stale park anchors
-        const activeCounts: Partial<Record<AgentFleetType, number>> = {}
-        let totalActive = 0
-        agents.current.forEach(a => {
-          if (a.state === 'dying' || a.state === 'regrouping' || a.fleetType === 'mainship') return
-          activeCounts[a.fleetType] = (activeCounts[a.fleetType] ?? 0) + 1
-          totalActive++
-        })
         // Fleet-wide retreat: any fleet ≤ 40% of original count
         const checkedFleets = new Set<string>()
         agents.current.forEach(a => {
@@ -2114,35 +2135,27 @@ function SpaceSim() {
             })
           }
         })
-        // No steady drip — when the field thins out, pull the next WAVE forward
-        if (totalActive <= 1) nextRegularWave = Math.min(nextRegularWave, now + 3000)
       }
-      // ── WAVE SPAWNING: reinforcements arrive in bursts (2–3 fleets at once), then a lull ──
-      if (now >= nextRegularWave && nextRegularWave > 0) {
-        nextRegularWave = now + 20000 + Math.random() * 15000   // 20–35s between waves
-        const factions: AgentFleetType[] = ['klaed', 'nairan', 'nautolan']
-        const waveFleets = 2 + Math.floor(Math.random() * 3)     // 2–4 fleets per wave
-        for (let k = 0; k < waveFleets; k++) {
-          if (agents.current.size >= MAX_SHIPS) break
-          const counts: Partial<Record<AgentFleetType, number>> = {}
-          agents.current.forEach(a => { if (a.state !== 'dying' && a.fleetType !== 'mainship') counts[a.fleetType] = (counts[a.fleetType] ?? 0) + 1 })
-          const weakest = factions.reduce((a, b) => (counts[a] ?? 0) <= (counts[b] ?? 0) ? a : b)
-          spawnFleet(weakest)
+      // ── CAPTURE BEACONS: the ONLY way factions grow. Keep ~2 floating; a ship that touches one
+      // bumps its faction's cap +1 and calls in a side-entering reinforcement. Consumed → respawns later. ──
+      if (beacons.current.size < 2 && now >= nextBeaconSpawn) {
+        spawnBeacon(); nextBeaconSpawn = now + 4000 + Math.random() * 3000
+      }
+      beacons.current.forEach((b, id) => {
+        let taker: ShipAgent | null = null
+        agents.current.forEach(a => { if (!taker && a.state !== 'dying' && isWarFleet(a.fleetType) && dist2D(b.x, b.y, a.x + 24, a.y + 24) < 30) taker = a })
+        if (taker) {
+          const f = (taker as ShipAgent).fleetType as WarFleet
+          factionCap.current[f] += 1
+          spawnFleet(f, 1)                                   // reinforcement flies in from the side
+          beacons.current.delete(id); beaconEls.current.delete(id)
+          nextBeaconSpawn = Math.max(nextBeaconSpawn, now + 5000 + Math.random() * 3000)
+          setBeaconKeys([...beacons.current.keys()])
+        } else {
+          const el = beaconEls.current.get(id)
+          if (el) { const p = 1 + 0.18 * Math.sin(now * 0.004 + b.born); el.style.transform = `translate(${b.x}px,${SY(b.y)}px) scale(${p})` }
         }
-      }
-      // Revenge waves: oversized fast wave 5s after a leader is killed
-      for (let i = revengeQueue.length - 1; i >= 0; i--) {
-        const rv = revengeQueue[i]
-        if (now >= rv.triggerAt) { spawnFleet(rv.type, rv.size, 1.5); revengeQueue.splice(i, 1) }
-      }
-      // ── SOLO SURVIVOR: the lone Main Ship wanders in now and then (a fourth voice).
-      // It survives a couple of deaths (mainRespawnsLeft), then truly departs. ──
-      if (now >= nextMainshipWindow) {
-        nextMainshipWindow = now + 60000 + Math.random() * 60000  // re-roll every 1-2 min
-        let mainActive = false
-        agents.current.forEach(a => { if (a.fleetType === 'mainship') mainActive = true })
-        if (!mainActive && Math.random() < 0.4 && agents.current.size < MAX_SHIPS) spawnFleet('mainship')
-      }
+      })
       // ── DYNAMIC PICKUP EVENTS ─────────────────────────────────────────────────
       // Every 30s roll a weighted event that dictates what spawns for the period.
       if (now >= nextPickupEvent) {
@@ -2582,6 +2595,12 @@ function SpaceSim() {
             agent.cruiseAngle = lerpAngle(agent.cruiseAngle, Math.atan2(ne.y + 24 - (agent.y + 24), ne.x + 24 - (agent.x + 24)), 0.09)
             fleetPark.delete(agent.fleetId)
           }
+          // No foe in sight? Steer for the nearest capture beacon — this is how factions grow.
+          else if (isLead && !enemyNear && beacons.current.size > 0) {
+            let bx = 0, by = 0, bd = Infinity
+            beacons.current.forEach(b => { const d = dist2D(agent.x + 24, agent.y + 24, b.x, b.y); if (d < bd) { bd = d; bx = b.x; by = b.y } })
+            if (bd < Infinity) { agent.cruiseAngle = lerpAngle(agent.cruiseAngle, Math.atan2(by - (agent.y + 24), bx - (agent.x + 24)), 0.06); fleetPark.delete(agent.fleetId) }
+          }
 
           if (isLead) {
             if (parked && park) {
@@ -2605,7 +2624,7 @@ function SpaceSim() {
               // Decide to station the whole fleet when it's calm out
               if (now >= agent.nextParkCheck) {
                 agent.nextParkCheck = now + 5000 + Math.random() * 5000
-                if (!parked && !enemyNear && Math.random() < fl.parkChance) {
+                if (!parked && !enemyNear && beacons.current.size === 0 && Math.random() < fl.parkChance) {
                   fleetPark.set(agent.fleetId, { until: now + 5000 + Math.random() * 7000, x: agent.x, y: agent.y, heading: agent.angle })
                 }
               }
@@ -2912,26 +2931,49 @@ function SpaceSim() {
             const turn = (danger - d) / danger * turnCap * dt * 5   // urgent — hard swerve when close
             avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), turn)
           })
-          // Separation: BANK away from any ship crowding inside personal space (SEP_RADIUS < slot
-          // pitch, so formations still hold). This turns the heading — capped by turnCap — instead of
-          // injecting lateral velocity, so motion stays forward-only and the turn radius stays ∝ speed
-          // (a fast ship arcs away, it can't snap sideways). That kills the close-quarters glitch.
-          agents.current.forEach(other => {
-            if (other.id === agent.id || other.state === 'dying') return
-            const dx = agent.x + 24 - (other.x + 24), dy = agent.y + 24 - (other.y + 24)
-            const dd = Math.sqrt(dx * dx + dy * dy)
-            // En paz/crucero, dale MUCHO espacio a las OTRAS flotas (adiós amontonamiento koi);
-            // el radio chico solo aplica dentro de tu propia flota y en combate, para que las
-            // batallas sí cierren distancia.
-            const inCombat  = agent.state === 'engaging' || agent.state === 'routing'
-            const sameFleet = other.fleetId === agent.fleetId
-            const wide      = !inCombat && !sameFleet
-            const radius    = wide ? SEP_RADIUS * 2.6 : SEP_RADIUS
-            const strength  = wide ? SEP_TURN * 2.4 : SEP_TURN
-            if (dd >= radius || dd < 0.1) return
-            const w = (radius - dd) / radius
-            avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), w * turnCap * dt * strength)
-          })
+          // ── Anticipatory collision avoidance — cada nave vuela como piloto, no como riel ──
+          // Sin campo de fuerza. El piloto vigila su cono de vuelo, predice el cruce más
+          // inminente (tiempo y distancia de paso más cercana desde el movimiento relativo),
+          // compromete un banco decidido y LO SOSTIENE. Entre amenazas reales no hace nada más
+          // que volar su intención. Qué tan tarde / fuerte / limpio = carácter de raza × skill.
+          {
+            const pc    = PILOT[agent.fleetType] ?? PILOT.klaed
+            const skill = agent.pilotSkill
+            if (now < agent.evadeUntil) {
+              // en plena maniobra: sigue volando el banco comprometido (la decisión, sostenida)
+              avoidAngle = clampTurn(avoidAngle, agent.evadeAngle, turnCap * dt * (0.7 + skill * 0.9))
+            } else if (now >= agent.nextEvadeCheck) {
+              agent.nextEvadeCheck = now + pc.reactMs * (1.6 - skill)   // los torpes notan más tarde
+              const cx = agent.x + 24, cy = agent.y + 24
+              let worstT = Infinity, wMx = 0, wMy = 0, threat = false
+              agents.current.forEach(other => {
+                if (other.id === agent.id || other.state === 'dying') return
+                const rx = (other.x + 24) - cx, ry = (other.y + 24) - cy
+                const dist = Math.hypot(rx, ry)
+                if (dist > pc.perceive || dist < 0.1) return
+                const fwd = (Math.cos(agent.angle) * rx + Math.sin(agent.angle) * ry) / dist
+                if (fwd < 0.15) return                              // solo lo que viene adelante en el cono
+                const rvx = other.avx - agent.avx, rvy = other.avy - agent.avy
+                const rv2 = rvx * rvx + rvy * rvy
+                if (rv2 < 1e-9) return                              // velocidad igualada → sin cruce
+                const t = -(rx * rvx + ry * rvy) / rv2
+                if (t < 0 || t > pc.lookAheadMs) return             // separándose, o muy lejos en el tiempo
+                const mx = rx + rvx * t, my = ry + rvy * t          // vector de brecha en el paso más cercano
+                if (Math.hypot(mx, my) > pc.margin + 40) return     // va a librar cómodo → ignorar
+                if (t < worstT) { worstT = t; wMx = mx; wMy = my; threat = true }
+              })
+              if (threat) {
+                // vira lejos de donde estará el otro (abre la brecha), y compromételo
+                let da = Math.atan2(wMy, wMx) - agent.angle
+                da = Math.atan2(Math.sin(da), Math.cos(da))
+                const side = da >= 0 ? -1 : 1
+                const err  = (1 - skill) * (Math.random() - 0.5) * 1.1   // los torpes calculan mal la línea
+                agent.evadeAngle = agent.angle + side * pc.bank + err
+                agent.evadeUntil = now + pc.commitMs * (0.6 + skill * 0.6)
+                avoidAngle = clampTurn(avoidAngle, agent.evadeAngle, turnCap * dt * (0.7 + skill * 0.9))
+              }
+            }
+          }
           if (avoidAngle !== agent.angle) {
             const curSpd = Math.sqrt(agent.vx*agent.vx + agent.vy*agent.vy)
             agent.angle = avoidAngle
@@ -3239,10 +3281,8 @@ function SpaceSim() {
       if (active) rafId = requestAnimationFrame(tick)
     }
 
-    // Initial spawn: all three factions, so the tall field starts alive on several fronts
-    const factionPool: AgentFleetType[] = ['klaed', 'nairan', 'nautolan']
-    factionPool.forEach(f => spawnFleet(f))
-    nextRegularWave = performance.now() + 25000 + Math.random() * 10000
+    // Initial spawn: ONE lone ship per faction (cap starts at 1); they grow only by capturing beacons.
+    ;(['klaed', 'nairan', 'nautolan'] as WarFleet[]).forEach(f => spawnFleet(f, 1))
     rafId = requestAnimationFrame(tick)
     return () => { active = false; cancelAnimationFrame(rafId) }
   }, [])
@@ -3329,6 +3369,30 @@ function SpaceSim() {
         )
       })}
       {expList.map(exp => <ExplosionSprite key={exp.id} exp={exp} />)}
+      {/* Capture beacons — pixel-art cyan crystal (spawner objective); positioned each frame (SY) in the tick */}
+      {beaconKeys.map(id => {
+        const b = beacons.current.get(id)
+        if (!b) return null
+        const C = '#2f9fe6', M = '#5fc8ff', L = '#a9e8ff', W = '#f2fdff'   // edge → core
+        const px = (x: number, y: number, f: string) => <rect x={x} y={y} width={1} height={1} fill={f} />
+        return (
+          <div
+            key={id}
+            ref={el => { if (el) beaconEls.current.set(id, el as HTMLDivElement); else beaconEls.current.delete(id) }}
+            style={{ position: 'absolute', top: 0, left: 0, width: 22, height: 22, marginLeft: -11, marginTop: -11, pointerEvents: 'none', willChange: 'transform', filter: 'drop-shadow(0 0 4px rgba(120,205,255,0.95)) drop-shadow(0 0 9px rgba(80,175,255,0.5))', transform: `translate(${b.x}px,${b.y}px)` }}
+          >
+            <svg width={22} height={22} viewBox="0 0 7 7" shapeRendering="crispEdges" style={{ display: 'block' }}>
+              {px(3, 0, C)}
+              {px(2, 1, C)}{px(3, 1, M)}{px(4, 1, C)}
+              {px(1, 2, C)}{px(2, 2, M)}{px(3, 2, L)}{px(4, 2, M)}{px(5, 2, C)}
+              {px(0, 3, C)}{px(1, 3, M)}{px(2, 3, L)}{px(3, 3, W)}{px(4, 3, L)}{px(5, 3, M)}{px(6, 3, C)}
+              {px(1, 4, C)}{px(2, 4, M)}{px(3, 4, L)}{px(4, 4, M)}{px(5, 4, C)}
+              {px(2, 5, C)}{px(3, 5, M)}{px(4, 5, C)}
+              {px(3, 6, C)}
+            </svg>
+          </div>
+        )
+      })}
       {pickupKeys.map(id => {
         const pk = pickups.current.get(id)
         if (!pk) return null
