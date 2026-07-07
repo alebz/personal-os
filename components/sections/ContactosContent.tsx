@@ -545,7 +545,7 @@ export default function ContactosContent() {
   const [catFilter, setCatFilter]     = useState<string | null>(null)
   const [drawer, setDrawer]           = useState<Drawer | null>(null)
   const [showCatMgr, setShowCatMgr]  = useState(false)
-  const [listOpen, setListOpen]       = useState(true)
+  const [listOpen, setListOpen]       = useState(false)
   const [filterOpen, setFilterOpen]   = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
   const [sort, setSort] = useState<Sort>(() => {

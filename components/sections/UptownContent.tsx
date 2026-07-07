@@ -211,7 +211,7 @@ function AmountInput({
 function SectionCard({ title, note, total, colorClass = 'text-ink-3', children }: {
   title: string; note?: string; total?: number; colorClass?: string; children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   return (
     <div className="rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 pt-3 pb-2 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <button onClick={() => setOpen(o => !o)} className="mb-2 flex w-full items-center justify-between">
