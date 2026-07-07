@@ -213,19 +213,12 @@ const COMBAT_SPEED   = 0.033  // px/ms  (forward-only, 40% of original)
 const COMBAT_RATIO   = COMBAT_SPEED / CRUISE_SPEED  // combat speed relative to cruise
 const PROJ_SPEED     = 0.45   // px/ms
 const PROJ_LIFE      = 2200   // ms
-const HIT_RADIUS     = 20     // px — projectile hit distance
 const COLLIDE_DIST   = 40     // px — centres this close = sprites touching → contact damage
 const NO_OVERLAP     = 46     // px — shove colliding ships to at least this far apart (no stacked 2D sprites)
-const RAM_DMG        = 2      // damage each ship takes on a touch (allies included — space is vital)
 const SEP_RADIUS     = 64     // px — personal space every ship actively keeps (< slot pitch, so formations still hold)
 const SEP_TURN       = 5.5    // how hard a ship BANKS away from a crowding neighbour (× its speed-capped turn rate)
 const REGEN_DELAY    = 5000   // ms of no hull damage before a ship starts patching up (must also be clear of enemies)
 const REGEN_INTERVAL = 3500   // ms per +1 HP while safe — slow, so wounds still matter in a fight
-const DETECT_DIST    = 600    // px — combat trigger
-const PRED_SHIP_MS   = 800    // ms — ship prediction look-ahead
-const PRED_SHIP_DIST = 80     // px — predicted collision threshold (ships)
-const PRED_PROJ_MS   = 600    // ms — projectile prediction look-ahead
-const PRED_PROJ_DIST = 40     // px — predicted close-pass threshold (projectiles)
 const MAX_SHIPS      = 20     // hard cap on total active ships (tall 3× field → multiple fronts)
 const MAX_PROJS      = 18     // global projectile cap (room for 6-shot salvos + bursts + beams)
 const SALVO_SHOTS    = 6      // torpedo salvo — projectiles per volley (matches the 6-tube sprite)
@@ -240,8 +233,6 @@ const MUZZLE_DUR     = 260    // ms — one-shot weapon firing (muzzle) animatio
 const ROUT_MORALE    = 0.25
 const RALLY_RECOVER  = 0.5
 const RALLY_MORALE   = 0.8
-
-type RaceBehavior = 'aggressive' | 'tactical' | 'tank' | 'survivor'
 
 // ─── Unified race table — SINGLE SOURCE OF TRUTH for per-race stats ────────────
 // speed / armor / turnRate / fireRate are base stat POINTS (0–10). Equipment
@@ -298,9 +289,9 @@ type FlightShape = 'v' | 'wall' | 'loose' | 'arrow' | 'solo'
 const FLIGHT: Record<AgentFleetType, {
   wiggleAmp: number; wiggleFreq: number; spacing: number; shape: FlightShape; parkChance: number
 }> = {
-  klaed:    { wiggleAmp: 0.07, wiggleFreq: 0.0012, spacing: 1.0,  shape: 'arrow', parkChance: 0.10 },
-  nairan:   { wiggleAmp: 0.10, wiggleFreq: 0.0009, spacing: 0.9,  shape: 'v',     parkChance: 0.55 },
-  nautolan: { wiggleAmp: 0.06, wiggleFreq: 0.0007, spacing: 1.05, shape: 'wall',  parkChance: 0.40 },
+  klaed:    { wiggleAmp: 0.07, wiggleFreq: 0.0012, spacing: 1.0,  shape: 'arrow', parkChance: 0.06 },
+  nairan:   { wiggleAmp: 0.10, wiggleFreq: 0.0009, spacing: 0.9,  shape: 'v',     parkChance: 0.22 },
+  nautolan: { wiggleAmp: 0.06, wiggleFreq: 0.0007, spacing: 1.05, shape: 'wall',  parkChance: 0.18 },
   mainship: { wiggleAmp: 0.30, wiggleFreq: 0.0019, spacing: 1.0,  shape: 'solo',  parkChance: 0.15 },
 }
 
@@ -512,23 +503,6 @@ const WRECK_FADE = 13000   // ms slow fade-out at the end
 const MAX_WRECKS = 6
 const PICKUP_FADE = 700   // ms — pickups fade out (like wreckage) when cleared
 
-// Snapshot of ecosystem state surfaced to the HUD (updated every 5s, not per-frame)
-interface EcoState {
-  dominant: WarFleet | null
-  underdog: WarFleet | null
-  grudge:   Record<WarFleet, WarFleet | null>
-  alliance: Record<WarFleet, WarFleet | null>
-  active:   Record<WarFleet, boolean>
-}
-function emptyEcoState(): EcoState {
-  return {
-    dominant: null, underdog: null,
-    grudge:   { klaed: null, nairan: null, nautolan: null },
-    alliance: { klaed: null, nairan: null, nautolan: null },
-    active:   { klaed: false, nairan: false, nautolan: false },
-  }
-}
-
 interface ExpData {
   id:          string
   x:           number; y: number
@@ -645,10 +619,6 @@ function computeStats(ship: ShipAgent) {
   ship.shieldHp     = shd.shieldHp
 }
 
-// Project an agent's center position ms into the future
-function predictedCenter(a: ShipAgent, ms: number): { x: number; y: number } {
-  return { x: a.x + 24 + a.vx * ms, y: a.y + 24 + a.vy * ms }
-}
 
 // Segment intersection — returns true if segment p1→p2 crosses p3→p4
 function segmentsIntersect(
@@ -683,18 +653,6 @@ function atHomeEdge(agent: ShipAgent, W: number, H: number): boolean {
   return false
 }
 
-// Local formation offsets: x = forward (negative = behind), y = right (perpendicular)
-// Cruise: tight arrow — 40px back per row, 25px lateral per row
-function fleetOffsets(count: number): { x: number; y: number }[] {
-  if (count === 1) return [{ x: 0, y: 0 }]
-  const offsets: { x: number; y: number }[] = [{ x: 0, y: 0 }]
-  for (let i = 1; i < count; i++) {
-    const side = i % 2 === 1 ? 1 : -1
-    const row  = Math.ceil(i / 2)
-    offsets.push({ x: -row * 40, y: side * row * 25 })
-  }
-  return offsets
-}
 
 function getDestructData(combo: ShipCombo): DestructData | null {
   const n = NAIRAN_SHIPS.find(s => s.base === combo.base)
@@ -1249,7 +1207,6 @@ function ExplosionSprite({ exp }: { exp: ExpData }) {
 
 // ─── Space simulation (autonomous agents) ────────────────────────────────────
 
-const FLEET_SHORT: Record<WarFleet, string> = { klaed: 'KLA', nairan: 'NAI', nautolan: 'NAU' }
 
 // Ship archetype detection (for the live per-family type breakdown in the HUD)
 const SHIP_CLASSES = ['Battlecruiser', 'Bomber', 'Dreadnought', 'Fighter', 'Frigate', 'Scout', 'Support', 'Torpedo']
@@ -1498,7 +1455,6 @@ function SpaceSim() {
   // ── Ancient Races Ecosystem persistent memory ──
   const warMemoryRef = useRef<WarMemory>(emptyWarMemory())
   const zoneMemRef   = useRef<ZoneMemory>(emptyZoneMemory())
-  const [ecoState, setEcoState] = useState<EcoState>(emptyEcoState)
   const [shipStats, setShipStats] = useState<ShipStats>(emptyShipStats)
   const [killLog,   setKillLog]   = useState<KillEntry[]>([])
   // Selected battle mode (persisted). battleModeRef lets the tick read it without re-subscribing;
@@ -1934,7 +1890,7 @@ function SpaceSim() {
       setAsteroidKeys([...asteroids.current.keys()])
     }
 
-    function respawnMainship(agent: ShipAgent, now: number) {
+    function respawnMainship(agent: ShipAgent) {
       const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
       const { x, y, angle } = edgeSpawn(W, H)
       const newCombo = randomShip('mainship')
@@ -2104,22 +2060,6 @@ function SpaceSim() {
       setAgentKeys([...agents.current.keys()])  // force re-render so the new gear shows
     }
 
-    // A ramming hit — soaks the shield first, then hull; only lethal if it empties the hull.
-    function ramDamage(agent: ShipAgent, now: number) {
-      if (agent.shieldActive && agent.shieldHp > 0) {
-        agent.shieldHp -= RAM_DMG; agent.lastShieldHit = now
-        if (agent.shieldHp <= 0) {
-          const rs = RACE[agent.fleetType as keyof typeof RACE] || RACE.klaed
-          agent.shieldActive = false; agent.shieldCooldown = now + rs.shieldRecharge
-        }
-      } else {
-        agent.hp -= RAM_DMG
-        agent.regenReadyAt = now + REGEN_DELAY
-        spawnHit(agent.x + 24, agent.y + 24)
-        if (agent.hp <= 0) killAgent(agent, now)   // ram death — no killerType (mutual), no score
-      }
-    }
-
     function tick(now: number) {
       const dt = Math.min(now - lastTime, 50)
       lastTime = now
@@ -2144,7 +2084,6 @@ function SpaceSim() {
       if (now >= nextBalanceCheck) {
         nextBalanceCheck = now + 3000
         fleetPark.forEach((v, k) => { if (now > v.until + 30000) fleetPark.delete(k) })  // prune stale park anchors
-        const factions: AgentFleetType[] = ['klaed', 'nairan', 'nautolan']
         const activeCounts: Partial<Record<AgentFleetType, number>> = {}
         let totalActive = 0
         agents.current.forEach(a => {
@@ -2373,17 +2312,6 @@ function SpaceSim() {
             if (warMemory[ft][rivals[0]] === 0 && warMemory[ft][rivals[1]] === 0) grudge[ft] = null
           }
         })
-        // Surface a snapshot to the HUD (low-frequency re-render)
-        setEcoState({
-          dominant: dominantFleet, underdog: underdogFleet,
-          grudge: { ...grudge },
-          alliance: {
-            klaed:    ghostAlliance && dominantFleet && dominantFleet !== 'klaed'    ? dominantFleet : null,
-            nairan:   ghostAlliance && dominantFleet && dominantFleet !== 'nairan'   ? dominantFleet : null,
-            nautolan: ghostAlliance && dominantFleet && dominantFleet !== 'nautolan' ? dominantFleet : null,
-          },
-          active,
-        })
       }
       // Underdog desperation: +25% speed (survival adrenaline)
       const speedBoost = (ft: AgentFleetType) => ft === underdogFleet ? 1.25 : 1.0
@@ -2405,7 +2333,7 @@ function SpaceSim() {
         if (agent.state === 'dying') {
           // Main ship: schedule respawn instead of permanent removal
           if (agent.fleetType === 'mainship' && agent.respawnAt > 0) {
-            if (now >= agent.respawnAt) { respawnMainship(agent, now); agentChanged = true }
+            if (now >= agent.respawnAt) { respawnMainship(agent); agentChanged = true }
             return
           }
           if (now - agent.dyingStart > agent.dyingDuration + 200) { toRemoveAgents.push(agent.id); agentChanged = true }
@@ -2696,7 +2624,8 @@ function SpaceSim() {
             const dx = tx - agent.x, dy = ty - agent.y
             const d  = Math.hypot(dx, dy) || 1
             const wig = d < 34 ? Math.sin(now * fl.wiggleFreq + agent.wingSlot * 1.7) * fl.wiggleAmp * 0.5 : 0
-            agent.angle = clampTurn(agent.angle, Math.atan2(dy, dx) + wig, turnCap * dt)
+            const aimAngle = d < 46 ? lerpAngle(Math.atan2(dy, dx), hd, 0.55) : Math.atan2(dy, dx)
+            agent.angle = clampTurn(agent.angle, aimAngle + wig, turnCap * dt)
             const s = Math.min(d * 0.06, spd * 1.35)
             agent.vx = Math.cos(agent.angle) * s; agent.vy = Math.sin(agent.angle) * s
             agent.cruiseAngle = leader.cruiseAngle
@@ -2991,9 +2920,17 @@ function SpaceSim() {
             if (other.id === agent.id || other.state === 'dying') return
             const dx = agent.x + 24 - (other.x + 24), dy = agent.y + 24 - (other.y + 24)
             const dd = Math.sqrt(dx * dx + dy * dy)
-            if (dd >= SEP_RADIUS || dd < 0.1) return
-            const w = (SEP_RADIUS - dd) / SEP_RADIUS
-            avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), w * turnCap * dt * SEP_TURN)
+            // En paz/crucero, dale MUCHO espacio a las OTRAS flotas (adiós amontonamiento koi);
+            // el radio chico solo aplica dentro de tu propia flota y en combate, para que las
+            // batallas sí cierren distancia.
+            const inCombat  = agent.state === 'engaging' || agent.state === 'routing'
+            const sameFleet = other.fleetId === agent.fleetId
+            const wide      = !inCombat && !sameFleet
+            const radius    = wide ? SEP_RADIUS * 2.6 : SEP_RADIUS
+            const strength  = wide ? SEP_TURN * 2.4 : SEP_TURN
+            if (dd >= radius || dd < 0.1) return
+            const w = (radius - dd) / radius
+            avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), w * turnCap * dt * strength)
           })
           if (avoidAngle !== agent.angle) {
             const curSpd = Math.sqrt(agent.vx*agent.vx + agent.vy*agent.vy)
