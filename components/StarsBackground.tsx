@@ -213,15 +213,21 @@ const COMBAT_RATIO   = COMBAT_SPEED / CRUISE_SPEED  // combat speed relative to 
 const PROJ_SPEED     = 0.45   // px/ms
 const PROJ_LIFE      = 2200   // ms
 const HIT_RADIUS     = 20     // px — projectile hit distance
-const COLLIDE_DIST   = 30     // px — ship-to-ship contact distance
-const RAM_DMG        = 2      // damage each ship takes in an ENEMY ram (same-fleet just shove apart)
+const COLLIDE_DIST   = 40     // px — centres this close = sprites touching → contact damage
+const NO_OVERLAP     = 46     // px — shove colliding ships to at least this far apart (no stacked 2D sprites)
+const RAM_DMG        = 2      // damage each ship takes on a touch (allies included — space is vital)
+const SEP_RADIUS     = 58     // px — personal space every ship actively keeps (< slot pitch, so formations still hold)
+const SEP_STRENGTH   = 0.85   // separation nudge as a fraction of cruise speed — firm, so space is genuinely respected
 const DETECT_DIST    = 600    // px — combat trigger
 const PRED_SHIP_MS   = 800    // ms — ship prediction look-ahead
 const PRED_SHIP_DIST = 80     // px — predicted collision threshold (ships)
 const PRED_PROJ_MS   = 600    // ms — projectile prediction look-ahead
 const PRED_PROJ_DIST = 40     // px — predicted close-pass threshold (projectiles)
 const MAX_SHIPS      = 10     // hard cap on total active ships
-const MAX_PROJS      = 8      // global projectile cap
+const MAX_PROJS      = 18     // global projectile cap (room for 6-shot salvos + bursts + beams)
+const SALVO_SHOTS    = 6      // torpedo salvo — projectiles per volley (matches the 6-tube sprite)
+const SALVO_CHARGES  = 2      // salvos a torpedo ship holds; refilled by a weapon pickup
+const SALVO_COOLDOWN = 2600   // ms between salvos
 const SCORE_DECAY    = 0.9994 // battle-score multiplier per 60s (~19h half-life)
 const NOSE_OFFSET    = 22     // px — projectiles spawn from the ship's nose, not its centre
 const FIRE_CONE      = 0.28   // rad (~16°) — may only fire when the nose points at the target
@@ -298,7 +304,7 @@ const FLIGHT: Record<AgentFleetType, {
 // Formation slot offsets in ship-local frame (x = forward/back, y = lateral). Slot 0 = leader.
 // Shape + spacing come from the family; the number of slots grows with the fleet size.
 function formationSlots(count: number, shape: FlightShape, spacing: number): { x: number; y: number }[] {
-  const S = 54 * spacing   // slot pitch (>ship width, so a tight formation still leaves breathing room)
+  const S = 78 * spacing   // slot pitch — wide, clear gaps between ships (space is vital; > SEP_RADIUS so formations hold)
   const slots: { x: number; y: number }[] = [{ x: 0, y: 0 }]
   for (let i = 1; i < count; i++) {
     const side = i % 2 === 1 ? 1 : -1
@@ -412,6 +418,7 @@ interface ShipAgent {
   engineType:  EngineKey
   shieldType:  ShieldKey
   weaponType:  WeaponKey
+  salvoCharges: number  // torpedo-class only: loaded 6-shot salvos left (refilled by weapon pickups)
   maxSpeed:    number   // px/ms cruise speed
   maxHp:       number   // computed armor
   turnAccel:   number   // px/ms² lateral accel (agility) — sets how tight an arc it can carve
@@ -444,6 +451,7 @@ interface ProjData {
   born:           number
   maxRange:       number
   kind:           ProjKind  // visual (bullet / cannon / rocket / laser / bolt)
+  beam:           boolean   // zapper laser — a long fast streak that crosses the screen
   dead:           boolean
   damage:         number
   splash:         boolean
@@ -1011,7 +1019,7 @@ function pixelDisc(cx: number, cy: number, r: number, fill: string, keyPrefix: s
 
 // A single projectile sprite, drawn pointing RIGHT (+x = travel direction),
 // self-centred on (0,0) so the wrapper can translate+rotate around the bullet point.
-function ProjectileSprite({ kind, fleetType }: { kind: ProjKind; fleetType: AgentFleetType }) {
+function ProjectileSprite({ kind, fleetType, beam }: { kind: ProjKind; fleetType: AgentFleetType; beam?: boolean }) {
   const c = PROJ_PALETTE[fleetType] ?? PROJ_PALETTE.klaed
   const wrap = (w: number, h: number, children: React.ReactNode, glowPx = 4) => (
     <svg
@@ -1061,7 +1069,16 @@ function ProjectileSprite({ kind, fleetType }: { kind: ProjKind; fleetType: Agen
   }
 
   if (kind === 'laser') {
-    // Beam: bright core line + glowing envelope, fast flicker
+    if (beam) {
+      // Screen-crossing beam: a long, thin, flickering streak with a hot leading tip
+      return wrap(64, 5, <>
+        <rect x={0} y={1} width={62} height={3} fill={c.glow} style={{ animation: 'laser-flicker 0.06s steps(3) infinite' }} />
+        <rect x={0} y={2} width={64} height={1} fill={c.body} />
+        <rect x={6} y={2} width={54} height={1} fill={c.core} />
+        <rect x={58} y={0} width={6} height={5} fill={c.core} />
+      </>, 6)
+    }
+    // Short bolt: bright core line + glowing envelope, fast flicker
     return wrap(20, 6, <>
       <rect x={0} y={1} width={18} height={4} fill={c.glow} style={{ animation: 'laser-flicker 0.08s steps(3) infinite' }} />
       <rect x={0} y={2} width={19} height={2} fill={c.body} />
@@ -1577,6 +1594,7 @@ function SpaceSim() {
           engineType: 'none' as EngineKey,
           shieldType: 'none' as ShieldKey,
           weaponType: 'none' as WeaponKey,
+          salvoCharges: 0,
           maxSpeed: 0, maxHp: 1, turnAccel: 0,   // all set by computeStats just below
           damage: 1, range: 0, splash: false, sizeSpeedMult: 1,
           spiralUntil: 0, engagePauseUntil: 0, respectUntil: 0, vengeanceUntil: 0,
@@ -1606,32 +1624,49 @@ function SpaceSim() {
       setAgentKeys(prev => [...prev, ...newAgents.map(a => a.id)])
     }
 
-    // Projectiles leave the nose, travelling straight along the ship's facing.
-    function spawnProjectile(owner: ShipAgent) {
-      const dirx = Math.cos(owner.angle), diry = Math.sin(owner.angle)
+    // Spawn one projectile from the nose. Options let the firing patterns fan the angle (salvo),
+    // stagger down the barrel (burst), or launch a fast long streak (beam). Caller batches setProjKeys.
+    function spawnProjectile(owner: ShipAgent, opts?: { angle?: number; speedMul?: number; rangeMul?: number; beam?: boolean; posOffset?: number }) {
+      const ang  = opts?.angle ?? owner.angle
+      const dirx = Math.cos(ang), diry = Math.sin(ang)
       const id = genId()
-      const nx = owner.x + 24 + dirx * NOSE_OFFSET   // muzzle at the nose tip
-      const ny = owner.y + 24 + diry * NOSE_OFFSET
+      const off = NOSE_OFFSET + (opts?.posOffset ?? 0)
+      const nx = owner.x + 24 + dirx * off   // muzzle at the nose tip
+      const ny = owner.y + 24 + diry * off
+      const beam = !!opts?.beam
       projs.current.set(id, {
         id, ownerFleetId: owner.fleetId, ownerFleetType: owner.fleetType,
         hitRadius: owner.hitRadius,
         x: nx, y: ny, ox: nx, oy: ny,
-        vx: dirx * PROJ_SPEED, vy: diry * PROJ_SPEED,
+        vx: dirx * PROJ_SPEED * (opts?.speedMul ?? 1), vy: diry * PROJ_SPEED * (opts?.speedMul ?? 1),
         born: performance.now(),
-        maxRange: owner.range > 0 ? owner.range : PROJ_DEFAULT_RANGE,
+        maxRange: (owner.range > 0 ? owner.range : PROJ_DEFAULT_RANGE) * (opts?.rangeMul ?? 1),
         kind: weaponKind(owner.weaponType),
+        beam,
         dead: false,
         damage: owner.damage, splash: owner.splash,
         ownerId: owner.id,
       })
-      setProjKeys(prev => [...prev, id])
+    }
+
+    // Firing style: torpedo-class ships fire a loaded 6-shot SALVO; otherwise the weapon decides —
+    // autocannon = 3-round BURST, zapper = a fast screen-crossing BEAM, others = a SINGLE shot.
+    function firePattern(agent: ShipAgent): 'single' | 'burst' | 'salvo' | 'beam' {
+      if (agent.salvoCharges > 0 && shipClassName(agent.combo.base) === 'Torpedo') return 'salvo'
+      if (agent.weaponType === 'autocannon') return 'burst'
+      if (agent.weaponType === 'zapper')     return 'beam'
+      return 'single'
     }
 
     // Fire only when the nose is aimed within FIRE_CONE of the target. Triggers the
     // one-shot muzzle animation. Returns true if a shot was released.
     function tryFireNose(agent: ShipAgent, tx: number, ty: number, now: number): boolean {
-      if (!agent.hasWeapon || now - agent.lastShot <= agent.fireInterval) return false
-      if (projs.current.size >= MAX_PROJS || now < agent.fireStopUntil) return false
+      if (!agent.hasWeapon || now < agent.fireStopUntil) return false
+      const pattern = firePattern(agent)
+      const cadence = pattern === 'salvo' ? SALVO_COOLDOWN : agent.fireInterval
+      if (now - agent.lastShot <= cadence) return false
+      const need = pattern === 'salvo' ? SALVO_SHOTS : pattern === 'burst' ? 3 : 1
+      if (projs.current.size + need > MAX_PROJS) return false
       const cx = agent.x + 24, cy = agent.y + 24
       const bearing = Math.atan2(ty - cy, tx - cx)
       const off = Math.abs(((bearing - agent.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
@@ -1649,10 +1684,30 @@ function SpaceSim() {
         if (foff < FIRE_CONE + Math.min(0.5, 26 / Math.max(20, fd))) blocked = true
       })
       if (blocked) return false
-      spawnProjectile(agent)
+
+      if (pattern === 'salvo') {
+        // 6-shot fan across a ~34° arc — the torpedo ship's signature volley
+        for (let i = 0; i < SALVO_SHOTS; i++) {
+          const t = (i / (SALVO_SHOTS - 1)) - 0.5   // -0.5 … 0.5
+          spawnProjectile(agent, { angle: agent.angle + t * 0.6 })
+        }
+        agent.salvoCharges -= 1
+        agent.fireStopUntil = now + 1900
+      } else if (pattern === 'burst') {
+        // 3-round quick burst — staggered down the barrel so it reads as a stream
+        for (let i = 0; i < 3; i++) spawnProjectile(agent, { posOffset: i * 15 })
+        agent.fireStopUntil = now + 1300
+      } else if (pattern === 'beam') {
+        // laser: a fast, long streak that crosses the screen
+        spawnProjectile(agent, { beam: true, speedMul: 3.4, rangeMul: 8 })
+        agent.fireStopUntil = now + 1400
+      } else {
+        spawnProjectile(agent)
+        agent.fireStopUntil = now + 1500
+      }
       agent.lastShot = now
-      agent.fireStopUntil = now + 1500
       agent.muzzleStart = now             // kick the firing animation
+      setProjKeys([...projs.current.keys()])
       return true
     }
 
@@ -1940,6 +1995,8 @@ function SpaceSim() {
       if (pickup.type === 'weapon') {
         agent.weaponType = pickup.key as WeaponKey
         agent.hasWeapon = true
+        // Torpedo ships reload their 6-shot salvos from any weapon pickup
+        if (shipClassName(agent.combo.base) === 'Torpedo') agent.salvoCharges = SALVO_CHARGES
         // Mount the weapon sprite on the hull (new combo ref → FoozleShip re-composites)
         agent.combo = { ...agent.combo, weapon: agent.equipWeapon }
       } else if (pickup.type === 'shield') {
@@ -2077,10 +2134,10 @@ function SpaceSim() {
         else if (now > q.at + 15000) pickupSpawnQueue.splice(i, 1)   // give up if it waited too long
       }
 
-      // Ship-to-ship contact. Same-fleet ships DON'T kill each other — they just shove apart
-      // (formation jostling isn't a death sentence). Enemies RAM: both take real damage and
-      // bounce off, so a collision death now means someone's hull ran out, not a cheap brush.
-      // Regrouping ships are exempt so a fleet can safely re-form.
+      // Ship-to-ship contact — TOUCH = DAMAGE, for EVERYONE (allies included). Space is vital:
+      // ships keep their distance via the strong separation nudge, so a touch is a genuine failure
+      // and it costs both hulls. On contact they're hard-shoved apart so they never stack (2D — no
+      // overlapping sprites) and don't re-hit every frame. Regrouping ships are exempt.
       agents.current.forEach((aA, idA) => {
         if (aA.state === 'dying' || aA.state === 'regrouping') return
         agents.current.forEach((aB, idB) => {
@@ -2091,16 +2148,14 @@ function SpaceSim() {
           const collide = d < COLLIDE_DIST
             || segmentsIntersect(ax - aA.avx*dt, ay - aA.avy*dt, ax, ay, bx - aB.avx*dt, by - aB.avy*dt, bx, by)
           if (!collide) return
-          // Shove the pair apart so they can't stack (each moves half the overlap; smooth, not a teleport)
+          // Hard shove fully clear of each other (centres to NO_OVERLAP), then damage both
           let nx = ax - bx, ny = ay - by
           const nd = Math.hypot(nx, ny)
-          if (nd < 0.5) { nx = Math.cos(aA.angle); ny = Math.sin(aA.angle) }   // exact overlap → split along heading
-          else { nx /= nd; ny /= nd }
-          const push = (COLLIDE_DIST - Math.min(d, COLLIDE_DIST)) / 2 + 1
+          if (nd < 0.5) { nx = Math.cos(aA.angle); ny = Math.sin(aA.angle) } else { nx /= nd; ny /= nd }
+          const push = (NO_OVERLAP - Math.min(d, NO_OVERLAP)) / 2 + 0.5
           aA.x += nx * push; aA.y += ny * push
           aB.x -= nx * push; aB.y -= ny * push
-          if (aA.fleetId === aB.fleetId) return   // same family: bump, no blood
-          ramDamage(aA, now); ramDamage(aB, now)  // enemies: mutual ram damage (lethal only if wounded)
+          ramDamage(aA, now); ramDamage(aB, now)  // touch costs both hulls (lethal only if already wounded)
         })
       })
 
@@ -2729,7 +2784,7 @@ function SpaceSim() {
             } else {
               agent.wingAngle += 0.0012 * dt
               // Dominant arrogance: formation discipline -50% (wings drift much wider)
-              const baseRadius = rs.behavior === 'tank' ? 30 : agent.wingSlot <= 2 ? 70 : 90
+              const baseRadius = rs.behavior === 'tank' ? 48 : agent.wingSlot <= 2 ? 95 : 120
               const wingRadius = baseRadius * (isDom ? 1.5 : 1)
               const slotOffset = (agent.wingSlot - 1) * (Math.PI / 3)
               const orbitAngle = agent.wingAngle + slotOffset
@@ -2812,21 +2867,11 @@ function SpaceSim() {
           }
         }
 
-        // ── Collision avoidance — rotate angle away, then recompute forward velocity ──
+        // ── Evasion — asteroids by steering, crowding by a soft separation nudge ──
         // Juggernaut ignores all evasion and plows straight ahead.
         if (!juggernaut) {
-          let avoidAngle = agent.angle
-          agents.current.forEach(other => {
-            if (other.id === agent.id || other.state === 'dying') return
-            const dx = agent.x + 24 - (other.x + 24)
-            const dy = agent.y + 24 - (other.y + 24)
-            const d  = Math.sqrt(dx*dx + dy*dy) || 1
-            if (d >= 60) return
-            const sameFleet = other.fleetId === agent.fleetId
-            const turn = (60 - d) / 60 * turnCap * dt * (sameFleet ? 4 : 2)
-            avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), turn)
-          })
           // Asteroids are lethal and NOT in agents.current — swerve wide of any rock ahead.
+          let avoidAngle = agent.angle
           asteroids.current.forEach(ast => {
             const acx = ast.x + ast.size / 2, acy = ast.y + ast.size / 2
             const dx = agent.x + 24 - acx, dy = agent.y + 24 - acy
@@ -2844,6 +2889,24 @@ function SpaceSim() {
             agent.angle = avoidAngle
             agent.vx = Math.cos(agent.angle) * curSpd
             agent.vy = Math.sin(agent.angle) * curSpd
+          }
+          // Separation: a soft velocity nudge away from any ship crowding INSIDE formation spacing
+          // (SEP_RADIUS < slot pitch), so a tight formation still forms up but ships never stack.
+          // Smoothed by the inertia below → banking, not a snap. Replaces the old nose-turn avoidance
+          // that fired at formation distance and made allies scatter like a school of fish.
+          let sx = 0, sy = 0
+          agents.current.forEach(other => {
+            if (other.id === agent.id || other.state === 'dying') return
+            const dx = agent.x + 24 - (other.x + 24), dy = agent.y + 24 - (other.y + 24)
+            const dd = Math.sqrt(dx * dx + dy * dy)
+            if (dd >= SEP_RADIUS || dd < 0.1) return
+            const w = (SEP_RADIUS - dd) / SEP_RADIUS
+            sx += (dx / dd) * w; sy += (dy / dd) * w
+          })
+          if (sx || sy) {
+            const sl = Math.hypot(sx, sy) || 1
+            const nudge = agent.maxSpeed * SEP_STRENGTH
+            agent.vx += (sx / sl) * nudge; agent.vy += (sy / sl) * nudge
           }
         }
 
@@ -3221,7 +3284,7 @@ function SpaceSim() {
               zIndex: 2,
             }}
           >
-            <ProjectileSprite kind={proj.kind} fleetType={proj.ownerFleetType} />
+            <ProjectileSprite kind={proj.kind} fleetType={proj.ownerFleetType} beam={proj.beam} />
           </div>
         )
       })}

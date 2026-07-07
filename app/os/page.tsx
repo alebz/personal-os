@@ -13,7 +13,7 @@ const SECTIONS: OSSection[] = [
   { label: 'Tareas',    color: '#EA4335', href: '/crm', content: <TareasContent /> },
   { label: 'Contactos', color: '#F6821E', href: '/contactos', content: <ContactosContent /> },
   { label: 'Cerebro',   color: '#FBBC05', href: '/brain', content: <CerebroContent /> },
-  { label: 'Finanzas',  color: '#34A853', href: '/finance', content: <FinanzasContent /> },
+  { label: 'Finanzas Alex', color: '#34A853', href: '/finance', content: <FinanzasContent /> },
   { label: 'Uptown',    color: '#4285F4', href: '/uptown', content: <UptownContent /> },
   { label: 'Diario',    color: '#9B59B6', href: '/journal', content: <DiarioContent /> },
 ]

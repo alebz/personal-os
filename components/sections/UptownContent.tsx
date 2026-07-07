@@ -211,18 +211,20 @@ function AmountInput({
 function SectionCard({ title, note, total, colorClass = 'text-ink-3', children }: {
   title: string; note?: string; total?: number; colorClass?: string; children: React.ReactNode
 }) {
+  const [open, setOpen] = useState(true)
   return (
     <div className="rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 pt-3 pb-2 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
-      <div className="mb-2 flex items-center justify-between">
+      <button onClick={() => setOpen(o => !o)} className="mb-2 flex w-full items-center justify-between">
         <div className="flex items-baseline gap-1.5">
+          <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 shrink-0 text-ink-3/50 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
           <p className={`text-[10px] font-bold uppercase tracking-widest ${colorClass}`}>{title}</p>
           {note && <span className="text-[9px] text-ink-3/60">{note}</span>}
         </div>
         {total !== undefined && total > 0 && (
           <span className="text-xs font-semibold tabular-nums text-ink-4"><Mxn v={total} /></span>
         )}
-      </div>
-      {children}
+      </button>
+      {open && children}
     </div>
   )
 }
@@ -599,19 +601,17 @@ function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
   const previsto = totalIngresos - totalEgresos
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Previsto final del mes</p>
-      <p className={`text-4xl font-black tabular-nums ${previsto >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={previsto} /></p>
-      <p className="mb-3 text-[10px] text-ink-3/50">Si cobras y pagas todo</p>
-      <div className="space-y-1.5 border-t border-ink-4/10 pt-3">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-ink-3">↑ Ingresos esperados</span>
-          <span className="tabular-nums font-medium text-ok"><Mxn v={totalIngresos} /></span>
+    <div className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Previsto fin de mes</p>
+          <p className="text-[9px] text-ink-3/50">Si cobras y pagas todo</p>
         </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-ink-3">↓ Egresos esperados</span>
-          <span className="tabular-nums font-medium text-danger"><Mxn v={totalEgresos} /></span>
-        </div>
+        <p className={`text-2xl font-black tabular-nums ${previsto >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={previsto} /></p>
+      </div>
+      <div className="mt-2 flex items-center justify-between border-t border-ink-4/10 pt-2 text-[11px]">
+        <span className="text-ink-3">↑ Ingresos <span className="font-medium text-ok"><Mxn v={totalIngresos} /></span></span>
+        <span className="text-ink-3">↓ Egresos <span className="font-medium text-danger"><Mxn v={totalEgresos} /></span></span>
       </div>
     </div>
   )
@@ -646,13 +646,17 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
   const saldoActual = (bal.starting_balance || 0) + cobrado - pagado
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo actual</p>
-      <p className={`text-4xl font-black tabular-nums ${saldoActual >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={saldoActual} /></p>
-      <p className="mb-3 text-[10px] text-ink-3/50">Lo que tienes según lo marcado</p>
-      <div className="space-y-1.5 border-t border-ink-4/10 pt-3">
-        <div className="flex items-center justify-between text-[11px] text-ink-3/60">
-          <span>Saldo inicial</span>
+    <div className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo actual</p>
+          <p className="text-[9px] text-ink-3/50">Según lo marcado</p>
+        </div>
+        <p className={`text-2xl font-black tabular-nums ${saldoActual >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={saldoActual} /></p>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-ink-4/10 pt-2 text-[11px]">
+        <span className="flex items-center gap-1 text-ink-3">
+          Inicial
           {editing ? (
             <input
               type="number"
@@ -664,25 +668,14 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
                 if (e.key === 'Enter') e.currentTarget.blur()
                 if (e.key === 'Escape') { setEditing(false); setDraft(String(bal.starting_balance)) }
               }}
-              className="w-32 rounded border border-accent/40 bg-ink-2/20 px-2 py-0.5 text-right tabular-nums text-ink-4 outline-none"
+              className="w-20 rounded border border-accent/40 bg-ink-2/20 px-1 py-0.5 text-right tabular-nums text-ink-4 outline-none"
             />
           ) : (
-            <button
-              onClick={() => setEditing(true)}
-              className="tabular-nums underline decoration-dotted underline-offset-2 hover:text-ink-4"
-            >
-              <Mxn v={bal.starting_balance} />
-            </button>
+            <button onClick={() => setEditing(true)} className="tabular-nums underline decoration-dotted underline-offset-2 hover:text-ink-4"><Mxn v={bal.starting_balance} /></button>
           )}
-        </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-ink-3">+ Cobrado</span>
-          <span className="tabular-nums font-medium text-ok"><Mxn v={cobrado} /></span>
-        </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-ink-3">− Pagado</span>
-          <span className="tabular-nums font-medium text-danger"><Mxn v={pagado} /></span>
-        </div>
+        </span>
+        <span className="text-ink-3">+ Cob. <span className="font-medium text-ok"><Mxn v={cobrado} /></span></span>
+        <span className="text-ink-3">− Pag. <span className="font-medium text-danger"><Mxn v={pagado} /></span></span>
       </div>
     </div>
   )
@@ -698,7 +691,7 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
   const faltan = Math.max(0, FONDO_META - fondoTotal)
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+    <div className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="mb-2 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Fondo Mantenimiento</p>
@@ -986,12 +979,13 @@ function ValetTab({ month }: { month: string }) {
     return `Sáb ${d.getDate()}`
   }
 
+  const numWeeks        = saturdaysInMonth(month).length
   const ppt             = config.price_per_point
   const cobrado         = payments.filter(p => p.status !== 'pending').reduce((s, p) => s + Math.round((VALET_TENANTS.find(t => t.id === p.tenant_id)?.pts ?? 0) * ppt), 0)
-  const esperado        = config.num_weeks * VALET_TOTAL_PTS * ppt
+  const esperado        = numWeeks * VALET_TOTAL_PTS * ppt
   const weekProvAmt     = (idx: number) => (config.provider_amounts as number[])[idx] ?? VALET_PROVIDER_WEEK
-  const proveedorPagado = Array.from({ length: config.num_weeks }, (_, i) => (config.provider_paid as boolean[])[i] ? weekProvAmt(i) : 0).reduce((s, v) => s + v, 0)
-  const proveedorTotal  = Array.from({ length: config.num_weeks }, (_, i) => weekProvAmt(i)).reduce((s, v) => s + v, 0)
+  const proveedorPagado = Array.from({ length: numWeeks }, (_, i) => (config.provider_paid as boolean[])[i] ? weekProvAmt(i) : 0).reduce((s, v) => s + v, 0)
+  const proveedorTotal  = Array.from({ length: numWeeks }, (_, i) => weekProvAmt(i)).reduce((s, v) => s + v, 0)
 
   if (loading) return (
     <div className="flex items-center justify-center py-32">
@@ -1003,8 +997,8 @@ function ValetTab({ month }: { month: string }) {
   )
 
   return (
-    <div className="space-y-4">
-      {/* Resumen */}
+    <div className="flex flex-col gap-4">
+      {/* Resumen + Configuración */}
       <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
         <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen Valet</p>
         <div className="space-y-3">
@@ -1061,21 +1055,14 @@ function ValetTab({ month }: { month: string }) {
             )
           })()}
         </div>
-      </div>
-
-      {/* Configuración */}
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-ink-4/10 bg-ink-2/20 px-4 py-3">
+        {/* Configuración */}
+        <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-ink-4/10 pt-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Configuración</p>
 
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-ink-3">Semanas:</span>
-          <button onClick={() => config.num_weeks > 1 && void saveConfig({ num_weeks: config.num_weeks - 1 })}
-            disabled={config.num_weeks <= 1}
-            className="flex h-6 w-6 items-center justify-center rounded border border-ink-4/10 text-sm text-ink-3 hover:text-ink-4 disabled:opacity-30">−</button>
-          <span className="w-4 text-center text-sm font-bold text-ink-4">{config.num_weeks}</span>
-          <button onClick={() => config.num_weeks < 5 && void saveConfig({ num_weeks: config.num_weeks + 1 })}
-            disabled={config.num_weeks >= 5}
-            className="flex h-6 w-6 items-center justify-center rounded border border-ink-4/10 text-sm text-ink-3 hover:text-ink-4 disabled:opacity-30">+</button>
+          <span className="text-sm font-bold text-ink-4">{numWeeks}</span>
+          <span className="text-[10px] text-ink-3/50">· auto</span>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -1111,9 +1098,11 @@ function ValetTab({ month }: { month: string }) {
             className="w-20 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-0.5 text-right text-xs tabular-nums text-ink-4 outline-none focus:border-accent/50" />
         </div>
       </div>
+      </div>
 
       {/* Semanas */}
-      {Array.from({ length: config.num_weeks }, (_, i) => i + 1).map(w => (
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: numWeeks }, (_, i) => i + 1).map(w => (
         <ValetWeekCard
           key={w}
           weekNum={w}
@@ -1127,6 +1116,7 @@ function ValetTab({ month }: { month: string }) {
           onProviderAmount={amount => setProviderAmount(w - 1, amount)}
         />
       ))}
+      </div>
     </div>
   )
 }
@@ -1368,6 +1358,22 @@ export default function UptownContent() {
           ))}
         </div>
 
+        {pageTab === 'finanzas' && !loading && !error && (
+          <div className="mb-3 grid shrink-0 grid-cols-3 gap-3">
+            <PrevistoCard
+              rents={rents} expenses={expenses} nomina={nomina}
+              extraIncome={extraIncome} extraExpenses={extraExpenses}
+            />
+            <SaldoActualCard
+              bal={balance}
+              rents={rents} expenses={expenses} nomina={nomina}
+              extraIncome={extraIncome} extraExpenses={extraExpenses}
+              onSave={saveStartingBalance}
+            />
+            <FondoCard fondoTotal={fondoTotal} currentMonthFondo={currentFondo} />
+          </div>
+        )}
+
         <div className="flex-1 min-h-0 overflow-y-auto pb-8">
         {pageTab === 'valet' ? (
           <ValetTab month={month} />
@@ -1387,23 +1393,9 @@ export default function UptownContent() {
             <button onClick={() => void loadMonth(month)} className="underline">Reintentar</button>
           </div>
         ) : (
-          <div className="space-y-5">
-            {/* Previsto + Saldo Actual */}
-            <div className="grid grid-cols-2 gap-5">
-              <PrevistoCard
-                rents={rents} expenses={expenses} nomina={nomina}
-                extraIncome={extraIncome} extraExpenses={extraExpenses}
-              />
-              <SaldoActualCard
-                bal={balance}
-                rents={rents} expenses={expenses} nomina={nomina}
-                extraIncome={extraIncome} extraExpenses={extraExpenses}
-                onSave={saveStartingBalance}
-              />
-            </div>
-
+          <div className="space-y-3">
             {/* Main grid: income | expenses */}
-            <div className="grid gap-5 lg:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               {/* ── Ingresos ── */}
               <div className="space-y-3">
                 <p className="text-[10px] font-black uppercase tracking-widest text-ok">↑ Ingresos</p>
@@ -1420,7 +1412,6 @@ export default function UptownContent() {
                   onMethod={setExtraIncomeMethod}
                   onAmount={setExtraIncomeAmount}
                 />
-                <FondoCard fondoTotal={fondoTotal} currentMonthFondo={currentFondo} />
               </div>
 
               {/* ── Egresos ── */}

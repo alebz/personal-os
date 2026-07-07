@@ -395,56 +395,6 @@ function AddExtraForm({
   )
 }
 
-function PanelVacPanel({
-  viajes,
-  vacMvsThisMonth,
-}: {
-  viajes: Envelope[]
-  vacMvsThisMonth: Movement[]
-}) {
-  const active = viajes.filter(v => !v.pausado)
-  if (active.length === 0) return null
-  const totalThisMonth = vacMvsThisMonth.reduce((s, m) => s + Number(m.amount), 0)
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-      <div className="flex items-center justify-between border-b border-ink-4/5 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">Sobrecito Vacaciones</p>
-        <span className="text-xs font-medium text-accent"><Mxn v={totalThisMonth} /> este mes</span>
-      </div>
-      <div className="divide-y divide-ink-4/5">
-        {active.map(v => {
-          const pct = v.target > 0 ? Math.min((Number(v.saved) / v.target) * 100, 100) : 0
-          return (
-            <div key={v.id} className="px-4 py-3">
-              <div className="mb-2 flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-ink-4">{v.label}</p>
-                  {v.fecha && <p className="text-[10px] text-ink-3">{v.fecha}</p>}
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold tabular-nums text-accent">
-                    <Mxn v={Number(v.saved)} /> <span className="font-normal text-ink-3">/ <Mxn v={v.target} /></span>
-                  </p>
-                  <p className="text-[10px] text-ink-3">
-                    {pct.toFixed(0)}% · faltan <Mxn v={Math.max(0, v.target - Number(v.saved))} />
-                  </p>
-                </div>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-ink-2/30">
-                <div
-                  className="h-full rounded-full bg-accent transition-all duration-500"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function EditModal({
   mv,
   onSave,
@@ -530,7 +480,6 @@ interface PanelTabProps {
   incomeItems: IncomeItem[]
   commitments: Commitment[]
   movements: Movement[]
-  envelopes: Envelope[]
   monthChecks: MonthChecks
   balance: Balance | null
   nominaMirror: NominaMirror[] | 'loading'
@@ -548,7 +497,6 @@ function PanelTab({
   incomeItems,
   commitments,
   movements,
-  envelopes,
   monthChecks,
   balance,
   nominaMirror,
@@ -567,7 +515,6 @@ function PanelTab({
 
   const freelanceMvs    = movements.filter(m => m.category === 'freelance')
   const gxMvs           = movements.filter(m => m.category === 'gasto_extra')
-  const vacMvsThisMonth = movements.filter(m => m.category === 'vacaciones')
 
   const activeIncome  = incomeItems.filter(i => i.active)
   const activeCosts   = commitments.filter(c => c.active)
@@ -734,12 +681,6 @@ function PanelTab({
           </div>
         </div>
       </div>
-
-      {/* Vacaciones */}
-      <PanelVacPanel
-        viajes={envelopes}
-        vacMvsThisMonth={vacMvsThisMonth}
-      />
 
       {/* Edit modal */}
       {editMov && (
@@ -1739,7 +1680,7 @@ export default function FinancePage() {
         {/* Header */}
         <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-4">Finanzas</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-ink-4">Finanzas Alex</h1>
             <p className="text-xs text-ink-3">León, Guanajuato · MXN</p>
           </div>
 
@@ -1800,7 +1741,6 @@ export default function FinancePage() {
                 incomeItems={incomeItems}
                 commitments={commitments}
                 movements={movements}
-                envelopes={envelopes}
                 monthChecks={monthChecks}
                 balance={balance}
                 nominaMirror={nominaMirror}
