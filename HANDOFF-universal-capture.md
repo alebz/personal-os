@@ -37,6 +37,30 @@ Aunque la sección quedó en blanco, el archivo conserva utilidades compartidas 
 
 Si remodelas Diario, **mantén esos 4 exports** o mueve a un módulo compartido y actualiza los 2 imports.
 
+## Indexado para /api/ask (RAG / pgvector) — Diario + Notas
+
+`/api/ask` busca en `memory_chunks` vía pgvector. Antes, las entradas de **Diario** y las **Notas**
+creadas por UI nunca se embebían ahí → eran invisibles para "Preguntar". Ya se indexan.
+
+- **Helper compartido:** `lib/memoryIndex.ts` → `reindexJournalEntry()` y `reindexNote()`.
+  Patrón (igual que `app/api/capture/route.ts`): `embed()` de `@/lib/openai` + insert en
+  `memory_chunks { entity_id:null, content, embedding, metadata }`.
+  **Dedup — UNA chunk por fila:** cada llamada primero BORRA las chunks de esa fila
+  (`metadata->>journal_id` / `metadata->>note_id`), luego inserta una nueva; así los guardados
+  repetidos no duplican. Devuelve `true` si (re)indexó, `false` si dejó la fila des-indexada.
+  - Diario: `metadata { kind:'diario', journal_id, entry_date, mood }`; solo si content > 10 chars.
+  - Notas: `metadata { kind:'nota', note_id, tags }`; embebe `title + content` (umbral bajo — una
+    nota puede ser un teléfono/PIN).
+- **Dónde se dispara (live):**
+  - `PATCH /api/journal/[id]` → reindexa **solo si `body.content` cambió** (salta guardados de solo-mood).
+  - `POST /api/notes` y `PATCH /api/notes/[id]` → reindexan la nota.
+  - Los `DELETE` de ambos borran la chunk (no deja huérfanos). Todo best-effort (try/catch, nunca rompe el guardado).
+- **Backfill (una vez):** `POST /api/journal/reindex` y `POST /api/notes/reindex` — recorren todo y
+  reindexan con el mismo dedup; responden `{ total, indexed, cleared, failed }`. Correr una vez con:
+  `curl -sS -X POST http://localhost:3000/api/journal/reindex` (y `.../notes/reindex`).
+- **`/api/ask`:** `match_threshold=0.3`, `match_count=12` (subidos por el dueño; NO bajar). Tras el
+  backfill, preguntar algo del diario/notas devuelve la fuente con `metadata.kind` = `diario`/`nota`.
+
 ## Regla de oro / qué NO tocar
 
 - Ningún endpoint se reescribió ni borró. Si algún modo deja de guardar, el bug está en la UI de

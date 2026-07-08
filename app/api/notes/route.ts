@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { reindexNote } from '@/lib/memoryIndex'
+
+export const runtime = 'nodejs'
 
 export async function GET() {
   const supabase = createServerClient()
@@ -23,5 +26,9 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Index the new note for /api/ask (best-effort).
+  if (data) { try { await reindexNote(supabase, data) } catch (err) { console.error('note POST reindex failed', err) } }
+
   return NextResponse.json(data, { status: 201 })
 }

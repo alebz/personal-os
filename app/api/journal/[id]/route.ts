@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { reindexJournalEntry } from '@/lib/memoryIndex'
 
 export const runtime = 'nodejs'
 
@@ -36,6 +37,12 @@ export async function PATCH(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Re-index for /api/ask only when the text actually changed (skip mood-only saves). Best-effort.
+  if (body.content !== undefined && data) {
+    try { await reindexJournalEntry(supabase, data) } catch (err) { console.error('journal PATCH reindex failed', err) }
+  }
+
   return NextResponse.json(data)
 }
 
@@ -53,5 +60,9 @@ export async function DELETE(
     .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Drop its memory chunk so it stops surfacing in /api/ask.
+  await supabase.from('memory_chunks').delete().eq('metadata->>journal_id', id)
+
   return NextResponse.json({ ok: true })
 }
