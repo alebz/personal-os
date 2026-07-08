@@ -61,3 +61,11 @@
   en prod), pero `TareasContent` no escuchaba el evento `capture:task` que dispara UniversalCapture → la
   cara de Tareas no se refrescaba hasta recargar. Fix: `TareasContent` ahora escucha `capture:task` y
   refetch-ea. (Las notas sí aparecían porque viven en el mismo Cerebro.)
+- **Gesto de cambiar escritorio bloqueado en /login (MX Master side button):** pruebas empíricas en
+  prod descartaron que el app capture/`preventDefault` wheel o keydown (StarsBackground es la MISMA
+  instancia del layout en todas las rutas y no tiene listeners; está detrás del `<main>` full-screen).
+  La diferencia real de /login era (a) el input con `autoFocus` (un campo enfocado puede tragarse el
+  atajo del gesto) y (b) que sin captura de wheel, Chrome usa el swipe horizontal para back/forward y
+  se come el gesto del SO. Fix: quitado el `autoFocus` del login + `overscroll-behavior: none` en
+  html/body (evita que Chrome secuestre el swipe horizontal; sano para una app tipo OS). Nota: no se
+  pudo reproducir el gesto del hardware desde aquí — verificar con el MX Master en prod.

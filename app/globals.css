@@ -155,12 +155,16 @@ input::placeholder, textarea::placeholder {
 html {
   background-color: var(--color-ink-0);
   color: var(--color-ink-4);
+  /* Don't let the browser hijack horizontal swipes for back/forward nav — it can eat the macOS
+     "switch desktop" gesture (e.g. MX Master side button). Also kills accidental swipe-back. */
+  overscroll-behavior: none;
 }
 
 body {
   min-height: 100dvh;
   font-family: var(--os-font);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
 /*

@@ -42,7 +42,6 @@ function LoginForm() {
           id="password"
           name="password"
           type="password"
-          autoFocus
           autoComplete="current-password"
           placeholder="Contraseña"
           value={password}
