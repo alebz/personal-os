@@ -155,19 +155,21 @@ const CAT_LABEL: Record<Category, string> = {
 
 // ─── Method badge / select ────────────────────────────────────────────────────
 
-const METHOD_STYLE: Record<string, string> = {
-  efectivo: 'bg-warn/15 text-warn',
-  spei:     'bg-accent/15 text-accent',
-  cargo:    'bg-danger/15 text-danger',
+// Solo dos métodos: efectivo 💵 (cash) y tarjeta 💳 (digital — SPEI/cargo cuentan como digital).
+// Registros viejos con 'spei'/'cargo' se normalizan a tarjeta.
+const METHOD_META: Record<'efectivo' | 'tarjeta', { emoji: string; label: string }> = {
+  efectivo: { emoji: '💵', label: 'Efectivo' },
+  tarjeta:  { emoji: '💳', label: 'Tarjeta'  },
 }
-const METHOD_LABEL: Record<string, string> = { efectivo: 'Ef', spei: 'SP', cargo: 'Ca' }
+function normMethod(m: string | null | undefined): 'efectivo' | 'tarjeta' {
+  return m === 'efectivo' ? 'efectivo' : 'tarjeta'
+}
 
 function MethodBadge({ metodo }: { metodo: string }) {
-  const style = METHOD_STYLE[metodo] ?? 'bg-ink-2/20 text-ink-3'
-  const label = METHOD_LABEL[metodo] ?? metodo.slice(0, 2).toUpperCase()
+  const m = normMethod(metodo)
   return (
-    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${style}`}>
-      {label}
+    <span className="shrink-0 text-sm leading-none" title={METHOD_META[m].label}>
+      {METHOD_META[m].emoji}
     </span>
   )
 }
@@ -181,14 +183,13 @@ function MethodSelect({
 }) {
   return (
     <select
-      value={value}
+      value={normMethod(value)}
       onChange={e => onChange(e.target.value)}
       onClick={e => e.stopPropagation()}
-      className="shrink-0 rounded border border-ink-4/10 bg-ink-2/30 px-1.5 py-0.5 text-[10px] font-bold text-ink-4 outline-none"
+      className="shrink-0 rounded border border-ink-4/10 bg-ink-2/30 px-1.5 py-0.5 text-xs text-ink-4 outline-none"
     >
-      <option value="efectivo">Ef</option>
-      <option value="spei">SP</option>
-      <option value="cargo">Ca</option>
+      <option value="efectivo">💵 Efectivo</option>
+      <option value="tarjeta">💳 Tarjeta</option>
     </select>
   )
 }
@@ -380,9 +381,8 @@ function AddExtraForm({
         onChange={e => setMetodo(e.target.value)}
         className="rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-xs text-ink-4 outline-none"
       >
-        <option value="efectivo">Ef</option>
-        <option value="spei">SP</option>
-        <option value="cargo">Ca</option>
+        <option value="efectivo">💵 Efectivo</option>
+        <option value="tarjeta">💳 Tarjeta</option>
       </select>
       <button
         onClick={submit}
@@ -406,7 +406,7 @@ function EditModal({
 }) {
   const [desc,   setDesc]   = useState(mv.description)
   const [monto,  setMonto]  = useState(String(mv.amount))
-  const [metodo, setMetodo] = useState(mv.metodo ?? 'efectivo')
+  const [metodo, setMetodo] = useState(normMethod(mv.metodo))
   const [saving, setSaving] = useState(false)
 
   async function save() {
@@ -445,12 +445,11 @@ function EditModal({
           />
           <select
             value={metodo}
-            onChange={e => setMetodo(e.target.value)}
+            onChange={e => setMetodo(normMethod(e.target.value))}
             className="rounded-xl border border-ink-4/10 bg-ink-2/20 px-3 py-2 text-sm text-ink-4 outline-none"
           >
-            <option value="efectivo">Efectivo</option>
-            <option value="spei">SPEI</option>
-            <option value="cargo">Cargo</option>
+            <option value="efectivo">💵 Efectivo</option>
+            <option value="tarjeta">💳 Tarjeta</option>
           </select>
         </div>
         <div className="flex gap-2 pt-1">
@@ -538,6 +537,30 @@ function PanelTab({
   const flujo = cobrado - pagado
   const caja  = Number(balance?.caja_fuerte ?? 0)
 
+  // ── Saldos vivos: última foto de "Cuadrar" ± movimientos creados después, por método ──
+  const snapAt = balance?.updated_at ? new Date(balance.updated_at).getTime() : 0
+  function accountDelta(account: 'efectivo' | 'tarjeta') {
+    return movements.reduce((sum, m) => {
+      if (m.category === 'ajuste' || m.metodo == null) return sum
+      if (normMethod(m.metodo) !== account) return sum
+      if (snapAt && new Date(m.created_at).getTime() <= snapAt) return sum
+      return sum + (m.flow === 'in' ? Number(m.amount) : -Number(m.amount))
+    }, 0)
+  }
+  const dEfectivo = accountDelta('efectivo')
+  const dTarjeta  = accountDelta('tarjeta')
+  const liveEfectivo = Number(balance?.efectivo ?? 0) + dEfectivo
+  const liveTarjeta  = Number(balance?.tarjeta  ?? 0) + dTarjeta
+  function deltaSub(d: number) {
+    if (!d) return undefined
+    return (
+      <>
+        <span className={d < 0 ? 'text-danger' : 'text-ok'}>{d < 0 ? '−' : '+'}<Mxn v={Math.abs(d)} /></span>
+        <span className="text-ink-3"> desde cuadre</span>
+      </>
+    )
+  }
+
   function PanelCard({
     label, value, cls, sub, subNode,
   }: {
@@ -566,8 +589,8 @@ function PanelTab({
     <div className="space-y-5">
       {/* 4 summary cards */}
       <div className="grid grid-cols-3 gap-3">
-        <PanelCard label="Efectivo"           value={Number(balance?.efectivo   ?? 0)} cls="text-success" />
-        <PanelCard label="Tarjeta"            value={Number(balance?.tarjeta    ?? 0)} cls="text-info" />
+        <PanelCard label="Efectivo"           value={liveEfectivo} cls="text-success" subNode={deltaSub(dEfectivo)} />
+        <PanelCard label="Tarjeta"            value={liveTarjeta}  cls="text-info"    subNode={deltaSub(dTarjeta)} />
         <PanelCard label="Caja Fuerte"        value={caja}    cls="text-warn" />
         <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     subNode={<><span className="text-ink-3">de </span><Mxn v={totalInPrevistos} /></>} />
         <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" subNode={<><span className="text-ink-3">de </span><Mxn v={totalGastoPrevistos} /></>} />
@@ -1039,7 +1062,7 @@ function CompromisoTab({
   const [name,   setName]   = useState('')
   const [amount, setAmount] = useState('')
   const [meses,  setMeses]  = useState('')
-  const [metodo, setMetodo] = useState('cargo')
+  const [metodo, setMetodo] = useState('tarjeta')
 
   const active       = commitments.filter(c => c.active)
   const totalMensual = active.reduce((s, c) => s + monthlyCost(c), 0)
@@ -1104,9 +1127,8 @@ function CompromisoTab({
           value={metodo} onChange={e => setMetodo(e.target.value)}
           className="rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2 text-sm text-ink-4 outline-none backdrop-blur-xl"
         >
-          <option value="efectivo">Ef</option>
-          <option value="spei">SP</option>
-          <option value="cargo">Ca</option>
+          <option value="efectivo">💵 Efectivo</option>
+          <option value="tarjeta">💳 Tarjeta</option>
         </select>
         <button
           onClick={submit} disabled={!name.trim() || !amount}
@@ -1315,9 +1337,8 @@ function ConfigTab({
             value={metodo} onChange={e => setMetodo(e.target.value)}
             className="rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-xs text-ink-4 outline-none"
           >
-            <option value="efectivo">Ef</option>
-            <option value="spei">SP</option>
-            <option value="cargo">Ca</option>
+            <option value="efectivo">💵 Efectivo</option>
+            <option value="tarjeta">💳 Tarjeta</option>
           </select>
           <button
             onClick={() => void submit()} disabled={!nombre.trim() || !monto}
@@ -1517,7 +1538,7 @@ export default function FinancePage() {
         month, date: todayStr(),
         description: c.name, amount: c.amount,
         flow: 'out', category: 'gasto_fijo',
-        commitment_id: c.id, envelope_id: null, metodo: c.metodo ?? 'cargo',
+        commitment_id: c.id, envelope_id: null, metodo: c.metodo ?? 'tarjeta',
       })
       setMovements(prev => [mov, ...prev])
       const next: MonthChecks = {

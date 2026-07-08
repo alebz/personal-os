@@ -77,7 +77,26 @@
       "Bash(sed -n '/function weaponKind/,/^}/p' components/StarsBackground.tsx)",
       "Bash(cd *)",
       "Bash(grep -n \"wavePhase\\\\|morale\\\\|vengeanceUntil\\\\|number$\\\\|: number\")",
-      "Bash(awk '/^function fleetOffsets/{f=1} f{print NR\": \"$0} f&&/^}/{exit}' components/StarsBackground.tsx)"
+      "Bash(awk '/^function fleetOffsets/{f=1} f{print NR\": \"$0} f&&/^}/{exit}' components/StarsBackground.tsx)",
+      "Bash(grep -n \"translate\\(\\\\${agent.x}px,\\\\${SY\\(agent.y\\)}\\\\|el.style.transform  = \\\\`translate\\\\|agent.x > W + m\\) agent.x = -m\" components/StarsBackground.tsx)",
+      "Bash(sed -i '' 's/^interface JournalEntry {/export interface JournalEntry {/' components/sections/DiarioContent.tsx)",
+      "Bash(sed -i '' 's/^function groupByDate\\(/export function groupByDate\\(/' components/sections/DiarioContent.tsx)",
+      "Bash(sed -i '' 's/^function formatDateHeader\\(/export function formatDateHeader\\(/' components/sections/DiarioContent.tsx)",
+      "Bash(sed -i '' 's/^function EntryCard\\({/export function EntryCard\\({/' components/sections/DiarioContent.tsx)",
+      "Bash(sed -i '' 's/^function moodEmoji\\(/export function moodEmoji\\(/' components/sections/DiarioContent.tsx)",
+      "Bash(sed -i '' 's/^function formatTime\\(/export function formatTime\\(/' components/sections/DiarioContent.tsx)",
+      "Bash(supabase --version)",
+      "Bash(pkill -9 -f \"next dev\")",
+      "Bash(pkill -9 -f \"next-server\")",
+      "Bash(GIT_LITERAL_PATHSPECS=1 git add supabase/migrations/0035_habits_model.sql app/api/habits/route.ts app/api/habits/[id] app/habits components/sections/HabitTrackerContent.tsx components/HabitTracker.tsx app/page.tsx components/CalendarCard.tsx components/sections/InicioContent.tsx)",
+      "Bash(GIT_LITERAL_PATHSPECS=1 git add app/api/calendar/route.ts app/api/calendar/[id] components/CalendarCard.tsx components/sections/InicioContent.tsx lib/weekdayColors.ts)",
+      "Bash(awk '/export async function POST/,/^}/' app/api/tasks/route.ts)",
+      "Bash(grep -nA3 \"^html\\\\|^body\\\\|^html,\\\\|overscroll\\\\|touch-action\\\\|position:\\\\s*fixed\\\\|overflow:\\\\s*hidden\\\\|min-height:\\\\s*100\" app/globals.css)",
+      "Bash(grep -nA8 \"function onDialWheel\\\\|const onDialWheel\" components/lolo/LoloShell.tsx)",
+      "Bash(awk 'NR>=3549 && /return \\\\\\(/{found=NR} found && NR>=found {print NR\": \"$0; c++} c>12{exit}' components/StarsBackground.tsx)",
+      "Bash(nohup npm run dev)",
+      "Bash(echo \"dev server arrancando \\(PID $!\\)... espero a que compile\")",
+      "Bash(echo \"dev server \\(PID $!\\) arrancando\")"
     ]
   }
 }
