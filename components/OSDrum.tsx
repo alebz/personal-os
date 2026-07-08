@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import OSSettings from '@/components/OSSettings'
+import { useOSSettings } from '@/components/OSSettingsContext'
 
 export type OSSection = { label: string; color: string; href: string; content?: ReactNode }
 
@@ -44,6 +45,7 @@ function Ship({ color, px = 78 }: { color: string; px?: number }) {
 export default function OSDrum({ sections }: { sections: OSSection[] }) {
   const N = sections.length
   const router = useRouter()
+  const { toggleSettings, settingsOpen } = useOSSettings()
 
   const sceneRef = useRef<HTMLDivElement>(null)
   const deckRef = useRef<HTMLDivElement>(null)
@@ -268,6 +270,24 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
           ))}
         </div>
       </div>
+
+      {/* Settings gear — always visible, just to the left of the nav dots (not tied to the Inicio face) */}
+      <button
+        onClick={toggleSettings}
+        title="Ajustes del sistema"
+        aria-label="Ajustes del sistema"
+        style={{
+          position: 'fixed', top: '50%', right: 54, zIndex: 4,
+          transform: settingsOpen ? 'translateY(-50%) rotate(45deg)' : 'translateY(-50%) rotate(0deg)',
+          fontSize: 18, lineHeight: 1,
+          opacity: settingsOpen ? 1 : 0.4,
+          transition: 'opacity 200ms ease, transform 300ms ease',
+          color: 'var(--color-ink-3)', background: 'none', border: 'none',
+          cursor: 'pointer', padding: 0, pointerEvents: 'auto',
+        }}
+      >
+        ⚙
+      </button>
 
       <div className="os-vig top" />
       <div className="os-vig bot" />

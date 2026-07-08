@@ -77,6 +77,7 @@ export default function TopRail() {
             onClick={toggleSettings}
             title="Ajustes del sistema"
             style={{
+              order:      -1,
               fontSize:   18,
               lineHeight: 1,
               opacity:    settingsOpen ? 1 : 0.45,
