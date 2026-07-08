@@ -12,16 +12,17 @@ import InicioContent from '@/components/sections/InicioContent'
 
 // OSDrum reveals faces in reverse as you scroll down (index 0 front, then N-1, N-2 … 1). So the
 // CARDS are laid out reversed-past-index-0 to make the on-screen order read top→bottom:
-//   Cerebro · Inicio · Tareas · Uptown · Finanzas · Hábitos · Contactos.
+//   Inicio · Cerebro · Tareas · Uptown · Finanzas · Hábitos · Contactos.
+// Inicio is index 0 so the OS loads on the clock+calendar face; Cerebro sits right below it.
 // Colors stay pinned per array position — the drum's rainbow does not move, only the cards do.
 const SECTIONS: OSSection[] = [
-  { label: 'Cerebro',   color: '#e8ecff', href: '/brain', content: <CerebroContent /> },
+  { label: 'Inicio',    color: '#e8ecff', href: '/', content: <InicioContent /> },
   { label: 'Contactos', color: '#EA4335', href: '/contactos', content: <ContactosContent /> },
   { label: 'Hábitos',   color: '#F6821E', href: '/habits', content: <HabitTrackerContent /> },
   { label: 'Finanzas Alex', color: '#FBBC05', href: '/finance', content: <FinanzasContent /> },
   { label: 'Uptown',    color: '#34A853', href: '/uptown', content: <UptownContent /> },
   { label: 'Tareas',    color: '#4285F4', href: '/crm', content: <TareasContent /> },
-  { label: 'Inicio',    color: '#9B59B6', href: '/', content: <InicioContent /> },
+  { label: 'Cerebro',   color: '#9B59B6', href: '/brain', content: <CerebroContent /> },
 ]
 
 export default function HomePage() {
