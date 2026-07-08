@@ -101,6 +101,13 @@ function apiDelete(url: string): Promise<void> {
 
 // ── TaskCard ───────────────────────────────────────────────────────────────
 
+// Oculta la descripción cuando solo repite el título (común en capturas rápidas donde
+// el resumen ≈ el texto original). Normaliza mayúsculas + puntuación/espacios finales.
+function sameAsTitle(desc: string, title: string): boolean {
+  const norm = (s: string) => s.trim().replace(/[.\s]+$/, '').toLowerCase()
+  return norm(desc) === norm(title)
+}
+
 function TaskCard({
   task,
   onToggle,
@@ -155,7 +162,7 @@ function TaskCard({
             )}
           </div>
 
-          {task.description && !done && (
+          {task.description && !done && !sameAsTitle(task.description, task.title) && (
             <p className="mt-0.5 line-clamp-2 text-xs text-ink-3">{task.description}</p>
           )}
 
