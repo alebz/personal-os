@@ -17,7 +17,7 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-function Clock({ color = '#F59E0B', scale = 1 }: { color?: string; scale?: number }) {
+function Clock({ color: colorProp = '#F59E0B', colorFn, scale = 1 }: { color?: string; colorFn?: (d: Date) => string; scale?: number }) {
   const [now,   setNow]   = useState<Date | null>(null)
   const [colon, setColon] = useState(true)
 
@@ -28,6 +28,9 @@ function Clock({ color = '#F59E0B', scale = 1 }: { color?: string; scale?: numbe
   }, [])
 
   if (!now) return <div style={{ width: 220 * scale, height: 88 * scale }} aria-hidden />
+
+  // Recomputed every tick from the live time so the colour can drift through the day (see dayColorFlow).
+  const color = colorFn ? colorFn(now) : colorProp
 
   const h24    = now.getHours()
   const h12    = h24 % 12 || 12
