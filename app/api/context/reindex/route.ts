@@ -9,31 +9,41 @@ export const maxDuration = 300
 
 const CONTEXT_FILE = path.join(process.cwd(), 'context', 'contexto-alex.md')
 
-// Split the profile doc into independently-recoverable chunks: every heading (# ## ###) starts a new
-// chunk (its heading + body up to the next heading) — so each ## section, each ### subsection, and
-// each `## <fecha>` bitácora entry becomes its own chunk. Pure dividers / meta headings (a heading
-// whose only body is blockquotes, `---` or blanks — e.g. `# PARTE 1`, the doc title) are dropped.
-function chunkByHeadings(md: string): { section: string; content: string }[] {
-  const chunks: { section: string; content: string }[] = []
-  let cur: { section: string; lines: string[] } | null = null
-
-  const flush = () => {
-    if (!cur) return
-    const body = cur.lines.slice(1).filter(l => {
-      const t = l.trim()
-      return t.length > 0 && !t.startsWith('>') && t !== '---'
-    })
-    const content = cur.lines.join('\n').trim()
-    if (body.length > 0 && content) chunks.push({ section: cur.section, content })
-    cur = null
-  }
-
+// Split the profile doc into small, independently-recoverable chunks:
+//   1. Split by markdown heading (# ## ###). Pure dividers/meta (a heading whose only body is
+//      blockquotes / `---` / blanks — e.g. `# PARTE 1`, the doc title) are dropped.
+//   2. A section that is a bullet LIST (≥2 top-level bullets) is split into ONE chunk per bullet,
+//      each prefixed with the section title for context — so every person in the directory and every
+//      bitácora item becomes its own focused chunk (a query like "quién es Andrés" hits it directly,
+//      instead of a diluted 8-people blob). Prose sections stay as a single chunk.
+function chunkDoc(md: string): { section: string; content: string }[] {
+  type Sec = { title: string; heading: string; body: string[] }
+  const secs: Sec[] = []
+  let cur: Sec | null = null
   for (const line of md.split('\n')) {
     const m = /^#{1,3}\s+(.+?)\s*$/.exec(line)
-    if (m) { flush(); cur = { section: m[1].trim(), lines: [line] } }
-    else { if (!cur) cur = { section: 'Intro', lines: [] }; cur.lines.push(line) }
+    if (m) { if (cur) secs.push(cur); cur = { title: m[1].trim(), heading: line, body: [] } }
+    else if (cur) cur.body.push(line)
   }
-  flush()
+  if (cur) secs.push(cur)
+
+  const hasBody = (lines: string[]) => lines.some(l => { const t = l.trim(); return t.length > 0 && !t.startsWith('>') && t !== '---' })
+  const chunks: { section: string; content: string }[] = []
+
+  for (const s of secs) {
+    if (!hasBody(s.body)) continue   // drop pure divider / meta headings
+    const bulletIdx = s.body.map((l, i) => (/^[-*]\s+/.test(l) ? i : -1)).filter(i => i >= 0)
+    if (bulletIdx.length >= 2) {
+      for (let b = 0; b < bulletIdx.length; b++) {
+        const start = bulletIdx[b]
+        const end   = b + 1 < bulletIdx.length ? bulletIdx[b + 1] : s.body.length
+        const block = s.body.slice(start, end).join('\n').trim()
+        if (block) chunks.push({ section: s.title, content: `${s.title}\n${block}` })
+      }
+    } else {
+      chunks.push({ section: s.title, content: [s.heading, ...s.body].join('\n').trim() })
+    }
+  }
   return chunks
 }
 
@@ -48,7 +58,7 @@ export async function POST() {
     return NextResponse.json({ error: 'context/contexto-alex.md not found' }, { status: 404 })
   }
 
-  const chunks = chunkByHeadings(md)
+  const chunks = chunkDoc(md)
   const supabase = createServerClient()
 
   // Dedup: drop the whole previous 'perfil' layer so a re-ingest replaces it (never duplicates).
