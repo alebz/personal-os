@@ -391,6 +391,133 @@ function HabitDetail({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+// ─── Monthly global heatmap — a calendar-style month grid; each day shows a dot per habit ──────
+
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const DOW_LABELS  = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+// Monday-first calendar grid (same shape as the calendar card).
+function monthGridCells(year: number, month: number): { date: Date; inMonth: boolean }[] {
+  const first = new Date(year, month, 1)
+  const last  = new Date(year, month + 1, 0)
+  const startOffset = (first.getDay() + 6) % 7
+  const cells: { date: Date; inMonth: boolean }[] = []
+  for (let i = startOffset - 1; i >= 0; i--) cells.push({ date: new Date(year, month, -i), inMonth: false })
+  for (let d = 1; d <= last.getDate(); d++)  cells.push({ date: new Date(year, month, d), inMonth: true })
+  const rem = (7 - (cells.length % 7)) % 7
+  for (let d = 1; d <= rem; d++) cells.push({ date: new Date(year, month + 1, d), inMonth: false })
+  return cells
+}
+
+function MonthlyHeatmap() {
+  const now = new Date()
+  const [year,  setYear]  = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth())   // 0-11
+  const [habits, setHabits] = useState<Habit[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const mm          = String(month + 1).padStart(2, '0')
+  const lastDayKey  = `${year}-${mm}-${String(daysInMonth).padStart(2, '0')}`
+  const todayKey    = localToday()
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/habits?days=${daysInMonth}&today=${lastDayKey}`)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setHabits(data) })
+      .finally(() => setLoading(false))
+  }, [year, month]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function prev() { if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
+  function next() { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
+  const beyond = year > now.getFullYear() || (year === now.getFullYear() && month >= now.getMonth())
+
+  const active = habits.filter(h => !h.archived)
+  const cells  = monthGridCells(year, month)
+  const dk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  return (
+    <div>
+      {/* Month nav — calendar style */}
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-baseline gap-2.5">
+          <h3 className="text-lg font-bold capitalize tracking-tight text-ink-4">{MONTH_NAMES[month]}</h3>
+          <span className="text-sm font-light text-ink-3">{year}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={prev} aria-label="Mes anterior" className="flex h-8 w-8 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
+            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <button onClick={next} disabled={beyond} aria-label="Mes siguiente" className="flex h-8 w-8 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4 disabled:opacity-30">
+            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" /></div>
+      ) : active.length === 0 ? (
+        <p className="py-16 text-center text-sm text-ink-3">Sin hábitos activos.</p>
+      ) : (
+        <>
+          {/* DOW headers (weekday rainbow) */}
+          <div className="mb-2 grid grid-cols-7">
+            {DOW_LABELS.map(d => (
+              <div key={d} className="text-center text-[11px] font-semibold uppercase tracking-wider text-ink-3/70">{d}</div>
+            ))}
+          </div>
+
+          {/* Day cells — each shows a dot per habit (filled in its colour when done) */}
+          <div className="grid grid-cols-7 gap-1.5">
+            {cells.map(({ date, inMonth }, i) => {
+              const key = dk(date)
+              const isToday = key === todayKey
+              return (
+                <div
+                  key={i}
+                  className={`flex min-h-[3.75rem] flex-col items-center gap-1.5 rounded-xl px-1 pt-1.5 pb-1.5 ${
+                    isToday ? 'bg-accent/10 ring-1 ring-accent/40' : 'bg-ink-1/40'
+                  } ${!inMonth ? 'opacity-30' : ''}`}
+                >
+                  <span className={`text-xs tabular-nums ${isToday ? 'font-semibold text-accent' : 'text-ink-3'}`}>{date.getDate()}</span>
+                  {inMonth && (
+                    <div className="flex max-w-full flex-wrap items-center justify-center gap-1">
+                      {active.map(h => {
+                        const done = h.dates.includes(key)
+                        return (
+                          <span
+                            key={h.id}
+                            title={done ? `${h.name} ✓` : h.name}
+                            className="h-1.5 w-1.5 rounded-full transition-colors"
+                            style={{ background: done ? h.color : 'rgb(255 255 255 / 0.08)' }}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Legend + per-habit totals */}
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {active.map(h => (
+              <div key={h.id} className="flex items-center gap-1.5 rounded-full border border-ink-4/10 bg-ink-1/40 px-2.5 py-1">
+                <span className="h-2 w-2 rounded-full" style={{ background: h.color }} />
+                <span className="text-sm leading-none">{h.icon}</span>
+                <span className="text-xs text-ink-3">{h.name}</span>
+                <span className="text-xs font-bold tabular-nums" style={{ color: h.color }}>{h.dates.length}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function HabitTrackerContent() {
   const [habits,  setHabits]  = useState<Habit[]>([])
   const [loading, setLoading] = useState(true)
@@ -398,6 +525,7 @@ export default function HabitTrackerContent() {
   const [modal,   setModal]   = useState<Habit | 'new' | null>(null)
   const [detail,  setDetail]  = useState<Habit | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [view,    setView]    = useState<'list' | 'month'>('list')
 
   const load = useCallback(async () => {
     const t = localToday()
@@ -458,19 +586,32 @@ export default function HabitTrackerContent() {
       <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="text-xl font-semibold text-ink-4">Hábitos</h1>
-          {!loading && active.length > 0 && (
+          {view === 'list' && !loading && active.length > 0 && (
             <span className="text-sm text-ink-3">{doneToday}/{active.length} hoy</span>
           )}
         </div>
-        <button
-          onClick={() => setModal('new')}
-          className="rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
-        >
-          + Nuevo
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5 rounded-lg border border-ink-4/10 p-0.5">
+            <button onClick={() => setView('list')} title="Lista diaria" className={`rounded-md p-1.5 transition-colors ${view === 'list' ? 'bg-accent/15 text-accent' : 'text-ink-3 hover:text-ink-4'}`}>
+              <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.6}><path d="M2 4h12M2 8h12M2 12h12" strokeLinecap="round" /></svg>
+            </button>
+            <button onClick={() => setView('month')} title="Vista mensual" className={`rounded-md p-1.5 transition-colors ${view === 'month' ? 'bg-accent/15 text-accent' : 'text-ink-3 hover:text-ink-4'}`}>
+              <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.4}><rect x="2" y="2" width="12" height="12" rx="1.5" /><path d="M2 6h12M6 6v8M10 6v8" strokeLinecap="round" /></svg>
+            </button>
+          </div>
+          {view === 'list' && (
+            <button
+              onClick={() => setModal('new')}
+              className="rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+            >
+              + Nuevo
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pb-[35vh]">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-[35vh]">
+        {view === 'month' ? <MonthlyHeatmap /> : (<div className="space-y-2">
         {loading ? (
           <div className="flex justify-center py-16">
             <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
@@ -511,6 +652,7 @@ export default function HabitTrackerContent() {
             )}
           </div>
         )}
+        </div>)}
       </div>
 
       {detail !== null && (
