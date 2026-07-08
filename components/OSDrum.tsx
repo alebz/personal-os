@@ -169,7 +169,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
       target.current += dir * SUBSTEP
     }
     const onDown = (e: PointerEvent) => {
-      if ((e.target as HTMLElement)?.closest?.('.os-cface, .os-settings-root')) return   // no secuestres el puntero sobre contenido interactivo
+      if ((e.target as HTMLElement)?.closest?.('.os-cface, .os-settings-root, .os-gear')) return   // no secuestres el puntero sobre contenido interactivo (incluye el botón de ajustes)
       dragging.current = true; moved.current = false; lastY.current = e.clientY; vel.current = 0; scene.setPointerCapture(e.pointerId)
     }
     const onMove = (e: PointerEvent) => {
@@ -271,16 +271,18 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         </div>
       </div>
 
-      {/* Settings gear — always visible, just to the left of the nav dots (not tied to the Inicio face) */}
+      {/* Settings gear — always visible, top-right (not tied to the Inicio face). .os-gear keeps the
+          drum's pointer-capture from swallowing its click. */}
       <button
         onClick={toggleSettings}
         title="Ajustes del sistema"
         aria-label="Ajustes del sistema"
+        className="os-gear"
         style={{
-          position: 'fixed', top: '50%', right: 54, zIndex: 4,
-          transform: settingsOpen ? 'translateY(-50%) rotate(45deg)' : 'translateY(-50%) rotate(0deg)',
-          fontSize: 18, lineHeight: 1,
-          opacity: settingsOpen ? 1 : 0.4,
+          position: 'fixed', top: 26, right: 28, zIndex: 10002,
+          transform: settingsOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+          fontSize: 20, lineHeight: 1,
+          opacity: settingsOpen ? 1 : 0.55,
           transition: 'opacity 200ms ease, transform 300ms ease',
           color: 'var(--color-ink-3)', background: 'none', border: 'none',
           cursor: 'pointer', padding: 0, pointerEvents: 'auto',
