@@ -1306,7 +1306,7 @@ interface KillEntry { id: string; txt: string; col: string }
 // combat down so the fleets just explore, form up and park (asteroids still bite).
 type BattleMode = 'eternal' | 'peace'
 const BATTLE_MODES: { id: BattleMode; icon: string; label: string; full: string }[] = [
-  { id: 'eternal', icon: '⚔', label: 'ETERNA', full: 'GUERRA ETERNA' },
+  { id: 'eternal', icon: '⚔', label: 'GUERRA', full: 'GUERRA' },
   { id: 'peace',   icon: '☮', label: 'PAZ',    full: 'TIEMPOS DE PAZ' },
 ]
 
@@ -1338,6 +1338,7 @@ function MiniShip({ view }: { view: ShipView }) {
 // Pixel-art CRT scoreboard (ported from the Scoreboard HUD design), driven by live sim data
 function ScoreHUD({ ships, log, mode, onMode }: { ships: ShipStats; log: KillEntry[]; mode: BattleMode; onMode: (m: BattleMode) => void }) {
   const pathname = usePathname()
+  const [collapsed, setCollapsed] = useState(false)
   if (pathname === '/login') return null   // login shows only stars + ships, no scoreboard
   const fleets: WarFleet[] = ['klaed', 'nautolan', 'nairan']
   const ROW_H = 88
@@ -1355,7 +1356,25 @@ function ScoreHUD({ ships, log, mode, onMode }: { ships: ShipStats; log: KillEnt
   if (typeof document === 'undefined') return null
   return createPortal(
     <div style={{ position: 'fixed', top: '50%', left: 12, zIndex: 50, pointerEvents: 'none', userSelect: 'none', transform: 'translateY(-50%) scale(0.9)', transformOrigin: 'left center' }}>
-      <div style={{ position: 'relative', width: 406, background: '#0a0c10', border: '1px solid #1e2532', borderRadius: 6, boxShadow: '0 22px 60px rgba(0,0,0,.6), inset 0 0 60px rgba(0,0,0,.5)', overflow: 'hidden', fontFamily: "'Silkscreen', system-ui, sans-serif" }}>
+      {/* PESTAÑA — colapsa/expande el marcador hacia la izquierda (deja solo los números) */}
+      <button type="button" onClick={() => setCollapsed(c => !c)} aria-label={collapsed ? 'Expandir marcador' : 'Colapsar marcador'}
+        style={{ position: 'absolute', top: '50%', right: -13, transform: 'translateY(-50%)', width: 14, height: 48, borderRadius: '0 5px 5px 0', background: '#0a0c10', border: '1px solid #1e2532', borderLeft: 'none', color: '#6b7d90', cursor: 'pointer', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Silkscreen'", fontSize: 8, padding: 0, zIndex: 2 }}>
+        {collapsed ? '▶' : '◀'}
+      </button>
+      <div style={{ position: 'relative', width: collapsed ? 66 : 406, background: '#0a0c10', border: '1px solid #1e2532', borderRadius: 6, boxShadow: '0 22px 60px rgba(0,0,0,.6), inset 0 0 60px rgba(0,0,0,.5)', overflow: 'hidden', fontFamily: "'Silkscreen', system-ui, sans-serif", transition: 'width .35s cubic-bezier(.22,.61,.36,1)' }}>
+        {collapsed ? (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {fleets.map(key => {
+              const st = ships[key]; const m = FLEET_META[key]
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 60, borderBottom: '1px solid #12171e' }}>
+                  <span style={{ fontFamily: "'VT323'", fontSize: 32, lineHeight: 0.8, color: m.cm }}>{st.alive}</span>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+        <>
         {/* header — shows the ACTIVE MODE */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px', borderBottom: '1px solid #171d27' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'Silkscreen'", fontSize: 8.5, letterSpacing: '1.5px', color: '#8fa0b0' }}><span style={{ fontSize: 11 }}>{modeMeta.icon}</span>{modeMeta.full}</span>
@@ -1419,6 +1438,8 @@ function ScoreHUD({ ships, log, mode, onMode }: { ships: ShipStats; log: KillEnt
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, background: 'repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.30) 2px 3px)', animation: 'crtflick 3.5s ease-in-out infinite' }} />
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, background: 'radial-gradient(130% 100% at 50% 42%,rgba(0,0,0,0) 58%,rgba(0,0,0,.5) 100%)' }} />
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, boxShadow: 'inset 0 0 0 1px rgba(120,160,200,.04)' }} />
+        </>
+        )}
       </div>
     </div>,
     document.body,
