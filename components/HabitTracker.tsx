@@ -1,237 +1,99 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-interface Habit { id: string; label: string }
+// Inicio dashboard summary — a small, server-backed checklist for TODAY, wired to the same habits
+// model as the Hábitos drum face (GET /api/habits + POST /api/habits/:id/toggle). Editing/heatmaps
+// live on the Hábitos face; here it's just "N/M hoy" + quick toggles.
 
-const DEFAULT_HABITS: Habit[] = [
-  { id: 'ejercicio',  label: 'Ejercicio' },
-  { id: 'meditacion', label: 'Meditación' },
-  { id: 'lectura',    label: 'Lectura' },
-  { id: 'yoga',       label: 'Yoga' },
-  { id: 'dormir',     label: 'Dormir 8h' },
-]
+interface Habit { id: string; name: string; icon: string; color: string; dates: string[] }
 
-const MAX_HABITS = 8
-const LS_CONFIG  = 'habits:config'
-const LS_DATA    = 'habits:'
-
-function localDateKey(d = new Date()): string {
+function localToday(): string {
+  const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function loadConfig(): Habit[] {
-  try {
-    const raw = localStorage.getItem(LS_CONFIG)
-    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return p }
-  } catch {}
-  return DEFAULT_HABITS
-}
-
-function saveConfig(h: Habit[]) {
-  try { localStorage.setItem(LS_CONFIG, JSON.stringify(h)) } catch {}
-}
-
-function loadDone(date: string): string[] {
-  try {
-    const raw = localStorage.getItem(LS_DATA + date)
-    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) return p }
-  } catch {}
-  return []
-}
-
-function saveDone(date: string, done: string[]) {
-  try { localStorage.setItem(LS_DATA + date, JSON.stringify(done)) } catch {}
-}
-
-async function syncToServer(date: string, done: string[], total: number) {
-  await fetch(`/api/habits/${date}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ done, total }),
-  }).catch(() => {})
-}
-
 export default function HabitTracker() {
-  const [today,    setToday]    = useState('')
-  const [habits,   setHabits]   = useState<Habit[]>([])
-  const [done,     setDone]     = useState<string[]>([])
-  const [editMode, setEditMode] = useState(false)
-  const [editList, setEditList] = useState<Habit[]>([])
-  const [newLabel, setNewLabel] = useState('')
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [habits, setHabits] = useState<Habit[]>([])
+  const [today,  setToday]  = useState('')
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    const t = localDateKey()
+    const t = localToday()
     setToday(t)
-    const cfg = loadConfig()
-    setHabits(cfg)
-    setDone(loadDone(t))
-
-    // Merge server data
     fetch(`/api/habits?days=1&today=${t}`)
       .then(r => r.json())
-      .then((rows: { date: string; habits: { done: string[] } }[]) => {
-        const row = rows.find(r => r.date === t)
-        if (row?.habits?.done) {
-          setDone(prev => {
-            const merged = Array.from(new Set([...row.habits.done, ...prev]))
-            saveDone(t, merged)
-            return merged
-          })
-        }
-      })
+      .then((data: Habit[]) => { if (Array.isArray(data)) setHabits(data) })
       .catch(() => {})
+      .finally(() => setLoaded(true))
   }, [])
 
-  function toggle(id: string) {
+  async function toggle(h: Habit) {
     if (!today) return
-    setDone(prev => {
-      const next = prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]
-      saveDone(today, next)
-      clearTimeout(syncTimer.current)
-      syncTimer.current = setTimeout(() => syncToServer(today, next, habits.length), 400)
-      return next
-    })
+    const has = h.dates.includes(today)
+    const nextDates = has ? h.dates.filter(d => d !== today) : [...h.dates, today]
+    setHabits(prev => prev.map(x => x.id === h.id ? { ...x, dates: nextDates } : x))
+    try {
+      const res = await fetch(`/api/habits/${h.id}/toggle`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ date: today }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      setHabits(prev => prev.map(x => x.id === h.id ? { ...x, dates: h.dates } : x))
+    }
   }
 
-  function openEdit() {
-    setEditList(habits.map(h => ({ ...h })))
-    setNewLabel('')
-    setEditMode(true)
-  }
-
-  function saveEdit() {
-    const trimmed = editList.filter(h => h.label.trim())
-    setHabits(trimmed)
-    saveConfig(trimmed)
-    setEditMode(false)
-  }
-
-  function addHabit() {
-    const label = newLabel.trim()
-    if (!label || editList.length >= MAX_HABITS) return
-    setEditList(prev => [...prev, { id: `h_${Date.now()}`, label }])
-    setNewLabel('')
-  }
-
-  const count = done.filter(id => habits.some(h => h.id === id)).length
+  const count = habits.filter(h => h.dates.includes(today)).length
 
   return (
     <div className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-4">🔥 Hábitos</h2>
-          {!editMode && (
-            <span className="text-xs text-ink-3">
-              {count}/{habits.length} hoy
-            </span>
-          )}
-        </div>
-        {editMode ? (
-          <button
-            onClick={saveEdit}
-            className="rounded-lg bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/25"
-          >
-            Listo
-          </button>
-        ) : (
-          <button
-            onClick={openEdit}
-            className="rounded-lg p-1 text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4"
-            aria-label="Editar hábitos"
-          >
-            <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.5}>
-              <path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+      <div className="mb-4 flex items-center gap-3">
+        <h2 className="text-sm font-semibold tracking-wide text-ink-4">🔥 Hábitos</h2>
+        {loaded && habits.length > 0 && (
+          <span className="text-xs text-ink-3">{count}/{habits.length} hoy</span>
         )}
       </div>
 
-      {editMode ? (
-        <div className="space-y-2">
-          {editList.map(h => (
-            <div key={h.id} className="flex items-center gap-2">
-              <input
-                value={h.label}
-                onChange={e => setEditList(prev => prev.map(x => x.id === h.id ? { ...x, label: e.target.value } : x))}
-                className="flex-1 rounded-lg border border-ink-4/15 bg-ink-0/40 px-2.5 py-1.5 text-sm text-ink-4 outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20"
-              />
-              <button
-                onClick={() => setEditList(prev => prev.filter(x => x.id !== h.id))}
-                className="shrink-0 rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.5}>
-                  <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          ))}
-          {editList.length < MAX_HABITS && (
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                value={newLabel}
-                onChange={e => setNewLabel(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addHabit()}
-                placeholder="Nuevo hábito…"
-                className="flex-1 rounded-lg border border-dashed border-ink-4/20 bg-transparent px-2.5 py-1.5 text-sm text-ink-3 outline-none placeholder:text-ink-3/40 focus:border-accent/40"
-              />
-              <button
-                onClick={addHabit}
-                className="shrink-0 rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-accent/10 hover:text-accent"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.8}>
-                  <path d="M8 3v10M3 8h10" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          )}
-        </div>
+      {loaded && habits.length === 0 ? (
+        <p className="py-2 text-xs text-ink-3/70">Crea tus hábitos en la cara de Hábitos.</p>
       ) : (
         <>
-        <ul className="space-y-0.5">
-          {habits.map(h => {
-            const checked = done.includes(h.id)
-            return (
-              <li key={h.id}>
-                <button
-                  onClick={() => toggle(h.id)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-ink-4/5"
-                >
-                  <span
-                    className={[
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                      checked ? 'border-accent bg-accent' : 'border-ink-3/40 bg-transparent',
-                    ].join(' ')}
+          <ul className="space-y-0.5">
+            {habits.map(h => {
+              const checked = h.dates.includes(today)
+              return (
+                <li key={h.id}>
+                  <button
+                    onClick={() => toggle(h)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-ink-4/5"
                   >
-                    {checked && (
-                      <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5" stroke="currentColor" strokeWidth={1.8}>
-                        <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className={[
-                    'text-sm transition-colors',
-                    checked ? 'text-ink-3 line-through' : 'text-ink-4',
-                  ].join(' ')}>
-                    {h.label}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-ink-3/40 transition-colors"
+                      style={checked ? { backgroundColor: h.color, borderColor: h.color } : undefined}
+                    >
+                      {checked && (
+                        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-white" stroke="currentColor" strokeWidth={1.8}>
+                          <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="text-sm leading-none">{h.icon}</span>
+                    <span className={`text-sm transition-colors ${checked ? 'text-ink-3 line-through' : 'text-ink-4'}`}>{h.name}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
 
-        {/* Progress bar */}
-        <div className="mt-4">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-4/10">
-            <div
-              className="h-full rounded-full bg-accent transition-all duration-500"
-              style={{ width: habits.length > 0 ? `${(count / habits.length) * 100}%` : '0%' }}
-            />
+          <div className="mt-4">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-4/10">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-500"
+                style={{ width: habits.length > 0 ? `${(count / habits.length) * 100}%` : '0%' }}
+              />
+            </div>
           </div>
-        </div>
         </>
       )}
     </div>

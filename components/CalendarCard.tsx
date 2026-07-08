@@ -157,225 +157,168 @@ export default function CalendarCard() {
     ? (byDate.get(selected) ?? []).sort((a, b) => a.start.localeCompare(b.start))
     : []
 
-  const selectedLabel = selected
-    ? new Date(selected + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-    : ''
+  const selDate      = selected ? new Date(selected + 'T12:00:00') : null
+  const weekday      = selDate ? selDate.toLocaleDateString('es-MX', { weekday: 'long' }) : ''
+  const dayMonth     = selDate ? selDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : ''
+  const isTodaySel   = selected === todayKey
+  const selBday      = selDate ? isBirthday(selDate) : false
+  const showTodayBtn = viewYear !== today.getFullYear() || viewMonth !== today.getMonth()
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
+    <div className="rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card sm:p-8">
 
-      {/* Month nav */}
-      <div className="mb-4 flex items-center justify-between">
-        <button
-          onClick={prevMonth}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4"
-          aria-label="Mes anterior"
-        >
-          <svg viewBox="0 0 16 16" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={2}>
-            <path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-
-        <div className="flex flex-col items-center">
-          <h2 className="text-base font-semibold tracking-wide text-ink-4">
-            {MONTHS[viewMonth]} {viewYear}
-          </h2>
-          {(viewYear !== today.getFullYear() || viewMonth !== today.getMonth()) && (
+      {/* Header */}
+      <div className="mb-6 flex items-end justify-between">
+        <div className="flex items-baseline gap-2.5">
+          <h2 className="text-2xl font-bold tracking-tight text-ink-4">{MONTHS[viewMonth]}</h2>
+          <span className="text-lg font-light text-ink-3">{viewYear}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {showTodayBtn && (
             <button
               onClick={goToday}
-              className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-accent/70 transition-colors hover:text-accent"
+              className="rounded-full border border-ink-4/15 px-3 py-1.5 text-xs font-medium text-ink-3 transition-colors hover:border-accent/40 hover:text-accent"
             >
               Hoy
             </button>
           )}
+          <button onClick={prevMonth} aria-label="Mes anterior" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
+            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <button onClick={nextMonth} aria-label="Mes siguiente" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
+            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:gap-8">
+
+        {/* ── Month grid ─────────────────────────────────────────── */}
+        <div>
+          <div className="mb-2 grid grid-cols-7">
+            {DOW.map((d, i) => (
+              <div key={d} className={`text-center text-[11px] font-semibold uppercase tracking-wider ${i >= 5 ? 'text-ink-3/40' : 'text-ink-3/70'}`}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5">
+            {cells.map(({ date, isCurrentMonth }, idx) => {
+              const key        = localDateKey(date)
+              const isToday    = key === todayKey
+              const isSelected = key === selected
+              const isWeekend  = idx % 7 >= 5
+              const cellEvents = loading ? [] : (byDate.get(key) ?? [])
+              const bday       = isCurrentMonth && isBirthday(date)
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => { if (selected !== key) { setAddTitle(''); setAddTime(''); setAddError(null) } setSelected(key) }}
+                  className={`group relative flex min-h-[3.5rem] flex-col items-center gap-1 rounded-xl px-1 pt-1.5 pb-1 transition-all ${
+                    isSelected ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-ink-4/[0.06]'
+                  } ${!isCurrentMonth ? 'opacity-35' : ''}`}
+                >
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-sm tabular-nums transition-colors ${
+                      bday ? 'font-bold' :
+                      isToday ? 'bg-accent font-semibold text-white' :
+                      isSelected ? 'font-semibold text-accent' :
+                      isWeekend ? 'text-ink-3' : 'text-ink-4'
+                    }`}
+                    style={bday ? { background: '#f0b53a', color: '#3a2400', boxShadow: '0 0 0 1px #7a4e12, 0 0 0 2px #ffe08a' } : undefined}
+                    title={bday ? '¡Tu cumpleaños! 🎂' : undefined}
+                  >
+                    {date.getDate()}
+                  </span>
+
+                  {cellEvents.length > 0 && (
+                    <div className="flex items-center gap-[3px]">
+                      {cellEvents.slice(0, 4).map(ev => (
+                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-full" style={{ background: eventColor(ev.uid) }} />
+                      ))}
+                      {cellEvents.length > 4 && <span className="text-[9px] leading-none text-ink-3">+{cellEvents.length - 4}</span>}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        <button
-          onClick={nextMonth}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4"
-          aria-label="Mes siguiente"
-        >
-          <svg viewBox="0 0 16 16" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={2}>
-            <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      </div>
+        {/* ── Agenda for the selected day ────────────────────────── */}
+        <div className="lg:border-l lg:border-ink-4/10 lg:pl-8">
+          {!selected ? (
+            <div className="flex h-full min-h-[9rem] items-center justify-center text-center text-sm text-ink-3/50">
+              Elige un día para ver sus eventos
+            </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-accent/80">{isTodaySel ? 'Hoy' : weekday}</p>
+                <h3 className="text-xl font-semibold capitalize text-ink-4">{dayMonth}</h3>
+              </div>
 
-      {/* DOW headers */}
-      <div className="grid grid-cols-7 mb-0.5">
-        {DOW.map((d, i) => (
-          <div
-            key={d}
-            className={[
-              'py-1 text-center text-[10px] font-semibold uppercase tracking-widest',
-              i >= 5 ? 'text-accent/60' : 'text-ink-3/55',
-            ].join(' ')}
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Grid — 40px cells */}
-      <div className="grid grid-cols-7 gap-px">
-        {cells.map(({ date, isCurrentMonth }, idx) => {
-          const key        = localDateKey(date)
-          const isToday    = key === todayKey
-          const isSelected = key === selected
-          const colIdx     = idx % 7
-          const isWeekend  = colIdx >= 5
-          const cellEvents = byDate.get(key) ?? []
-          const hasEvents  = !loading && cellEvents.length > 0
-          const overflow   = cellEvents.length - 2
-          const bday       = isCurrentMonth && isBirthday(date)
-
-          return (
-            <button
-              key={key}
-              onClick={() => setSelected(prev => {
-                if (prev !== key) { setAddTitle(''); setAddTime(''); setAddError(null) }
-                return prev === key ? null : key
-              })}
-              style={{
-                minHeight: 40,
-                opacity: isCurrentMonth ? 1 : 0.32,
-                background: isSelected
-                  ? 'rgba(120,100,220,0.08)'
-                  : isWeekend
-                    ? 'rgba(255,255,255,0.015)'
-                    : 'transparent',
-              }}
-              className="relative flex flex-col items-center rounded-lg pt-1 pb-0.5 px-0.5 transition-colors hover:bg-ink-4/5"
-            >
-              {bday && (
-                <svg
-                  aria-hidden
-                  viewBox="0 0 7 7"
-                  className="pointer-events-none absolute right-0.5 top-0 h-3.5 w-3.5"
-                  style={{ shapeRendering: 'crispEdges', imageRendering: 'pixelated', animation: 'bday-twinkle 1.2s steps(3, jump-none) alternate infinite' }}
-                >
-                  <rect x="3" y="0" width="1" height="7" fill="#ffd76a" />
-                  <rect x="0" y="3" width="7" height="1" fill="#ffd76a" />
-                  <rect x="2" y="2" width="3" height="3" fill="#fff2c4" />
-                  <rect x="3" y="3" width="1" height="1" fill="#ffffff" />
-                </svg>
-              )}
-
-              <span
-                className={[
-                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums',
-                  bday ? 'font-bold' : '',
-                  !bday && isToday   ? 'bg-accent text-white font-bold' : '',
-                  !bday && !isToday && isCurrentMonth  ? 'text-ink-4 font-medium' : '',
-                  !bday && !isToday && !isCurrentMonth ? 'text-ink-3' : '',
-                ].join(' ')}
-                style={bday ? {
-                  background: '#f0b53a',
-                  color: '#3a2400',
-                  boxShadow: '0 0 0 1px #7a4e12, 0 0 0 2px #ffe08a',
-                } : undefined}
-                title={bday ? '¡Tu cumpleaños! 🎂' : undefined}
-              >
-                {date.getDate()}
-              </span>
-
-              {hasEvents && (
-                <div className="mt-0.5 w-full flex flex-col gap-px px-0.5">
-                  {cellEvents.slice(0, 2).map(ev => (
-                    <div
-                      key={ev.uid}
-                      className="truncate rounded-sm px-1 text-white"
-                      style={{ background: eventColor(ev.uid), opacity: 0.88, fontSize: 8, lineHeight: '1.5' }}
-                    >
-                      {ev.title}
-                    </div>
-                  ))}
-                  {overflow > 0 && (
-                    <span className="text-center text-ink-3" style={{ fontSize: 8 }}>+{overflow}</span>
-                  )}
+              {selBday && (
+                <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2.5 text-[12px] font-medium text-amber-200/90">
+                  <span className="text-base">🎂</span>
+                  <span>¡Feliz vuelta al sol, Matti! Que sea un gran año, Leo 🦁</span>
                 </div>
               )}
-            </button>
-          )
-        })}
-      </div>
 
-      {/* Day detail panel */}
-      {selected && (
-        <div className="mt-3 rounded-xl border border-ink-4/10 bg-ink-0/40 p-3 backdrop-blur">
-          {/* Header */}
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold capitalize text-ink-4">{selectedLabel}</span>
-            <button
-              onClick={() => setSelected(null)}
-              className="flex h-5 w-5 items-center justify-center rounded text-ink-3 hover:text-ink-4"
-              aria-label="Cerrar"
-            >
-              <svg viewBox="0 0 14 14" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={2}>
-                <path d="M2 2l10 10M12 2L2 12" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
+              {loading ? (
+                <p className="animate-pulse py-4 text-sm text-ink-3">Cargando…</p>
+              ) : fetchError ? (
+                <p className="py-4 text-sm text-red-400">⚠ {fetchError}</p>
+              ) : dayEvents.length === 0 ? (
+                <p className="py-4 text-sm italic text-ink-3/50">Sin eventos este día</p>
+              ) : (
+                <ul className="space-y-2">
+                  {dayEvents.map(ev => (
+                    <li key={ev.uid} className="flex items-stretch gap-3 rounded-xl bg-ink-0/40 px-3 py-2.5">
+                      <span className="w-1 shrink-0 rounded-full" style={{ background: eventColor(ev.uid) }} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium leading-snug text-ink-4">{ev.title}</p>
+                        <p className="mt-0.5 text-xs text-ink-3">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-          {selected && isBirthday(new Date(selected + 'T12:00:00')) && (
-            <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-300/25 bg-amber-300/10 px-2.5 py-2 text-[11px] font-medium text-amber-200/90">
-              <span className="text-sm">🎂</span>
-              <span>¡Feliz vuelta al sol, Matti! Que sea un gran año, Leo 🦁</span>
-            </div>
+              {/* Quick-add */}
+              <form onSubmit={handleAddEvent} className="mt-4 space-y-2 border-t border-ink-4/10 pt-4">
+                <input
+                  type="text"
+                  value={addTitle}
+                  onChange={e => setAddTitle(e.target.value)}
+                  placeholder="Nuevo evento…"
+                  disabled={adding}
+                  className="w-full rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="time"
+                    value={addTime}
+                    onChange={e => setAddTime(e.target.value)}
+                    disabled={adding}
+                    className="flex-1 rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 outline-none transition-colors focus:border-accent/50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={adding || !addTitle.trim()}
+                    className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    Agregar
+                  </button>
+                </div>
+                {addError && <p className="text-xs text-red-400">{addError}</p>}
+              </form>
+            </>
           )}
-
-          {/* Events list */}
-          {loading ? (
-            <p className="animate-pulse text-xs text-ink-3">Cargando…</p>
-          ) : fetchError ? (
-            <p className="text-xs text-red-400">⚠ {fetchError}</p>
-          ) : dayEvents.length === 0 ? (
-            <p className="mb-2 text-xs italic text-ink-3/50">Sin eventos</p>
-          ) : (
-            <ul className="mb-2 space-y-1.5">
-              {dayEvents.map(ev => (
-                <li key={ev.uid} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 shrink-0 rounded-sm" style={{ width: 3, height: 26, background: eventColor(ev.uid) }} />
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-medium text-ink-4">{ev.title}</div>
-                    <div className="text-[10px] text-ink-3">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* Quick-add form */}
-          <form onSubmit={handleAddEvent} className="mt-2 flex items-center gap-1.5 border-t border-ink-4/10 pt-2">
-            <input
-              type="text"
-              value={addTitle}
-              onChange={e => setAddTitle(e.target.value)}
-              placeholder="Agregar evento..."
-              disabled={adding}
-              className="min-w-0 flex-1 rounded border border-ink-4/20 bg-ink-0/60 px-2 py-1 text-xs text-ink-4 placeholder-ink-3/50 outline-none focus:border-accent/50"
-            />
-            <input
-              type="time"
-              value={addTime}
-              onChange={e => setAddTime(e.target.value)}
-              disabled={adding}
-              className="w-[104px] shrink-0 rounded border border-ink-4/20 bg-ink-0/60 px-1.5 py-1 text-xs text-ink-4 outline-none focus:border-accent/50"
-            />
-            <button
-              type="submit"
-              disabled={adding || !addTitle.trim()}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-accent/80 text-white transition-opacity hover:bg-accent disabled:opacity-40"
-              aria-label="Agregar"
-            >
-              <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={2}>
-                <path d="M6 2v8M2 6h8" strokeLinecap="round" />
-              </svg>
-            </button>
-          </form>
-          {addError && <p className="mt-1 text-[10px] text-red-400">{addError}</p>}
         </div>
-      )}
+      </div>
     </div>
   )
 }
