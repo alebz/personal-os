@@ -281,7 +281,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         style={{
           position: 'fixed', top: 26, right: 28, zIndex: 10002,
           transform: settingsOpen ? 'rotate(45deg)' : 'rotate(0deg)',
-          fontSize: 20, lineHeight: 1,
+          fontSize: 24, lineHeight: 1,
           opacity: settingsOpen ? 1 : 0.55,
           transition: 'opacity 200ms ease, transform 300ms ease',
           color: 'var(--color-ink-3)', background: 'none', border: 'none',

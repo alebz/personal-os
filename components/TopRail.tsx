@@ -78,7 +78,7 @@ export default function TopRail() {
             title="Ajustes del sistema"
             style={{
               order:      -1,
-              fontSize:   18,
+              fontSize:   22,
               lineHeight: 1,
               opacity:    settingsOpen ? 1 : 0.45,
               transition: 'opacity 200ms ease, transform 300ms ease',
