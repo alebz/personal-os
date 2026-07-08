@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import CalendarCard from '@/components/CalendarCard'
 import Clock from '@/components/Clock'
+import { dayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ function Hero() {
       </button>
 
       <div className="py-4">
-        <Clock scale={1.8} />
+        <Clock scale={1.8} color={dayColor(new Date())} />
       </div>
 
       {quote && (

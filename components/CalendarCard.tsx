@@ -2,20 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import type { CalEvent } from '@/app/api/calendar/route'
+import { WEEKDAY_RAINBOW, dayColor } from '@/lib/weekdayColors'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const EVENT_COLORS = ['#7c6ef0', '#e05c7e', '#2db87a', '#e08c3a', '#3ab8d4']
-// Events captured inside the OS (quick-add) render in a single accent hue so they
-// stand out from read-only iCal events, which keep a stable per-uid colour.
-const CAPTURED_COLOR = '#8b7bff'
-
-function eventColor(uid: string): string {
-  if (uid.startsWith('captured:')) return CAPTURED_COLOR
-  let h = 0
-  for (let i = 0; i < uid.length; i++) h = ((h << 5) - h + uid.charCodeAt(i)) | 0
-  return EVENT_COLORS[Math.abs(h) % EVENT_COLORS.length]
-}
 
 // ── Birthday easter egg ─────────────────────────────────────────────────────
 // Matti — 28 July, a Leo. His own turn around the sun gets gold + a sparkle.
@@ -67,6 +56,87 @@ const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+// Relative day label for the Up-next carousel: "Hoy", "Mañana", the weekday, or "12 jul".
+function relativeLabel(startISO: string, allDay: boolean, base: Date): string {
+  const key  = allDay ? startISO.slice(0, 10) : localDateKey(new Date(startISO))
+  const ev   = new Date(key + 'T12:00:00')
+  const t0   = new Date(base.getFullYear(), base.getMonth(), base.getDate())
+  const diff = Math.round((ev.getTime() - t0.getTime()) / 86_400_000)
+  if (diff <= 0)  return 'Hoy'
+  if (diff === 1) return 'Mañana'
+  if (diff < 7)   return ev.toLocaleDateString('es-MX', { weekday: 'long' })
+  return ev.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
+}
+
+// ── Up next ─────────────────────────────────────────────────────────────────
+// A gentle auto-advancing carousel of the next 3 events. Pauses on hover; dots take the
+// current event's colour so it feels alive without being noisy.
+function weekdayColor(startISO: string, allDay: boolean): string {
+  const key = allDay ? startISO.slice(0, 10) : localDateKey(new Date(startISO))
+  return dayColor(new Date(key + 'T12:00:00'))
+}
+
+function UpNext({ events, today }: { events: CalEvent[]; today: Date }) {
+  const items = events.slice(0, 3)
+  const [idx, setIdx]       = useState(0)
+  const [paused, setPaused] = useState(false)
+
+  useEffect(() => { setIdx(0) }, [events])
+
+  useEffect(() => {
+    if (paused || items.length <= 1) return
+    const t = setInterval(() => setIdx(i => (i + 1) % items.length), 4500)
+    return () => clearInterval(t)
+  }, [paused, items.length])
+
+  const ev    = items[idx] ?? items[0]
+  const color = ev ? weekdayColor(ev.start, ev.allDay) : '#8b7bff'
+
+  return (
+    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <style>{`@keyframes upnext-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}`}</style>
+      <p className="mb-3.5 text-[11px] font-semibold uppercase tracking-widest text-ink-3/70">Próximos</p>
+
+      {!ev ? (
+        <div className="flex min-h-[6rem] items-center rounded-2xl border border-ink-4/10 bg-ink-0/30 px-4 text-sm italic text-ink-3/50">
+          Nada próximo en el horizonte
+        </div>
+      ) : (
+        <>
+          <div
+            className="relative rounded-2xl border border-ink-4/10 bg-ink-0/40 p-4"
+            style={{ minHeight: '6rem', boxShadow: `0 0 10px ${color}59` }}
+          >
+            <div key={idx} style={{ animation: 'upnext-in .45s ease' }}>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="rounded-full px-2.5 py-1 text-xs font-semibold capitalize" style={{ background: color + '22', color }}>
+                  {relativeLabel(ev.start, ev.allDay, today)}
+                </span>
+                <span className="text-xs text-ink-3">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</span>
+              </div>
+              <p className="line-clamp-2 text-base font-semibold leading-snug text-ink-4">{ev.title}</p>
+            </div>
+          </div>
+
+          {items.length > 1 && (
+            <div className="mt-2.5 flex items-center gap-1.5">
+              {items.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  aria-label={`Evento ${i + 1}`}
+                  className="h-1.5 rounded-full transition-all"
+                  style={{ width: i === idx ? 18 : 6, background: i === idx ? color : 'rgba(255,255,255,0.2)' }}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function CalendarCard() {
   const today    = new Date()
   const todayKey = localDateKey(today)
@@ -77,12 +147,17 @@ export default function CalendarCard() {
   const [events,     setEvents]     = useState<CalEvent[]>([])
   const [loading,    setLoading]    = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [upcoming,   setUpcoming]   = useState<CalEvent[]>([])
 
-  // Quick-add state
-  const [addTitle, setAddTitle] = useState('')
-  const [addTime,  setAddTime]  = useState('')
-  const [adding,   setAdding]   = useState(false)
-  const [addError, setAddError] = useState<string | null>(null)
+  // Add / edit form state (editingUid = a captured event's uid when editing, else null = create)
+  const [addTitle,   setAddTitle]   = useState('')
+  const [addDate,    setAddDate]    = useState(todayKey)
+  const [addTime,    setAddTime]    = useState('')
+  const [addNote,    setAddNote]    = useState('')
+  const [editingUid, setEditingUid] = useState<string | null>(null)
+  const [adding,     setAdding]     = useState(false)
+  const [addError,   setAddError]   = useState<string | null>(null)
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)
 
   function rangeForView(year: number, month: number): { from: string; to: string } {
     const gridCells = buildGridCells(year, month)
@@ -104,6 +179,29 @@ export default function CalendarCard() {
       .catch(e => setFetchError(String(e)))
       .finally(() => setLoading(false))
   }
+
+  // Upcoming events for the "Próximos" carousel — anchored to today, independent of the browsed month.
+  function fetchUpcoming() {
+    const end = new Date(today); end.setDate(end.getDate() + 90)
+    fetch(`/api/calendar?from=${todayKey}&to=${localDateKey(end)}`)
+      .then(r => r.json())
+      .then((data: CalEvent[] | { error: string }) => {
+        if (!Array.isArray(data)) return
+        const now = Date.now()
+        const up = data
+          .filter(ev => {
+            const dayKey = ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start))
+            if (dayKey > todayKey) return true
+            if (dayKey < todayKey) return false
+            return ev.allDay || new Date(ev.start).getTime() >= now
+          })
+          .sort((a, b) => a.start.localeCompare(b.start))
+        setUpcoming(up)
+      })
+      .catch(() => {})
+  }
+
+  useEffect(() => { fetchUpcoming() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refetch whenever the visible month changes (also covers initial mount).
   useEffect(() => {
@@ -129,26 +227,65 @@ export default function CalendarCard() {
     setSelected(todayKey)
   }
 
+  function resetForm() {
+    setAddTitle(''); setAddTime(''); setAddNote(''); setEditingUid(null); setAddError(null)
+    setAddDate(selected ?? todayKey)
+  }
+
+  // Only captured events (created inside the OS) are editable/deletable. iCal events are read-only.
+  function isEditable(ev: CalEvent): boolean {
+    return ev.uid.startsWith('captured:')
+  }
+
+  function startEdit(ev: CalEvent) {
+    setEditingUid(ev.uid)
+    setAddTitle(ev.title)
+    setAddDate(ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start)))
+    setAddTime(ev.allDay ? '' : formatTime(ev.start))
+    setAddNote(ev.note ?? '')
+    setAddError(null); setConfirmDel(null)
+  }
+
   async function handleAddEvent(e: React.FormEvent) {
     e.preventDefault()
-    if (!addTitle.trim() || !selected) return
+    const date = addDate
+    if (!addTitle.trim() || !date) return
     setAdding(true); setAddError(null)
     try {
-      const res = await fetch('/api/calendar', {
-        method: 'POST',
+      const editingId = editingUid?.startsWith('captured:') ? editingUid.slice('captured:'.length) : null
+      const payload = { title: addTitle, event_date: date, event_time: addTime || undefined, note: addNote || undefined }
+      const res = await fetch(editingId ? `/api/calendar/${editingId}` : '/api/calendar', {
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: addTitle, event_date: selected, event_time: addTime || undefined }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok || data.error) { setAddError(data.error ?? 'Error'); return }
-      setAddTitle(''); setAddTime('')
-      setLoading(true)
-      await fetchEvents()
+      resetForm()
+      // Jump to wherever the event landed (may be another month if the date was changed).
+      const d = new Date(date + 'T12:00:00')
+      const monthChanged = d.getFullYear() !== viewYear || d.getMonth() !== viewMonth
+      if (monthChanged) { setViewYear(d.getFullYear()); setViewMonth(d.getMonth()) }
+      setSelected(date)
+      if (!monthChanged) { setLoading(true); await fetchEvents() }   // month change refetches via effect
+      fetchUpcoming()
     } catch (err) {
       setAddError(String(err))
     } finally {
       setAdding(false)
     }
+  }
+
+  async function deleteEvent(ev: CalEvent) {
+    if (!isEditable(ev)) return
+    const idPart = ev.uid.slice('captured:'.length)
+    setConfirmDel(null)
+    setEvents(prev => prev.filter(x => x.uid !== ev.uid))       // optimistic
+    setUpcoming(prev => prev.filter(x => x.uid !== ev.uid))
+    if (editingUid === ev.uid) resetForm()
+    try { await fetch(`/api/calendar/${idPart}`, { method: 'DELETE' }) } catch { /* refetch reconciles */ }
+    await fetchEvents()
+    fetchUpcoming()
   }
 
   const byDate    = groupByDate(events)
@@ -158,6 +295,7 @@ export default function CalendarCard() {
     : []
 
   const selDate      = selected ? new Date(selected + 'T12:00:00') : null
+  const selColor     = selDate ? dayColor(selDate) : '#8b7bff'
   const weekday      = selDate ? selDate.toLocaleDateString('es-MX', { weekday: 'long' }) : ''
   const dayMonth     = selDate ? selDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : ''
   const isTodaySel   = selected === todayKey
@@ -197,7 +335,11 @@ export default function CalendarCard() {
         <div>
           <div className="mb-2 grid grid-cols-7">
             {DOW.map((d, i) => (
-              <div key={d} className={`text-center text-[11px] font-semibold uppercase tracking-wider ${i >= 5 ? 'text-ink-3/40' : 'text-ink-3/70'}`}>
+              <div
+                key={d}
+                className="text-center text-[11px] font-semibold uppercase tracking-wider"
+                style={{ color: WEEKDAY_RAINBOW[i] + 'cc' }}
+              >
                 {d}
               </div>
             ))}
@@ -215,7 +357,7 @@ export default function CalendarCard() {
               return (
                 <button
                   key={key}
-                  onClick={() => { if (selected !== key) { setAddTitle(''); setAddTime(''); setAddError(null) } setSelected(key) }}
+                  onClick={() => { if (selected !== key) { resetForm(); setAddDate(key) } setSelected(key) }}
                   className={`group relative flex min-h-[3.5rem] flex-col items-center gap-1 rounded-xl px-1 pt-1.5 pb-1 transition-all ${
                     isSelected ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-ink-4/[0.06]'
                   } ${!isCurrentMonth ? 'opacity-35' : ''}`}
@@ -236,7 +378,7 @@ export default function CalendarCard() {
                   {cellEvents.length > 0 && (
                     <div className="flex items-center gap-[3px]">
                       {cellEvents.slice(0, 4).map(ev => (
-                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-full" style={{ background: eventColor(ev.uid) }} />
+                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-full" style={{ background: dayColor(date) }} />
                       ))}
                       {cellEvents.length > 4 && <span className="text-[9px] leading-none text-ink-3">+{cellEvents.length - 4}</span>}
                     </div>
@@ -248,7 +390,10 @@ export default function CalendarCard() {
         </div>
 
         {/* ── Agenda for the selected day ────────────────────────── */}
-        <div className="lg:border-l lg:border-ink-4/10 lg:pl-8">
+        <div className="flex flex-col gap-6 lg:border-l lg:border-ink-4/10 lg:pl-8">
+          <UpNext events={upcoming} today={today} />
+
+          <div className="lg:border-t lg:border-ink-4/10 lg:pt-6">
           {!selected ? (
             <div className="flex h-full min-h-[9rem] items-center justify-center text-center text-sm text-ink-3/50">
               Elige un día para ver sus eventos
@@ -256,7 +401,7 @@ export default function CalendarCard() {
           ) : (
             <>
               <div className="mb-4">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-accent/80">{isTodaySel ? 'Hoy' : weekday}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: selColor }}>{isTodaySel ? 'Hoy' : weekday}</p>
                 <h3 className="text-xl font-semibold capitalize text-ink-4">{dayMonth}</h3>
               </div>
 
@@ -276,47 +421,86 @@ export default function CalendarCard() {
               ) : (
                 <ul className="space-y-2">
                   {dayEvents.map(ev => (
-                    <li key={ev.uid} className="flex items-stretch gap-3 rounded-xl bg-ink-0/40 px-3 py-2.5">
-                      <span className="w-1 shrink-0 rounded-full" style={{ background: eventColor(ev.uid) }} />
+                    <li key={ev.uid} className={`group flex items-stretch gap-3 rounded-xl px-3 py-2.5 transition-colors ${editingUid === ev.uid ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-ink-0/40'}`}>
+                      <span className="w-1 shrink-0 rounded-full" style={{ background: selColor }} />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium leading-snug text-ink-4">{ev.title}</p>
                         <p className="mt-0.5 text-xs text-ink-3">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</p>
+                        {ev.note && <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-ink-3/80">{ev.note}</p>}
                       </div>
+
+                      {isEditable(ev) && (confirmDel === ev.uid ? (
+                        <div className="flex shrink-0 items-center gap-1 self-start">
+                          <button type="button" onClick={() => deleteEvent(ev)} className="rounded-lg px-2 py-1 text-[11px] font-medium text-red-400 hover:bg-red-400/10">Borrar</button>
+                          <button type="button" onClick={() => setConfirmDel(null)} className="rounded-lg px-2 py-1 text-[11px] text-ink-3 hover:text-ink-4">No</button>
+                        </div>
+                      ) : (
+                        <div className="flex shrink-0 items-start gap-0.5 text-ink-3/50 opacity-60 transition-opacity group-hover:opacity-100">
+                          <button type="button" onClick={() => startEdit(ev)} aria-label="Editar" className="rounded-lg p-1.5 hover:bg-ink-4/10 hover:text-ink-4">
+                            <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.6}><path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+                          <button type="button" onClick={() => setConfirmDel(ev.uid)} aria-label="Borrar" className="rounded-lg p-1.5 hover:bg-red-400/10 hover:text-red-400">
+                            <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.6}><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5l.5-9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+                        </div>
+                      ))}
                     </li>
                   ))}
                 </ul>
               )}
 
-              {/* Quick-add */}
+              {/* Add / edit form */}
               <form onSubmit={handleAddEvent} className="mt-4 space-y-2 border-t border-ink-4/10 pt-4">
+                {editingUid && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">Editando</span>
+                    <button type="button" onClick={resetForm} className="text-[11px] text-ink-3 transition-colors hover:text-ink-4">Cancelar</button>
+                  </div>
+                )}
                 <input
                   type="text"
                   value={addTitle}
                   onChange={e => setAddTitle(e.target.value)}
-                  placeholder="Nuevo evento…"
+                  placeholder={editingUid ? 'Título del evento' : 'Nuevo evento…'}
                   disabled={adding}
                   className="w-full rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
                 />
+                <textarea
+                  value={addNote}
+                  onChange={e => setAddNote(e.target.value)}
+                  placeholder="Nota (opcional)…"
+                  disabled={adding}
+                  rows={2}
+                  className="w-full resize-none rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
+                />
                 <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={addDate}
+                    onChange={e => setAddDate(e.target.value)}
+                    disabled={adding}
+                    className="flex-1 rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
+                  />
                   <input
                     type="time"
                     value={addTime}
                     onChange={e => setAddTime(e.target.value)}
                     disabled={adding}
-                    className="flex-1 rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 outline-none transition-colors focus:border-accent/50"
+                    className="flex-1 rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
                   />
-                  <button
-                    type="submit"
-                    disabled={adding || !addTitle.trim()}
-                    className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    Agregar
-                  </button>
                 </div>
+                <button
+                  type="submit"
+                  disabled={adding || !addTitle.trim()}
+                  className="w-full rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  {adding ? '…' : editingUid ? 'Guardar' : 'Agregar'}
+                </button>
                 {addError && <p className="text-xs text-red-400">{addError}</p>}
               </form>
             </>
           )}
+          </div>
         </div>
       </div>
     </div>

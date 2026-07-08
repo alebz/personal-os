@@ -14,11 +14,14 @@ export interface CalEvent {
   start:  string
   end:    string
   allDay: boolean
+  note?:  string   // optional free-text note (captured events only)
 }
 
-// ── Module-level cache (5 min TTL, keyed by range) ───────────────────────────
+// ── iCal cache (5 min TTL, keyed by range) ───────────────────────────────────
+// Only the slow external iCal fetch is cached. Captured events are a fast Supabase query and are
+// always fetched fresh, so create/edit/delete reflect immediately with no cache to bust.
 
-const _cache = new Map<string, { events: CalEvent[]; ts: number }>()
+const _icalCache = new Map<string, { events: CalEvent[]; ts: number }>()
 const CACHE_TTL = 5 * 60 * 1000
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -113,7 +116,7 @@ async function fetchCapturedEvents(fromStr: string, toStr: string): Promise<CalE
     if (!data?.length) return []
 
     return data.flatMap((row): CalEvent[] => {
-      const meta = (row.metadata ?? {}) as { event_date?: string; event_time?: string }
+      const meta = (row.metadata ?? {}) as { event_date?: string; event_time?: string; note?: string }
       const event_date = meta.event_date
       const event_time = meta.event_time
       if (!event_date) return []
@@ -130,6 +133,7 @@ async function fetchCapturedEvents(fromStr: string, toStr: string): Promise<CalE
         start,
         end:    endDate,
         allDay: !event_time,
+        ...(meta.note ? { note: meta.note } : {}),
       }]
     })
   } catch {
@@ -137,11 +141,26 @@ async function fetchCapturedEvents(fromStr: string, toStr: string): Promise<CalE
   }
 }
 
+async function getIcalCached(fromStr: string, toStr: string): Promise<CalEvent[]> {
+  const key = `${fromStr}|${toStr}`
+  const hit = _icalCache.get(key)
+  if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.events
+
+  // iCal parser wants Date bounds. winEnd is exclusive, so +1 day on `to` includes the `to` day.
+  const winStartDate = new Date(`${fromStr}T00:00:00Z`)
+  const winEndDate   = new Date(`${toStr}T00:00:00Z`)
+  winEndDate.setUTCDate(winEndDate.getUTCDate() + 1)
+
+  const events = await fetchAndParse(winStartDate, winEndDate).catch(() => [] as CalEvent[])
+  _icalCache.set(key, { events, ts: Date.now() })
+  return events
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, event_date, event_time } = await req.json()
+    const { title, event_date, event_time, note } = await req.json()
     if (!title?.trim() || !event_date) {
       return NextResponse.json({ error: 'title and event_date required' }, { status: 400 })
     }
@@ -151,10 +170,13 @@ export async function POST(req: NextRequest) {
       kind: 'event',
       status: 'todo',
       urgency: 'someday',
-      metadata: { event_date, ...(event_time ? { event_time } : {}) },
+      metadata: {
+        event_date,
+        ...(event_time ? { event_time } : {}),
+        ...(note?.trim() ? { note: note.trim() } : {}),
+      },
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    _cache.clear()  // bust cache so next GET reflects the new event
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -162,8 +184,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const now = Date.now()
-
   // Range comes from the visible month grid: ?from=YYYY-MM-DD&to=YYYY-MM-DD
   // Fallback (no params): today → +31 days.
   const { searchParams } = new URL(req.url)
@@ -173,25 +193,12 @@ export async function GET(req: NextRequest) {
   const toStr = searchParams.get('to')
     ?? (() => { const d = new Date(); d.setUTCDate(d.getUTCDate() + 31); return d.toISOString().slice(0, 10) })()
 
-  const cacheKey = `${fromStr}|${toStr}`
-  const hit = _cache.get(cacheKey)
-  if (hit && now - hit.ts < CACHE_TTL) {
-    return NextResponse.json(hit.events, { headers: { 'Cache-Control': 'no-store' } })
-  }
-
-  // iCal parser wants Date bounds. winEnd is exclusive, so +1 day on `to`
-  // makes the `to` day itself fully included.
-  const winStartDate = new Date(`${fromStr}T00:00:00Z`)
-  const winEndDate   = new Date(`${toStr}T00:00:00Z`)
-  winEndDate.setUTCDate(winEndDate.getUTCDate() + 1)
-
   try {
     const [icalEvents, capturedEvents] = await Promise.all([
-      fetchAndParse(winStartDate, winEndDate).catch(() => [] as CalEvent[]),
+      getIcalCached(fromStr, toStr),
       fetchCapturedEvents(fromStr, toStr),
     ])
     const events = [...icalEvents, ...capturedEvents].sort((a, b) => a.start.localeCompare(b.start))
-    _cache.set(cacheKey, { events, ts: now })
     return NextResponse.json(events, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     console.error('[calendar] error:', err)
