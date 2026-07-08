@@ -38,7 +38,7 @@ function Hero() {
 
 export default function InicioContent() {
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-5 px-6 pb-8 pt-6 -mt-[60px]">
+    <main className="mx-auto flex min-h-full max-w-6xl flex-col justify-center gap-5 px-6 py-8">
       <Hero />
       <CalendarCard />
     </main>
