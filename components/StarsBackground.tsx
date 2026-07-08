@@ -1389,45 +1389,47 @@ function ScoreHUD({ ships, tourney }: {
   const [left, right] = tourney.contenders
   const AMBER = '#f2c744'
 
-  // One contender column: big pixel flag over its name, with a giant live ship-count beneath.
-  const Side = ({ f, align }: { f: WarFleet; align: 'left' | 'right' }) => {
+  // One contender ROW: flag + name on the left, big live ship-count on the right.
+  const Side = ({ f }: { f: WarFleet }) => {
     const m = FLEET_META[f]; const em = EMBLEMS[f]; const n = ships[f]?.alive ?? 0
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: align === 'left' ? 'flex-start' : 'flex-end', gap: 3 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexDirection: align === 'left' ? 'row' : 'row-reverse' }}>
-          <div style={{ width: 26, height: 26, flex: 'none', imageRendering: 'pixelated' }}><FleetEmblem grid={em.grid} pal={em.pal} size={26} /></div>
-          <span style={{ fontFamily: "'Silkscreen'", fontSize: 9, letterSpacing: '1px', color: m.cm, textShadow: `0 0 6px ${m.cm}88` }}>{m.name}</span>
-        </div>
-        <span style={{ fontFamily: "'Silkscreen'", fontSize: 30, lineHeight: 1, color: '#fff', textShadow: `0 0 8px ${m.cm}, 2px 2px 0 ${m.cm}55` }}>{String(n).padStart(2, '0')}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, width: 132 }}>
+        <div style={{ width: 20, height: 20, flex: 'none', imageRendering: 'pixelated' }}><FleetEmblem grid={em.grid} pal={em.pal} size={20} /></div>
+        <span style={{ fontFamily: "'Silkscreen'", fontSize: 8, letterSpacing: '1px', color: m.cm, textShadow: `0 0 6px ${m.cm}88`, flex: 1 }}>{m.name}</span>
+        <span style={{ fontFamily: "'Silkscreen'", fontSize: 22, lineHeight: 1, color: '#fff' }}>{String(n).padStart(2, '0')}</span>
       </div>
     )
   }
 
-  // Centre column changes with the phase: VS during a match, WINS on resolve, countdown in peace.
+  // Centre divider changes with the phase: VS during a match, WINS on resolve, countdown in peace.
   const centre = () => {
     if (tourney.phase === 'peace') {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <span style={{ fontFamily: "'Silkscreen'", fontSize: 7, letterSpacing: '2px', color: AMBER, textShadow: `0 0 6px ${AMBER}99` }}>BATTLE IN</span>
-          <span style={{ fontFamily: "'Silkscreen'", fontSize: 24, lineHeight: 1, color: '#fff', textShadow: `0 0 10px ${AMBER}` }}>{tourney.countdown}s</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, whiteSpace: 'nowrap' }}>
+          <span style={{ fontFamily: "'Silkscreen'", fontSize: 6.5, letterSpacing: '2px', color: AMBER, textShadow: `0 0 6px ${AMBER}99` }}>BATTLE IN</span>
+          <span style={{ fontFamily: "'Silkscreen'", fontSize: 13, lineHeight: 1, color: '#fff' }}>{tourney.countdown}s</span>
         </div>
       )
     }
     if (tourney.winner) {
       const wm = FLEET_META[tourney.winner]
       return (
-        <span style={{ fontFamily: "'Silkscreen'", fontSize: 9, letterSpacing: '1px', color: wm.ca, textShadow: `0 0 8px ${wm.cm}`, animation: 'blink 1s steps(1) infinite', whiteSpace: 'nowrap' }}>{wm.name} WINS!</span>
+        <span style={{ fontFamily: "'Silkscreen'", fontSize: 8, letterSpacing: '1px', color: wm.ca, textShadow: `0 0 8px ${wm.cm}`, animation: 'blink 1s steps(1) infinite', whiteSpace: 'nowrap' }}>{wm.name} WINS!</span>
       )
     }
-    return <span style={{ fontFamily: "'Silkscreen'", fontSize: 13, color: AMBER, textShadow: `0 0 8px ${AMBER}aa` }}>VS</span>
+    return <span style={{ fontFamily: "'Silkscreen'", fontSize: 10, color: AMBER, textShadow: `0 0 8px ${AMBER}aa` }}>VS</span>
   }
 
   return createPortal(
-    <div style={{ position: 'fixed', top: 14, left: 16, zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {left && <Side f={left} align="left" />}
-        <div style={{ minWidth: 58, display: 'flex', justifyContent: 'center', alignItems: 'center', paddingTop: 4 }}>{centre()}</div>
-        {right && <Side f={right} align="right" />}
+    <div style={{ position: 'fixed', top: '50%', left: 60, transform: 'translateY(-50%)', zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+        {left && <Side f={left} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, height: 1, background: `${AMBER}44` }} />
+          {centre()}
+          <div style={{ flex: 1, height: 1, background: `${AMBER}44` }} />
+        </div>
+        {right && <Side f={right} />}
       </div>
     </div>,
     document.body,
@@ -3174,7 +3176,7 @@ function SpaceSim() {
         // old code lacked: keep personal space on the cruise (bank away from a crowding neighbour and
         // feather the throttle instead of only shoving at the last px), and brake into hard turns and
         // when closing on whatever it's aiming at. Skippable for ships that have left the fight.
-        const flying = agent.state !== 'dying' && agent.state !== 'regrouping'
+        const flying = agent.state !== 'regrouping'
         if (flying) {
           const cx = agent.x + 24, cy = agent.y + 24
           // Nearest same-space neighbour (any fleet) inside personal space
