@@ -311,7 +311,7 @@ const PILOT: Record<AgentFleetType, {
 // Formation slot offsets in ship-local frame (x = forward/back, y = lateral). Slot 0 = leader.
 // Shape + spacing come from the family; the number of slots grows with the fleet size.
 function formationSlots(count: number, shape: FlightShape, spacing: number): { x: number; y: number }[] {
-  const S = 78 * spacing   // slot pitch — wide, clear gaps between ships (space is vital; > SEP_RADIUS so formations hold)
+  const S = 104 * spacing   // slot pitch — WIDE, clear gaps (space is vital; wings must never crowd each other)
   const slots: { x: number; y: number }[] = [{ x: 0, y: 0 }]
   for (let i = 1; i < count; i++) {
     const side = i % 2 === 1 ? 1 : -1
@@ -319,11 +319,11 @@ function formationSlots(count: number, shape: FlightShape, spacing: number): { x
     if (shape === 'wall') {
       slots.push({ x: -8 * row, y: side * row * S })              // abreast phalanx
     } else if (shape === 'loose') {
-      slots.push({ x: -row * S * (0.7 + (i % 3) * 0.25), y: side * row * S * 0.9 })  // scattered wedge
+      slots.push({ x: -row * S * (0.7 + (i % 3) * 0.25), y: side * row * S * 0.95 })  // scattered wedge
     } else if (shape === 'arrow') {
-      slots.push({ x: -row * S * 1.3, y: side * row * S * 0.45 })  // sharp swept-back spearhead
+      slots.push({ x: -row * S * 1.2, y: side * row * S * 0.62 })  // swept-back spearhead (wings well apart)
     } else {
-      slots.push({ x: -row * S, y: side * row * S * 0.68 })       // tight V
+      slots.push({ x: -row * S, y: side * row * S * 0.75 })       // open V
     }
   }
   // 4 ships → close a V into a diamond (arrow stays a 4-deep spear)
@@ -394,7 +394,7 @@ interface ShipAgent {
   angle:        number    // radians, 0=right, π/2=down
   cruiseAngle:  number    // straight-line heading for cruising
   wavePhase:    number    // sine wave accumulator
-  state:        'cruising' | 'engaging' | 'retreating' | 'regrouping' | 'pickup_seeking' | 'routing' | 'dying'
+  state:        'cruising' | 'engaging' | 'retreating' | 'regrouping' | 'pickup_seeking' | 'routing' | 'victory_cruise' | 'dying'
   hp:           number
   wingSlot:     number    // 0=leader, 1,2,3…=wing index for orbit offset
   wingAngle:    number    // orbit angle accumulator (wings only)
@@ -436,6 +436,7 @@ interface ShipAgent {
   sizeSpeedMult: number // small hulls fly faster, big hulls slower
   // ── Ancient Races Ecosystem ──
   spiralUntil:   number  // klaed post-kill victory spiral (0 = none)
+  boostUntil:    number  // adrenaline sprint after taking a near-fatal hit (0 = none)
   engagePauseUntil: number  // nairan pre-engage assessment pause (0 = none)
   respectUntil:  number  // klaed slowed in mourning near fallen kin (0 = none)
   vengeanceUntil: number // klaed +aggression after mourning (0 = none)
@@ -1268,7 +1269,7 @@ const EMBLEMS: Record<WarFleet, { pal: Record<string, string>; grid: string[] }>
     '..t.......t..', '...tt...tt...', '....ttttt....', '..ttttttttt..', '..tt.sgs.tt..',
     '..ttssgsstt..', '..ttttttttt..', '...tt.g.tt...', '...t..g..t...', '..t..ggg..t..',
     '.t...g.g...t.', '.....g.g.....', '....g...g....'] },
-  nairan: { pal: { g: '#74b94b', d: '#3c7a34', a: '#e8a13a' }, grid: [
+  nairan: { pal: { g: '#a86ee8', d: '#5e3a94', a: '#d9b8ff' }, grid: [
     '......a......', '.....gag.....', '....ggagg....', '...gg.a.gg...', '..gg..a..gg..',
     '.gg...a...gg.', '.g....a....g.', '.g....a....g.', '......a......', '.....ggg.....',
     '.....g.g.....', '....gg.gg....', '...gg...gg...'] },
@@ -1295,7 +1296,7 @@ function FleetEmblem({ grid, pal, size = 38 }: { grid: string[]; pal: Record<str
 const FLEET_META: Record<WarFleet, { name: string; cm: string; ca: string }> = {
   klaed:    { name: "KLA'ED",   cm: '#e0473a', ca: '#f2c744' },
   nautolan: { name: 'NAUTOLAN', cm: '#b9975a', ca: '#54d06a' },
-  nairan:   { name: 'NAIRAN',   cm: '#74b94b', ca: '#e8a13a' },
+  nairan:   { name: 'NAIRAN',   cm: '#a86ee8', ca: '#c9a3ff' },
 }
 
 interface KillEntry { id: string; txt: string; col: string }
@@ -1466,7 +1467,9 @@ function SpaceSim() {
   // Capture beacons (spawner objectives) + per-faction ship caps (grown by capturing beacons).
   const beacons     = useRef(new Map<string, { id: string; x: number; y: number; born: number }>())
   const beaconEls   = useRef(new Map<string, HTMLDivElement>())
-  const factionCap  = useRef<Record<WarFleet, number>>({ klaed: 1, nairan: 1, nautolan: 1 })
+  const factionCap  = useRef<Record<WarFleet, number>>({ klaed: 3, nairan: 3, nautolan: 3 })
+  // Round state: fielded factions, elimination order (banked), winner, and the round-phase machine.
+  const roundRef    = useRef<{ everAlive: WarFleet[]; deathOrder: WarFleet[]; winner: WarFleet | null; phase: 'active' | 'resolving' | 'peace'; phaseAt: number }>({ everAlive: [], deathOrder: [], winner: null, phase: 'active', phaseAt: 0 })
 
   const [pickupKeys,     setPickupKeys]     = useState<string[]>([])
   const [beaconKeys,     setBeaconKeys]     = useState<string[]>([])
@@ -1503,6 +1506,8 @@ function SpaceSim() {
     let nextAsteroidSpawn = performance.now() + 6000   // first hazard drifts in ~6s
     let nextAsteroidBelt  = performance.now() + 35000  // first belt ~35s in
     let nextBeaconSpawn  = 0  // capture-beacon respawn timer (fires on first tick)
+    let deployWave       = 0  // staggered fly-in progress for a new round
+    let nextDeploy       = 0  // next deploy-wave timestamp
     let prevMode: BattleMode | null = null   // detect mode switches (null → init on first tick)
     const fleetRetreating         = new Set<string>()
     const fleetRetreatingCooldown = new Map<string, number>()
@@ -1587,6 +1592,7 @@ function SpaceSim() {
     function spawnFleet(type?: AgentFleetType, count?: number, inSpeedMult?: number) {
       const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
       const ft      = type ?? pickType()
+      if (isWarFleet(ft) && roundRef.current.deathOrder.includes(ft as WarFleet)) return   // banked: no respawns this round
       // Per-faction cap: a faction fields at most its earned cap (grown only by capturing beacons).
       const cap  = isWarFleet(ft) ? factionCap.current[ft as WarFleet] : 1
       let live = 0; agents.current.forEach(a => { if (a.fleetType === ft && a.state !== 'dying') live++ })
@@ -1650,7 +1656,7 @@ function SpaceSim() {
           regenReadyAt: 0,
           maxSpeed: 0, maxHp: 1, turnAccel: 0,   // all set by computeStats just below
           damage: 1, range: 0, splash: false, sizeSpeedMult: 1,
-          spiralUntil: 0, engagePauseUntil: 0, respectUntil: 0, vengeanceUntil: 0,
+          spiralUntil: 0, boostUntil: 0, engagePauseUntil: 0, respectUntil: 0, vengeanceUntil: 0,
           targetLockedUntil: 0,
           mainRespawnsLeft: ft === 'mainship' ? 2 : 0,
           muzzleStart: 0,
@@ -2078,7 +2084,8 @@ function SpaceSim() {
       }
       // Recompute all derived stats from the new equipment loadout
       computeStats(agent)
-      if (agent.hp > agent.maxHp) agent.hp = agent.maxHp
+      agent.hp = agent.maxHp   // grabbing any pickup fully repairs the hull
+      agent.prevHp = agent.maxHp
       pickups.current.delete(pickup.id)
       pickupEls.current.delete(pickup.id)
       setPickupKeys([...pickups.current.keys()])
@@ -2100,9 +2107,12 @@ function SpaceSim() {
       const SY = (yy: number) => ((yy - scrollY) % H + H) % H
 
       // ── BATTLE MODE routing ─────────────────────────────────────────────────
+      // 'eternal' runs the auto war↔peace cycle (rounds + a 3-min peace between them). 'peace' forces
+      // a permanent calm. peaceNow = combat is OFF right now (manual peace, OR the war cycle's peace phase).
       const mode = battleModeRef.current
-      const peaceMode = mode === 'peace'   // no combat: ships just explore, form up, park — asteroids still bite
-      if (mode !== prevMode) {   // switching to peace stands the fleets down; eternal needs no reset
+      const warMode  = mode === 'eternal'
+      const peaceNow = mode === 'peace' || (warMode && roundRef.current.phase === 'peace')
+      if (mode !== prevMode) {   // switching to peace stands the fleets down
         prevMode = mode
         if (mode === 'peace') {
           agents.current.forEach(a => { if (a.state === 'engaging' || a.state === 'retreating' || a.state === 'routing') { a.state = 'cruising'; a.targetId = null } })
@@ -2138,7 +2148,7 @@ function SpaceSim() {
       }
       // ── CAPTURE BEACONS: the ONLY way factions grow. Keep ~2 floating; a ship that touches one
       // bumps its faction's cap +1 and calls in a side-entering reinforcement. Consumed → respawns later. ──
-      if (beacons.current.size < 2 && now >= nextBeaconSpawn) {
+      if (beacons.current.size < 2 && now >= nextBeaconSpawn && warMode && roundRef.current.phase === 'active') {
         spawnBeacon(); nextBeaconSpawn = now + 4000 + Math.random() * 3000
       }
       beacons.current.forEach((b, id) => {
@@ -2156,6 +2166,49 @@ function SpaceSim() {
           if (el) { const p = 1 + 0.18 * Math.sin(now * 0.004 + b.born); el.style.transform = `translate(${b.x}px,${SY(b.y)}px) scale(${p})` }
         }
       })
+      // ── WAR ⇄ PEACE CYCLE (eternal mode): rounds resolve, then 3 min of peace, then war again.
+      // Diegetic — nobody is clear()'d; everyone flies in and out. ──
+      if (warMode) {
+        const RF = roundRef.current
+        if (RF.phase === 'active') {
+          if (RF.winner) {                                    // last faction standing → resolve the round
+            RF.phase = 'resolving'; RF.phaseAt = now
+            beacons.current.clear(); beaconEls.current.clear(); setBeaconKeys([])   // objectives close out
+          }
+        } else if (RF.phase === 'resolving') {
+          if (now - RF.phaseAt > 3500) {                      // after a VICTORIA beat, everyone leaves BY FLIGHT
+            agents.current.forEach(a => {
+              if (a.state === 'dying') return
+              if (a.fleetType === RF.winner) { if (a.state !== 'victory_cruise') { a.state = 'victory_cruise'; a.targetId = null; a.retreatStart = now } }
+              else if (isWarFleet(a.fleetType) && a.state !== 'routing') { a.state = 'routing'; a.retreatStart = now }
+            })
+          }
+          if (now - RF.phaseAt > 24000) {                     // safety net: force out any straggler that never cleared
+            agents.current.forEach((a, id) => {
+              if (!isWarFleet(a.fleetType)) return
+              const el = agentEls.current.get(id); if (el) el.style.visibility = 'hidden'
+              agents.current.delete(id); agentEls.current.delete(id)
+            })
+            setAgentKeys([...agents.current.keys()])
+          }
+          let anyWar = false; agents.current.forEach(a => { if (isWarFleet(a.fleetType)) anyWar = true })
+          if (!anyWar) {                                      // field cleared → PEACETIME begins
+            RF.everAlive = []; RF.deathOrder = []; RF.winner = null
+            factionCap.current = { klaed: 3, nairan: 3, nautolan: 3 }
+            deployWave = 0; nextDeploy = now + 800
+            RF.phase = 'peace'; RF.phaseAt = now
+          }
+        } else if (RF.phase === 'peace') {                    // ~3 min of calm: squads fly in, explore, no combat
+          if (deployWave < 3 && now >= nextDeploy) {
+            ;(['klaed', 'nairan', 'nautolan'] as WarFleet[]).forEach(f => spawnFleet(f, 1))
+            deployWave++; nextDeploy = now + 2600
+          }
+          if (now - RF.phaseAt > 180000) {                    // peace over → reignite the WAR
+            ;(['klaed', 'nairan', 'nautolan'] as WarFleet[]).forEach(f => spawnFleet(f, 3))   // top each faction back to full
+            RF.phase = 'active'; RF.phaseAt = now
+          }
+        }
+      }
       // ── DYNAMIC PICKUP EVENTS ─────────────────────────────────────────────────
       // Every 30s roll a weighted event that dictates what spawns for the period.
       if (now >= nextPickupEvent) {
@@ -2185,10 +2238,11 @@ function SpaceSim() {
       // ships keep their distance via the strong separation nudge, so a touch is a genuine failure
       // and it costs both hulls. On contact they're hard-shoved apart so they never stack (2D — no
       // overlapping sprites) and don't re-hit every frame. Regrouping ships are exempt.
+      const bumpSafe = (s: ShipAgent['state']) => s === 'dying' || s === 'regrouping' || s === 'victory_cruise' || s === 'routing'
       agents.current.forEach((aA, idA) => {
-        if (aA.state === 'dying' || aA.state === 'regrouping') return
+        if (bumpSafe(aA.state)) return
         agents.current.forEach((aB, idB) => {
-          if (idA >= idB || aB.state === 'dying' || aB.state === 'regrouping') return
+          if (idA >= idB || bumpSafe(aB.state)) return
           const ax = aA.x + 24, ay = aA.y + 24
           const bx = aB.x + 24, by = aB.y + 24
           const d = dist2D(ax, ay, bx, by)
@@ -2202,7 +2256,9 @@ function SpaceSim() {
           const push = (NO_OVERLAP - Math.min(d, NO_OVERLAP)) / 2 + 0.5
           aA.x += nx * push; aA.y += ny * push
           aB.x -= nx * push; aB.y -= ny * push
-          if (!peaceMode) { killAgent(aA, now); killAgent(aB, now) }  // COLLISION = DEATH — both hulls explode (killAgent is idempotent; peace is the only bump-safe mode)
+          // ENEMIES crashing = death (space is vital in a fight). Same-faction just shoves clear —
+          // squadmates flying formation shouldn't kill each other with a bump.
+          if (aA.fleetType !== aB.fleetType) { killAgent(aA, now); killAgent(aB, now) }
         })
       })
 
@@ -2288,6 +2344,28 @@ function SpaceSim() {
             fleetBroken[f] = false
           }
         })
+        // ── ROUND STATE: during the ACTIVE battle, a faction that has fielded a ship and hits 0 is
+        // BANKED (out for the round); record the death order. When only one remains, it wins the round. ──
+        const RF = roundRef.current
+        // Track who has fielded a ship in ANY phase (so a faction that spawns during deploy counts).
+        ;(['klaed', 'nairan', 'nautolan'] as WarFleet[]).forEach(f => {
+          if (stats[f].alive > 0 && !RF.everAlive.includes(f)) RF.everAlive.push(f)
+        })
+        if (warMode && RF.phase === 'active') {
+          ;(['klaed', 'nairan', 'nautolan'] as WarFleet[]).forEach(f => {
+            if (RF.everAlive.includes(f) && stats[f].alive === 0 && !RF.deathOrder.includes(f)) {
+              RF.deathOrder.push(f)
+              setKillLog(prev => [{ id: genId(), txt: `${FLEET_META[f].name} ELIMINADA`, col: FLEET_META[f].cm }, ...prev].slice(0, 8))
+            }
+          })
+          if (!RF.winner && RF.everAlive.length === 3) {
+            const standing = (['klaed', 'nairan', 'nautolan'] as WarFleet[]).filter(f => !RF.deathOrder.includes(f))
+            if (standing.length === 1) {
+              RF.winner = standing[0]
+              setKillLog(prev => [{ id: genId(), txt: `★ ${FLEET_META[standing[0]].name} GANA LA RONDA`, col: FLEET_META[standing[0]].cm }, ...prev].slice(0, 8))
+            }
+          }
+        }
         setShipStats(stats)
       }
 
@@ -2381,7 +2459,7 @@ function SpaceSim() {
         // so routs cascade. It must steady itself (climb back over RALLY_RECOVER) to rejoin the
         // fight — hysteresis stops flicker. Berserk last-stands and juggernauts are fearless.
         const fearless = berserk || juggernaut
-        if (agent.state !== 'routing' && agent.state !== 'regrouping' && !fearless && agent.morale < ROUT_MORALE) {
+        if (agent.state !== 'routing' && agent.state !== 'regrouping' && agent.state !== 'victory_cruise' && !fearless && agent.morale < ROUT_MORALE) {
           agent.state = 'routing'; agent.targetId = null; agent.seekingPickupId = null
         } else if (agent.state === 'routing' && (agent.morale >= RALLY_RECOVER || fearless)) {
           agent.state = 'cruising'
@@ -2440,19 +2518,13 @@ function SpaceSim() {
         //   nautolan: shield → weapon (craves All-Around / Invincibility)
         //   mainship: engine → weapon → shield (speed is survival)
         // Scarcity events set a global scramble flag so everyone rushes the lone pickup.
-        if (!fleetRetreating.has(agent.fleetId) && agent.state !== 'routing') {
+        if (!fleetRetreating.has(agent.fleetId) && agent.state !== 'routing' && agent.state !== 'victory_cruise') {
           const needsWeapon = agent.weaponType === 'none'
           const needsShield = agent.shieldType === 'none'
           const needsEngine = agent.engineType === 'none'
-          let priority: PickupData['type'][]
-          if (agent.fleetType === 'klaed')         priority = needsWeapon ? ['weapon'] : []
-          else if (agent.fleetType === 'nautolan') priority = ['shield', 'weapon']
-          else if (agent.fleetType === 'mainship') priority = ['engine', 'weapon', 'shield']
-          else                                     priority = ['weapon', 'shield']
-          // During a scarcity scramble, everyone chases whatever pickup exists
-          if (pickupScramble) priority = ['weapon', 'shield', 'engine']
-          // Underdog desperation: grab anything to survive, even mid-fight
-          if (isUnder) priority = ['engine', 'weapon', 'shield']
+          // Ships only actively SEEK a weapon (so they can fight); shields/engines are grabbed on
+          // contact but never chased — an armed ship stays free to HUNT BEACONS, not wander for loot.
+          const priority: PickupData['type'][] = needsWeapon ? ['weapon'] : []
 
           const wants = (t: PickupData['type']) =>
             (t === 'weapon' && needsWeapon) || (t === 'shield' && needsShield) || (t === 'engine' && needsEngine) || pickupScramble
@@ -2537,6 +2609,15 @@ function SpaceSim() {
           agent.vx = Math.cos(agent.angle) * spd
           agent.vy = Math.sin(agent.angle) * spd
 
+        // ── VICTORY CRUISE (round winner peels off in a confident lap and flies OUT of frame) ──
+        } else if (agent.state === 'victory_cruise') {
+          const spd = agent.maxSpeed * 1.05 * speedBoost(agent.fleetType)
+          const exit = homeAngle(agent.homeEdge)   // head back out the side it flew in from
+          agent.cruiseAngle = exit
+          agent.angle = clampTurn(agent.angle, exit + Math.sin(now * 0.0016 + agent.wingSlot) * 0.12, turnCap * dt)
+          agent.vx = Math.cos(agent.angle) * spd
+          agent.vy = Math.sin(agent.angle) * spd
+
         // ── VICTORY SPIRAL (kla'ed celebrates a kill with a defiant spin) ──
         } else if (now < agent.spiralUntil) {
           agent.angle += 0.00785 * dt   // ~1 full revolution over 0.8s
@@ -2588,18 +2669,20 @@ function SpaceSim() {
             if (d < nearED) { nearED = d; nearEnemy = o }
           })
           const enemyNear = !!nearEnemy && nearED < detectRange
-          // Leader steers the WHOLE group at the nearest foe while still out of range: the
-          // formation holds shape and advances, instead of everyone breaking off at first sight.
-          if (isLead && enemyNear && nearED > engageRange && nearEnemy) {
+          // Growing the fleet WINS the war, so a beacon is the TOP priority: an armed ship hunts the
+          // nearest one unless a foe is already in FIRING range (then it fights). Combat emerges from
+          // contesting beacons — ships don't chase distant enemies when there's ground to capture.
+          const beaconHunt = isLead && beacons.current.size > 0 && nearED > engageRange
+          if (beaconHunt) {
+            let bx = 0, by = 0, bd = Infinity
+            beacons.current.forEach(b => { const d = dist2D(agent.x + 24, agent.y + 24, b.x, b.y); if (d < bd) { bd = d; bx = b.x; by = b.y } })
+            agent.cruiseAngle = Math.atan2(by - (agent.y + 24), bx - (agent.x + 24))   // aim STRAIGHT at it — no lazy lerp
+            fleetPark.delete(agent.fleetId)
+          } else if (!peaceNow && isLead && enemyNear && nearED > engageRange && nearEnemy) {
+            // No beacon to grab → advance in formation toward the nearest foe.
             const ne = nearEnemy as ShipAgent
             agent.cruiseAngle = lerpAngle(agent.cruiseAngle, Math.atan2(ne.y + 24 - (agent.y + 24), ne.x + 24 - (agent.x + 24)), 0.09)
             fleetPark.delete(agent.fleetId)
-          }
-          // No foe in sight? Steer for the nearest capture beacon — this is how factions grow.
-          else if (isLead && !enemyNear && beacons.current.size > 0) {
-            let bx = 0, by = 0, bd = Infinity
-            beacons.current.forEach(b => { const d = dist2D(agent.x + 24, agent.y + 24, b.x, b.y); if (d < bd) { bd = d; bx = b.x; by = b.y } })
-            if (bd < Infinity) { agent.cruiseAngle = lerpAngle(agent.cruiseAngle, Math.atan2(by - (agent.y + 24), bx - (agent.x + 24)), 0.06); fleetPark.delete(agent.fleetId) }
           }
 
           if (isLead) {
@@ -2618,13 +2701,13 @@ function SpaceSim() {
             } else {
               // Family wiggle: serpentine cruise (klaed loose & jittery, nautolan rigid)
               agent.wavePhase += fl.wiggleFreq * dt
-              const waveAngle = agent.cruiseAngle + Math.sin(agent.wavePhase + agent.wingSlot * 1.3) * fl.wiggleAmp
+              const waveAngle = agent.cruiseAngle + (beaconHunt ? 0 : Math.sin(agent.wavePhase + agent.wingSlot * 1.3) * fl.wiggleAmp)
               agent.angle = clampTurn(agent.angle, waveAngle, turnCap * dt)
               agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd
               // Decide to station the whole fleet when it's calm out
               if (now >= agent.nextParkCheck) {
                 agent.nextParkCheck = now + 5000 + Math.random() * 5000
-                if (!parked && !enemyNear && beacons.current.size === 0 && Math.random() < fl.parkChance) {
+                if (!parked && (peaceNow || !enemyNear) && beacons.current.size === 0 && Math.random() < fl.parkChance) {
                   fleetPark.set(agent.fleetId, { until: now + 5000 + Math.random() * 7000, x: agent.x, y: agent.y, heading: agent.angle })
                 }
               }
@@ -2652,7 +2735,7 @@ function SpaceSim() {
 
           // Break the formation into individual combat once in firing range (leader), or the
           // moment the leader commits (wings follow their leader into the attack together).
-          const commit = !peaceMode && (isLead
+          const commit = !peaceNow && (isLead
             ? (enemyNear && nearED <= engageRange)
             : ((!!leader && leader.state === 'engaging') || (enemyNear && nearED <= engageRange)))
           if (commit) {
@@ -2914,6 +2997,8 @@ function SpaceSim() {
           }
         }
 
+        // Adrenaline: a near-fatally-wounded ship gets a brief speed burst to break away from its attacker.
+        if (now < agent.boostUntil) { agent.vx *= 1.45; agent.vy *= 1.45 }
         // ── Evasion — asteroids by steering, crowding by a soft separation nudge ──
         // Juggernaut ignores all evasion and plows straight ahead.
         if (!juggernaut) {
@@ -2974,6 +3059,13 @@ function SpaceSim() {
               }
             }
           }
+          // Horizontal soft boundary — fighting ships stay in the visible WIDTH (only fleeing/winning
+          // ships leave the sides). Keeps chases in frame; the tall field still handles up/down.
+          if (agent.state !== 'routing' && agent.state !== 'retreating' && agent.state !== 'victory_cruise') {
+            const mgn = 100
+            if (agent.x < mgn)          avoidAngle = clampTurn(avoidAngle, 0,       (mgn - agent.x) / mgn * turnCap * dt * 5)
+            else if (agent.x > W - mgn) avoidAngle = clampTurn(avoidAngle, Math.PI, (agent.x - (W - mgn)) / mgn * turnCap * dt * 5)
+          }
           if (avoidAngle !== agent.angle) {
             const curSpd = Math.sqrt(agent.vx*agent.vx + agent.vy*agent.vy)
             agent.angle = avoidAngle
@@ -2994,14 +3086,16 @@ function SpaceSim() {
         // (overlap now self-resolves: touching ships explode — no hard separation push,
         //  which used to teleport ships apart and looked glitchy)
 
-        // Retreating & routed ships despawn when they clear the edge (they fled the fight); others wrap
+        // Leaving ships (fled or victorious) despawn once they clear ANY edge. Fighting ships still
+        // WRAP vertically (tall field, scroll to follow) but BOUNCE back in horizontally, so a chase
+        // never vanishes out the sides — the soft boundary above keeps them in the visible width.
         const m = 60
         if (agent.x < -m || agent.x > W + m || agent.y < -m || agent.y > H + m) {
-          if (agent.state === 'retreating' || agent.state === 'routing') {
+          if (agent.state === 'retreating' || agent.state === 'routing' || agent.state === 'victory_cruise') {
             toRemoveAgents.push(agent.id); agentChanged = true; return
           }
-          if      (agent.x > W + m) agent.x = -m
-          else if (agent.x < -m)    agent.x = W + m
+          if      (agent.x > W + m) { agent.x = W + m; agent.vx = -Math.abs(agent.vx); agent.avx = -Math.abs(agent.avx) }
+          else if (agent.x < -m)    { agent.x = -m;    agent.vx =  Math.abs(agent.vx); agent.avx =  Math.abs(agent.avx) }
           if      (agent.y > H + m) agent.y = -m
           else if (agent.y < -m)    agent.y = H + m
         }
@@ -3117,6 +3211,7 @@ function SpaceSim() {
               agent.regenReadyAt = now + REGEN_DELAY
               spawnHit(proj.x, proj.y)
               if (agent.hp <= 0) killAgent(agent, now, proj.ownerFleetType, proj.ownerId)
+              else if (agent.hp <= agent.maxHp * 0.35) agent.boostUntil = now + 1600   // near-fatal hit → adrenaline sprint to break away
             }
             // Rocket splash: everyone within 40px of impact takes 1 damage (friend or foe)
             if (proj.splash) {
@@ -3281,8 +3376,8 @@ function SpaceSim() {
       if (active) rafId = requestAnimationFrame(tick)
     }
 
-    // Initial spawn: ONE lone ship per faction (cap starts at 1); they grow only by capturing beacons.
-    ;(['klaed', 'nairan', 'nautolan'] as WarFleet[]).forEach(f => spawnFleet(f, 1))
+    // Initial spawn: a squad of THREE per faction (cap starts at 3); they grow only by capturing beacons.
+    ;(['klaed', 'nairan', 'nautolan'] as WarFleet[]).forEach(f => spawnFleet(f, 3))
     rafId = requestAnimationFrame(tick)
     return () => { active = false; cancelAnimationFrame(rafId) }
   }, [])
