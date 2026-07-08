@@ -453,6 +453,10 @@ export default function CerebroContent() {
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
+  // Keep the backstage "perfil" RAG layer in sync with context/contexto-alex.md. Cheap: only
+  // re-ingests when the doc's hash changed (no cost when unchanged). Fire-and-forget on load.
+  useEffect(() => { fetch('/api/context/sync', { method: 'POST' }).catch(() => {}) }, [])
+
   // Load notes once when switching to notas tab
   useEffect(() => {
     if (mode !== 'notas' || notesLoaded) return
@@ -589,7 +593,7 @@ export default function CerebroContent() {
   const hasAnswer      = answer.length > 0
 
   return (
-      <main className="mx-auto flex h-full max-w-3xl flex-col px-6 pt-6">
+      <main className={`mx-auto flex h-full max-w-3xl flex-col px-6 ${vaultOpen ? 'pt-6' : 'justify-center'}`}>
 
         {/* Universal capture — the one writing box for the whole OS */}
         <div className="mb-3 shrink-0"><UniversalCapture /></div>
@@ -624,7 +628,7 @@ export default function CerebroContent() {
         </div>
 
         {/* ── NOTAS MODE ─────────────────────────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-y-auto pb-[40vh] pt-2">
+        <div className="flex-1 min-h-0 overflow-y-auto pb-16 pt-2">
         {mode === 'notas' && (
           <>
             {/* Search + new note */}
