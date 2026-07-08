@@ -41,7 +41,7 @@ const RESULT_FILTERS: { id: string | null; label: string }[] = [
   { id: 'diario',  label: 'Diario' },
 ]
 
-const TOP_N = 8
+const TOP_N = 5
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,8 +59,8 @@ function fmtDate(iso: string): string {
 function ResultCard({ chunk }: { chunk: MemoryChunk }) {
   const [expanded, setExpanded] = useState(false)
   const kind = String(chunk.metadata?.kind ?? 'nota')
-  const long = chunk.content.length > 240
-  const body = !expanded && long ? chunk.content.slice(0, 240).trimEnd() + '…' : chunk.content
+  const long = chunk.content.length > 160
+  const body = !expanded && long ? chunk.content.slice(0, 160).trimEnd() + '…' : chunk.content
   const pct  = Math.round((chunk.similarity ?? 0) * 100)
 
   return (
@@ -235,6 +235,13 @@ export default function CerebroContent() {
     }
   }
 
+  // Reset the whole consult session so a search never lingers — used by the ✕ and when leaving Consultar.
+  function clearSearch() {
+    abortRef.current?.abort()
+    setQuery(''); setResults([]); setSearched(false); setSearching(false)
+    setAnswer(''); setAskSources([]); setAsking(false); setShowAll(false); setKindFilter(null); setErr(null)
+  }
+
   const filtered = useMemo(
     () => (kindFilter ? results.filter(r => String(r.metadata?.kind) === kindFilter) : results),
     [results, kindFilter],
@@ -258,7 +265,7 @@ export default function CerebroContent() {
             <button
               key={i}
               type="button"
-              onClick={() => setIntent(i)}
+              onClick={() => { if (i === 'capturar') clearSearch(); setIntent(i) }}
               className={`relative z-10 flex-1 rounded-full py-1.5 text-sm font-medium capitalize transition-colors ${intent === i ? 'text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
             >
               {i}
@@ -335,8 +342,18 @@ export default function CerebroContent() {
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void runSearch() } }}
                 placeholder="Busca en tu memoria…"
-                className="w-full bg-transparent py-1 pl-7 pr-2 text-[15px] text-ink-4 placeholder:text-ink-2/60 outline-none"
+                className="w-full bg-transparent py-1 pl-7 pr-8 text-[15px] text-ink-4 placeholder:text-ink-2/60 outline-none"
               />
+              {(query || searched) && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  aria-label="Limpiar búsqueda"
+                  className="absolute right-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/[0.08] hover:text-ink-4"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.8}><path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" /></svg>
+                </button>
+              )}
             </div>
 
             {/* Secondary, discreet: kind filters */}
@@ -374,11 +391,14 @@ export default function CerebroContent() {
           {searched && !searching && (
             filtered.length > 0 ? (
               <>
-                <p className="text-xs text-ink-3">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-ink-3">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
+                  <button onClick={clearSearch} className="text-xs text-ink-3 transition-colors hover:text-ink-4">Limpiar ✕</button>
+                </div>
                 {visible.map(c => <ResultCard key={c.id} chunk={c} />)}
-                {filtered.length > TOP_N && !showAll && (
-                  <button onClick={() => setShowAll(true)} className="w-full rounded-xl border border-ink-4/10 py-2 text-xs text-ink-3 transition-colors hover:text-ink-4">
-                    Ver {filtered.length - TOP_N} más
+                {filtered.length > TOP_N && (
+                  <button onClick={() => setShowAll(s => !s)} className="w-full rounded-xl border border-ink-4/10 py-2 text-xs text-ink-3 transition-colors hover:text-ink-4">
+                    {showAll ? 'Ver menos' : `Ver ${filtered.length - TOP_N} más`}
                   </button>
                 )}
                 {/* Discreet AI fallback */}
