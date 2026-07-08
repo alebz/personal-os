@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
-import { unstable_ViewTransition as ViewTransition } from "react";
+import * as React from "react";
 import "./globals.css";
 import { StarsBackground } from "@/components/StarsBackground";
 import { OSSettingsProvider } from "@/components/OSSettingsContext";
 import AdanCompanionWrapper from "@/components/AdanCompanionWrapper";
+
+// React 19.1's ViewTransition is runtime-only (not yet in @types/react), and stripped from some
+// builds — so use it when present, else fall back to a no-op wrapper. Keeps the prod build/typecheck
+// green and never renders `undefined`.
+const ViewTransition: React.ComponentType<{ children?: React.ReactNode }> =
+  (React as unknown as { unstable_ViewTransition?: React.ComponentType<{ children?: React.ReactNode }> }).unstable_ViewTransition
+  ?? (React.Fragment as unknown as React.ComponentType<{ children?: React.ReactNode }>);
 
 export const metadata: Metadata = {
   title: "personal-os",

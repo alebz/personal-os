@@ -48,8 +48,8 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
   const sceneRef = useRef<HTMLDivElement>(null)
   const deckRef = useRef<HTMLDivElement>(null)
   const faceRefs = useRef<(HTMLDivElement | null)[]>([])
-  const dotRefs = useRef<(HTMLDivElement | null)[]>([])
-  const dotRefsR = useRef<(HTMLDivElement | null)[]>([])
+  const dotRefs = useRef<(HTMLElement | null)[]>([])   // <i> dot elements
+  const dotRefsR = useRef<(HTMLElement | null)[]>([])
   const contentRefs = useRef<(HTMLDivElement | null)[]>([])
   const [center, setCenter] = useState(0)
 

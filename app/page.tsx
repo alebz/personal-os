@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import OSDrum, { type OSSection } from '@/components/OSDrum'
 import HabitTrackerContent from '@/components/sections/HabitTrackerContent'
 import CerebroContent from '@/components/sections/CerebroContent'
@@ -24,5 +25,9 @@ const SECTIONS: OSSection[] = [
 ]
 
 export default function HomePage() {
-  return <OSDrum sections={SECTIONS} />
+  // The drum (and every section it mounts) is client-only — render after mount so it never runs
+  // during SSR/prerender, where `document` isn't defined.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return mounted ? <OSDrum sections={SECTIONS} /> : null
 }
