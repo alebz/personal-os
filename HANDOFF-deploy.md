@@ -45,3 +45,19 @@
   quedó SIN commitear a propósito. La versión commiteada está limpia.
 - Antes de pushear código nuevo a `main`, correr `npm run build` UNA vez (no `next dev`) para atrapar
   errores estrictos de prod; y verificar el **estado committeado** (no el working tree) si hay WIP sucio.
+
+## Fixes post-primer-deploy (prod, probados en incógnito)
+
+- **Sprites rotos en /login (middleware bloqueaba assets):** el `matcher` del middleware no excluía los
+  assets de `/public`, así que auth **307-redirigía** las peticiones de imágenes/fuentes a `/login`
+  para visitantes sin sesión → naves/Lolo/etc. rotos en el login. Fix: el matcher ahora excluye
+  cualquier ruta que **termine en extensión estática** (`png|jpg|jpeg|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp3|mp4|webm`).
+  Cubre todos los assets de `/public` por extensión (no por carpeta) y **no abre hueco**: las rutas
+  `/api/*` y de app (sin extensión) siguen protegidas. Era específico de prod (en local estás logueado → pasaban).
+- **/login limpio:** `StarsBackground` (ScoreHUD) y `AdanCompanionWrapper` (Lolo) hacen
+  `usePathname() === '/login' → return null`, así el login muestra **solo estrellas + naves** (ambiente),
+  sin scoreboard ni companion. El form se rediseñó con los tokens del OS (glassmorphism ink/accent).
+- **Tareas no aparecían al capturarlas desde Cerebro:** el backend guardaba bien (ambos paths, verificado
+  en prod), pero `TareasContent` no escuchaba el evento `capture:task` que dispara UniversalCapture → la
+  cara de Tareas no se refrescaba hasta recargar. Fix: `TareasContent` ahora escucha `capture:task` y
+  refetch-ea. (Las notas sí aparecían porque viven en el mismo Cerebro.)

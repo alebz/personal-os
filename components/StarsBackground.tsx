@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { usePathname } from 'next/navigation'
 import { useOSSettings } from './OSSettingsContext'
 import type { Fleet } from './OSSettingsContext'
 
@@ -1336,6 +1337,8 @@ function MiniShip({ view }: { view: ShipView }) {
 
 // Pixel-art CRT scoreboard (ported from the Scoreboard HUD design), driven by live sim data
 function ScoreHUD({ ships, log, mode, onMode }: { ships: ShipStats; log: KillEntry[]; mode: BattleMode; onMode: (m: BattleMode) => void }) {
+  const pathname = usePathname()
+  if (pathname === '/login') return null   // login shows only stars + ships, no scoreboard
   const fleets: WarFleet[] = ['klaed', 'nautolan', 'nairan']
   const ROW_H = 88
   const orderIdx: Record<WarFleet, number> = { klaed: 0, nautolan: 1, nairan: 2 }

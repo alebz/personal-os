@@ -897,6 +897,13 @@ export default function TareasContent() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
+  // A task captured elsewhere (UniversalCapture → /api/capture) fires this; refetch so it shows here.
+  useEffect(() => {
+    const onCaptureTask = () => loadAll()
+    window.addEventListener('capture:task', onCaptureTask)
+    return () => window.removeEventListener('capture:task', onCaptureTask)
+  }, [loadAll])
+
   useEffect(() => {
     if (!filterOpen) return
     function onClick(e: MouseEvent) {

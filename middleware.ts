@@ -51,6 +51,8 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except Next internals and static assets.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Run on everything except Next internals and /public static assets. Without the file-extension
+  // exclusion, auth would 307-redirect image/font requests (e.g. the sim sprites) to /login for
+  // unauthenticated visitors — so they'd break on the login page.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp3|mp4|webm)$).*)'],
 }
