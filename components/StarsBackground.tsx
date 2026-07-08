@@ -1009,7 +1009,7 @@ const ASTEROID_EXPLODE: DestructData = {
 }
 const MAX_PICKUPS      = 22   // cap on pickups on the field at once (more ships need arming)
 const MAX_ASTEROIDS    = 16   // ambient count kept drifting (tall field)
-const ASTEROID_HARD_CAP = 40  // never exceed (ambient + belts)
+const ASTEROID_HARD_CAP = 64  // never exceed (ambient + a heavy multi-row belt wave)
 const ASTEROID_DMG     = 3    // serious blast damage to nearby ships
 const ASTEROID_BLAST   = 78   // px — radius of the damaging shockwave
 
@@ -1865,37 +1865,40 @@ function SpaceSim() {
       addAsteroid(x, y, Math.cos(a) * spd, Math.sin(a) * spd, size, now)
     }
 
-    // A random asteroid belt: a staggered stream of rocks crossing the screen together
+    // A random asteroid belt EVENT: a dense field of rocks crossing the screen together. Intensity is
+    // rolled each time — sometimes a light scatter, sometimes a thick multi-row wall that fills the view.
     function spawnAsteroidBelt(now: number) {
       const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
-      const horizontal = true   // vertical belts would pop mid-screen (toroidal field) — cross horizontally
+      // Roll intensity: 0 light / 1 medium / 2 heavy (heavy is rarer)
+      const roll = Math.random()
+      const tier = roll < 0.45 ? 0 : roll < 0.8 ? 1 : 2
+      const rows      = tier === 0 ? 1 : tier === 1 ? 2 : 3            // parallel streams
+      const perRow    = tier === 0 ? (5 + Math.floor(Math.random() * 4))   // ~5–8
+                       : tier === 1 ? (8 + Math.floor(Math.random() * 5))   // ~8–12
+                       :             (11 + Math.floor(Math.random() * 6))   // ~11–16
       const spd = 0.009 + Math.random() * 0.006
-      // drift direction (mostly across, slight diagonal)
-      const a = horizontal
-        ? (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.5
-        : (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2) + (Math.random() - 0.5) * 0.5
+      const a = (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.4   // cross horizontally, slight diagonal
       const vx = Math.cos(a) * spd, vy = Math.sin(a) * spd
-      // perpendicular spread axis
-      const px = -Math.sin(a), py = Math.cos(a)
-      const count = 6 + Math.floor(Math.random() * 5)    // 6–10 rocks
-      // Start line just outside the leading edge, centred on a random band
-      const cx = vx >= 0 ? -80 : W + 80
-      const cy0 = vy >= 0 ? -80 : H + 80
-      const bandCx = horizontal ? cx : Math.random() * W
-      const bandCy = horizontal ? Math.random() * H : cy0
-      const gap = 70 + Math.random() * 80
-      for (let i = 0; i < count; i++) {
-        const off = (i - (count - 1) / 2) * gap
-        const jitter = (Math.random() - 0.5) * 40
-        const x = bandCx + px * off - vx * 800 * Math.random() * 0.001 + (horizontal ? 0 : jitter)
-        const y = bandCy + py * off - vy * 800 * Math.random() * 0.001 + (horizontal ? jitter : 0)
-        const size = 18 + Math.round(Math.pow(Math.random(), 1.5) * 46)  // ~18–64px, mostly smaller
-        // per-rock speed + a slight heading jitter so the stream isn't a rigid line
-        const m = 0.8 + Math.random() * 0.45
-        const j = (Math.random() - 0.5) * 0.22
-        const rvx = (vx * Math.cos(j) - vy * Math.sin(j)) * m
-        const rvy = (vx * Math.sin(j) + vy * Math.cos(j)) * m
-        addAsteroid(x, y, rvx, rvy, size, now)
+      const px = -Math.sin(a), py = Math.cos(a)          // perpendicular spread axis
+      const cx = vx >= 0 ? -80 : W + 80                  // start just outside the leading edge
+      const gap = 66 + Math.random() * 74                // spacing between rocks along a row
+      const rowGap = 90 + Math.random() * 60             // depth spacing between parallel rows
+      for (let r = 0; r < rows; r++) {
+        // Each row centred on its own random band, staggered in depth behind the leading edge
+        const bandCy = Math.random() * H
+        const rowBack = r * rowGap + Math.random() * 40
+        for (let i = 0; i < perRow; i++) {
+          const off = (i - (perRow - 1) / 2) * gap
+          const jitter = (Math.random() - 0.5) * 44
+          const x = cx + px * off - vx * rowBack * 100
+          const y = bandCy + py * off + jitter - vy * rowBack * 100
+          const size = 18 + Math.round(Math.pow(Math.random(), 1.5) * 46)  // ~18–64px, mostly smaller
+          const m = 0.8 + Math.random() * 0.45
+          const j = (Math.random() - 0.5) * 0.22
+          const rvx = (vx * Math.cos(j) - vy * Math.sin(j)) * m
+          const rvy = (vx * Math.sin(j) + vy * Math.cos(j)) * m
+          addAsteroid(x, y, rvx, rvy, size, now)
+        }
       }
     }
 
@@ -3417,9 +3420,9 @@ function SpaceSim() {
         nextAsteroidSpawn = now + 2500 + Math.random() * 4000
         spawnAsteroid(now)
       }
-      // Random asteroid belt: a whole stream drifts through every ~30–60s
+      // Random asteroid belt WAVE: intensity rolled inside; an occasional event every ~50–110s
       if (now >= nextAsteroidBelt) {
-        nextAsteroidBelt = now + 30000 + Math.random() * 30000
+        nextAsteroidBelt = now + 50000 + Math.random() * 60000
         spawnAsteroidBelt(now)
       }
       let astChanged = false
@@ -3431,6 +3434,11 @@ function SpaceSim() {
         const m = ast.size + 40
         if (ast.x < -m || ast.x > W + m || ast.y < -m || ast.y > H + m) {
           asteroids.current.delete(ast.id); asteroidEls.current.delete(ast.id); astChanged = true; return
+        }
+        // Spontaneous detonation: any rock can go unstable and blow on its own — low odds, and only
+        // once it's had a moment on-screen (so they don't pop the instant they spawn). ~1.6%/sec.
+        if (now - ast.born > 2500 && ast.x > -ast.size && ast.x < W + ast.size) {
+          if (Math.random() < 0.016 * (dt / 1000)) { explodeAsteroid(ast, now); astChanged = true; return }
         }
         // A ship passing very close sets it off
         const cx = ast.x + ast.size / 2, cy = ast.y + ast.size / 2
