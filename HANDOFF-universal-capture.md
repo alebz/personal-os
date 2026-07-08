@@ -61,6 +61,28 @@ creadas por UI nunca se embebían ahí → eran invisibles para "Preguntar". Ya 
 - **`/api/ask`:** `match_threshold=0.3`, `match_count=12` (subidos por el dueño; NO bajar). Tras el
   backfill, preguntar algo del diario/notas devuelve la fuente con `metadata.kind` = `diario`/`nota`.
 
+## Capa de contexto "perfil" (backstage) — context/contexto-alex.md
+
+Documento vivo con el perfil personal de Alex (identidad, negocios, propiedades, directorio de
+personas + una bitácora fechada). **NO** vive en `/api/notes` ni journal — es una capa aparte que
+solo alimenta el RAG de Cerebro.
+
+- **Archivo:** `context/contexto-alex.md` (versionado). Se edita seguido (Claudio lo actualiza cuando
+  Alex cuenta algo nuevo; lo permanente sube al "Núcleo", lo volátil vive en la "Bitácora" fechada).
+- **Reindex:** `POST /api/context/reindex` — lee el archivo y lo parte en chunks por encabezado
+  (`#`/`##`/`###`): cada `##` sección, cada `###` subsección y cada `## <fecha>` de la bitácora = un
+  chunk recuperable; los divisores/meta sin cuerpo real (`# PARTE 1`, título) se descartan. Embebe
+  cada chunk con `insertMemoryChunk` (lib/memoryIndex) → `metadata { kind:'perfil', section }`.
+- **Dedup / idempotente:** ANTES de insertar borra TODOS los chunks `metadata->>kind = 'perfil'`, así
+  re-ingerir reemplaza la capa completa sin duplicar. Responde `{ ok, indexed, cleared }`. Barato de
+  re-correr cada vez que el doc cambia.
+- **Correr (una vez / tras cada edición), desde la consola del navegador con sesión:**
+  `fetch('/api/context/reindex',{method:'POST'}).then(r=>r.json()).then(console.log)`
+- **Verificar:** Cerebro → ✨ Preguntar "quién es Andrés" / "cuáles son mis proyectos principales" →
+  respuesta con fuente `metadata.kind = 'perfil'`.
+- **Deploy:** el endpoint lee el `.md` con `fs` desde `process.cwd()/context/…` (runtime nodejs).
+  En dev funciona directo; en Vercel hay que asegurar que el archivo quede incluido en el bundle.
+
 ## Regla de oro / qué NO tocar
 
 - Ningún endpoint se reescribió ni borró. Si algún modo deja de guardar, el bug está en la UI de

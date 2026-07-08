@@ -3,6 +3,13 @@ import { embed } from '@/lib/openai'
 
 type SB = ReturnType<typeof createServerClient>
 
+// Embed one piece of text and insert it as a memory_chunk with arbitrary metadata. Bulk callers
+// (e.g. the context reindex) own their own dedup (delete-by-metadata) before inserting.
+export async function insertMemoryChunk(supabase: SB, content: string, metadata: Record<string, unknown>): Promise<void> {
+  const embedding = await embed(content)
+  await supabase.from('memory_chunks').insert({ entity_id: null, content, embedding, metadata })
+}
+
 // ONE memory_chunk per source row, kept in sync with its text. Each call deletes the row's existing
 // chunk(s) first (dedup — repeated saves never pile up), then inserts a fresh one if there's real
 // text. Callers own error handling (live routes = best-effort try/catch; backfills = count failures).
