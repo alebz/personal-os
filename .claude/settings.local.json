@@ -96,7 +96,8 @@
       "Bash(awk 'NR>=3549 && /return \\\\\\(/{found=NR} found && NR>=found {print NR\": \"$0; c++} c>12{exit}' components/StarsBackground.tsx)",
       "Bash(nohup npm run dev)",
       "Bash(echo \"dev server arrancando \\(PID $!\\)... espero a que compile\")",
-      "Bash(echo \"dev server \\(PID $!\\) arrancando\")"
+      "Bash(echo \"dev server \\(PID $!\\) arrancando\")",
+      "Bash(echo \"dev PID $!\")"
     ]
   }
 }
