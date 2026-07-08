@@ -1,9 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import UniversalCapture from '@/components/UniversalCapture'
-import { formatTime, moodEmoji, type JournalEntry } from '@/components/sections/DiarioContent'
+import { MOODS } from '@/components/sections/DiarioContent'
+
+// Cerebro — the OS's single command bar. One box, two intents:
+//   • Capturar → Tarea / Nota / Diario (reuses /api/capture, /api/notes, /api/journal). ENTER saves.
+//   • Consultar → searches your own memory (/api/memory/search) as the protagonist; asking the AI
+//     (/api/ask RAG) is a discreet action next to the results, not a headline feature.
+// Design language mirrors CalendarCard (roomy, minimal, ink/accent, subtle glass). No internal
+// scrolls — everything flows in the drum face's own scroll; long result lists show the top 8 + a
+// "ver más" that expands downward.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -15,833 +21,400 @@ interface MemoryChunk {
   similarity: number
 }
 
-interface Note {
-  id: string
-  title: string
-  content: string
-  tags: string[]
-  created_at: string
-  updated_at: string
-}
-
-type Mode = 'search' | 'ask' | 'patterns' | 'notas' | 'diario'
-
-interface Evidence {
-  type:  string
-  count: number
-  label: string
-}
-
-interface PatternInsight {
-  category:   'energy' | 'creative' | 'relationship' | 'financial' | 'recurring' | 'behavioral'
-  title:      string
-  insight:    string
-  confidence: number
-  evidence:   Evidence[]
-}
-
-interface PatternResult {
-  insights: PatternInsight[]
-  summary:  string
-  analyzed: { total: number; byKind: Record<string, number> }
-}
-
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PATTERN_ICON: Record<string, string> = {
-  energy: '⚡', creative: '🎨', relationship: '👥',
-  financial: '💰', recurring: '🔁', behavioral: '🧠',
-}
-const PATTERN_LABEL: Record<string, string> = {
-  energy:       'Patrón de energía',
-  creative:     'Patrón creativo',
-  relationship: 'Patrón relacional',
-  financial:    'Patrón financiero',
-  recurring:    'Tema recurrente',
-  behavioral:   'Patrón conductual',
-}
-const PATTERN_COLOR: Record<string, string> = {
-  energy:       'text-warn',
-  creative:     'text-accent',
-  relationship: 'text-ok',
-  financial:    'text-danger',
-  recurring:    'text-ink-3',
-  behavioral:   'text-accent',
+const CAPTURE_MODES = [
+  { id: 'tarea',  label: 'Tarea',  placeholder: '¿Qué hay que hacer?' },
+  { id: 'nota',   label: 'Nota',   placeholder: 'Suelta una idea…' },
+  { id: 'diario', label: 'Diario', placeholder: '¿Qué estás pensando o sintiendo hoy?' },
+] as const
+type CapMode = (typeof CAPTURE_MODES)[number]['id']
+
+const KIND_LABEL: Record<string, string> = {
+  nota: 'Nota', diario: 'Diario', perfil: 'Perfil', task: 'Tarea', reminder: 'Recordatorio',
+  log: 'Registro', idea: 'Idea', contact: 'Contacto', event: 'Evento',
 }
 
-const KIND_CLS: Record<string, string> = {
-  task:     'text-accent border-accent/25 bg-accent/10',
-  reminder: 'text-accent border-accent/25 bg-accent/10',
-  log:      'text-ok border-ok/25 bg-ok/10',
-  note:     'text-ink-3 border-ink-4/15 bg-ink-1/30',
-  idea:     'text-warn border-warn/25 bg-warn/10',
-  contact:  'text-ok border-ok/15 bg-ok/5',
-}
-
-const KIND_EMOJI: Record<string, string> = {
-  task:     '✅',
-  reminder: '🔔',
-  log:      '📝',
-  note:     '📌',
-  idea:     '💡',
-  contact:  '👤',
-}
-
-const MODE_META: { id: Mode; label: string }[] = [
-  { id: 'search',      label: '🔍 Resultados'  },
-  { id: 'ask',         label: '✨ Preguntar'   },
-  { id: 'patterns',    label: '🔮 Patrones'    },
-  { id: 'notas',       label: '📋 Notas'       },
-  { id: 'diario',      label: '📓 Diario'      },
+const RESULT_FILTERS: { id: string | null; label: string }[] = [
+  { id: null,      label: 'Todo' },
+  { id: 'nota',    label: 'Notas' },
+  { id: 'diario',  label: 'Diario' },
 ]
+
+const TOP_N = 8
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-MX', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  })
+  return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function kindLabel(metadata: Record<string, unknown>): string {
-  return String(metadata?.kind ?? 'nota')
-}
+// ── Result card ───────────────────────────────────────────────────────────────
 
-// ── ChunkCard ─────────────────────────────────────────────────────────────────
-
-function ChunkCard({ chunk, index }: { chunk: MemoryChunk; index?: number }) {
+function ResultCard({ chunk }: { chunk: MemoryChunk }) {
   const [expanded, setExpanded] = useState(false)
-  const kind = kindLabel(chunk.metadata)
-  const cls  = KIND_CLS[kind] ?? KIND_CLS.note
-  const pct  = Math.round(chunk.similarity * 100)
-  const long = chunk.content.length > 260
-  const body = !expanded && long ? chunk.content.slice(0, 260) + '…' : chunk.content
+  const kind = String(chunk.metadata?.kind ?? 'nota')
+  const long = chunk.content.length > 240
+  const body = !expanded && long ? chunk.content.slice(0, 240).trimEnd() + '…' : chunk.content
+  const pct  = Math.round((chunk.similarity ?? 0) * 100)
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
-      <div className="flex items-center gap-3 border-b border-ink-4/5 px-4 py-2.5">
-        {index !== undefined && (
-          <span className="min-w-[1.5rem] text-center text-xs font-mono text-ink-3/60">
-            [{index + 1}]
-          </span>
-        )}
-        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${cls}`}>
-          {KIND_EMOJI[kind] ?? '🔹'} {kind}
-        </span>
-        <span className="text-[10px] text-ink-3">
-          {chunk.created_at ? fmtDate(chunk.created_at) : '—'}
-        </span>
-        <span className="ml-auto font-mono text-[10px] text-ink-3/60">{pct}%</span>
+    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 px-4 py-3.5 transition-colors">
+      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-ink-3">
+        <span className="font-medium uppercase tracking-wide">{KIND_LABEL[kind] ?? kind}</span>
+        {chunk.created_at && <><span className="text-ink-3/40">·</span><span>{fmtDate(chunk.created_at)}</span></>}
+        <span className="ml-auto tabular-nums text-ink-2/50">{pct}%</span>
       </div>
-      <div className="px-4 py-3">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">{body}</p>
-        {long && (
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="mt-1 text-[10px] text-accent hover:underline"
-          >
-            {expanded ? 'Mostrar menos' : 'Mostrar más'}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── PatternCard ───────────────────────────────────────────────────────────────
-
-function PatternCard({ insight, index }: { insight: PatternInsight; index: number }) {
-  const icon  = PATTERN_ICON[insight.category]  ?? '🔹'
-  const label = PATTERN_LABEL[insight.category] ?? insight.category
-  const color = PATTERN_COLOR[insight.category] ?? 'text-ink-3'
-  const bar   = Math.max(0, Math.min(100, insight.confidence))
-
-  return (
-    <div
-      className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card"
-      style={{ animationDelay: `${index * 60}ms` }}
-    >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-base leading-none">{icon}</span>
-          <span className={`text-[10px] font-semibold uppercase tracking-widest ${color}`}>
-            {label}
-          </span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="font-mono text-[11px] text-ink-3">{bar}%</span>
-          <div className="h-1 w-14 overflow-hidden rounded-full bg-ink-4/10">
-            <div className="h-full rounded-full bg-accent/70 transition-all" style={{ width: `${bar}%` }} />
-          </div>
-        </div>
-      </div>
-      <h3 className="mb-1.5 text-sm font-semibold text-ink-4">{insight.title}</h3>
-      <p className="mb-3 text-sm leading-relaxed text-ink-3">{insight.insight}</p>
-      {insight.evidence.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {insight.evidence.map((e, i) => (
-            <span key={i} className="rounded-full border border-ink-4/10 px-2 py-0.5 text-[10px] text-ink-3">
-              {e.count} {e.label}
-            </span>
-          ))}
-        </div>
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">{body}</p>
+      {long && (
+        <button onClick={() => setExpanded(e => !e)} className="mt-1.5 text-[11px] text-ink-3 transition-colors hover:text-ink-4">
+          {expanded ? 'Mostrar menos' : 'Mostrar más'}
+        </button>
       )}
     </div>
-  )
-}
-
-// ── NoteCard ──────────────────────────────────────────────────────────────────
-
-function NoteCard({
-  note,
-  onEdit,
-  onDeleted,
-}: {
-  note: Note
-  onEdit: () => void
-  onDeleted: (id: string) => void
-}) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-
-  async function handleDelete(e: React.MouseEvent) {
-    e.stopPropagation()
-    setDeleting(true)
-    await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
-    onDeleted(note.id)
-  }
-
-  return (
-    <div
-      onClick={onEdit}
-      className="break-inside-avoid mb-3 cursor-pointer overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-lg shadow-black/10 backdrop-blur-xl transition-colors hover:border-accent/20 group dashboard-card"
-    >
-      <h3 className="mb-1.5 text-sm font-semibold leading-snug text-ink-4">{note.title}</h3>
-
-      {note.content && (
-        <p className="mb-2.5 line-clamp-4 text-xs leading-relaxed text-ink-3">{note.content}</p>
-      )}
-
-      {note.tags.length > 0 && (
-        <div className="mb-2.5 flex flex-wrap gap-1">
-          {note.tags.map(t => (
-            <span key={t} className="rounded-full border border-ink-4/10 px-2 py-0.5 text-[9px] text-ink-3">
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between">
-        <span className="text-[9px] text-ink-2/50">{fmtDate(note.updated_at)}</span>
-        {confirmDelete ? (
-          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-            <span className="text-[9px] text-danger">¿Eliminar?</span>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-[9px] font-medium text-danger hover:underline disabled:opacity-50"
-            >
-              {deleting ? '…' : 'Sí'}
-            </button>
-            <button
-              onClick={e => { e.stopPropagation(); setConfirmDelete(false) }}
-              className="text-[9px] text-ink-3 hover:underline"
-            >
-              No
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}
-            className="text-[9px] text-ink-2/40 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
-          >
-            Eliminar
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── NoteModal ─────────────────────────────────────────────────────────────────
-
-function NoteModal({
-  note,
-  onClose,
-  onSaved,
-  onDeleted,
-}: {
-  note: Note | null
-  onClose: () => void
-  onSaved: (note: Note) => void
-  onDeleted: (id: string) => void
-}) {
-  const [title,     setTitle]     = useState(note?.title ?? '')
-  const [content,   setContent]   = useState(note?.content ?? '')
-  const [tagsInput, setTagsInput] = useState(note?.tags.join(', ') ?? '')
-  const [saving,    setSaving]    = useState(false)
-  const [deleting,  setDeleting]  = useState(false)
-  const [confirmDel, setConfirmDel] = useState(false)
-  const titleRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { titleRef.current?.focus() }, [])
-
-  // Close on Escape
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  async function handleSave() {
-    if (!title.trim() || saving) return
-    setSaving(true)
-    const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean)
-    const body = { title: title.trim(), content, tags }
-    try {
-      const res = await fetch(
-        note ? `/api/notes/${note.id}` : '/api/notes',
-        { method: note ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-      )
-      const data: Note = await res.json()
-      if (res.ok) { onSaved(data); onClose() }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleDelete() {
-    if (!note || deleting) return
-    setDeleting(true)
-    await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
-    onDeleted(note.id)
-    onClose()
-  }
-
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave()
-  }
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Panel */}
-      <div className="relative w-full max-w-lg rounded-2xl border border-ink-4/15 bg-ink-1 shadow-2xl">
-        {/* Title input */}
-        <div className="border-b border-ink-4/10 px-5 pt-5 pb-3">
-          <input
-            ref={titleRef}
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Título"
-            className="w-full bg-transparent text-base font-semibold text-ink-4 placeholder:text-ink-2/50 outline-none"
-          />
-        </div>
-
-        {/* Content textarea */}
-        <div className="px-5 py-3">
-          <textarea
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Contenido…"
-            rows={7}
-            className="w-full resize-none bg-transparent text-sm leading-relaxed text-ink-4 placeholder:text-ink-2/40 outline-none"
-          />
-        </div>
-
-        {/* Tags input */}
-        <div className="border-t border-ink-4/10 px-5 py-3">
-          <input
-            value={tagsInput}
-            onChange={e => setTagsInput(e.target.value)}
-            placeholder="Etiquetas separadas por comas (ej: banco, personal, trabajo)"
-            className="w-full bg-transparent text-xs text-ink-3 placeholder:text-ink-2/40 outline-none"
-          />
-          {/* Tag preview pills */}
-          {tagsInput.trim() && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {tagsInput.split(',').map(t => t.trim()).filter(Boolean).map(t => (
-                <span key={t} className="rounded-full border border-ink-4/10 px-2 py-0.5 text-[9px] text-ink-3">{t}</span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-ink-4/10 px-5 py-3">
-          {/* Delete */}
-          {note ? (
-            confirmDel ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-danger">¿Eliminar nota?</span>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="text-xs font-medium text-danger hover:underline disabled:opacity-50"
-                >
-                  {deleting ? '…' : 'Sí, eliminar'}
-                </button>
-                <button onClick={() => setConfirmDel(false)} className="text-xs text-ink-3 hover:underline">
-                  Cancelar
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmDel(true)}
-                className="text-xs text-ink-2/60 transition-colors hover:text-danger"
-              >
-                Eliminar
-              </button>
-            )
-          ) : (
-            <p className="text-[10px] text-ink-2/40">⌘↵ para guardar</p>
-          )}
-
-          {/* Save / Cancel */}
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className="px-3 py-1.5 text-sm text-ink-3 transition-colors hover:text-ink-4">
-              Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!title.trim() || saving}
-              className="rounded-xl bg-accent/15 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40"
-            >
-              {saving ? '…' : note ? 'Guardar' : 'Crear nota'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body
   )
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CerebroContent() {
-  // Memory search / ask / patterns state
-  const [query,       setQuery]       = useState('')
-  const [mode,        setMode]        = useState<Mode>('search')
-  const [results,     setResults]     = useState<MemoryChunk[]>([])
-  const [answer,      setAnswer]      = useState('')
-  const [sources,     setSources]     = useState<MemoryChunk[]>([])
-  const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
-  const [hasSearched, setHasSearched] = useState(false)
-  const [patterns,    setPatterns]    = useState<PatternResult | null>(null)
-  const [hasAnalyzed, setHasAnalyzed] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const [intent, setIntent] = useState<'capturar' | 'consultar'>('capturar')
 
-  // Notes state
-  const [notes,       setNotes]       = useState<Note[]>([])
-  const [notesLoaded, setNotesLoaded] = useState(false)
-  const [noteSearch,  setNoteSearch]  = useState('')
-  const [noteModal,   setNoteModal]   = useState<Note | 'new' | null>(null)
-  const [vaultOpen,   setVaultOpen]   = useState(false)   // consultation hub collapsed by default
+  // Capture
+  const [capMode,  setCapMode]  = useState<CapMode>('tarea')
+  const [capText,  setCapText]  = useState('')
+  const [mood,     setMood]     = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const capRef   = useRef<HTMLTextAreaElement>(null)
+  const feedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  // Journal history (read from the same /api/journal the Diario section uses)
-  const [journal,       setJournal]       = useState<JournalEntry[]>([])
-  const [journalLoaded, setJournalLoaded] = useState(false)
-  const [journalExpand, setJournalExpand] = useState<string | null>(null)
+  // Consult — search over one's own memory
+  const [query,     setQuery]     = useState('')
+  const [results,   setResults]   = useState<MemoryChunk[]>([])
+  const [searched,  setSearched]  = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [kindFilter, setKindFilter] = useState<string | null>(null)
+  const [showAll,   setShowAll]   = useState(false)
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  // Ask the AI (RAG) — the discreet fallback
+  const [answer,     setAnswer]     = useState('')
+  const [askSources, setAskSources] = useState<MemoryChunk[]>([])
+  const [asking,     setAsking]     = useState(false)
 
-  // Keep the backstage "perfil" RAG layer in sync with context/contexto-alex.md. Cheap: only
-  // re-ingests when the doc's hash changed (no cost when unchanged). Fire-and-forget on load.
+  const [err, setErr] = useState<string | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const abortRef  = useRef<AbortController | null>(null)
+
+  const capMeta = CAPTURE_MODES.find(m => m.id === capMode) ?? CAPTURE_MODES[0]
+
+  // Keep the backstage "perfil" RAG layer in sync with context/contexto-alex.md (cheap; only
+  // re-ingests when the doc's hash changed). Fire-and-forget on load.
   useEffect(() => { fetch('/api/context/sync', { method: 'POST' }).catch(() => {}) }, [])
 
-  // Load notes once when switching to notas tab
   useEffect(() => {
-    if (mode !== 'notas' || notesLoaded) return
-    fetch('/api/notes')
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setNotes(data) })
-      .finally(() => setNotesLoaded(true))
-  }, [mode, notesLoaded])
+    if (intent === 'capturar') capRef.current?.focus()
+    else searchRef.current?.focus()
+  }, [intent])
 
-  const filteredNotes = useMemo(() => {
-    const q = noteSearch.toLowerCase().trim()
-    if (!q) return notes
-    return notes.filter(n =>
-      n.title.toLowerCase().includes(q) ||
-      n.content.toLowerCase().includes(q) ||
-      n.tags.some(t => t.toLowerCase().includes(q))
-    )
-  }, [notes, noteSearch])
-
-  function handleNoteSaved(saved: Note) {
-    setNotes(prev => {
-      const idx = prev.findIndex(n => n.id === saved.id)
-      if (idx >= 0) {
-        const next = [...prev]; next[idx] = saved; return next
-      }
-      return [saved, ...prev]
-    })
+  function grow() {
+    const ta = capRef.current
+    if (ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px' }
   }
 
-  function handleNoteDeleted(id: string) {
-    setNotes(prev => prev.filter(n => n.id !== id))
+  function flash(msg: string) {
+    setFeedback(msg)
+    clearTimeout(feedTimer.current)
+    feedTimer.current = setTimeout(() => setFeedback(null), 2600)
   }
 
-  // Load journal history once when switching to the Diario tab
-  useEffect(() => {
-    if (mode !== 'diario' || journalLoaded) return
-    fetch('/api/journal')
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setJournal(data) })
-      .finally(() => setJournalLoaded(true))
-  }, [mode, journalLoaded])
-
-
-  // Memory search / patterns handlers
-  async function loadPatterns() {
-    setLoading(true)
-    setError(null)
-    setPatterns(null)
-    setHasAnalyzed(true)
+  // ── Capture ──────────────────────────────────────────────────────────────
+  async function submitCapture() {
+    const t = capText.trim()
+    if (!t || saving) return
+    setSaving(true)
     try {
-      const r = await fetch('/api/patterns', {
-        method:  'POST',
-        headers: { 'content-type': 'application/json' },
-        body:    JSON.stringify({ focus: query.trim() || undefined }),
-      })
-      if (!r.ok) throw new Error(await r.text())
-      setPatterns(await r.json())
-    } catch (e) {
-      setError(String(e))
+      if (capMode === 'tarea') {
+        const res = await fetch('/api/capture', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t }),
+        })
+        if (!res.ok) throw new Error()
+        const data: { kind?: string } = await res.json().catch(() => ({}))
+        if (data.kind === 'task' || data.kind === 'reminder' || data.kind === 'event') {
+          window.dispatchEvent(new CustomEvent('capture:task'))
+        }
+      } else if (capMode === 'nota') {
+        const lines   = t.split('\n')
+        const title   = (lines[0] ?? t).slice(0, 120).trim() || 'Nota'
+        const content = lines.slice(1).join('\n').trim()
+        const res = await fetch('/api/notes', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, content, tags: [] }),
+        })
+        if (!res.ok) throw new Error()
+      } else {
+        const r = await fetch('/api/journal', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entry_date: localToday() }),
+        })
+        if (!r.ok) throw new Error()
+        const created: { id: string } = await r.json()
+        await fetch(`/api/journal/${created.id}`, {
+          method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: t, mood: mood || null }),
+        })
+      }
+      setCapText(''); setMood('')
+      if (capRef.current) capRef.current.style.height = 'auto'
+      flash('Guardado ✓')
+    } catch {
+      flash('Error al guardar')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  async function handleSubmit(e?: React.FormEvent) {
-    e?.preventDefault()
-    if (mode === 'patterns') { loadPatterns(); return }
-    if (!query.trim() || loading) return
-
+  // ── Search one's own memory ──────────────────────────────────────────────
+  async function runSearch() {
+    const q = query.trim()
+    if (!q || searching) return
     abortRef.current?.abort()
-    const ctrl = new AbortController()
-    abortRef.current = ctrl
-
-    setLoading(true)
-    setError(null)
-    setResults([])
-    setAnswer('')
-    setSources([])
-    setHasSearched(true)
-
+    const ctrl = new AbortController(); abortRef.current = ctrl
+    setSearching(true); setErr(null); setSearched(true); setShowAll(false); setAnswer(''); setAskSources([])
     try {
-      if (mode === 'search') {
-        const r = await fetch('/api/memory/search', {
-          method:  'POST',
-          headers: { 'content-type': 'application/json' },
-          body:    JSON.stringify({ query: query.trim() }),
-          signal:  ctrl.signal,
-        })
-        if (!r.ok) throw new Error(await r.text())
-        const data = await r.json()
-        setResults(Array.isArray(data) ? data : [])
-      } else {
-        const r = await fetch('/api/ask', {
-          method:  'POST',
-          headers: { 'content-type': 'application/json' },
-          body:    JSON.stringify({ query: query.trim() }),
-          signal:  ctrl.signal,
-        })
-        if (!r.ok) throw new Error(await r.text())
-        if (!r.body) throw new Error('No response body')
+      const r = await fetch('/api/memory/search', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q }), signal: ctrl.signal,
+      })
+      if (!r.ok) throw new Error(await r.text())
+      const data = await r.json()
+      setResults(Array.isArray(data) ? data : [])
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') setErr(String(e))
+    } finally {
+      setSearching(false)
+    }
+  }
 
-        const reader  = r.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const raw = line.slice(6).trim()
-            if (raw === '[DONE]') break
-            try {
-              const msg = JSON.parse(raw) as { type: string; text?: string; sources?: MemoryChunk[]; message?: string }
-              if (msg.type === 'sources') setSources(msg.sources ?? [])
-              else if (msg.type === 'text') setAnswer(prev => prev + (msg.text ?? ''))
-              else if (msg.type === 'error') setError(msg.message ?? 'Error')
-            } catch { /* skip malformed lines */ }
-          }
+  // ── Ask the AI (RAG, streaming) — discreet fallback ──────────────────────
+  async function runAsk() {
+    const q = query.trim()
+    if (!q || asking) return
+    abortRef.current?.abort()
+    const ctrl = new AbortController(); abortRef.current = ctrl
+    setAsking(true); setErr(null); setAnswer(''); setAskSources([])
+    try {
+      const r = await fetch('/api/ask', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q }), signal: ctrl.signal,
+      })
+      if (!r.ok) throw new Error(await r.text())
+      if (!r.body) throw new Error('No response body')
+      const reader = r.body.getReader(); const decoder = new TextDecoder(); let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6).trim()
+          if (raw === '[DONE]') break
+          try {
+            const msg = JSON.parse(raw) as { type: string; text?: string; sources?: MemoryChunk[]; message?: string }
+            if (msg.type === 'sources') setAskSources(msg.sources ?? [])
+            else if (msg.type === 'text') setAnswer(prev => prev + (msg.text ?? ''))
+            else if (msg.type === 'error') setErr(msg.message ?? 'Error')
+          } catch { /* skip malformed */ }
         }
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') setError(String(e))
+      if ((e as Error).name !== 'AbortError') setErr(String(e))
     } finally {
-      setLoading(false)
+      setAsking(false)
     }
   }
 
-  const displayResults = mode === 'search' ? results : sources
-  const hasResults     = displayResults.length > 0
-  const hasAnswer      = answer.length > 0
+  const filtered = useMemo(
+    () => (kindFilter ? results.filter(r => String(r.metadata?.kind) === kindFilter) : results),
+    [results, kindFilter],
+  )
+  const visible = showAll ? filtered : filtered.slice(0, TOP_N)
+  const hasAnswer = answer.length > 0
 
   return (
-      <main className={`mx-auto flex h-full max-w-3xl flex-col px-6 ${vaultOpen ? 'pt-6' : 'justify-center'}`}>
+    <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
 
-        {/* Universal capture — the one writing box for the whole OS */}
-        <div className="mb-3 shrink-0"><UniversalCapture /></div>
+      {/* ── Command bar ─────────────────────────────────────────────────── */}
+      <div className="rounded-3xl border border-ink-4/10 bg-ink-1/50 p-6 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
 
-        {/* Consultation hub (search · ask · patterns · notes vault) — collapsed by default */}
-        <button
-          type="button"
-          onClick={() => setVaultOpen(o => !o)}
-          className="mb-3 flex shrink-0 items-center gap-2 self-start rounded-full border border-ink-4/10 bg-ink-1/60 px-3 py-1.5 text-xs text-ink-3 transition-colors hover:text-ink-4"
-        >
-          <span>{vaultOpen ? '▾' : '▸'}</span>
-          <span>Consultar el vault — buscar · preguntar · patrones · notas</span>
-        </button>
-
-        {vaultOpen && (<>
-        {/* Mode toggle */}
-        <div className="mb-4 flex shrink-0 flex-wrap gap-2">
-          {MODE_META.map(({ id, label }) => (
+        {/* Intent toggle */}
+        <div className="relative mb-5 flex rounded-full border border-ink-4/10 bg-ink-0/40 p-1">
+          <div
+            className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-ink-4/[0.08] transition-transform duration-200 ease-out"
+            style={{ transform: intent === 'consultar' ? 'translateX(100%)' : 'translateX(0)' }}
+          />
+          {(['capturar', 'consultar'] as const).map(i => (
             <button
-              key={id}
+              key={i}
               type="button"
-              onClick={() => setMode(id)}
-              className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
-                mode === id
-                  ? 'border-accent/40 bg-[oklch(0.24_0.055_255)] font-medium text-accent'
-                  : 'border-ink-4/10 bg-ink-1/90 text-ink-3 hover:bg-ink-1 hover:text-ink-4'
-              }`}
+              onClick={() => setIntent(i)}
+              className={`relative z-10 flex-1 rounded-full py-1.5 text-sm font-medium capitalize transition-colors ${intent === i ? 'text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
             >
-              {label}
+              {i}
             </button>
           ))}
         </div>
 
-        {/* ── NOTAS MODE ─────────────────────────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-y-auto pb-16 pt-2">
-        {mode === 'notas' && (
+        {intent === 'capturar' ? (
           <>
-            {/* Search + new note */}
-            <div className="mb-5 flex gap-3">
-              <input
-                value={noteSearch}
-                onChange={e => setNoteSearch(e.target.value)}
-                placeholder="Buscar por título, contenido o etiqueta…"
-                className="flex-1 rounded-2xl border border-ink-4/10 bg-ink-1/85 py-3 pl-5 pr-4 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-              />
-              <button
-                onClick={() => setNoteModal('new')}
-                className="shrink-0 rounded-2xl border border-accent/20 bg-accent/10 px-4 py-3 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
-              >
-                + Nueva nota
-              </button>
+            {/* Sub-mode chips */}
+            <div className="mb-3 flex gap-1">
+              {CAPTURE_MODES.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => { setCapMode(m.id); if (m.id !== 'diario') setMood(''); capRef.current?.focus() }}
+                  className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${capMode === m.id ? 'bg-ink-4/[0.08] text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
 
-            {/* Grid */}
-            {!notesLoaded ? (
-              <div className="flex justify-center py-16">
-                <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
-              </div>
-            ) : filteredNotes.length === 0 ? (
-              <div className="py-20 text-center">
-                <p className="mb-3 text-4xl">📋</p>
-                <p className="text-sm text-ink-3">
-                  {noteSearch
-                    ? 'No se encontraron notas con ese texto.'
-                    : <>Aún no tienes notas.<br />Guarda teléfonos, combinaciones, datos de cuentas…</>}
-                </p>
-                {!noteSearch && (
-                  <p className="mt-3 text-[11px] text-ink-2/50">
-                    Nota: los datos se guardan sin cifrado en Supabase.<br />
-                    Úsalo para referencias (teléfonos, PINs de banco, etc.), no para contraseñas maestras.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="columns-1 gap-3 sm:columns-2">
-                {filteredNotes.map(note => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    onEdit={() => setNoteModal(note)}
-                    onDeleted={handleNoteDeleted}
-                  />
+            <textarea
+              ref={capRef}
+              value={capText}
+              onChange={e => { setCapText(e.target.value); grow() }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submitCapture() } }}
+              placeholder={capMeta.placeholder}
+              disabled={saving}
+              className="w-full resize-none overflow-hidden bg-transparent text-[15px] leading-relaxed text-ink-4 placeholder:text-ink-2/60 outline-none disabled:opacity-40"
+              style={{ minHeight: capMode === 'tarea' ? '32px' : '76px' }}
+            />
+
+            {capMode === 'diario' && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {MOODS.map(m => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMood(mood === m.value ? '' : m.value)}
+                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${mood === m.value ? 'border-accent/25 bg-accent/10 text-accent' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
+                  >
+                    <span>{m.emoji}</span><span>{m.label}</span>
+                  </button>
                 ))}
               </div>
             )}
+
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-ink-4/8 pt-3">
+              <span className={`text-xs transition-opacity ${feedback ? 'opacity-100' : 'opacity-0'} ${feedback === 'Guardado ✓' ? 'text-ok' : 'text-danger'}`}>
+                {feedback ?? ' '}
+              </span>
+              <button
+                type="button"
+                onClick={() => void submitCapture()}
+                disabled={saving || !capText.trim()}
+                className="shrink-0 rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Search — the protagonist */}
+            <div className="relative">
+              <svg viewBox="0 0 20 20" fill="none" className="pointer-events-none absolute left-1 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" stroke="currentColor" strokeWidth={1.6}>
+                <circle cx="9" cy="9" r="6" /><path d="M14 14l3.5 3.5" strokeLinecap="round" />
+              </svg>
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void runSearch() } }}
+                placeholder="Busca en tu memoria…"
+                className="w-full bg-transparent py-1 pl-7 pr-2 text-[15px] text-ink-4 placeholder:text-ink-2/60 outline-none"
+              />
+            </div>
+
+            {/* Secondary, discreet: kind filters */}
+            <div className="mt-3 flex items-center gap-1 border-t border-ink-4/8 pt-3">
+              {RESULT_FILTERS.map(f => (
+                <button
+                  key={f.label}
+                  type="button"
+                  onClick={() => setKindFilter(f.id)}
+                  className={`rounded-md px-2 py-0.5 text-[11px] transition-colors ${kindFilter === f.id ? 'bg-ink-4/[0.08] text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+              <span className="ml-auto text-[11px] text-ink-2/50">Enter para buscar</span>
+            </div>
           </>
         )}
+      </div>
 
-        {/* ── DIARIO MODE — journal history (read from the same /api/journal) ──── */}
-        {mode === 'diario' && (
-          !journalLoaded ? (
-            <div className="flex justify-center py-16">
-              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+      {/* ── Results / answer — expand below only when there's something ───── */}
+      {intent === 'consultar' && (
+        <div className="mt-5 space-y-4">
+          {err && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>
+          )}
+
+          {searching && (
+            <div className="flex items-center gap-3 py-6 text-sm text-ink-3">
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+              Buscando en tu memoria…
             </div>
-          ) : journal.length === 0 ? (
-            <div className="py-20 text-center">
-              <p className="mb-3 text-4xl">📓</p>
-              <p className="text-sm text-ink-3">Aún no hay entradas en tu diario.</p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {[...journal].sort((a, b) => b.created_at.localeCompare(a.created_at)).map(entry => {
-                const open  = journalExpand === entry.id
-                const stamp = `${new Date(entry.entry_date + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} ${formatTime(entry.created_at)}`
-                return (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    onClick={() => setJournalExpand(id => (id === entry.id ? null : entry.id))}
-                    className="flex w-full items-start gap-2 rounded-lg border border-ink-4/8 bg-ink-1/40 px-2.5 py-1.5 text-left transition-colors hover:bg-ink-1/70"
-                  >
-                    <span className="shrink-0 text-sm leading-tight">{moodEmoji(entry.mood) || '·'}</span>
-                    <span className={`min-w-0 flex-1 whitespace-pre-wrap text-xs leading-snug text-ink-3 ${open ? '' : 'line-clamp-1'}`}>
-                      {entry.content?.trim() || <span className="italic text-ink-2/50">(sin texto)</span>}
-                    </span>
-                    <span className="shrink-0 whitespace-nowrap pt-0.5 text-[10px] tabular-nums text-ink-2/50">{stamp}</span>
+          )}
+
+          {searched && !searching && (
+            filtered.length > 0 ? (
+              <>
+                <p className="text-xs text-ink-3">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
+                {visible.map(c => <ResultCard key={c.id} chunk={c} />)}
+                {filtered.length > TOP_N && !showAll && (
+                  <button onClick={() => setShowAll(true)} className="w-full rounded-xl border border-ink-4/10 py-2 text-xs text-ink-3 transition-colors hover:text-ink-4">
+                    Ver {filtered.length - TOP_N} más
                   </button>
-                )
-              })}
-            </div>
-          )
-        )}
-
-        {/* ── SEARCH / ASK / PATTERNS MODE ──────────────────────────────── */}
-        {mode !== 'notas' && mode !== 'diario' && (
-          <>
-            <form onSubmit={handleSubmit} className="mb-8">
-              <div className="relative">
-                <input
-                  ref={inputRef}
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder={
-                    mode === 'search'   ? 'Busca algo en tu memoria… ej. "reunión con Carlos"' :
-                    mode === 'patterns' ? 'Área de enfoque (opcional)… ej. "creatividad", "hábitos"' :
-                                         'Pregunta algo… ej. "¿Qué sé sobre Barbaján?"'
-                  }
-                  className="w-full rounded-2xl border border-ink-4/10 bg-ink-1/85 py-3.5 pl-5 pr-28 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-                />
-                <button
-                  type="submit"
-                  disabled={loading || (mode !== 'patterns' && !query.trim())}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40"
-                >
-                  {loading ? '…' : mode === 'patterns' ? 'Analizar' : '↵'}
-                </button>
-              </div>
-            </form>
-
-            {/* Error */}
-            {error && (
-              <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                {error}
-              </div>
-            )}
-
-            {/* Loading */}
-            {loading && (
-              <div className="flex items-center gap-3 py-8 text-sm text-ink-3">
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
-                {mode === 'patterns'
-                  ? 'Analizando patrones en tu vida…'
-                  : mode === 'search' ? 'Buscando en tu memoria…' : 'Consultando a tu OS…'}
-              </div>
-            )}
-
-            {/* Ask mode — streaming answer */}
-            {mode === 'ask' && hasAnswer && (
-              <div className="mb-8 overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-                <div className="border-b border-ink-4/5 px-5 py-3">
-                  <span className="text-xs font-medium text-accent">✨ Respuesta</span>
-                </div>
-                <div className="px-5 py-4">
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">
-                    {answer}
-                    {loading && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent" />}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Results / sources */}
-            {mode !== 'patterns' && !loading && hasSearched && (
-              <>
-                {hasResults ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-ink-3">
-                      {mode === 'ask' ? 'Fuentes consultadas' : 'Resultados'} ({displayResults.length})
-                    </p>
-                    {displayResults.map((chunk, i) => (
-                      <ChunkCard key={chunk.id} chunk={chunk} index={mode === 'ask' ? i : undefined} />
-                    ))}
-                  </div>
-                ) : !loading && !hasAnswer ? (
-                  <div className="py-16 text-center">
-                    <p className="text-sm italic text-ink-3/60">
-                      No se encontró nada relevante.{' '}
-                      {mode === 'ask' && 'Prueba reformular la pregunta.'}
-                    </p>
-                  </div>
-                ) : null}
-              </>
-            )}
-
-            {/* Patterns results */}
-            {mode === 'patterns' && !loading && hasAnalyzed && (
-              <>
-                {patterns ? (
-                  <div className="space-y-4">
-                    {patterns.summary && (
-                      <div className="rounded-2xl border border-accent/15 bg-accent/5 px-5 py-4">
-                        <p className="text-sm leading-relaxed text-ink-4">{patterns.summary}</p>
-                        <p className="mt-2 text-[10px] text-ink-3">
-                          {patterns.analyzed.total} memorias analizadas ·{' '}
-                          {Object.entries(patterns.analyzed.byKind)
-                            .map(([k, n]) => `${n} ${k}`)
-                            .join(', ')}
-                        </p>
-                      </div>
-                    )}
-                    {patterns.insights.map((insight, i) => (
-                      <PatternCard key={i} insight={insight} index={i} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-16 text-center">
-                    <p className="text-sm italic text-ink-3/60">No se detectaron patrones.</p>
-                  </div>
+                )}
+                {/* Discreet AI fallback */}
+                {!hasAnswer && !asking && (
+                  <button onClick={() => void runAsk()} className="block w-full pt-1 text-center text-xs text-ink-3 transition-colors hover:text-accent">
+                    ¿No lo encuentras? Pregúntale a Cerebro →
+                  </button>
                 )}
               </>
-            )}
+            ) : !hasAnswer && !asking ? (
+              <div className="py-10 text-center">
+                <p className="text-sm italic text-ink-3/60">Nada en tu memoria coincide.</p>
+                <button onClick={() => void runAsk()} className="mt-2 text-xs text-ink-3 transition-colors hover:text-accent">
+                  Pregúntale a Cerebro →
+                </button>
+              </div>
+            ) : null
+          )}
 
-          </>
-        )}
-
+          {/* AI answer (RAG) */}
+          {(asking || hasAnswer) && (
+            <div className="rounded-2xl border border-accent/15 bg-accent/[0.04] px-5 py-4">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-accent/80">Cerebro responde</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">
+                {answer}
+                {asking && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent align-middle" />}
+              </p>
+              {askSources.length > 0 && (
+                <p className="mt-3 border-t border-ink-4/8 pt-2 text-[11px] text-ink-3">
+                  {askSources.length} fuente{askSources.length === 1 ? '' : 's'} · {[...new Set(askSources.map(s => KIND_LABEL[String(s.metadata?.kind)] ?? String(s.metadata?.kind)))].join(' · ')}
+                </p>
+              )}
+            </div>
+          )}
         </div>
-        </>)}
-
-        {/* ── NOTE MODAL ─────────────────────────────────────────────────── */}
-        {noteModal !== null && (
-          <NoteModal
-            note={noteModal === 'new' ? null : noteModal}
-            onClose={() => setNoteModal(null)}
-            onSaved={handleNoteSaved}
-            onDeleted={handleNoteDeleted}
-          />
-        )}
-
-      </main>
+      )}
+    </main>
   )
 }

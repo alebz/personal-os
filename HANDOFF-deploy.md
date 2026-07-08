@@ -69,3 +69,28 @@
   se come el gesto del SO. Fix: quitado el `autoFocus` del login + `overscroll-behavior: none` en
   html/body (evita que Chrome secuestre el swipe horizontal; sano para una app tipo OS). Nota: no se
   pudo reproducir el gesto del hardware desde aquí — verificar con el MX Master en prod.
+
+## 🚫 REGLA DE ORO (permanente, aplica a TODO el OS)
+
+**PROHIBIDOS los scrolls internos.** Ningún contenido va en cajitas con su propio `overflow-y-auto`
+/`overflow-scroll`/`max-h` scrolleable que peleen con el scroll del tambor y corten el contenido.
+Todo fluye en el scroll principal de la cara (la cara del drum ya es el contenedor scrolleable).
+Para listas largas: mostrar los **TOP N más relevantes + un "Ver más"** que EXPANDE hacia abajo en el
+scroll principal (no una cajita scrolleable). Al construir/editar cualquier cara, verificar que no
+introduzca `overflow-y-auto` interno.
+
+## Rediseño de Cerebro (CerebroContent.tsx)
+
+Reescrito como **una barra de comando unificada** (look CalendarCard: glass sutil, aire, ink/accent,
+sin emojis parchados):
+- **Toggle deslizante [Capturar ⟷ Consultar]** (default Capturar).
+- **Capturar:** sub-chips Tarea / Nota / Diario (minimal, sin emoji) → mismos endpoints
+  (`/api/capture`, `/api/notes`, `/api/journal`). ENTER guarda; Diario muestra su fila de mood.
+- **Consultar:** la caja es **buscador de la propia memoria** (`/api/memory/search`, protagonista,
+  dispara con Enter). Filtros Todo/Notas/Diario discretos. Resultados fluyen abajo: **top 8 + "Ver N
+  más"** (sin scroll interno). "**¿No lo encuentras? Pregúntale a Cerebro →**" es una acción discreta
+  que corre el RAG (`/api/ask`, streaming) y muestra la respuesta en un panel debajo — NO es tab
+  principal.
+- Se retiró el `overflow-y-auto` interno anterior (cumple la regla de oro). Solo rediseño de UI; los
+  endpoints y el auto-sync de `/api/context/sync` se mantienen. `UniversalCapture.tsx` quedó huérfano
+  (su lógica se absorbió en la barra); se puede borrar si no se reusa.
