@@ -158,6 +158,7 @@ export default function CalendarCard() {
   const [adding,     setAdding]     = useState(false)
   const [addError,   setAddError]   = useState<string | null>(null)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [formOpen,   setFormOpen]   = useState(false)   // collapsed to just the title until focused
 
   function rangeForView(year: number, month: number): { from: string; to: string } {
     const gridCells = buildGridCells(year, month)
@@ -229,7 +230,14 @@ export default function CalendarCard() {
 
   function resetForm() {
     setAddTitle(''); setAddTime(''); setAddNote(''); setEditingUid(null); setAddError(null)
-    setAddDate(selected ?? todayKey)
+    setAddDate(selected ?? todayKey); setFormOpen(false)
+  }
+
+  // Auto-collapse a pristine create form when focus leaves it (nothing typed, not editing).
+  function handleFormBlur(e: React.FocusEvent<HTMLFormElement>) {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return   // focus still inside the form
+    if (editingUid || addTitle.trim() || addNote.trim() || addTime) return  // has content / editing → keep open
+    setFormOpen(false)
   }
 
   // Only captured events (created inside the OS) are editable/deletable. iCal events are read-only.
@@ -243,7 +251,7 @@ export default function CalendarCard() {
     setAddDate(ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start)))
     setAddTime(ev.allDay ? '' : formatTime(ev.start))
     setAddNote(ev.note ?? '')
-    setAddError(null); setConfirmDel(null)
+    setAddError(null); setConfirmDel(null); setFormOpen(true)
   }
 
   async function handleAddEvent(e: React.FormEvent) {
@@ -450,7 +458,7 @@ export default function CalendarCard() {
               )}
 
               {/* Add / edit form */}
-              <form onSubmit={handleAddEvent} className="mt-4 space-y-2 border-t border-ink-4/10 pt-4">
+              <form onSubmit={handleAddEvent} onBlur={handleFormBlur} className="mt-4 space-y-2 border-t border-ink-4/10 pt-4">
                 {editingUid && (
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">Editando</span>
@@ -461,10 +469,13 @@ export default function CalendarCard() {
                   type="text"
                   value={addTitle}
                   onChange={e => setAddTitle(e.target.value)}
+                  onFocus={() => setFormOpen(true)}
+                  onClick={() => setFormOpen(true)}
                   placeholder={editingUid ? 'Título del evento' : 'Nuevo evento…'}
                   disabled={adding}
                   className="w-full rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
                 />
+                {formOpen && (<>
                 <textarea
                   value={addNote}
                   onChange={e => setAddNote(e.target.value)}
@@ -497,6 +508,7 @@ export default function CalendarCard() {
                   {adding ? '…' : editingUid ? 'Guardar' : 'Agregar'}
                 </button>
                 {addError && <p className="text-xs text-red-400">{addError}</p>}
+                </>)}
               </form>
             </>
           )}
