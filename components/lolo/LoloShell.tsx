@@ -82,7 +82,7 @@ function roundBtn(pressed: boolean, color = 'var(--btn)'): React.CSSProperties {
 
 export default function LoloShell({
   pos, cssVars, scanlinesOn, netOk,
-  time, temperament, mode, busy, bubble, chatMessages, showFloorShadow, bgImage,
+  mode, busy, bubble, chatMessages, showFloorShadow, bgImage,
   containerRef, frameRef, imgRef, dialogueRef, messagesRef, inputRef, dragging,
   onPointerDown, onPointerMove, onPointerUp, onFaceClick, onScrollDown,
   onBubblePause, onBubbleResume,
@@ -151,6 +151,8 @@ export default function LoloShell({
     return () => ro.disconnect()
   }, [containerRef])
   const dynS = containerWidth / DEVICE_W
+  const innerW = DEVICE_W - 12  // bezel content width (6px border each side)
+  const clipD  = `M24,0 H${innerW - 24} A24,24 0 0 1 ${innerW},24 V938 A62,62 0 0 1 ${innerW - 62},1000 H62 A62,62 0 0 1 0,938 V24 A24,24 0 0 1 24,0 Z M12,10 H${innerW - 12} V654 H12 Z`
 
   return createPortal(
     <div
@@ -208,7 +210,7 @@ export default function LoloShell({
           </svg>
 
           {/* Unified bezel */}
-          <div style={{ position: 'relative', width: 483, isolation: 'isolate', pointerEvents: 'auto', background: 'linear-gradient(135deg, var(--shellLight,#c8bdb5) 0%, var(--shellMid,#b8aea5) 50%, var(--shellDark,#a89a92) 100%)', border: '6px solid var(--shellBorder,#8a7f77)', boxShadow: '0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15),inset 0 -2px 4px rgba(0,0,0,.2)', borderRadius: '24px 24px 62px 62px', padding: '36px 20px 36px', animation: 'deviceSway 4s ease-in-out infinite', imageRendering: 'pixelated', ...shellStyle }}>
+          <div style={{ position: 'relative', width: DEVICE_W, isolation: 'isolate', pointerEvents: 'auto', background: 'linear-gradient(135deg, var(--shellLight,#c8bdb5) 0%, var(--shellMid,#b8aea5) 50%, var(--shellDark,#a89a92) 100%)', border: '6px solid var(--shellBorder,#8a7f77)', boxShadow: '0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15),inset 0 -2px 4px rgba(0,0,0,.2)', borderRadius: '24px 24px 62px 62px', padding: '36px 20px 36px', animation: 'deviceSway 4s ease-in-out infinite', imageRendering: 'pixelated', ...shellStyle }}>
 
             {/* Shared clipPath: plastic frame only, with rounded corners matching the shell.
                 evenodd: outer rounded boundary minus screen bay (x12-459,y10-654, +8px inset on all sides).
@@ -217,7 +219,7 @@ export default function LoloShell({
             <svg width={0} height={0} style={{ position: 'absolute', overflow: 'hidden', pointerEvents: 'none' }} aria-hidden>
               <defs>
                 <clipPath id="shell-frame-clip">
-                  <path clipRule="evenodd" d="M24,0 H447 A24,24 0 0 1 471,24 V938 A62,62 0 0 1 409,1000 H62 A62,62 0 0 1 0,938 V24 A24,24 0 0 1 24,0 Z M12,10 H459 V654 H12 Z" />
+                  <path clipRule="evenodd" d={clipD} />
                 </clipPath>
               </defs>
             </svg>
@@ -268,23 +270,8 @@ export default function LoloShell({
 {/* Ground gradient */}
                 <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 74, zIndex: 1, background: 'linear-gradient(180deg, transparent, rgba(170,185,140,.5))', pointerEvents: 'none' }} />
 
-                {/* HUD: top strip */}
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 36, background: 'color-mix(in srgb, var(--lcd) 92%, #000)', borderBottom: '3px solid var(--ink)', borderRadius: '6px 6px 0 0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 11px 3px', pointerEvents: 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ color: '#c05a52', fontSize: 13, lineHeight: 1, animation: 'adanHeart 2.6s ease-in-out infinite', display: 'inline-block' }}>♥︎</span>
-                      <span style={{ fontFamily: "'Press Start 2P',monospace", fontSize: 10, letterSpacing: 1, color: 'var(--ink)' }}>LOLO</span>
-                      <span style={{ fontFamily: "'Press Start 2P',monospace", fontSize: 10, letterSpacing: 1, color: 'var(--ink)', opacity: .35 }}>·</span>
-                      <span style={{ fontFamily: "'Press Start 2P',monospace", fontSize: 8, letterSpacing: .5, color: 'var(--ink)', opacity: .85 }}>{temperament.current}</span>
-                      {mode === 'chat' && <span style={{ fontFamily: "'Press Start 2P',monospace", fontSize: 7, letterSpacing: .5, color: 'var(--ink)', opacity: .5, marginLeft: 4 }}>CHAT</span>}
-                    </div>
-                    <div style={{ fontFamily: "'Press Start 2P',monospace", fontSize: 9, lineHeight: 1, color: 'var(--ink)', opacity: .9, letterSpacing: 1 }}>{time}</div>
-                  </div>
-                </div>
-
                 {/* Flex column: character area + always-visible input bar */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0, margin: 0, zIndex: 3, minHeight: 0 }}>
-                  <div style={{ height: 26, flexShrink: 0, pointerEvents: 'none' }} />
 
                   {/* Character area — chat/config overlays are children so bottom:0 is relative here */}
                   <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
@@ -310,11 +297,14 @@ export default function LoloShell({
                             draggable={false}
                             onClick={onFaceClick}
                             onError={e => { const el = e.target as HTMLImageElement; if (!el.src.endsWith('lolo_idle_2.png')) el.src = ALL_LOLO_IMAGES[0] }}
-                            style={{ position: 'absolute', bottom: 0, left: '50%', width: '100%', height: 'auto', transform: `translateX(-50%) translateY(calc(${(dialZoom - 1.0) * 80}% + ${activeShift}% - 5%)) scale(${activeZoom}) rotateX(${dialTilt}deg)`, transformOrigin: 'bottom center', display: 'block', cursor: 'pointer', imageRendering: 'pixelated', userSelect: 'none', filter: 'drop-shadow(0 7px 7px rgba(40,30,10,.22))', transition: isDragging ? 'transform 0.1s ease' : 'transform 0.4s ease-out' }}
+                            style={{ position: 'absolute', bottom: 0, left: '50%', width: '70%', height: 'auto', transform: `translateX(-50%) translateY(calc(${(dialZoom - 1.0) * 80}% + ${activeShift}% - 10%)) scale(${activeZoom}) rotateX(${dialTilt}deg)`, transformOrigin: 'bottom center', display: 'block', cursor: 'pointer', imageRendering: 'pixelated', userSelect: 'none', filter: 'drop-shadow(0 7px 7px rgba(40,30,10,.22))', transition: isDragging ? 'transform 0.1s ease' : 'transform 0.4s ease-out' }}
                           />
                         </div>
                       </div>
                     </div>
+
+                    {/* Scanlines — inside the character area only: above Lolo, below chat/bubble/input, so text stays clean */}
+                    {scanlinesOn && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, background: 'repeating-linear-gradient(to bottom, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 4px, transparent 4px, transparent 8px)' }} />}
 
                     {/* Chat overlay + dialogue bubble — bottom:0 is flush with input bar top */}
                     <LoloChat
@@ -333,13 +323,15 @@ export default function LoloShell({
                   </div>
 
                   {/* Always-visible input bar */}
-                  <div style={{ height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', borderTop: '2px solid var(--ink)', background: 'color-mix(in srgb, var(--lcd) 96%, #000)', padding: '0 10px', gap: 6, zIndex: 20 }}>
+                  <div style={{ height: 52, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', borderTop: '2px solid var(--ink)', background: 'color-mix(in srgb, var(--lcd) 96%, #000)', padding: '0 10px', gap: 6, zIndex: 25 }}>
+                    <style>{`.lolo-input{font-family:'VT323',monospace!important;font-size:36px!important;letter-spacing:.5px!important;}.lolo-input::placeholder{font-family:'VT323',monospace!important;font-size:36px!important;color:#1a1a1a!important;opacity:.5!important;}`}</style>
                     <input
                       ref={inputRef}
                       onKeyDown={onInputKey}
+                      className="lolo-input"
                       placeholder="habla con lolo…"
                       maxLength={160}
-                      style={{ flex: 1, width: '100%', border: 'none', background: 'rgba(0,0,0,0.08)', padding: '6px 10px', fontFamily: "'VT323',monospace", fontSize: 28, color: '#1a1a1a', outline: 'none', letterSpacing: .5 }}
+                      style={{ flex: 1, width: '100%', border: 'none', background: 'rgba(0,0,0,0.08)', padding: '6px 10px', fontFamily: "'VT323',monospace", fontSize: 36, color: '#1a1a1a', outline: 'none', letterSpacing: .5 }}
                     />
                     <button onClick={onSend} style={{ flexShrink: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center' as const, padding: 0 }}>
                       <svg width="13" height="13" viewBox="0 0 14 14" style={{ imageRendering: 'pixelated', display: 'block' }}>
@@ -356,9 +348,6 @@ export default function LoloShell({
 
                 {/* Dither */}
                 <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 24, backgroundImage: 'repeating-conic-gradient(rgba(0,0,0,.6) 0% 25%, transparent 0% 50%)', backgroundSize: '3px 3px', opacity: .05 }} />
-
-                {/* Scanlines */}
-                {scanlinesOn && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 25, background: 'repeating-linear-gradient(to bottom, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 4px, transparent 4px, transparent 8px)' }} />}
 
                 {/* LCD shadow */}
                 <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none', zIndex: 30, boxShadow: 'inset 0 5px 16px rgba(0,0,0,.62),inset 4px 0 8px rgba(0,0,0,.28),inset -4px 0 8px rgba(0,0,0,.28),inset 0 -3px 6px rgba(0,0,0,.18)' }} />

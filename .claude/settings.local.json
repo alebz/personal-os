@@ -98,7 +98,8 @@
       "Bash(echo \"dev server arrancando \\(PID $!\\)... espero a que compile\")",
       "Bash(echo \"dev server \\(PID $!\\) arrancando\")",
       "Bash(echo \"dev PID $!\")",
-      "Bash(echo \"PID $!\")"
+      "Bash(echo \"PID $!\")",
+      "Bash(grep -nB2 -A2 \"<NewTaskInput urgency={tier.id} onAdd={onAdd} />$\" components/sections/TareasContent.tsx)"
     ]
   }
 }

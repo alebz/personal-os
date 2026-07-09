@@ -39,6 +39,8 @@ export default function HabitTracker() {
         body: JSON.stringify({ date: today }),
       })
       if (!res.ok) throw new Error()
+      // Lolo reacciona orgulloso al COMPLETAR un hábito (no al desmarcarlo)
+      if (!has) { try { window.dispatchEvent(new Event('lolo-proud')) } catch {} }
     } catch {
       setHabits(prev => prev.map(x => x.id === h.id ? { ...x, dates: h.dates } : x))
     }

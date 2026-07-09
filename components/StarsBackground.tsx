@@ -455,15 +455,6 @@ const RACE_HUE: Record<AgentFleetType, number> = {
   klaed: 0, nairan: 180, nautolan: 90, mainship: 270,
 }
 
-// Dynamic pickup event table — rolled every 30s
-const PICKUP_EVENTS = [
-  { name: 'normal',   weight: 40, engines: 2, shields: 2, weapons: 3 },
-  { name: 'armament', weight: 20, engines: 0, shields: 1, weapons: 5 },
-  { name: 'defense',  weight: 20, engines: 1, shields: 5, weapons: 1 },
-  { name: 'motorush', weight: 10, engines: 5, shields: 0, weapons: 1 },
-  { name: 'scarcity', weight: 10, engines: 0, shields: 0, weapons: 2 },
-] as const
-
 // ─── Agent types ─────────────────────────────────────────────────────────────
 
 type AgentFleetType = 'nairan' | 'klaed' | 'nautolan' | 'mainship'
@@ -617,7 +608,6 @@ interface WreckData {
 const WRECK_LIFE = 34000   // ms visible
 const WRECK_FADE = 13000   // ms slow fade-out at the end
 const MAX_WRECKS = 6
-const PICKUP_FADE = 700   // ms — pickups fade out (like wreckage) when cleared
 
 interface ExpData {
   id:          string
@@ -647,9 +637,7 @@ interface PickupData {
   glowColor: string
   x:    number; y: number
   vx:   number; vy: number  // drift like an asteroid (bounces off edges)
-  born: number
-  expireAt: number          // each pickup lives its own lifespan (staggered despawn)
-  fadeStart: number         // >0 → fading out before removal
+  born: number             // spawn time (persistent — pickups no longer expire)
   speedMult:          number  // engine
   shieldStrength:     number  // shield
   shieldDuration:     number  // shield
@@ -1008,6 +996,7 @@ const ASTEROID_EXPLODE: DestructData = {
   frames: 8, size: 96,
 }
 const MAX_PICKUPS      = 22   // cap on pickups on the field at once (more ships need arming)
+const PICKUP_TARGET    = 14   // persistent field: keep this many pickups floating; refill toward it
 const MAX_ASTEROIDS    = 16   // ambient count kept drifting (tall field)
 const ASTEROID_HARD_CAP = 64  // never exceed (ambient + a heavy multi-row belt wave)
 const ASTEROID_DMG     = 3    // serious blast damage to nearby ships
@@ -1525,11 +1514,8 @@ function SpaceSim() {
     const fleetOriginalCounts     = new Map<string, number>()
     // Stationing: fleetId → parked anchor + heading + expiry (fleet holds formation in place)
     const fleetPark = new Map<string, { until: number; x: number; y: number; heading: number }>()
-    // Dynamic pickup-event state (rolled every 30s)
-    let nextPickupEvent  = 0                            // timestamp of next event roll
-    let pickupScramble   = false                        // true during 'scarcity' events
-    // Staggered spawns: an event queues its pickups to appear at spread-out times
-    const pickupSpawnQueue: { type: 'engine' | 'shield' | 'weapon'; at: number }[] = []
+    // Persistent pickup field: refill timer only (no more weighted events / scarcity).
+    let nextPickupEvent  = 0
 
     // ── Ancient Races Ecosystem state ──
     try { const w = localStorage.getItem('war-memory'); if (w) warMemoryRef.current = { ...emptyWarMemory(), ...JSON.parse(w) } } catch {}
@@ -1622,15 +1608,20 @@ function SpaceSim() {
         // All ships spawn with no equipment — must collect pickups. Remember the hull's
         // own weapon/shield sprites (or a faction fallback) to display once equipped.
         const combo       = { ...fullCombo, weapon: null, shield: null }
-        const spreadAngle = angle + (i === 0 ? 0 : (Math.random() - 0.5) * 0.4)
-        const spreadDist  = i * 60
+        // Fan the squad out on entry so ships DON'T spawn on top of each other and immediately
+        // collide. Alternate lateral offsets (>SEP_RADIUS apart) and stagger each one further BACK
+        // behind the edge, so they stream in as a loose column instead of a tight perpendicular wall.
+        const lane   = i === 0 ? 0 : (Math.ceil(i / 2) * (i % 2 === 1 ? 1 : -1))   // 0,+1,-1,+2,-2…
+        const perpX  = Math.cos(angle + Math.PI / 2), perpY = Math.sin(angle + Math.PI / 2)
+        const lateral = lane * 78                                    // sideways spacing (>SEP_RADIUS)
+        const back    = i * 116                                       // depth stagger behind the edge
         return {
           id: genId(), fleetId, fleetType: ft, isLeader,
           combo,
           equipWeapon: fullCombo.weapon ?? factionDefaultWeapon(ft),
           equipShield: fullCombo.shield ?? factionDefaultShield(ft),
-          x: sx + Math.cos(spreadAngle + Math.PI / 2) * spreadDist,
-          y: sy + Math.sin(spreadAngle + Math.PI / 2) * spreadDist,
+          x: sx + perpX * lateral - Math.cos(angle) * back,
+          y: sy + perpY * lateral - Math.sin(angle) * back,
           vx: 0, vy: 0,    // real velocity is set from computed maxSpeed just below
           avx: 0, avy: 0,
           angle, cruiseAngle: angle,
@@ -2059,8 +2050,7 @@ function SpaceSim() {
         : 'drop-shadow(0 0 2px rgba(255,90,90,0.5))'
       const drift = Math.random() * Math.PI * 2
       const dspd  = 0.004 + Math.random() * 0.006   // slow drift, like an asteroid
-      const life  = 12000 + Math.random() * 12000   // 12–24s individual lifespan (staggered)
-      const pk: PickupData = { id, type, key, src, glowColor, x, y, vx: Math.cos(drift) * dspd, vy: Math.sin(drift) * dspd, born: now, expireAt: now + life, fadeStart: 0, speedMult, shieldStrength, shieldDuration, pickupFireInterval }
+      const pk: PickupData = { id, type, key, src, glowColor, x, y, vx: Math.cos(drift) * dspd, vy: Math.sin(drift) * dspd, born: now, speedMult, shieldStrength, shieldDuration, pickupFireInterval }
       pickups.current.set(id, pk)
       setPickupKeys(prev => [...prev, id])
     }
@@ -2091,6 +2081,10 @@ function SpaceSim() {
       agent.prevHp = agent.maxHp
       pickups.current.delete(pickup.id)
       pickupEls.current.delete(pickup.id)
+      // Persistent field: collecting one immediately seeds a fresh pickup elsewhere (random type),
+      // so the number on the field stays constant instead of draining over time.
+      { const types: ('engine' | 'shield' | 'weapon')[] = ['engine', 'shield', 'weapon']
+        spawnPickup(types[Math.floor(Math.random() * types.length)], now) }
       setPickupKeys([...pickups.current.keys()])
       setCollectFlashes(prev => [...prev, { id: genId(), x: pickup.x, y: wrapFieldY(pickup.y), src: pickup.src }])
       agent.seekingPickupId = null
@@ -2164,7 +2158,13 @@ function SpaceSim() {
           setBeaconKeys([...beacons.current.keys()])
         } else {
           const el = beaconEls.current.get(id)
-          if (el) { const p = 1 + 0.18 * Math.sin(now * 0.004 + b.born); el.style.transform = `translate(${b.x}px,${SY(b.y)}px) scale(${p})` }
+          if (el) {
+            // No size bounce (it read as jelly). Fixed scale; the “alive” feel is a gentle glow pulse
+            // driven by opacity so the silhouette stays crisp and still.
+            const g = 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(now * 0.0035 + b.born))
+            el.style.transform = `translate(${b.x}px,${SY(b.y)}px)`
+            el.style.opacity = String(g)
+          }
         }
       })
       // ── WAR ⇄ PEACE CYCLE (eternal mode): rounds resolve, then 3 min of peace, then war again.
@@ -2219,28 +2219,13 @@ function SpaceSim() {
         }
       }
       // ── DYNAMIC PICKUP EVENTS ─────────────────────────────────────────────────
-      // Every 30s roll a weighted event that dictates what spawns for the period.
-      if (now >= nextPickupEvent) {
-        nextPickupEvent = now + 30000
-        // Weighted random event selection
-        const total = PICKUP_EVENTS.reduce((s, e) => s + e.weight, 0)
-        let r = Math.random() * total
-        let ev: typeof PICKUP_EVENTS[number] = PICKUP_EVENTS[0]
-        for (const e of PICKUP_EVENTS) { r -= e.weight; if (r <= 0) { ev = e; break } }
-        pickupScramble  = ev.name === 'scarcity'
-        // Queue the event's loadout to appear at STAGGERED times (not all at once).
-        // Old pickups aren't cleared — each one lives out its own lifespan and fades on its own.
-        const enqueue = (type: 'engine' | 'shield' | 'weapon', n: number) => {
-          for (let i = 0; i < n; i++) pickupSpawnQueue.push({ type, at: now + Math.random() * 7000 })
-        }
-        enqueue('engine', ev.engines); enqueue('shield', ev.shields); enqueue('weapon', ev.weapons)
-      }
-      // Drip queued pickups in as their time comes (retry while the field is full)
-      for (let i = pickupSpawnQueue.length - 1; i >= 0; i--) {
-        const q = pickupSpawnQueue[i]
-        if (now < q.at) continue
-        if (pickups.current.size < MAX_PICKUPS) { spawnPickup(q.type, now); pickupSpawnQueue.splice(i, 1) }
-        else if (now > q.at + 15000) pickupSpawnQueue.splice(i, 1)   // give up if it waited too long
+      // Persistent pickup field: pickups don't expire or run on events anymore — keep ~PICKUP_TARGET
+      // floating at all times. Grabbing one already seeds a replacement (see onPickupCollected); this
+      // fills the field on boot and tops it up after a match wipe. One drip at a time.
+      if (now >= nextPickupEvent && pickups.current.size < PICKUP_TARGET) {
+        nextPickupEvent = now + 500
+        const types: ('engine' | 'shield' | 'weapon')[] = ['engine', 'shield', 'weapon']
+        spawnPickup(types[Math.floor(Math.random() * types.length)], now)
       }
 
       // Ship-to-ship contact — TOUCH = DAMAGE, for EVERYONE (allies included). Space is vital:
@@ -2627,14 +2612,14 @@ function SpaceSim() {
           const priority: PickupData['type'][] = needsWeapon ? ['weapon'] : []
 
           const wants = (t: PickupData['type']) =>
-            (t === 'weapon' && needsWeapon) || (t === 'shield' && needsShield) || (t === 'engine' && needsEngine) || pickupScramble
+            (t === 'weapon' && needsWeapon) || (t === 'shield' && needsShield) || (t === 'engine' && needsEngine)
 
           let chosen: PickupData | null = null
           for (const t of priority) {
             if (!wants(t)) continue
             let bestPk: PickupData | null = null, bestPkD = Infinity
             pickups.current.forEach(p => {
-              if (p.type !== t || p.fadeStart > 0) return
+              if (p.type !== t) return
               const d = dist2D(agent.x+24, agent.y+24, p.x, p.y)
               if (d < bestPkD) { bestPkD = d; bestPk = p }
             })
@@ -2652,8 +2637,8 @@ function SpaceSim() {
             const seekTarget = agent.seekingPickupId ? pickups.current.get(agent.seekingPickupId) : undefined
             const satisfied = !seekTarget
               || (seekTarget.type === 'weapon' && !needsWeapon)
-              || (seekTarget.type === 'shield' && !needsShield && !pickupScramble)
-              || (seekTarget.type === 'engine' && !needsEngine && !pickupScramble)
+              || (seekTarget.type === 'shield' && !needsShield)
+              || (seekTarget.type === 'engine' && !needsEngine)
             if (satisfied) { agent.seekingPickupId = null; agent.state = 'cruising' }
           }
         }
@@ -2729,7 +2714,7 @@ function SpaceSim() {
         } else if (agent.state === 'pickup_seeking') {
           const spd = agent.maxSpeed * 1.1 * situFactor
           const pkTarget = agent.seekingPickupId ? pickups.current.get(agent.seekingPickupId) : null
-          if (!pkTarget || pkTarget.fadeStart > 0) {
+          if (!pkTarget) {
             agent.seekingPickupId = null; agent.state = 'cruising'
           } else {
             const pdx = pkTarget.x - (agent.x+24), pdy = pkTarget.y - (agent.y+24)
@@ -3473,13 +3458,8 @@ function SpaceSim() {
       let pickupChanged = false
       pickups.current.forEach((pk, id) => {
         const el = pickupEls.current.get(id)
-        if (pk.fadeStart > 0) {
-          const f = 1 - (now - pk.fadeStart) / PICKUP_FADE
-          if (f <= 0) { pickups.current.delete(id); pickupEls.current.delete(id); pickupChanged = true; return }
-          if (el) el.style.opacity = String(f)
-          return
-        }
-        if (now >= pk.expireAt) { pk.fadeStart = now; return }   // this one's lifespan is up — fade it out
+        // Persistent: pickups never expire or fade — they sit until a ship collects one (which then
+        // seeds a replacement elsewhere). They just drift and bounce off the field edges.
         pk.x += pk.vx * dt; pk.y += pk.vy * dt
         if (pk.x < 40)      { pk.x = 40;      pk.vx = Math.abs(pk.vx) }
         if (pk.x > W - 40)  { pk.x = W - 40;  pk.vx = -Math.abs(pk.vx) }
@@ -3489,8 +3469,7 @@ function SpaceSim() {
         let taker: ShipAgent | null = null
         agents.current.forEach(a => {
           if (taker || a.state === 'dying' || a.state === 'regrouping') return
-          const wants = pickupScramble
-            || (pk.type === 'weapon' && a.weaponType === 'none')
+          const wants = (pk.type === 'weapon' && a.weaponType === 'none')
             || (pk.type === 'shield' && a.shieldType === 'none')
             || (pk.type === 'engine' && a.engineType === 'none')
           if (wants && dist2D(pk.x, pk.y, a.x + 24, a.y + 24) < 28) taker = a
@@ -3565,8 +3544,7 @@ function SpaceSim() {
               position: 'absolute', top: 0, left: 0, width: a.size, height: a.size,
               imageRendering: 'pixelated', transformOrigin: 'center center',
               willChange: 'transform', opacity: a.opacity, zIndex: 1, pointerEvents: 'none',
-              visibility: 'hidden',
-              transform: `translate(${a.x}px,${a.y}px) rotate(${a.spin * 180 / Math.PI}deg)`,
+              transform: `translate(${a.x}px,${wrapFieldY(a.y)}px) rotate(${a.spin * 180 / Math.PI}deg)`,
             }}
           />
         )
@@ -3618,22 +3596,25 @@ function SpaceSim() {
       {beaconKeys.map(id => {
         const b = beacons.current.get(id)
         if (!b) return null
-        const C = '#2f9fe6', M = '#5fc8ff', L = '#a9e8ff', W = '#f2fdff'   // edge → core
+        const C = '#1f7fc4', M = '#3fa8e6', L = '#8fd8ff', W = '#f2fdff'   // edge → core
         const px = (x: number, y: number, f: string) => <rect x={x} y={y} width={1} height={1} fill={f} />
         return (
           <div
             key={id}
             ref={el => { if (el) beaconEls.current.set(id, el as HTMLDivElement); else beaconEls.current.delete(id) }}
-            style={{ position: 'absolute', top: 0, left: 0, width: 22, height: 22, marginLeft: -11, marginTop: -11, pointerEvents: 'none', willChange: 'transform', filter: 'drop-shadow(0 0 4px rgba(120,205,255,0.95)) drop-shadow(0 0 9px rgba(80,175,255,0.5))', transform: `translate(${b.x}px,${b.y}px)` }}
+            style={{ position: 'absolute', top: 0, left: 0, width: 16, height: 16, marginLeft: -8, marginTop: -8, pointerEvents: 'none', willChange: 'transform, opacity', filter: 'drop-shadow(0 0 2px rgba(120,205,255,0.8)) drop-shadow(0 0 5px rgba(70,160,255,0.35))', transform: `translate(${b.x}px,${b.y}px)` }}
           >
-            <svg width={22} height={22} viewBox="0 0 7 7" shapeRendering="crispEdges" style={{ display: 'block' }}>
-              {px(3, 0, C)}
-              {px(2, 1, C)}{px(3, 1, M)}{px(4, 1, C)}
-              {px(1, 2, C)}{px(2, 2, M)}{px(3, 2, L)}{px(4, 2, M)}{px(5, 2, C)}
-              {px(0, 3, C)}{px(1, 3, M)}{px(2, 3, L)}{px(3, 3, W)}{px(4, 3, L)}{px(5, 3, M)}{px(6, 3, C)}
-              {px(1, 4, C)}{px(2, 4, M)}{px(3, 4, L)}{px(4, 4, M)}{px(5, 4, C)}
-              {px(2, 5, C)}{px(3, 5, M)}{px(4, 5, C)}
-              {px(3, 6, C)}
+            <svg width={16} height={16} viewBox="0 0 9 9" shapeRendering="crispEdges" style={{ display: 'block' }}>
+              {/* four-point energy crystal: faceted body, bright core, spark tips */}
+              {px(4, 0, L)}
+              {px(4, 1, M)}
+              {px(3, 2, M)}{px(4, 2, L)}{px(5, 2, M)}
+              {px(0, 4, L)}{px(1, 4, M)}{px(2, 4, M)}{px(3, 4, L)}{px(4, 4, W)}{px(5, 4, L)}{px(6, 4, M)}{px(7, 4, M)}{px(8, 4, L)}
+              {px(3, 6, M)}{px(4, 6, L)}{px(5, 6, M)}
+              {px(4, 7, M)}
+              {px(4, 8, L)}
+              {/* inner facets to give the body volume */}
+              {px(3, 3, C)}{px(5, 3, C)}{px(3, 5, C)}{px(5, 5, C)}
             </svg>
           </div>
         )

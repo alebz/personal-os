@@ -3,7 +3,7 @@ import * as React from "react";
 import "./globals.css";
 import { StarsBackground } from "@/components/StarsBackground";
 import { OSSettingsProvider } from "@/components/OSSettingsContext";
-import AdanCompanionWrapper from "@/components/AdanCompanionWrapper";
+import LoloCompanionWrapper from "@/components/LoloCompanionWrapper";
 
 // React 19.1's ViewTransition is runtime-only (not yet in @types/react), and stripped from some
 // builds — so use it when present, else fall back to a no-op wrapper. Keeps the prod build/typecheck
@@ -34,7 +34,7 @@ export default function RootLayout({
       <body className="bg-ink-0 text-ink-4 antialiased">
         <OSSettingsProvider>
           <StarsBackground />
-          <AdanCompanionWrapper />
+          <LoloCompanionWrapper />
           {/* Content sits above the cosmic sim (which is fixed at z:0); this baseline
               keeps every card, sub-menu and button in front of the ships. */}
           <div style={{ position: 'relative', zIndex: 1 }}>

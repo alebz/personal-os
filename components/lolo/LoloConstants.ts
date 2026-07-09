@@ -1,8 +1,8 @@
 import type { ThemeName, Temperament, TemperamentState } from './LoloTypes'
 
 // ─── Device dimensions ────────────────────────────────────────────────────────
-export const S        = 0.50
-export const DEVICE_W = 483
+export const S        = 0.425
+export const DEVICE_W = 655
 export const DEVICE_H = 900
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
@@ -181,6 +181,13 @@ export const ALL_LOLO_IMAGES = [
   '/Lolo/Idle/lolo_idle_15.png',
   '/Lolo/Idle/lolo_idle_16.png',
   '/Lolo/Idle/lolo_idle_17.png',
+  '/Lolo/Idle/lolo_idle_18.png',
+  '/Lolo/Idle/lolo_idle_19.png',
+  '/Lolo/Idle/lolo_idle_20.png',
+  '/Lolo/Idle/lolo_idle_21.png',
+  '/Lolo/Idle/lolo_idle_22.png',
+  '/Lolo/Idle/lolo_idle_23.png',
+  '/Lolo/Idle/lolo_idle_24.png',
   // Posing
   '/Lolo/Posing/lolo_posing_1.png',
   '/Lolo/Posing/lolo_posing_2.png',
@@ -198,6 +205,9 @@ export const ALL_LOLO_IMAGES = [
   '/Lolo/Posing/lolo_posing_14.png',
   '/Lolo/Posing/lolo_posing_15.png',
   '/Lolo/Posing/lolo_posing_16.png',
+  '/Lolo/Posing/lolo_posing_17.png',
+  '/Lolo/Posing/lolo_posing_18.png',
+  '/Lolo/Posing/lolo_posing_19.png',
   // Feelings
   '/Lolo/Feelings/lolo_annoyed.png',
   '/Lolo/Feelings/lolo_ashamed.png',

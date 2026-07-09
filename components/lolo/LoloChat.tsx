@@ -45,7 +45,7 @@ export default function LoloChat({
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:'var(--ink)',opacity:.3}}>…</span>
             )}
             {chatMessages.filter(m => m.role === 'user').at(-1)?.content && (
-              <div style={{fontFamily:"'VT323',monospace",fontSize:26,color:'var(--ink)',opacity:.6,marginBottom:4,whiteSpace:'normal',wordBreak:'break-word'}}>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:28,color:'color-mix(in srgb, var(--ink) 70%, #000)',opacity:.6,marginBottom:4,whiteSpace:'normal',wordBreak:'break-word'}}>
                 › {chatMessages.filter(m => m.role === 'user').at(-1)!.content}
               </div>
             )}
@@ -57,8 +57,9 @@ export default function LoloChat({
               </div>
             )}
             {!busy && chatMessages.filter(m => m.role === 'assistant').at(-1)?.content && (
-              <div style={{fontFamily:"'VT323',monospace",fontSize:30,color:'var(--ink)',lineHeight:1.25,whiteSpace:'normal',wordBreak:'break-word',overflowWrap:'break-word'}}>
-                {chatMessages.filter(m => m.role === 'assistant').at(-1)!.content}
+              <div style={{fontFamily:"'VT323',monospace",fontSize:34,color:'color-mix(in srgb, var(--ink) 70%, #000)',lineHeight:1.25,whiteSpace:'normal',wordBreak:'break-word',overflowWrap:'break-word'}}>
+                {bubble.typing ? bubble.text : chatMessages.filter(m => m.role === 'assistant').at(-1)!.content}
+                {bubble.typing && <span style={{display:'inline-block',width:10,color:'var(--ink)',animation:'adanCaret .7s steps(1) infinite'}}>▌</span>}
               </div>
             )}
           </div>
@@ -88,7 +89,7 @@ export default function LoloChat({
                 </div>
               )}
               {!busy && bubble.text && (
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:12,lineHeight:1.75,color:'var(--ink)',letterSpacing:.3}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,lineHeight:1.75,color:'color-mix(in srgb, var(--ink) 70%, #000)',letterSpacing:.3}}>
                   {bubble.text}
                   {bubble.typing && <span style={{display:'inline-block',width:10,color:'var(--ink)',animation:'adanCaret .7s steps(1) infinite'}}>▌</span>}
                 </div>
