@@ -870,7 +870,7 @@ export default function TareasContent() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 pb-16 pt-6">
+    <div className="mx-auto w-full max-w-7xl px-6 pb-16 pt-2">
       <div className="pb-2">
         <div className="flex items-center justify-between">
           <div>
