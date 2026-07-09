@@ -320,7 +320,7 @@ export default function CalendarCard() {
         onClick={() => setAgendaOpen(o => !o)}
         aria-label={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
         title={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
-        className="absolute right-1.5 top-1/2 z-10 hidden h-16 w-5 -translate-y-1/2 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/40 text-ink-3/70 transition-colors hover:text-ink-4 lg:flex"
+        className="absolute left-full top-1/2 z-10 ml-2 hidden h-16 w-6 -translate-y-1/2 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/60 text-ink-3/70 shadow-lg shadow-black/20 backdrop-blur-xl transition-colors hover:text-ink-4 lg:flex"
       >
         <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
           <path d={agendaOpen ? 'M10 3L5 8l5 5' : 'M6 3l5 5-5 5'} strokeLinecap="round" strokeLinejoin="round" />
