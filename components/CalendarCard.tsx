@@ -159,6 +159,7 @@ export default function CalendarCard() {
   const [addError,   setAddError]   = useState<string | null>(null)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [formOpen,   setFormOpen]   = useState(false)   // collapsed to just the title until focused
+  const [agendaOpen, setAgendaOpen] = useState(true)    // right agenda column; collapse it to give the month full width
 
   function rangeForView(year: number, month: number): { from: string; to: string } {
     const gridCells = buildGridCells(year, month)
@@ -311,7 +312,20 @@ export default function CalendarCard() {
   const showTodayBtn = viewYear !== today.getFullYear() || viewMonth !== today.getMonth()
 
   return (
-    <div className="rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card sm:p-8">
+    <div className="relative rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card sm:p-8">
+
+      {/* Collapse tab — folds the agenda column away so the month fills the full width (lg only) */}
+      <button
+        type="button"
+        onClick={() => setAgendaOpen(o => !o)}
+        aria-label={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
+        title={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
+        className="absolute right-1.5 top-1/2 z-10 hidden h-16 w-5 -translate-y-1/2 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/40 text-ink-3/70 transition-colors hover:text-ink-4 lg:flex"
+      >
+        <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
+          <path d={agendaOpen ? 'M10 3L5 8l5 5' : 'M6 3l5 5-5 5'} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
 
       {/* Header */}
       <div className="mb-6 flex items-end justify-between">
@@ -337,7 +351,7 @@ export default function CalendarCard() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:gap-8">
+      <div className={`grid gap-6 lg:gap-8 ${agendaOpen ? 'lg:grid-cols-[1.7fr_1fr]' : 'lg:grid-cols-1'}`}>
 
         {/* ── Month grid ─────────────────────────────────────────── */}
         <div>
@@ -398,7 +412,7 @@ export default function CalendarCard() {
         </div>
 
         {/* ── Agenda for the selected day ────────────────────────── */}
-        <div className="flex flex-col gap-6 lg:border-l lg:border-ink-4/10 lg:pl-8">
+        <div className={`flex flex-col gap-6 lg:border-l lg:border-ink-4/10 lg:pl-8 ${agendaOpen ? '' : 'lg:hidden'}`}>
           <UpNext events={upcoming} today={today} />
 
           <div className="lg:border-t lg:border-ink-4/10 lg:pt-6">
