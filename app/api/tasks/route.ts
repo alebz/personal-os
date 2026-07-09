@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
     tags = [],
     entity_id = null,
     entity_name = null,
+    due_date = null,
   } = body
 
   if (!title || typeof title !== 'string') {
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
       tags,
       entity_id,
       entity_name,
+      due_date,
       status: 'todo',
     })
     .select()
@@ -118,6 +120,7 @@ export async function POST(req: NextRequest) {
         urgency,
         priority: typeof priority_score === 'number' ? priority_score : null,
         entity_id,
+        due_date,
         status: 'todo',
       })
       .select()

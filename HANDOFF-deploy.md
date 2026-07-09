@@ -121,3 +121,10 @@ intacto salvo un toque de lectura.
   único scroll interno que queda es el del **drawer** (overlay/modal — aceptable).
 - Se conserva: crear/editar/borrar (drawer), toggle completar, filtro por entidad, "nueva tarea" por
   columna/sección, completadas colapsables.
+- **Editar día:** el drawer ahora tiene campo **Día** (`due_date`) → al asignar fecha, la tarjeta
+  muestra el tag de color del día. Backend: POST `/api/tasks` acepta `due_date` (insert); PATCH ya
+  pasaba todo el body. GET lo devuelve.
+- **Drag & drop:** las tarjetas (Kanban) y filas (Lista) son `draggable`; soltar sobre una
+  columna/sección cambia la **urgency** de la tarea (`handleReorder` → PATCH `{urgency}`, optimista con
+  revert). HTML5 DnD nativo, sin librería. La columna resalta al pasar por encima. (Mueve entre TIERS
+  de urgencia, no entre días — para el día se usa el campo Día del drawer.)

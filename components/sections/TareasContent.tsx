@@ -129,7 +129,9 @@ function TaskCard({
     <div
       role="button"
       tabIndex={0}
-      className="group cursor-pointer rounded-2xl border border-ink-4/10 bg-ink-1/30 p-4 backdrop-blur-sm transition-colors hover:border-ink-4/20 hover:bg-ink-1/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move' }}
+      className="group cursor-grab rounded-2xl border border-ink-4/10 bg-ink-1/30 p-4 backdrop-blur-sm transition-colors hover:border-ink-4/20 hover:bg-ink-1/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 active:cursor-grabbing"
       onClick={() => onClick(task)}
       onKeyDown={(e) => e.key === 'Enter' && onClick(task)}
     >
@@ -266,21 +268,29 @@ function KanbanColumn({
   onToggle,
   onAdd,
   onClickTask,
+  onMove,
 }: {
   tier: (typeof TIERS)[number]
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
   onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
+  onMove: (id: string, urgency: Urgency) => void
 }) {
   const [showDone, setShowDone] = useState(false)
   const [showAll,  setShowAll]  = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const open = tasks.filter((t) => !t.completed_at)
   const done = tasks.filter((t) => t.completed_at)
   const visible = showAll ? open : open.slice(0, COLUMN_TOP_N)
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div
+      className={`flex flex-col gap-2.5 rounded-3xl border p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card transition-colors ${dragOver ? 'border-accent/50 bg-accent/[0.05]' : 'border-ink-4/10 bg-ink-1/40'}`}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!dragOver) setDragOver(true) }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false) }}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/plain'); if (id) onMove(id, tier.id) }}
+    >
       <div className="mb-1 flex items-baseline justify-between">
         <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</span>
         <span className="tabular-nums text-[11px] text-ink-2">{open.length}</span>
@@ -325,24 +335,26 @@ function KanbanView({
   onToggle,
   onAdd,
   onClickTask,
+  onMove,
 }: {
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
   onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
+  onMove: (id: string, urgency: Urgency) => void
 }) {
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {TIERS.map((tier) => (
-        <div key={tier.id} className="rounded-3xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-          <KanbanColumn
-            tier={tier}
-            tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
-            onToggle={onToggle}
-            onAdd={onAdd}
-            onClickTask={onClickTask}
-          />
-        </div>
+        <KanbanColumn
+          key={tier.id}
+          tier={tier}
+          tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
+          onToggle={onToggle}
+          onAdd={onAdd}
+          onClickTask={onClickTask}
+          onMove={onMove}
+        />
       ))}
     </div>
   )
@@ -366,7 +378,9 @@ function TaskRow({
     <div
       role="button"
       tabIndex={0}
-      className="group flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-ink-4/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/30"
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move' }}
+      className="group flex cursor-grab items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-ink-4/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/30 active:cursor-grabbing"
       onClick={() => onClick(task)}
       onKeyDown={(e) => e.key === 'Enter' && onClick(task)}
     >
@@ -394,21 +408,29 @@ function ListaSection({
   onToggle,
   onAdd,
   onClickTask,
+  onMove,
 }: {
   tier: (typeof TIERS)[number]
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
   onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
+  onMove: (id: string, urgency: Urgency) => void
 }) {
   const [showDone, setShowDone] = useState(false)
   const [showAll,  setShowAll]  = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const open = tasks.filter((t) => !t.completed_at)
   const done = tasks.filter((t) => t.completed_at)
   const visible = showAll ? open : open.slice(0, COLUMN_TOP_N)
 
   return (
-    <section>
+    <section
+      className={`-mx-2 rounded-2xl px-2 py-1 transition-colors ${dragOver ? 'bg-accent/[0.05]' : ''}`}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!dragOver) setDragOver(true) }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false) }}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/plain'); if (id) onMove(id, tier.id) }}
+    >
       <div className="mb-2 flex items-baseline gap-3 border-b border-ink-4/8 pb-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</h3>
         <span className="tabular-nums text-[11px] text-ink-2">{open.length}</span>
@@ -443,11 +465,13 @@ function ListaView({
   onToggle,
   onAdd,
   onClickTask,
+  onMove,
 }: {
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
   onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
+  onMove: (id: string, urgency: Urgency) => void
 }) {
   return (
     <div className="mx-auto max-w-3xl rounded-3xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card sm:p-8">
@@ -460,6 +484,7 @@ function ListaView({
             onToggle={onToggle}
             onAdd={onAdd}
             onClickTask={onClickTask}
+            onMove={onMove}
           />
         ))}
       </div>
@@ -611,6 +636,7 @@ type DrawerForm = {
   priority_score: string
   tags: string
   entity_name: string
+  due_date: string
 }
 
 function toDrawerForm(task: Task): DrawerForm {
@@ -622,6 +648,7 @@ function toDrawerForm(task: Task): DrawerForm {
     priority_score: task.priority_score != null ? String(task.priority_score) : '',
     tags: (task.tags ?? []).join(', '),
     entity_name: task.entity_name ?? '',
+    due_date: task.due_date ?? '',
   }
 }
 
@@ -634,6 +661,7 @@ function fromDrawerForm(form: DrawerForm): Partial<Task> {
     priority_score: form.priority_score !== '' ? Number(form.priority_score) : null,
     tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
     entity_name: form.entity_name || null,
+    due_date: form.due_date || null,
   }
 }
 
@@ -645,6 +673,7 @@ const EMPTY_FORM: DrawerForm = {
   priority_score: '',
   tags: '',
   entity_name: '',
+  due_date: '',
 }
 
 function TaskDrawer({
@@ -760,6 +789,12 @@ function TaskDrawer({
               </div>
 
               <div>
+                <label className={labelCls}>Día</label>
+                <input type="date" value={form.due_date} onChange={(e) => set('due_date', e.target.value)} className={`${inputCls} [color-scheme:dark]`} />
+                <p className="mt-1 text-[10px] text-ink-2">Le da a la tarjeta el color de ese día de la semana.</p>
+              </div>
+
+              <div>
                 <label className={labelCls}>Entidad</label>
                 <select value={form.entity_name} onChange={(e) => set('entity_name', e.target.value)} className={`${inputCls} appearance-none`}>
                   <option value="">— Ninguno —</option>
@@ -858,6 +893,18 @@ export default function TareasContent() {
     setTasks((prev) => [task, ...prev])
   }
 
+  // Drag & drop between tier columns → change the task's urgency (optimistic, reverts on error).
+  async function handleReorder(id: string, urgency: Urgency) {
+    const prev = tasks.find((t) => t.id === id)
+    if (!prev || (prev.urgency ?? 'someday') === urgency) return
+    setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, urgency } : t)))
+    try {
+      await apiPatch(`/api/tasks/${id}`, { urgency })
+    } catch {
+      setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, urgency: prev.urgency } : t)))
+    }
+  }
+
   async function handleToggle(id: string, done: boolean) {
     const completed_at = done ? new Date().toISOString() : null
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed_at } : t)))
@@ -905,6 +952,7 @@ export default function TareasContent() {
       tags: data.tags ?? [],
       entity_name: data.entity_name ?? null,
       entity_id: entities.find((e) => e.name === data.entity_name)?.id ?? null,
+      due_date: data.due_date ?? null,
     })
     setTasks((prev) => [task, ...prev])
   }
@@ -1005,10 +1053,10 @@ export default function TareasContent() {
         ) : (
           <>
             {view === 'kanban' && (
-              <KanbanView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
+              <KanbanView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} onMove={handleReorder} />
             )}
             {view === 'lista' && (
-              <ListaView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
+              <ListaView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} onMove={handleReorder} />
             )}
           </>
         )}
