@@ -176,104 +176,18 @@ function TaskCard({
   )
 }
 
-// ── NewTaskInput ───────────────────────────────────────────────────────────
-
-function NewTaskInput({
-  urgency,
-  entityName,
-  entityId,
-  onAdd,
-}: {
-  urgency: Urgency
-  entityName?: string
-  entityId?: string
-  onAdd: (task: Task) => void
-}) {
-  const [value, setValue] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [errored, setErrored] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const title = value.trim()
-    if (!title || adding) return
-    setAdding(true)
-    setErrored(false)
-    try {
-      const task = await apiPost<Task>('/api/tasks', {
-        title,
-        urgency,
-        entity_name: entityName ?? null,
-        entity_id: entityId ?? null,
-        tags: [],
-      })
-      onAdd(task)
-      setValue('')
-      inputRef.current?.focus()
-    } catch (err) {
-      console.error('[NewTaskInput] POST /api/tasks failed:', err)
-      setErrored(true)
-      setTimeout(() => setErrored(false), 2000)
-    } finally {
-      setAdding(false)
-    }
-  }
-
-  const [open, setOpen] = useState(false)
-
-  function handleBlur() {
-    if (!value.trim()) setOpen(false)
-  }
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0) }}
-        className="mb-2 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-ink-4/15 px-2.5 py-1.5 text-xs text-ink-2 transition-colors hover:border-ink-4/30 hover:text-ink-3"
-      >
-        <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3 shrink-0" stroke="currentColor" strokeWidth={1.8}>
-          <path d="M6 2v8M2 6h8" strokeLinecap="round" />
-        </svg>
-        Nueva tarea
-      </button>
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="mb-2">
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={handleBlur}
-        placeholder="Nombre de la tarea…"
-        disabled={adding}
-        className={`w-full rounded-lg border bg-ink-0/40 px-2.5 py-1.5 text-sm text-ink-4 placeholder:text-ink-2/50 transition-colors focus:outline-none focus:ring-1 disabled:opacity-40 ${
-          errored
-            ? 'border-danger/40 focus:ring-danger/20'
-            : 'border-accent/30 focus:ring-accent/20'
-        }`}
-      />
-      {errored && <p className="mt-0.5 text-[10px] text-danger">Error al guardar — revisar consola</p>}
-    </form>
-  )
-}
-
 // ── KanbanColumn ───────────────────────────────────────────────────────────
 
 function KanbanColumn({
   tier,
   tasks,
   onToggle,
-  onAdd,
   onClickTask,
   onMove,
 }: {
   tier: (typeof TIERS)[number]
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
-  onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
   onMove: (id: string, urgency: Urgency) => void
 }) {
@@ -295,8 +209,6 @@ function KanbanColumn({
         <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</span>
         <span className="tabular-nums text-[11px] text-ink-2">{open.length}</span>
       </div>
-
-      <NewTaskInput urgency={tier.id} onAdd={onAdd} />
 
       <div className="flex flex-col gap-2.5">
         {open.length === 0 && <p className="py-6 text-center text-xs text-ink-2">Sin tareas abiertas</p>}
@@ -333,13 +245,11 @@ function KanbanColumn({
 function KanbanView({
   tasks,
   onToggle,
-  onAdd,
   onClickTask,
   onMove,
 }: {
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
-  onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
   onMove: (id: string, urgency: Urgency) => void
 }) {
@@ -351,7 +261,6 @@ function KanbanView({
           tier={tier}
           tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
           onToggle={onToggle}
-          onAdd={onAdd}
           onClickTask={onClickTask}
           onMove={onMove}
         />
@@ -406,14 +315,12 @@ function ListaSection({
   tier,
   tasks,
   onToggle,
-  onAdd,
   onClickTask,
   onMove,
 }: {
   tier: (typeof TIERS)[number]
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
-  onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
   onMove: (id: string, urgency: Urgency) => void
 }) {
@@ -446,8 +353,6 @@ function ListaSection({
         )}
       </div>
 
-      <div className="mt-2 px-3"><NewTaskInput urgency={tier.id} onAdd={onAdd} /></div>
-
       {done.length > 0 && (
         <div className="mt-1 px-3">
           <button onClick={() => setShowDone((v) => !v)} className="text-[11px] text-ink-2 transition-colors hover:text-ink-3">
@@ -463,13 +368,11 @@ function ListaSection({
 function ListaView({
   tasks,
   onToggle,
-  onAdd,
   onClickTask,
   onMove,
 }: {
   tasks: Task[]
   onToggle: (id: string, done: boolean) => void
-  onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
   onMove: (id: string, urgency: Urgency) => void
 }) {
@@ -482,7 +385,6 @@ function ListaView({
             tier={tier}
             tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
             onToggle={onToggle}
-            onAdd={onAdd}
             onClickTask={onClickTask}
             onMove={onMove}
           />
@@ -889,10 +791,6 @@ export default function TareasContent() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [filterOpen])
 
-  function handleAdd(task: Task) {
-    setTasks((prev) => [task, ...prev])
-  }
-
   // Drag & drop between tier columns → change the task's urgency (optimistic, reverts on error).
   async function handleReorder(id: string, urgency: Urgency) {
     const prev = tasks.find((t) => t.id === id)
@@ -1053,10 +951,10 @@ export default function TareasContent() {
         ) : (
           <>
             {view === 'kanban' && (
-              <KanbanView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} onMove={handleReorder} />
+              <KanbanView tasks={visibleTasks} onToggle={handleToggle} onClickTask={setDrawerTask} onMove={handleReorder} />
             )}
             {view === 'lista' && (
-              <ListaView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} onMove={handleReorder} />
+              <ListaView tasks={visibleTasks} onToggle={handleToggle} onClickTask={setDrawerTask} onMove={handleReorder} />
             )}
           </>
         )}
