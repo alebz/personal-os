@@ -7,9 +7,9 @@ import { createServerClient } from '@/lib/supabase'
 // and fall back to the base schema from migrations 0001–0002, so the app stays
 // functional without requiring the migration to be applied first.
 const SELECT_FULL =
-  'id,title,description,urgency,key,priority_score,tags,entity_id,entity_name,completed_at,created_at'
+  'id,title,description,urgency,key,priority_score,tags,entity_id,entity_name,completed_at,created_at,due_date,metadata'
 const SELECT_BASE =
-  'id,title,description,urgency,priority,entity_id,completed_at,created_at'
+  'id,title,description,urgency,priority,entity_id,completed_at,created_at,due_date'
 
 // Normalise a task row so the client always receives the same Task shape
 // regardless of whether migration 0003 has been applied.
@@ -21,6 +21,8 @@ function normalise(task: any): any {
     priority_score: task.priority_score ?? task.priority ?? null,
     tags: task.tags ?? [],
     entity_name: task.entity_name ?? null,
+    due_date: task.due_date ?? null,
+    metadata: task.metadata ?? {},
   }
 }
 

@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { dayColor } from '@/lib/weekdayColors'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type Urgency = 'today' | 'this_week' | 'this_month' | 'someday'
-type View = 'kanban' | 'smart' | 'category'
+type View = 'kanban' | 'lista'
 
 interface Entity {
   id: string
@@ -26,46 +27,21 @@ interface Task {
   entity_name: string | null
   completed_at: string | null
   created_at: string
+  due_date: string | null
+  metadata: Record<string, unknown> | null
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const TIERS: {
-  id: Urgency
-  label: string
-  dotCls: string
-  badgeCls: string
-  borderCls: string
-}[] = [
-  {
-    id: 'today',
-    label: 'Hoy',
-    dotCls: 'bg-danger',
-    badgeCls: 'text-danger border-danger/30',
-    borderCls: 'border-danger/20',
-  },
-  {
-    id: 'this_week',
-    label: 'Esta Semana',
-    dotCls: 'bg-warn',
-    badgeCls: 'text-warn border-warn/30',
-    borderCls: 'border-warn/20',
-  },
-  {
-    id: 'this_month',
-    label: 'Este Mes',
-    dotCls: 'bg-accent',
-    badgeCls: 'text-accent border-accent/30',
-    borderCls: 'border-accent/20',
-  },
-  {
-    id: 'someday',
-    label: 'Algún Día',
-    dotCls: 'bg-ink-3',
-    badgeCls: 'text-ink-3 border-ink-4/10',
-    borderCls: 'border-ink-4/10',
-  },
+// Urgency tiers are neutral now — they carry NO colour (colour only ever means a weekday, below).
+const TIERS: { id: Urgency; label: string }[] = [
+  { id: 'today',      label: 'Hoy' },
+  { id: 'this_week',  label: 'Esta Semana' },
+  { id: 'this_month', label: 'Este Mes' },
+  { id: 'someday',    label: 'Algún Día' },
 ]
+
+const COLUMN_TOP_N = 8   // top-N per column/section, then "ver más" (golden rule: never an internal scroll)
 
 // ── API helpers ────────────────────────────────────────────────────────────
 
@@ -108,6 +84,33 @@ function sameAsTitle(desc: string, title: string): boolean {
   return norm(desc) === norm(title)
 }
 
+// ── Weekday colour — the ONLY colour allowed in Tareas ──────────────────────
+// Colour never decorates urgency here. It appears solely when a task references a concrete calendar
+// day: that day gets a small tag in its weekday colour (lib/weekdayColors, same as CalendarCard). The
+// day comes from due_date, or metadata.event_date/date for events captured from the calendar.
+const DOW_SHORT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']   // indexed by Date.getDay()
+
+function taskDay(task: Task): Date | null {
+  const md  = task.metadata ?? {}
+  const raw = task.due_date ?? (md.event_date as string | undefined) ?? (md.date as string | undefined)
+  if (!raw) return null
+  const d = new Date(String(raw).slice(0, 10) + 'T12:00:00')
+  return isNaN(d.getTime()) ? null : d
+}
+
+function DayTag({ day }: { day: Date }) {
+  const c = dayColor(day)
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+      style={{ color: c, background: c + '18' }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} />
+      {DOW_SHORT[day.getDay()]} {day.getDate()}
+    </span>
+  )
+}
+
 function TaskCard({
   task,
   onToggle,
@@ -117,31 +120,26 @@ function TaskCard({
   onToggle: (id: string, done: boolean) => void
   onClick: (task: Task) => void
 }) {
-  const tier = TIERS.find((t) => t.id === task.urgency)
-  const done = !!task.completed_at
+  const done     = !!task.completed_at
+  const day      = taskDay(task)
+  const showDesc = task.description && !done && !sameAsTitle(task.description, task.title)
+  const hasMeta  = !!day || !!task.entity_name || (task.tags?.length ?? 0) > 0
 
   return (
     <div
       role="button"
       tabIndex={0}
-      className="group relative cursor-pointer rounded-xl border border-ink-4/10 bg-ink-1/30 p-3 backdrop-blur-sm transition-all duration-150 hover:border-ink-4/20 hover:bg-ink-1/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
+      className="group cursor-pointer rounded-2xl border border-ink-4/10 bg-ink-1/30 p-4 backdrop-blur-sm transition-colors hover:border-ink-4/20 hover:bg-ink-1/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
       onClick={() => onClick(task)}
       onKeyDown={(e) => e.key === 'Enter' && onClick(task)}
     >
       <div className="flex items-start gap-3">
         <button
           className="mt-0.5 shrink-0 focus-visible:outline-none"
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggle(task.id, !done)
-          }}
-          aria-label={done ? 'Mark incomplete' : 'Mark complete'}
+          onClick={(e) => { e.stopPropagation(); onToggle(task.id, !done) }}
+          aria-label={done ? 'Marcar incompleta' : 'Marcar completa'}
         >
-          <div
-            className={`flex h-4 w-4 items-center justify-center rounded border transition-all duration-150 ${
-              done ? 'border-ok/60 bg-ok/20' : 'border-ink-4/30 hover:border-ink-4/60'
-            }`}
-          >
+          <div className={`flex h-[18px] w-[18px] items-center justify-center rounded-md border transition-colors ${done ? 'border-ok/60 bg-ok/20' : 'border-ink-4/30 hover:border-ink-4/60'}`}>
             {done && (
               <svg className="h-2.5 w-2.5 text-ok" viewBox="0 0 10 10" fill="none">
                 <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -151,40 +149,26 @@ function TaskCard({
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <span className={`text-sm font-medium leading-snug ${done ? 'text-ink-2 line-through' : 'text-ink-4'}`}>
-              {task.title}
-            </span>
-            {task.key && (
-              <span className="shrink-0 rounded-md border border-ink-4/10 px-1.5 py-0.5 font-mono text-[10px] text-ink-3">
-                {task.key}
-              </span>
-            )}
-          </div>
+          <p className={`text-sm font-medium leading-snug ${done ? 'text-ink-2 line-through' : 'text-ink-4'}`}>
+            {task.title}
+          </p>
 
-          {task.description && !done && !sameAsTitle(task.description, task.title) && (
-            <p className="mt-0.5 line-clamp-2 text-xs text-ink-3">{task.description}</p>
+          {showDesc && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-3">{task.description}</p>}
+
+          {hasMeta && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              {day && <DayTag day={day} />}
+              {task.entity_name && <span className="text-[11px] text-ink-3">{task.entity_name}</span>}
+              {task.tags?.map((tag) => (
+                <span key={tag} className="rounded-full border border-ink-4/10 px-2 py-0.5 text-[10px] text-ink-3">{tag}</span>
+              ))}
+            </div>
           )}
-
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {task.entity_name && (
-              <span className="text-[10px] font-medium text-ink-3">{task.entity_name}</span>
-            )}
-            {task.entity_name && task.tags?.length > 0 && (
-              <span className="text-[10px] text-ink-2">·</span>
-            )}
-            {task.tags?.map((tag) => (
-              <span key={tag} className="rounded-full border border-ink-4/10 px-1.5 py-0.5 text-[10px] text-ink-3">
-                {tag}
-              </span>
-            ))}
-            {task.priority_score != null && (
-              <span className={`ml-auto rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${tier?.badgeCls ?? 'border-ink-4/10 text-ink-3'}`}>
-                P{task.priority_score}
-              </span>
-            )}
-          </div>
         </div>
+
+        {task.key && (
+          <span className="shrink-0 rounded-md border border-ink-4/10 px-1.5 py-0.5 font-mono text-[10px] text-ink-3">{task.key}</span>
+        )}
       </div>
     </div>
   )
@@ -290,35 +274,39 @@ function KanbanColumn({
   onClickTask: (task: Task) => void
 }) {
   const [showDone, setShowDone] = useState(false)
+  const [showAll,  setShowAll]  = useState(false)
   const open = tasks.filter((t) => !t.completed_at)
   const done = tasks.filter((t) => t.completed_at)
+  const visible = showAll ? open : open.slice(0, COLUMN_TOP_N)
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="mb-1 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${tier.dotCls}`} />
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</span>
-        </div>
-        <span className="tabular-nums text-[10px] text-ink-2">{open.length}</span>
+    <div className="flex flex-col gap-2.5">
+      <div className="mb-1 flex items-baseline justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</span>
+        <span className="tabular-nums text-[11px] text-ink-2">{open.length}</span>
       </div>
 
       <NewTaskInput urgency={tier.id} onAdd={onAdd} />
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         {open.length === 0 && <p className="py-6 text-center text-xs text-ink-2">Sin tareas abiertas</p>}
-        {open.map((task) => (
+        {visible.map((task) => (
           <TaskCard key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />
         ))}
+        {open.length > COLUMN_TOP_N && (
+          <button onClick={() => setShowAll((s) => !s)} className="rounded-xl border border-ink-4/10 py-2 text-[11px] text-ink-3 transition-colors hover:text-ink-4">
+            {showAll ? 'Ver menos' : `Ver ${open.length - COLUMN_TOP_N} más`}
+          </button>
+        )}
       </div>
 
       {done.length > 0 && (
         <div className="mt-2">
-          <button onClick={() => setShowDone((v) => !v)} className="text-[10px] text-ink-2 transition-colors hover:text-ink-3">
+          <button onClick={() => setShowDone((v) => !v)} className="text-[11px] text-ink-2 transition-colors hover:text-ink-3">
             {showDone ? '▾' : '▸'} {done.length} completadas
           </button>
           {showDone && (
-            <div className="mt-2 flex flex-col gap-2 opacity-50">
+            <div className="mt-2.5 flex flex-col gap-2.5 opacity-50">
               {done.map((task) => (
                 <TaskCard key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />
               ))}
@@ -346,7 +334,7 @@ function KanbanView({
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {TIERS.map((tier) => (
-        <div key={tier.id} className={`rounded-2xl border bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card ${tier.borderCls}`}>
+        <div key={tier.id} className="rounded-3xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
           <KanbanColumn
             tier={tier}
             tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
@@ -360,175 +348,121 @@ function KanbanView({
   )
 }
 
-// ── SmartView ──────────────────────────────────────────────────────────────
+// ── ListaView ──────────────────────────────────────────────────────────────
 
-function SmartView({
-  allTasks,
+// Compact single-line row for the list view (checkbox + title + entity + day tag).
+function TaskRow({
+  task,
   onToggle,
-  onClickTask,
+  onClick,
 }: {
-  allTasks: Task[]
+  task: Task
   onToggle: (id: string, done: boolean) => void
-  onClickTask: (task: Task) => void
+  onClick: (task: Task) => void
 }) {
-  const [query, setQuery] = useState('')
-  const [matchedIds, setMatchedIds] = useState<string[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const results = matchedIds !== null ? allTasks.filter((t) => matchedIds.includes(t.id)) : null
-
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault()
-    const q = query.trim()
-    if (!q || loading) return
-    setLoading(true)
-    setError(null)
-    try {
-      const matched = await apiPost<Task[]>('/api/tasks/smart', { query: q })
-      setMatchedIds(matched.map((t) => t.id))
-    } catch {
-      setError('Error al buscar — revisa tu conexión e intenta de nuevo.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  const done = !!task.completed_at
+  const day  = taskDay(task)
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-6 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <path d="M12 3L14.5 9H21L15.5 13L17.5 19L12 15.5L6.5 19L8.5 13L3 9H9.5L12 3Z" fill="currentColor" opacity="0.9" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-ink-4">Búsqueda Inteligente</h3>
-            <p className="text-xs text-ink-3">Claude interpreta lenguaje natural para encontrar tareas</p>
-          </div>
+    <div
+      role="button"
+      tabIndex={0}
+      className="group flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-ink-4/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/30"
+      onClick={() => onClick(task)}
+      onKeyDown={(e) => e.key === 'Enter' && onClick(task)}
+    >
+      <button
+        className="shrink-0 focus-visible:outline-none"
+        onClick={(e) => { e.stopPropagation(); onToggle(task.id, !done) }}
+        aria-label={done ? 'Marcar incompleta' : 'Marcar completa'}
+      >
+        <div className={`flex h-[18px] w-[18px] items-center justify-center rounded-md border transition-colors ${done ? 'border-ok/60 bg-ok/20' : 'border-ink-4/30 hover:border-ink-4/60'}`}>
+          {done && <svg className="h-2.5 w-2.5 text-ok" viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
         </div>
+      </button>
 
-        <form onSubmit={handleSearch} className="mb-5 flex gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ej. 'seguimiento urgente de clientes' o 'tareas de diseño esta semana'"
-            className="flex-1 rounded-xl border border-ink-4/10 bg-ink-0/80 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20"
-          />
-          <button
-            type="submit"
-            disabled={loading || !query.trim()}
-            className="shrink-0 rounded-xl border border-accent/20 bg-accent/10 px-4 py-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {loading ? '…' : 'Buscar'}
-          </button>
-        </form>
+      <span className={`min-w-0 flex-1 truncate text-sm ${done ? 'text-ink-2 line-through' : 'text-ink-4'}`}>{task.title}</span>
 
-        {error && <p className="mb-4 text-sm text-danger">{error}</p>}
-
-        {loading && (
-          <div className="flex flex-col items-center gap-3 py-10 text-center">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent" />
-            <p className="text-sm text-ink-3">Claude está buscando…</p>
-          </div>
-        )}
-
-        {!loading && results !== null && (
-          <div>
-            <p className="mb-3 text-xs text-ink-3">
-              {results.length === 0 ? 'Sin tareas coincidentes.' : `${results.length} tarea${results.length === 1 ? '' : 's'} encontrada${results.length === 1 ? '' : 's'}`}
-            </p>
-            <div className="flex flex-col gap-2">
-              {results.map((task) => (
-                <TaskCard key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!loading && results === null && (
-          <div className="py-8 text-center">
-            <p className="text-xs leading-relaxed text-ink-2">
-              Intenta: &ldquo;todas las tareas de un cliente&rdquo; · &ldquo;prioridades de esta semana&rdquo; · &ldquo;cualquier cosa etiquetada diseño&rdquo;
-            </p>
-          </div>
-        )}
-      </div>
+      {task.entity_name && <span className="shrink-0 text-[11px] text-ink-3">{task.entity_name}</span>}
+      {day && <DayTag day={day} />}
     </div>
   )
 }
 
-// ── CategoryView ───────────────────────────────────────────────────────────
-
-function CategoryView({
+function ListaSection({
+  tier,
   tasks,
-  entities,
+  onToggle,
+  onAdd,
+  onClickTask,
+}: {
+  tier: (typeof TIERS)[number]
+  tasks: Task[]
+  onToggle: (id: string, done: boolean) => void
+  onAdd: (task: Task) => void
+  onClickTask: (task: Task) => void
+}) {
+  const [showDone, setShowDone] = useState(false)
+  const [showAll,  setShowAll]  = useState(false)
+  const open = tasks.filter((t) => !t.completed_at)
+  const done = tasks.filter((t) => t.completed_at)
+  const visible = showAll ? open : open.slice(0, COLUMN_TOP_N)
+
+  return (
+    <section>
+      <div className="mb-2 flex items-baseline gap-3 border-b border-ink-4/8 pb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</h3>
+        <span className="tabular-nums text-[11px] text-ink-2">{open.length}</span>
+      </div>
+
+      <div className="flex flex-col">
+        {open.length === 0 && done.length === 0 && <p className="px-3 py-2.5 text-xs italic text-ink-2/60">Sin tareas</p>}
+        {visible.map((task) => <TaskRow key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />)}
+        {open.length > COLUMN_TOP_N && (
+          <button onClick={() => setShowAll((s) => !s)} className="mt-1 self-start px-3 text-[11px] text-ink-3 transition-colors hover:text-ink-4">
+            {showAll ? 'Ver menos' : `Ver ${open.length - COLUMN_TOP_N} más`}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-2 px-3"><NewTaskInput urgency={tier.id} onAdd={onAdd} /></div>
+
+      {done.length > 0 && (
+        <div className="mt-1 px-3">
+          <button onClick={() => setShowDone((v) => !v)} className="text-[11px] text-ink-2 transition-colors hover:text-ink-3">
+            {showDone ? '▾' : '▸'} {done.length} completadas
+          </button>
+          {showDone && <div className="mt-1 flex flex-col opacity-50">{done.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onClick={onClickTask} />)}</div>}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function ListaView({
+  tasks,
   onToggle,
   onAdd,
   onClickTask,
 }: {
   tasks: Task[]
-  entities: Entity[]
   onToggle: (id: string, done: boolean) => void
   onAdd: (task: Task) => void
   onClickTask: (task: Task) => void
 }) {
-  const entityNames = entities.map((e) => e.name)
-  const groups = [
-    ...entities.map((e) => ({ id: e.id as string | null, name: e.name })),
-    { id: null, name: 'Sin categoría' },
-  ].map((g) => ({
-    ...g,
-    tasks: tasks.filter((t) =>
-      g.name === 'Sin categoría'
-        ? !t.entity_name || !entityNames.includes(t.entity_name)
-        : t.entity_name === g.name
-    ),
-  }))
-
   return (
-    <div className="flex flex-col gap-4">
-      {groups.map((group) => {
-        const open = group.tasks.filter((t) => !t.completed_at)
-        const done = group.tasks.filter((t) => t.completed_at)
-
-        return (
-          <div key={group.name} className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-            <div className="mb-4 flex items-center gap-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">{group.name}</h3>
-              {open.length > 0 && (
-                <span className="tabular-nums rounded-full border border-ink-4/10 px-1.5 py-0.5 text-[10px] text-ink-2">
-                  {open.length}
-                </span>
-              )}
-            </div>
-
-            <NewTaskInput
-              urgency="someday"
-              entityName={group.name === 'Uncategorized' ? undefined : group.name}
-              entityId={group.id ?? undefined}
-              onAdd={onAdd}
-            />
-
-            <div className="flex flex-col gap-2">
-              {open.map((task) => (
-                <TaskCard key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />
-              ))}
-              {done.length > 0 && (
-                <div className="mt-1 flex flex-col gap-2 opacity-40">
-                  {done.map((task) => (
-                    <TaskCard key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />
-                  ))}
-                </div>
-              )}
-              {open.length === 0 && done.length === 0 && (
-                <p className="py-3 text-xs text-ink-2">Sin tareas aún.</p>
-              )}
-            </div>
-          </div>
-        )
-      })}
+    <div className="mx-auto max-w-3xl rounded-3xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card sm:p-8">
+      <div className="flex flex-col gap-8">
+        {TIERS.map((tier) => (
+          <ListaSection
+            key={tier.id}
+            tier={tier}
+            tasks={tasks.filter((t) => (t.urgency ?? 'someday') === tier.id)}
+            onToggle={onToggle}
+            onAdd={onAdd}
+            onClickTask={onClickTask}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -986,18 +920,17 @@ export default function TareasContent() {
 
   const VIEWS: { id: View; label: string }[] = [
     { id: 'kanban', label: 'Kanban' },
-    { id: 'smart', label: 'Smart' },
-    { id: 'category', label: 'Category' },
+    { id: 'lista',  label: 'Lista' },
   ]
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="mx-auto w-full max-w-7xl shrink-0 px-6 pb-4 pt-6">
+    <div className="mx-auto w-full max-w-7xl px-6 pb-16 pt-6">
+      <div className="pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-ink-4">Tareas</h1>
-            <p className="mt-0.5 text-xs text-ink-3">
-              {loading ? 'Loading…' : `${openCount} open task${openCount === 1 ? '' : 's'}`}
+            <h1 className="text-2xl font-bold tracking-tight text-ink-4">Tareas</h1>
+            <p className="mt-1 text-xs text-ink-3">
+              {loading ? 'Cargando…' : `${openCount} tarea${openCount === 1 ? '' : 's'} abierta${openCount === 1 ? '' : 's'}`}
             </p>
           </div>
 
@@ -1056,7 +989,7 @@ export default function TareasContent() {
         )}
       </div>
 
-      <main className="mx-auto w-full max-w-7xl flex-1 min-h-0 overflow-y-auto px-6 pb-16">
+      <div className="mt-6">
         {loadError && (
           <div className="mb-4 flex items-center gap-3 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3">
             <span className="text-sm text-danger">{loadError}</span>
@@ -1074,15 +1007,12 @@ export default function TareasContent() {
             {view === 'kanban' && (
               <KanbanView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
             )}
-            {view === 'smart' && (
-              <SmartView allTasks={visibleTasks} onToggle={handleToggle} onClickTask={setDrawerTask} />
-            )}
-            {view === 'category' && (
-              <CategoryView tasks={visibleTasks} entities={entities} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
+            {view === 'lista' && (
+              <ListaView tasks={visibleTasks} onToggle={handleToggle} onAdd={handleAdd} onClickTask={setDrawerTask} />
             )}
           </>
         )}
-      </main>
+      </div>
 
       <TaskDrawer
         task={drawerTask}

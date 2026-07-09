@@ -94,3 +94,30 @@ sin emojis parchados):
 - Se retiró el `overflow-y-auto` interno anterior (cumple la regla de oro). Solo rediseño de UI; los
   endpoints y el auto-sync de `/api/context/sync` se mantienen. `UniversalCapture.tsx` quedó huérfano
   (su lógica se absorbió en la barra); se puede borrar si no se reusa.
+
+## 🎨 PRINCIPIO DE COLOR (permanente, aplica a TODO el OS)
+
+**El color SIEMPRE significa DÍA DE LA SEMANA — nunca es decorativo.** Nunca codifica urgencia,
+estado ni categoría. Fuente única: `lib/weekdayColors` (`WEEKDAY_RAINBOW` / `dayColor`), el mismo que
+usan CalendarCard y el reloj de Inicio. Contenedores/tiers/columnas/estados van **neutros**
+(bordes `ink-4/10`, tipografía limpia, sin puntos de color). El color solo aparece cuando un ítem
+referencia un **día concreto** → tag/punto pequeño en el color de ese día. Sin día concreto = neutro.
+
+## Rediseño de Tareas (TareasContent.tsx)
+
+Mismo trato que CalendarCard (limpio, minimal, mucho aire, glass, bordes neutros). Solo UI, backend
+intacto salvo un toque de lectura.
+- **Vistas:** se quitaron **Smart** y **Category** de la UI (se borraron los componentes; sus
+  endpoints `/api/tasks/smart` etc. siguen en el backend, sin usar). Quedó **Kanban** + nueva vista
+  **Lista** (toggle `[Kanban · Lista]`, sin emojis). Lista = filas compactas agrupadas por los tiers
+  (Hoy/Esta Semana/Este Mes/Algún Día), encabezados neutros, top-N + "ver más".
+- **Color:** se eliminaron TODOS los colores de urgencia (rojo/amarillo/azul de bordes y puntos). El
+  único color es el **tag de día**: `taskDay(task)` saca la fecha de `due_date` o `metadata.event_date`
+  y pinta un tag con `dayColor` (ver principio arriba). Tarea sin fecha = neutra.
+- **Backend (mínimo, solo lectura):** `/api/tasks` GET ahora incluye `due_date,metadata` en el SELECT
+  (columnas que ya existían en la tabla — 0001/0034) y en `normalise`. No cambian endpoints ni lógica
+  de escritura; el drawer aún no edita fecha (posible mejora futura para que el tag se use más).
+- **Regla de oro:** se quitó el `overflow-y-auto` de la cara; todo fluye en el scroll de la cara. El
+  único scroll interno que queda es el del **drawer** (overlay/modal — aceptable).
+- Se conserva: crear/editar/borrar (drawer), toggle completar, filtro por entidad, "nueva tarea" por
+  columna/sección, completadas colapsables.
