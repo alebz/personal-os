@@ -35,17 +35,31 @@ export default function LoloChat({
     document.addEventListener('touchstart', onDocTouch)
     return () => document.removeEventListener('touchstart', onDocTouch)
   }, [touchPaused, onBubbleResume])
+
+  // Autoscroll: seguir el fondo mientras Lolo escribe, salvo que subas a leer manualmente
+  const stickBottomRef = useRef(true)
+  useEffect(() => { stickBottomRef.current = true }, [chatMessages])
+  useEffect(() => {
+    if (mode !== 'chat') return
+    const el = messagesRef.current
+    if (el && stickBottomRef.current) el.scrollTop = el.scrollHeight
+  }, [bubble.text, chatMessages, mode, messagesRef])
+  function onMessagesScroll() {
+    const el = messagesRef.current
+    if (el) stickBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+  }
+
   return (
     <>
       {/* Chat history — overlays character area when chat mode is active */}
       {mode === 'chat' && (
         <div style={{position:'absolute',left:0,right:0,bottom:0,zIndex:20,minHeight:130,maxHeight:'55%',display:'flex',flexDirection:'column',background:'var(--lcd)',borderTop:'2px solid var(--ink)',animation:'adanBox .18s ease',overflow:'hidden'}}>
-          <div ref={messagesRef} style={{flex:1,overflowY:'auto',maxHeight:'100%',padding:'8px 12px 4px',scrollbarWidth:'none',minHeight:0} as React.CSSProperties}>
+          <div ref={messagesRef} onScroll={onMessagesScroll} style={{flex:1,overflowY:'auto',maxHeight:'100%',padding:'8px 12px 4px',scrollbarWidth:'none',minHeight:0} as React.CSSProperties}>
             {chatMessages.length === 0 && !busy && (
               <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:'var(--ink)',opacity:.3}}>…</span>
             )}
             {chatMessages.filter(m => m.role === 'user').at(-1)?.content && (
-              <div style={{fontFamily:"'VT323',monospace",fontSize:28,color:'color-mix(in srgb, var(--ink) 70%, #000)',opacity:.6,marginBottom:4,whiteSpace:'normal',wordBreak:'break-word'}}>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:30,color:'color-mix(in srgb, var(--ink) 70%, #000)',opacity:.6,marginBottom:4,whiteSpace:'normal',wordBreak:'break-word'}}>
                 › {chatMessages.filter(m => m.role === 'user').at(-1)!.content}
               </div>
             )}
@@ -57,7 +71,7 @@ export default function LoloChat({
               </div>
             )}
             {!busy && chatMessages.filter(m => m.role === 'assistant').at(-1)?.content && (
-              <div style={{fontFamily:"'VT323',monospace",fontSize:34,color:'color-mix(in srgb, var(--ink) 70%, #000)',lineHeight:1.25,whiteSpace:'normal',wordBreak:'break-word',overflowWrap:'break-word'}}>
+              <div style={{fontFamily:"'VT323',monospace",fontSize:38,color:'color-mix(in srgb, var(--ink) 70%, #000)',lineHeight:1.25,whiteSpace:'normal',wordBreak:'break-word',overflowWrap:'break-word'}}>
                 {bubble.typing ? bubble.text : chatMessages.filter(m => m.role === 'assistant').at(-1)!.content}
                 {bubble.typing && <span style={{display:'inline-block',width:10,color:'var(--ink)',animation:'adanCaret .7s steps(1) infinite'}}>▌</span>}
               </div>
@@ -89,7 +103,7 @@ export default function LoloChat({
                 </div>
               )}
               {!busy && bubble.text && (
-                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:13,lineHeight:1.75,color:'color-mix(in srgb, var(--ink) 70%, #000)',letterSpacing:.3}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:14,lineHeight:1.75,color:'color-mix(in srgb, var(--ink) 70%, #000)',letterSpacing:.3}}>
                   {bubble.text}
                   {bubble.typing && <span style={{display:'inline-block',width:10,color:'var(--ink)',animation:'adanCaret .7s steps(1) infinite'}}>▌</span>}
                 </div>

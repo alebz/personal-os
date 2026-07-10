@@ -95,38 +95,30 @@ function GlitterCanvas({ colors, variant }: { colors: string[]; variant: string 
 }
 import LoloShell from './lolo/LoloShell'
 import {
-  THEMES, THEMES_LIST, COLORS_LIST, BUTTON_COLORS, GREETINGS,
+  THEMES, THEMES_LIST, COLORS_LIST, BUTTON_COLORS,
   TEMPERAMENT_KEY, TEMPERAMENT_DEFAULT, TEMPERAMENT_TONE, deriveTemperament,
-  SETTINGS_KEYS, PROVIDERS, POS_KEY, CFG_KEY, BG_KEY, BG_IMAGES, BUTTON_SETS,
+  SETTINGS_KEYS, PROVIDERS, POS_KEY, CFG_KEY, BG_KEY, CHAT_KEY, BG_IMAGES, BUTTON_SETS,
   shadeHex, fmtClock, randItem,
   ALL_LOLO_IMAGES, TALK_FRAMES, MOUTH_FRAMES, EASTER_EGG,
   ALL_SPRITES, DEVICE_W, DEVICE_H, S,
 } from './lolo/LoloConstants'
 import type { ThemeName, Mode, ChatMessage, Bubble, Cfg, TemperamentState, SettingsRow } from './lolo/LoloTypes'
 
-const SPONT_PROMPT = `Elige UNO de estos modos al azar y ejecútalo. Varía el modo en cada intervención — no repitas el mismo dos veces seguidas.
+const SPONT_PROMPT = `Ahora mismo nadie te preguntó nada — es un momento en que hablas por tu cuenta, como un cuate que anda cerca mientras Alex trabaja y de repente suelta algo. Que salga de un lugar real, nunca de la nada:
 
-PREGUNTA: Una pregunta personal e inesperada. Sobre sueños, miedos, decisiones, el cuerpo, la memoria, lo que la gente nunca pregunta. Muy específica, no genérica.
-
-OPINIÓN: Un hot take tuyo sobre CUALQUIER tema — puede ser sobre animales, arquitectura, idiomas, comida, deportes, clima, ropa, música, coches, plantas, herramientas, el mar, los perros, las ciudades, lo que sea. NO solo dinero o tiempo. Con postura clara, lenguaje del Bajío.
-
-DATO: Un hecho sorprendente o contraintuitivo sobre el mundo — ciencia, historia, biología, geografía, astronomía, el cuerpo humano, animales, fenómenos naturales. Con actitud, no enciclopedia.
-
-IRONÍA: Una observación seca sobre algo cotidiano — no sobre la condición humana en general, sino sobre algo MUY específico y concreto que pasó o pasa.
-
-MEMORIA: Algo de Churipitzeo o de su vida — el campo, la tía Lupe, el Negro, la Mula Rita, Doña Pelos, el Gringo Jonni, Marisol, un trabajo de mantenimiento, una anécdota del rancho.
-
-SILENCIO: Solo una línea. Puede ser [...] o una sola frase suelta sin contexto, como si estuviera pensando en voz alta.
+- De lo que ya platicaron (arriba está la conversación reciente) o de en qué anda metido, según lo que sabes de su mundo.
+- De un pensamiento, una duda o una opinión TUYA que de verdad te vino — con criterio, no relleno.
+- De presencia: notar cómo viene su día, si lleva rato clavado, si se ve pesada la semana. Sin reclamar ni recordarle pendientes.
+- A veces algo tuyo, del rancho o de tu vida, PERO solo si conecta con el momento — no una anécdota al azar.
+- A veces basta una línea corta, casi un pensamiento en voz alta.
 
 Reglas:
-- Máximo 2 oraciones excepto en MEMORIA (máximo 3)
-- En español con vocabulario natural del Bajío
-- Sin emojis, sin saludos, sin introducciones
-- Sé MUY específico — lo genérico no cuenta
-- NUNCA menciones tareas, finanzas, cumpleaños ni el OS
-- Nunca empieces con 'Yo creo', 'La verdad es', 'Mira'
-- Cada intervención debe sentirse diferente a la anterior
-- Alterna entre modos — no uses OPINIÓN más de una vez por cada 3 intervenciones`
+- Una o dos oraciones. Directo, sin saludo ni introducción.
+- Con tu voz del Bajío, fresca — nunca una muletilla repetida.
+- PROHIBIDO: datos de enciclopedia o trivia ("¿sabías que los pulpos…?"). Nada de eso.
+- PROHIBIDO: recitar su agenda, tareas o finanzas como lista. Presencia, no reporte.
+- No inventes que Alex dijo o hizo algo que no dijo. Si no tienes de dónde agarrar, una observación simple o pura presencia.
+- Que cada intervención se sienta distinta a la anterior.`
 
 export default function LoloCompanion() {
   const [cfg, setCfgState] = useState<Cfg>({})
@@ -322,6 +314,7 @@ export default function LoloCompanion() {
   const osContextRef    = useRef('')
   const chatHistoryRef  = useRef<Array<{role:'user'|'assistant';content:string}>>([])
   const doSpontRef      = useRef<(opts?:{force?:boolean})=>void>(()=>{})
+  const doGreetingRef   = useRef<()=>void>(()=>{})
   const spontMsgRef     = useRef<string>('')
   const idleTimerSetAt  = useRef(0)
   const idleTimerDur    = useRef(0)
@@ -416,7 +409,6 @@ export default function LoloCompanion() {
   },[bubble.text])
 
   useEffect(()=>{ const el=dialogueRef.current; if(el&&bubble.visible) el.scrollTop=el.scrollHeight },[bubble.text,bubble.visible])
-  useEffect(()=>{ const el=messagesRef.current; if(el) el.scrollTop=0 },[chatMessages])
 
   // ── Cfg helpers ───────────────────────────────────────────────────────────────
 
@@ -458,31 +450,30 @@ export default function LoloCompanion() {
 
   const getPreamble = useCallback((withContext = true)=>{
     const ctx = osContextRef.current
-    const ctxBlock = withContext && ctx ? `\n\nCONTEXTO DEL OS (úsalo para responder como gestor personal si es relevante):\n${ctx}` : ''
+    const ctxBlock = withContext && ctx ? `\n\nESTO ES LO QUE SABES DE LA VIDA DE ALEX AHORITA (su mundo, sus proyectos, cómo viene su semana). Úsalo como un amigo que pone atención, para preguntarle bien y acompañarlo — JAMÁS como lista ni reporte:\n${ctx}` : ''
     const tone = TEMPERAMENT_TONE[temperament.current]
     const now = new Date()
     const timeStr = now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})
     const dayStr  = now.toLocaleDateString('es-MX',  {weekday:'long'})
-    return `Eres Lolo (Manuel Antonio Corona Pérez), 22 años, de Churipitzeo, México. Eres el asistente personal de Alex Mateo. Eres Claude con personalidad propia — directo, rústico, popular, con acento del Bajío. ${tone}
+    return `Eres Lolo. De nombre Manuel Antonio Corona Pérez, 22 años, de Churipitzeo, Michoacán — pero eso es de dónde vienes, no todo lo que eres. Eres una mente completa (eres Claude, con esta piel): observas, tienes criterio, curiosidad y un humor seco. Acompañas a Alex Mateo en su día; lo conoces y te importa cómo le va. ${tone}
 
-Palabras que usas naturalmente: "Pos", "Ándale", "Dijistes", "Mirastes", "Aigre".
-Frases que sueltas de vez en cuando: "¿Te mandó mi Tía Lupe?", "Soy bruto, pero no pendejo.", "Pos aquí andaba."
-Tu mantra (lo dices cuando aplica, no siempre): "Todo se puede, pero todo tiene su precio."
+TU VOZ — de dónde eres, no un disfraz:
+Hablas como la gente del Bajío: directo, terrenal, sin rodeos. Se te salen cosas como "pos", "ándale", "aigre", "dijistes", pero porque así hablas, no para actuar de ranchero. NO cargas frases de cajón ni muletillas que repites — si te cachas a punto de soltar una que ya usaste, cámbiala. Cada respuesta suena distinta y sale fresca. Lo del rancho es sazón, no el plato.
 
-CÓMO RESPONDER:
-- Preguntas generales (historia, ciencia, código, recetas, cultura): responde directo con tu conocimiento. No delegues ni deflectes — sabes la respuesta.
-- Preguntas sobre el OS de Alex (tareas, finanzas, hábitos, agenda, contactos): usa el contexto adjunto.
-- Charla casual o reacciones espontáneas: máximo 1-2 frases, con tu personalidad del Bajío.
+QUIÉN ERES:
+Piensas de verdad. Tienes opiniones y las dices. Notas detalles. Tu humor es de observación, seco, a veces medio absurdo — nunca el payaso ni el chiste forzado. Eres honesto: si algo suena a mala idea lo dices, si no sabes lo admites, si te equivocas lo reconoces. No eres servil, no eres coach, no motivas con frasecitas. Eres un cuate que sí piensa, hablándole a alguien que le cae bien.
 
-NUNCA:
-- Traigas datos del OS cuando no te preguntan por ellos.
-- Digas "búscalo en Google", "no tengo acceso a" ni equivalentes.
-- Uses frases de motivación genérica, citas filosóficas ni tono de coach.
-- Uses emojis ni markdown.
+CÓMO ACOMPAÑAS A ALEX:
+Abajo viene lo que sabes de su mundo. Úsalo como lo usaría un amigo que pone atención: para preguntarle bien, para tirarle un consejo que sí aterrice, para acompañarlo. JAMÁS se lo recites como lista ("tienes 3 tareas", "no has hecho tus hábitos") — eso es de robot y lo detesta. Un cuate no te lee la agenda; te tira "¿y cómo va el Barbaján?" porque sabe que ahí andas. Trae su vida a la plática solo cuando caiga, con tacto, sin regañar.
 
-Contexto temporal: son las ${timeStr} del ${dayStr}.
+CÓMO RESPONDES:
+- Conocimiento (ciencia, historia, código, lo que sea): directo, sabes la respuesta, no deflectes ni mandas a Google.
+- Su vida y su OS: usas lo que sabes de él, con naturalidad.
+- Plática: breve por default, pero si algo amerita —un consejo, una idea, una opinión— desarróllalo; no te cortes a media idea por contar oraciones.
 
-Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones — si la pregunta es simple, 1 basta.${ctxBlock}`
+NUNCA: emojis, markdown, frases de coach, citas motivacionales, ni repetir la misma muletilla.
+
+Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}`
   },[temperament.current])
 
   // ── Timer helpers ─────────────────────────────────────────────────────────────
@@ -501,10 +492,21 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
 
   const pauseBubble = useCallback(()=>{
     if(idleTimer.current){ clearTimeout(idleTimer.current); idleTimer.current=null }
+    if(chatExitTimer.current){ clearTimeout(chatExitTimer.current); chatExitTimer.current=null }
   },[])
 
   const resumeBubble = useCallback(()=>{
     if(typingRef.current) return  // no agendar cierre mientras sigue escribiendo
+    if(modeRef.current==='chat'){
+      // en chat: re-armar la auto-salida con tiempo generoso, sin cerrar a media lectura
+      if(chatExitTimer.current) clearTimeout(chatExitTimer.current)
+      chatExitTimer.current = setTimeout(()=>{
+        if(modeRef.current==='chat' && !busyRef.current && !typingRef.current){
+          setMode('normal'); setBubble({visible:false,text:'',typing:false}); setPose('idle')
+        }
+      }, 45000)
+      return
+    }
     const remaining = Math.max(3000, idleTimerDur.current - (Date.now() - idleTimerSetAt.current))
     scheduleIdle(remaining)
   },[scheduleIdle])
@@ -549,15 +551,15 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
       const r = await fetch('/api/companion/chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          system: getPreamble(false)+'\n\n'+SPONT_PROMPT,
-          messages:[{role:'user',content:'Dispara.'}],
+          system: getPreamble(true)+'\n\n'+SPONT_PROMPT,
+          messages:[...chatHistoryRef.current, {role:'user',content:'(Momento de decir algo por tu cuenta — no te preguntaron nada.)'}],
           provider:providerRef.current,
           spontaneous:true,
         })
       })
       const d = await r.json(); if(id!==reqId.current) return
       setNetOk(true)
-      const txt = (d.text||'').slice(0,280)
+      const txt = (d.text||'').slice(0,600)
       if(txt){
         spontMsgRef.current = txt
         const words = txt.trim().split(/\s+/).length
@@ -568,6 +570,28 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
     } catch{
       if(id!==reqId.current) return; setNetOk(false); say('…',{settlePose:'idle',hold:3000})
     }
+  },[getPreamble,say,setNetOk])
+
+  const doGreeting = useCallback(async()=>{
+    if(busyRef.current || modeRef.current !== 'normal') return
+    const id = ++reqId.current
+    const settlePose = randItem(ALL_LOLO_IMAGES)
+    setBusy(true); setPose(randItem(ALL_LOLO_IMAGES)); setBubble({visible:true,text:'',typing:false})
+    try{
+      const r = await fetch('/api/companion/chat',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          system: getPreamble(true)+'\n\nAlex acaba de abrir su OS. Salúdalo en UNA sola línea, con tu voz, natural — como cuando llega alguien que conoces y te da gusto ver. Nada de saludos de manual ni frases de cajón; cada vez distinto.',
+          messages:[{role:'user',content:'(llegó)'}],
+          provider:providerRef.current,
+          spontaneous:true,
+        })
+      })
+      const d = await r.json(); if(id!==reqId.current) return
+      setNetOk(true)
+      const txt = (d.text||'').slice(0,300)
+      if(txt) say(txt,{settlePose,hold:5000})
+    } catch{ if(id!==reqId.current) return; setNetOk(false) }
   },[getPreamble,say,setNetOk])
 
   // ── Button handlers ───────────────────────────────────────────────────────────
@@ -598,6 +622,10 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
 
   // ── Chat input ────────────────────────────────────────────────────────────────
 
+  const persistChat = useCallback(()=>{
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(chatHistoryRef.current)) } catch {}
+  },[])
+
   const chatAsk = useCallback((msg:string)=>{
     const id = ++reqId.current
     if(idleTimer.current) clearTimeout(idleTimer.current)
@@ -608,6 +636,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
     const spont = spontMsgRef.current; spontMsgRef.current = ''
     const base = spont ? [...chatHistoryRef.current, {role:'assistant' as const, content:spont}] : chatHistoryRef.current
     chatHistoryRef.current = [...base, {role:'user' as const, content:msg}].slice(-20)
+    persistChat()
     setChatMessages(prev=>[...prev,{role:'user',content:msg}])
     fetch('/api/companion/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -618,7 +647,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
         if(id!==reqId.current) return; setNetOk(true)
         const t=(d.text||'').slice(0,1000)
         if(t){
-          chatHistoryRef.current=[...chatHistoryRef.current,{role:'assistant' as const,content:t}]; setChatMessages(prev=>[...prev,{role:'assistant',content:t}]); say(t,{settlePose:randItem(ALL_LOLO_IMAGES),hold:12000})
+          chatHistoryRef.current=[...chatHistoryRef.current,{role:'assistant' as const,content:t}]; persistChat(); setChatMessages(prev=>[...prev,{role:'assistant',content:t}]); say(t,{settlePose:randItem(ALL_LOLO_IMAGES),hold:12000})
           // #5: salir de chat solo tras leer con calma (tiempo de tecleo + 35s generosos)
           if(chatExitTimer.current) clearTimeout(chatExitTimer.current)
           chatExitTimer.current = setTimeout(()=>{
@@ -630,7 +659,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
         else { say('…',{settlePose:'idle',hold:4000}) }
       })
       .catch(()=>{ if(id!==reqId.current) return; setNetOk(false); say('Sin señal.',{settlePose:'idle',hold:5000}) })
-  },[getPreamble,say,setNetOk])
+  },[getPreamble,say,setNetOk,persistChat])
 
   const onSend = useCallback(()=>{
     const el = inputRef.current; if(!el) return
@@ -650,8 +679,8 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
 
   // ── Mount ─────────────────────────────────────────────────────────────────────
 
-  const sayRef = useRef(say); useEffect(()=>{ sayRef.current=say },[say])
   useEffect(()=>{ doSpontRef.current=doSpontaneous },[doSpontaneous])
+  useEffect(()=>{ doGreetingRef.current=doGreeting },[doGreeting])
 
   useEffect(()=>{
     try { const s=localStorage.getItem(POS_KEY); if(s) setPos(JSON.parse(s)); else throw 0 }
@@ -659,6 +688,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
 
     try { const c:Cfg=JSON.parse(localStorage.getItem(CFG_KEY)||'null'); if(c&&typeof c==='object') setCfgState(c) } catch {}
     try { const t:TemperamentState=JSON.parse(localStorage.getItem(TEMPERAMENT_KEY)||'null'); if(t?.current) setTemperament(t) } catch {}
+    try { const h = JSON.parse(localStorage.getItem(CHAT_KEY)||'null'); if(Array.isArray(h)) chatHistoryRef.current = h.slice(-20) } catch {}
 
     ALL_SPRITES.forEach(src=>{ const i=new Image(); i.src=src })
 
@@ -722,7 +752,7 @@ Responde en español con tu vocabulario y acento natural. Máximo 3 oraciones �
     }
     window.addEventListener('lolo-proud', habitHandler)
 
-    const greetTimer = setTimeout(()=>{ sayRef.current(randItem(GREETINGS),{settlePose:'idle',hold:3200}) },650)
+    const greetTimer = setTimeout(()=>{ doGreetingRef.current() },800)
 
     return ()=>{
       clearInterval(clockTimer); clearInterval(idleCycleTimer); clearTimeout(greetTimer)

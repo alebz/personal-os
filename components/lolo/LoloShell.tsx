@@ -328,6 +328,8 @@ export default function LoloShell({
                     <input
                       ref={inputRef}
                       onKeyDown={onInputKey}
+                      onFocus={() => onBubblePause?.()}
+                      onBlur={() => { if(!inputRef.current?.value.trim()) onBubbleResume?.() }}
                       className="lolo-input"
                       placeholder="habla con lolo…"
                       maxLength={160}

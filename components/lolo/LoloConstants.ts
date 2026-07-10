@@ -136,6 +136,7 @@ export const PROVIDERS: [string, string][] = [['anthropic','CLAUDE'], ['openai',
 export const POS_KEY = 'lolo-pos'
 export const CFG_KEY = 'lolo_cfg'
 export const BG_KEY  = 'lolo_bg'
+export const CHAT_KEY = 'lolo_chat'
 
 export const BG_IMAGES = [
   '/Lolo/Backgrounds/background_1.png',
