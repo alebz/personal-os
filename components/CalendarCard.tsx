@@ -312,7 +312,7 @@ export default function CalendarCard() {
   const showTodayBtn = viewYear !== today.getFullYear() || viewMonth !== today.getMonth()
 
   return (
-    <div className="relative rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card sm:p-8">
+    <div className={`relative rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card sm:p-8 ${agendaOpen ? '' : 'lg:mx-auto lg:max-w-2xl'}`}>
 
       {/* Collapse tab — folds the agenda column away so the month fills the full width (lg only) */}
       <button
