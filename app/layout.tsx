@@ -13,7 +13,7 @@ const ViewTransition: React.ComponentType<{ children?: React.ReactNode }> =
   ?? (React.Fragment as unknown as React.ComponentType<{ children?: React.ReactNode }>);
 
 export const metadata: Metadata = {
-  title: "personal-os",
+  title: "Alex Mateo",
   description: "",
 };
 
