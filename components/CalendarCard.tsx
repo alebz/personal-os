@@ -56,87 +56,6 @@ const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-// Relative day label for the Up-next carousel: "Hoy", "Mañana", the weekday, or "12 jul".
-function relativeLabel(startISO: string, allDay: boolean, base: Date): string {
-  const key  = allDay ? startISO.slice(0, 10) : localDateKey(new Date(startISO))
-  const ev   = new Date(key + 'T12:00:00')
-  const t0   = new Date(base.getFullYear(), base.getMonth(), base.getDate())
-  const diff = Math.round((ev.getTime() - t0.getTime()) / 86_400_000)
-  if (diff <= 0)  return 'Hoy'
-  if (diff === 1) return 'Mañana'
-  if (diff < 7)   return ev.toLocaleDateString('es-MX', { weekday: 'long' })
-  return ev.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
-}
-
-// ── Up next ─────────────────────────────────────────────────────────────────
-// A gentle auto-advancing carousel of the next 3 events. Pauses on hover; dots take the
-// current event's colour so it feels alive without being noisy.
-function weekdayColor(startISO: string, allDay: boolean): string {
-  const key = allDay ? startISO.slice(0, 10) : localDateKey(new Date(startISO))
-  return dayColor(new Date(key + 'T12:00:00'))
-}
-
-function UpNext({ events, today }: { events: CalEvent[]; today: Date }) {
-  const items = events.slice(0, 3)
-  const [idx, setIdx]       = useState(0)
-  const [paused, setPaused] = useState(false)
-
-  useEffect(() => { setIdx(0) }, [events])
-
-  useEffect(() => {
-    if (paused || items.length <= 1) return
-    const t = setInterval(() => setIdx(i => (i + 1) % items.length), 4500)
-    return () => clearInterval(t)
-  }, [paused, items.length])
-
-  const ev    = items[idx] ?? items[0]
-  const color = ev ? weekdayColor(ev.start, ev.allDay) : '#8b7bff'
-
-  return (
-    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <style>{`@keyframes upnext-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}`}</style>
-      <p className="mb-3.5 text-[11px] font-semibold uppercase tracking-widest text-ink-3/70">Próximos</p>
-
-      {!ev ? (
-        <div className="flex min-h-[6rem] items-center rounded-2xl border border-ink-4/10 bg-ink-0/30 px-4 text-sm italic text-ink-3/50">
-          Nada próximo en el horizonte
-        </div>
-      ) : (
-        <>
-          <div
-            className="relative rounded-2xl border border-ink-4/10 bg-ink-0/40 p-4"
-            style={{ minHeight: '6rem', boxShadow: `0 0 10px ${color}59` }}
-          >
-            <div key={idx} style={{ animation: 'upnext-in .45s ease' }}>
-              <div className="mb-2 flex items-center gap-2">
-                <span className="rounded-full px-2.5 py-1 text-xs font-semibold capitalize" style={{ background: color + '22', color }}>
-                  {relativeLabel(ev.start, ev.allDay, today)}
-                </span>
-                <span className="text-xs text-ink-3">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</span>
-              </div>
-              <p className="line-clamp-2 text-base font-semibold leading-snug text-ink-4">{ev.title}</p>
-            </div>
-          </div>
-
-          {items.length > 1 && (
-            <div className="mt-2.5 flex items-center gap-1.5">
-              {items.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setIdx(i)}
-                  aria-label={`Evento ${i + 1}`}
-                  className="h-1.5 rounded-full transition-all"
-                  style={{ width: i === idx ? 18 : 6, background: i === idx ? color : 'rgba(255,255,255,0.2)' }}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
 export default function CalendarCard() {
   const today    = new Date()
   const todayKey = localDateKey(today)
@@ -147,7 +66,6 @@ export default function CalendarCard() {
   const [events,     setEvents]     = useState<CalEvent[]>([])
   const [loading,    setLoading]    = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
-  const [upcoming,   setUpcoming]   = useState<CalEvent[]>([])
 
   // Add / edit form state (editingUid = a captured event's uid when editing, else null = create)
   const [addTitle,   setAddTitle]   = useState('')
@@ -159,7 +77,7 @@ export default function CalendarCard() {
   const [addError,   setAddError]   = useState<string | null>(null)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [formOpen,   setFormOpen]   = useState(false)   // collapsed to just the title until focused
-  const [agendaOpen, setAgendaOpen] = useState(true)    // right agenda column; collapse it to give the month full width
+  const [agendaOpen, setAgendaOpen] = useState(false)   // right agenda column; starts collapsed (month full width)
 
   function rangeForView(year: number, month: number): { from: string; to: string } {
     const gridCells = buildGridCells(year, month)
@@ -181,29 +99,6 @@ export default function CalendarCard() {
       .catch(e => setFetchError(String(e)))
       .finally(() => setLoading(false))
   }
-
-  // Upcoming events for the "Próximos" carousel — anchored to today, independent of the browsed month.
-  function fetchUpcoming() {
-    const end = new Date(today); end.setDate(end.getDate() + 90)
-    fetch(`/api/calendar?from=${todayKey}&to=${localDateKey(end)}`)
-      .then(r => r.json())
-      .then((data: CalEvent[] | { error: string }) => {
-        if (!Array.isArray(data)) return
-        const now = Date.now()
-        const up = data
-          .filter(ev => {
-            const dayKey = ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start))
-            if (dayKey > todayKey) return true
-            if (dayKey < todayKey) return false
-            return ev.allDay || new Date(ev.start).getTime() >= now
-          })
-          .sort((a, b) => a.start.localeCompare(b.start))
-        setUpcoming(up)
-      })
-      .catch(() => {})
-  }
-
-  useEffect(() => { fetchUpcoming() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refetch whenever the visible month changes (also covers initial mount).
   useEffect(() => {
@@ -277,7 +172,6 @@ export default function CalendarCard() {
       if (monthChanged) { setViewYear(d.getFullYear()); setViewMonth(d.getMonth()) }
       setSelected(date)
       if (!monthChanged) { setLoading(true); await fetchEvents() }   // month change refetches via effect
-      fetchUpcoming()
     } catch (err) {
       setAddError(String(err))
     } finally {
@@ -290,11 +184,9 @@ export default function CalendarCard() {
     const idPart = ev.uid.slice('captured:'.length)
     setConfirmDel(null)
     setEvents(prev => prev.filter(x => x.uid !== ev.uid))       // optimistic
-    setUpcoming(prev => prev.filter(x => x.uid !== ev.uid))
     if (editingUid === ev.uid) resetForm()
     try { await fetch(`/api/calendar/${idPart}`, { method: 'DELETE' }) } catch { /* refetch reconciles */ }
     await fetchEvents()
-    fetchUpcoming()
   }
 
   const byDate    = groupByDate(events)
@@ -312,7 +204,7 @@ export default function CalendarCard() {
   const showTodayBtn = viewYear !== today.getFullYear() || viewMonth !== today.getMonth()
 
   return (
-    <div className={`relative rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card sm:p-8 ${agendaOpen ? '' : 'lg:mx-auto lg:max-w-2xl'}`}>
+    <div className={`relative rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card transition-[width] duration-300 ease-out sm:p-8 ${agendaOpen ? 'lg:w-full' : 'lg:mx-auto lg:w-[85%]'}`}>
 
       {/* Collapse tab — folds the agenda column away so the month fills the full width (lg only) */}
       <button
@@ -320,7 +212,7 @@ export default function CalendarCard() {
         onClick={() => setAgendaOpen(o => !o)}
         aria-label={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
         title={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
-        className="absolute left-full top-1/2 z-10 ml-2 hidden h-16 w-6 -translate-y-1/2 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/60 text-ink-3/70 shadow-lg shadow-black/20 backdrop-blur-xl transition-colors hover:text-ink-4 lg:flex"
+        className="absolute left-full top-1/2 z-10 ml-2 hidden h-16 w-6 -translate-y-1/2 items-center justify-center text-ink-3/70 transition-colors hover:text-ink-4 lg:flex"
       >
         <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
           <path d={agendaOpen ? 'M10 3L5 8l5 5' : 'M6 3l5 5-5 5'} strokeLinecap="round" strokeLinejoin="round" />
@@ -351,7 +243,7 @@ export default function CalendarCard() {
         </div>
       </div>
 
-      <div className={`grid gap-6 lg:gap-8 ${agendaOpen ? 'lg:grid-cols-[1.7fr_1fr]' : 'lg:grid-cols-1'}`}>
+      <div className={`grid gap-6 transition-[grid-template-columns] duration-300 ease-out lg:min-h-[407px] lg:items-start lg:gap-8 lg:pt-8 ${agendaOpen ? 'lg:grid-cols-[1.7fr_1fr]' : 'lg:grid-cols-[1fr_0fr]'}`}>
 
         {/* ── Month grid ─────────────────────────────────────────── */}
         <div>
@@ -412,10 +304,12 @@ export default function CalendarCard() {
         </div>
 
         {/* ── Agenda for the selected day ────────────────────────── */}
-        <div className={`flex flex-col gap-6 lg:border-l lg:border-ink-4/10 lg:pl-8 ${agendaOpen ? '' : 'lg:hidden'}`}>
-          <UpNext events={upcoming} today={today} />
-
-          <div className="lg:border-t lg:border-ink-4/10 lg:pt-6">
+        <div className="lg:border-l lg:border-ink-4/10 lg:pl-8">
+          <div
+            className="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
+            style={{ gridTemplateRows: agendaOpen ? '1fr' : '0fr', opacity: agendaOpen ? 1 : 0 }}
+          >
+            <div className="overflow-hidden">
           {!selected ? (
             <div className="flex h-full min-h-[9rem] items-center justify-center text-center text-sm text-ink-3/50">
               Elige un día para ver sus eventos
@@ -441,7 +335,7 @@ export default function CalendarCard() {
               ) : dayEvents.length === 0 ? (
                 <p className="py-4 text-sm italic text-ink-3/50">Sin eventos este día</p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="max-h-[9.5rem] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
                   {dayEvents.map(ev => (
                     <li key={ev.uid} className={`group flex items-stretch gap-3 rounded-xl px-3 py-2.5 transition-colors ${editingUid === ev.uid ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-ink-0/40'}`}>
                       <span className="w-1 shrink-0 rounded-full" style={{ background: selColor }} />
@@ -526,6 +420,7 @@ export default function CalendarCard() {
               </form>
             </>
           )}
+            </div>
           </div>
         </div>
       </div>
