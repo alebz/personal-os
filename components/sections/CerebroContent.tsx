@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { MOODS } from '@/components/sections/DiarioContent'
 import { canonicalKind, kindLabel } from '@/lib/memoryKinds'
+import BrainIndexModal from '@/components/BrainIndexModal'
 
 // Cerebro — the OS's single command bar. One box, two intents:
 //   • Capturar → Tarea / Nota / Diario (reuses /api/capture, /api/notes, /api/journal). ENTER saves.
@@ -98,6 +99,7 @@ export default function CerebroContent() {
   const [searched,  setSearched]  = useState(false)
   const [searching, setSearching] = useState(false)
   const [kindFilter, setKindFilter] = useState<string | null>(null)
+  const [showIndex, setShowIndex] = useState(false)   // "ver todo" browse index, as a modal over the drum
 
   // Ask the AI (RAG) — the discreet fallback
   const [answer,     setAnswer]     = useState('')
@@ -365,7 +367,17 @@ export default function CerebroContent() {
                   {f.label}
                 </button>
               ))}
-              <span className="ml-auto text-[11px] text-ink-2/50">Enter para buscar</span>
+              {query.trim() ? (
+                <span className="ml-auto text-[11px] text-ink-2/50">Enter para buscar</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowIndex(true)}
+                  className="ml-auto text-[11px] text-ink-3 transition-colors hover:text-accent"
+                >
+                  ver todo →
+                </button>
+              )}
             </div>
           </>
         )}
@@ -435,6 +447,9 @@ export default function CerebroContent() {
           )}
         </div>
       )}
+
+      {/* "Ver todo" browse index — modal overlay over the drum (portals to <body>) */}
+      <BrainIndexModal open={showIndex} onClose={() => setShowIndex(false)} />
     </main>
   )
 }
