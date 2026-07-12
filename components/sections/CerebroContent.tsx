@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { MOODS } from '@/components/sections/DiarioContent'
 
 // Cerebro — the OS's single command bar. One box, two intents:
@@ -8,12 +9,12 @@ import { MOODS } from '@/components/sections/DiarioContent'
 //   • Consultar → searches your own memory (/api/memory/search) as the protagonist; asking the AI
 //     (/api/ask RAG) is a discreet action next to the results, not a headline feature.
 // Design language mirrors CalendarCard (roomy, minimal, ink/accent, subtle glass). No internal
-// scrolls — everything flows in the drum face's own scroll; long result lists show the top 8 + a
-// "ver más" that expands downward.
+// scrolls — the drum only ever shows the "living present" (the top TOP_N matches). The full depth
+// of a query graduates to a dedicated page (/brain/q/[query]) that scrolls like a normal page.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface MemoryChunk {
+export interface MemoryChunk {
   id: string
   content: string
   metadata: Record<string, unknown>
@@ -41,7 +42,7 @@ const RESULT_FILTERS: { id: string | null; label: string }[] = [
   { id: 'diario',  label: 'Diario' },
 ]
 
-const TOP_N = 5
+const TOP_N = 3
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ function fmtDate(iso: string): string {
 
 // ── Result card ───────────────────────────────────────────────────────────────
 
-function ResultCard({ chunk }: { chunk: MemoryChunk }) {
+export function ResultCard({ chunk }: { chunk: MemoryChunk }) {
   const [expanded, setExpanded] = useState(false)
   const kind = String(chunk.metadata?.kind ?? 'nota')
   const long = chunk.content.length > 160
@@ -100,7 +101,6 @@ export default function CerebroContent() {
   const [searched,  setSearched]  = useState(false)
   const [searching, setSearching] = useState(false)
   const [kindFilter, setKindFilter] = useState<string | null>(null)
-  const [showAll,   setShowAll]   = useState(false)
 
   // Ask the AI (RAG) — the discreet fallback
   const [answer,     setAnswer]     = useState('')
@@ -182,7 +182,7 @@ export default function CerebroContent() {
     if (!q || searching) return
     abortRef.current?.abort()
     const ctrl = new AbortController(); abortRef.current = ctrl
-    setSearching(true); setErr(null); setSearched(true); setShowAll(false); setAnswer(''); setAskSources([])
+    setSearching(true); setErr(null); setSearched(true); setAnswer(''); setAskSources([])
     try {
       const r = await fetch('/api/memory/search', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q }), signal: ctrl.signal,
@@ -239,14 +239,14 @@ export default function CerebroContent() {
   function clearSearch() {
     abortRef.current?.abort()
     setQuery(''); setResults([]); setSearched(false); setSearching(false)
-    setAnswer(''); setAskSources([]); setAsking(false); setShowAll(false); setKindFilter(null); setErr(null)
+    setAnswer(''); setAskSources([]); setAsking(false); setKindFilter(null); setErr(null)
   }
 
   const filtered = useMemo(
     () => (kindFilter ? results.filter(r => String(r.metadata?.kind) === kindFilter) : results),
     [results, kindFilter],
   )
-  const visible = showAll ? filtered : filtered.slice(0, TOP_N)
+  const visible = filtered.slice(0, TOP_N)
   const hasAnswer = answer.length > 0
 
   return (
@@ -397,9 +397,12 @@ export default function CerebroContent() {
                 </div>
                 {visible.map(c => <ResultCard key={c.id} chunk={c} />)}
                 {filtered.length > TOP_N && (
-                  <button onClick={() => setShowAll(s => !s)} className="w-full rounded-xl border border-ink-4/10 py-2 text-xs text-ink-3 transition-colors hover:text-ink-4">
-                    {showAll ? 'Ver menos' : `Ver ${filtered.length - TOP_N} más`}
-                  </button>
+                  <Link
+                    href={`/brain/q/${encodeURIComponent(query.trim())}`}
+                    className="block w-full rounded-xl border border-ink-4/10 py-2 text-center text-xs text-ink-3 transition-colors hover:text-ink-4"
+                  >
+                    Ver los {filtered.length} resultados →
+                  </Link>
                 )}
                 {/* Discreet AI fallback */}
                 {!hasAnswer && !asking && (
