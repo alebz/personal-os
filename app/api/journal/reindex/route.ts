@@ -13,6 +13,7 @@ export async function POST() {
   const { data: entries, error } = await supabase
     .from('journal_entries')
     .select('id, content, entry_date, mood')
+    .eq('archived', false)   // soft-deleted entries stay de-indexed (out of /brain + search)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   let indexed = 0, cleared = 0, failed = 0

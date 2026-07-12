@@ -4,19 +4,23 @@ import { createServerClient } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
-// GET /api/journal?limit=100  — returns all entries, newest first
+// GET /api/journal?limit=100[&archived=1]  — active entries, newest first. Soft-deleted (archived)
+// entries are hidden by default; pass ?archived=1 to include them (mirrors /api/habits).
 export async function GET(req: NextRequest) {
   const limit = Math.min(
     parseInt(req.nextUrl.searchParams.get('limit') ?? '100', 10),
     500
   )
+  const includeArchived = req.nextUrl.searchParams.get('archived') === '1'
 
   const supabase = createServerClient()
-  const { data, error } = await supabase
+  let q = supabase
     .from('journal_entries')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
+  if (!includeArchived) q = q.eq('archived', false)
+  const { data, error } = await q
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data ?? [])

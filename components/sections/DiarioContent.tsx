@@ -9,6 +9,7 @@ export interface JournalEntry {
   mood:       string | null
   summary:    string | null
   insights:   string[]
+  archived:   boolean
   created_at: string
   updated_at: string
 }
