@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import { ResultCard, type MemoryChunk } from '@/components/sections/CerebroContent'
+import { canonicalKind, kindLabel, CANONICAL_KINDS } from '@/lib/memoryKinds'
 
 // Dedicated deep-dive for a single Cerebro query. The drum face only shows the "living present"
 // (top matches); this page is the full depth — a normal page that scrolls naturally. It re-runs
@@ -34,12 +35,15 @@ export default function BrainQueryPage() {
     return () => { cancelled = true }
   }, [query])
 
-  const kinds = useMemo(
-    () => [...new Set(results.map(r => String(r.metadata?.kind ?? 'nota')))],
-    [results],
-  )
+  // Canonical kinds present in the results, ordered by the shared display order (unknowns appended).
+  const kinds = useMemo(() => {
+    const present = new Set(results.map(r => canonicalKind(r.metadata?.kind as string | undefined)))
+    const ordered = CANONICAL_KINDS.filter(k => present.has(k))
+    const extras = [...present].filter(k => !CANONICAL_KINDS.includes(k as never))
+    return [...ordered, ...extras]
+  }, [results])
   const filtered = useMemo(
-    () => (kindFilter ? results.filter(r => String(r.metadata?.kind ?? 'nota') === kindFilter) : results),
+    () => (kindFilter ? results.filter(r => canonicalKind(r.metadata?.kind as string | undefined) === kindFilter) : results),
     [results, kindFilter],
   )
 
@@ -66,9 +70,9 @@ export default function BrainQueryPage() {
               <button
                 key={k}
                 onClick={() => setKindFilter(k)}
-                className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${kindFilter === k ? 'border-ink-4/20 bg-ink-4/[0.08] text-ink-4' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${kindFilter === k ? 'border-ink-4/20 bg-ink-4/[0.08] text-ink-4' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
               >
-                {k}
+                {kindLabel(k)}
               </button>
             ))}
           </div>

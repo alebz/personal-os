@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { MOODS } from '@/components/sections/DiarioContent'
+import { canonicalKind, kindLabel } from '@/lib/memoryKinds'
 
 // Cerebro — the OS's single command bar. One box, two intents:
 //   • Capturar → Tarea / Nota / Diario (reuses /api/capture, /api/notes, /api/journal). ENTER saves.
@@ -19,7 +20,7 @@ export interface MemoryChunk {
   content: string
   metadata: Record<string, unknown>
   created_at: string
-  similarity: number
+  similarity?: number   // present for search results; absent in the /brain browse index
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -31,10 +32,7 @@ const CAPTURE_MODES = [
 ] as const
 type CapMode = (typeof CAPTURE_MODES)[number]['id']
 
-const KIND_LABEL: Record<string, string> = {
-  nota: 'Nota', diario: 'Diario', perfil: 'Perfil', task: 'Tarea', reminder: 'Recordatorio',
-  log: 'Registro', idea: 'Idea', contact: 'Contacto', event: 'Evento',
-}
+// Kind label / canonicalization now live in @/lib/memoryKinds (shared with /brain and /brain/q).
 
 const RESULT_FILTERS: { id: string | null; label: string }[] = [
   { id: null,      label: 'Todo' },
@@ -51,7 +49,7 @@ function localToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function fmtDate(iso: string): string {
+export function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
@@ -59,17 +57,16 @@ function fmtDate(iso: string): string {
 
 export function ResultCard({ chunk }: { chunk: MemoryChunk }) {
   const [expanded, setExpanded] = useState(false)
-  const kind = String(chunk.metadata?.kind ?? 'nota')
   const long = chunk.content.length > 160
   const body = !expanded && long ? chunk.content.slice(0, 160).trimEnd() + '…' : chunk.content
-  const pct  = Math.round((chunk.similarity ?? 0) * 100)
+  const pct  = chunk.similarity != null ? Math.round(chunk.similarity * 100) : null
 
   return (
     <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 px-4 py-3.5 transition-colors">
       <div className="mb-1.5 flex items-center gap-2 text-[11px] text-ink-3">
-        <span className="font-medium uppercase tracking-wide">{KIND_LABEL[kind] ?? kind}</span>
+        <span className="font-medium uppercase tracking-wide">{kindLabel(chunk.metadata?.kind as string | undefined)}</span>
         {chunk.created_at && <><span className="text-ink-3/40">·</span><span>{fmtDate(chunk.created_at)}</span></>}
-        <span className="ml-auto tabular-nums text-ink-2/50">{pct}%</span>
+        {pct != null && <span className="ml-auto tabular-nums text-ink-2/50">{pct}%</span>}
       </div>
       <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">{body}</p>
       {long && (
@@ -243,7 +240,7 @@ export default function CerebroContent() {
   }
 
   const filtered = useMemo(
-    () => (kindFilter ? results.filter(r => String(r.metadata?.kind) === kindFilter) : results),
+    () => (kindFilter ? results.filter(r => canonicalKind(r.metadata?.kind as string | undefined) === kindFilter) : results),
     [results, kindFilter],
   )
   const visible = filtered.slice(0, TOP_N)
@@ -431,7 +428,7 @@ export default function CerebroContent() {
               </p>
               {askSources.length > 0 && (
                 <p className="mt-3 border-t border-ink-4/8 pt-2 text-[11px] text-ink-3">
-                  {askSources.length} fuente{askSources.length === 1 ? '' : 's'} · {[...new Set(askSources.map(s => KIND_LABEL[String(s.metadata?.kind)] ?? String(s.metadata?.kind)))].join(' · ')}
+                  {askSources.length} fuente{askSources.length === 1 ? '' : 's'} · {[...new Set(askSources.map(s => kindLabel(s.metadata?.kind as string | undefined)))].join(' · ')}
                 </p>
               )}
             </div>
