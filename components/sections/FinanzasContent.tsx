@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import Mxn from '@/components/Mxn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -10,7 +11,7 @@ type Tab      = 'Panel' | 'Historial' | 'Vacaciones' | 'Compromisos' | 'Cuadrar'
 type Flow     = 'in' | 'out'
 type Category = 'nomina' | 'freelance' | 'gasto_fijo' | 'gasto_extra' | 'vacaciones' | 'ajuste'
 
-interface Movement {
+export interface Movement {
   id: string
   month: string
   date: string
@@ -144,7 +145,7 @@ function monthlyCost(c: Commitment): number {
 
 // ─── Category meta ────────────────────────────────────────────────────────────
 
-const CAT_LABEL: Record<Category, string> = {
+export const CAT_LABEL: Record<Category, string> = {
   nomina: 'Nómina',
   freelance: 'Freelance',
   gasto_fijo: 'Fijo',
@@ -165,7 +166,7 @@ function normMethod(m: string | null | undefined): 'efectivo' | 'tarjeta' {
   return m === 'efectivo' ? 'efectivo' : 'tarjeta'
 }
 
-function MethodBadge({ metodo }: { metodo: string }) {
+export function MethodBadge({ metodo }: { metodo: string }) {
   const m = normMethod(metodo)
   return (
     <span className="shrink-0 text-sm leading-none" title={METHOD_META[m].label}>
@@ -779,6 +780,15 @@ function HistorialTab({
           ))
         )}
       </div>
+
+      {/* El drum solo muestra el mes en curso (presente vivo). El histórico completo vive en su
+          ruta dedicada, que scrollea como página normal — nunca dentro del tambor. */}
+      <Link
+        href="/finance/historial"
+        className="block w-full rounded-xl border border-ink-4/10 py-2.5 text-center text-xs text-ink-3 transition-colors hover:text-ink-4"
+      >
+        Ver historial completo →
+      </Link>
     </div>
   )
 }
