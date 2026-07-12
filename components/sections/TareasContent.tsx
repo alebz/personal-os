@@ -98,6 +98,19 @@ function taskDay(task: Task): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
+// "Accionable" = el presente vivo del drum: tareas abiertas dentro del horizonte de acción —
+// tiers cercanos (Hoy / Esta Semana) o con fecha vencida / de hoy. Completadas y futuro-lejano
+// (Este Mes / Algún Día sin fecha próxima) quedan fuera del drum, tras el toggle "Ver todo".
+function isActionable(task: Task): boolean {
+  if (task.completed_at) return false
+  const u = task.urgency ?? 'someday'
+  if (u === 'today' || u === 'this_week') return true
+  const day = taskDay(task)
+  if (!day) return false
+  const end = new Date(); end.setHours(23, 59, 59, 999)
+  return day.getTime() <= end.getTime()   // vencida o de hoy
+}
+
 function DayTag({ day }: { day: Date }) {
   const c = dayColor(day)
   return (
@@ -244,18 +257,20 @@ function KanbanColumn({
 
 function KanbanView({
   tasks,
+  tiers,
   onToggle,
   onClickTask,
   onMove,
 }: {
   tasks: Task[]
+  tiers: typeof TIERS
   onToggle: (id: string, done: boolean) => void
   onClickTask: (task: Task) => void
   onMove: (id: string, urgency: Urgency) => void
 }) {
   return (
     <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      {TIERS.map((tier) => (
+      {tiers.map((tier) => (
         <KanbanColumn
           key={tier.id}
           tier={tier}
@@ -367,11 +382,13 @@ function ListaSection({
 
 function ListaView({
   tasks,
+  tiers,
   onToggle,
   onClickTask,
   onMove,
 }: {
   tasks: Task[]
+  tiers: typeof TIERS
   onToggle: (id: string, done: boolean) => void
   onClickTask: (task: Task) => void
   onMove: (id: string, urgency: Urgency) => void
@@ -379,7 +396,7 @@ function ListaView({
   return (
     <div className="mx-auto max-w-3xl rounded-3xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card sm:p-8">
       <div className="flex flex-col gap-8">
-        {TIERS.map((tier) => (
+        {tiers.map((tier) => (
           <ListaSection
             key={tier.id}
             tier={tier}
@@ -754,6 +771,7 @@ export default function TareasContent() {
   const [creating, setCreating] = useState(false)
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [actionableOnly, setActionableOnly] = useState(true)
   const filterRef = useRef<HTMLDivElement>(null)
 
   const loadAll = useCallback(async () => {
@@ -864,6 +882,17 @@ export default function TareasContent() {
   const visibleTasks = entityFilter ? tasks.filter((t) => t.entity_name === entityFilter) : tasks
   const openCount = visibleTasks.filter((t) => !t.completed_at).length
 
+  // El filtro es el techo: por defecto el drum solo muestra lo accionable. "Ver todo" revela
+  // completadas y futuro-lejano. Los tiers lejanos (Este Mes / Algún Día) solo aparecen en modo
+  // accionable si contienen algo vencido/de hoy; si no, quedan ocultos hasta "Ver todo".
+  const viewTasks = actionableOnly ? visibleTasks.filter(isActionable) : visibleTasks
+  const shownTiers = actionableOnly
+    ? TIERS.filter((t) =>
+        t.id === 'today' || t.id === 'this_week' || viewTasks.some((k) => (k.urgency ?? 'someday') === t.id),
+      )
+    : TIERS
+  const actionableCount = visibleTasks.filter(isActionable).length
+
   const VIEWS: { id: View; label: string }[] = [
     { id: 'kanban', label: 'Kanban' },
     { id: 'lista',  label: 'Lista' },
@@ -908,7 +937,25 @@ export default function TareasContent() {
         </div>
 
         {!loading && (
-          <div ref={filterRef} className="relative mt-3 w-fit">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
+            {([
+              { on: true,  label: 'Accionable' },
+              { on: false, label: 'Ver todo' },
+            ] as const).map((o) => (
+              <button
+                key={o.label}
+                onClick={() => setActionableOnly(o.on)}
+                className={`rounded-full px-3.5 py-1 text-xs transition-colors ${
+                  actionableOnly === o.on ? 'bg-ink-4/10 font-medium text-ink-4' : 'text-ink-3 hover:text-ink-4'
+                }`}
+              >
+                {o.label}
+                {o.on && <span className="ml-1.5 tabular-nums text-ink-2">{actionableCount}</span>}
+              </button>
+            ))}
+          </nav>
+          <div ref={filterRef} className="relative w-fit">
             <button
               onClick={() => setFilterOpen((o) => !o)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
@@ -932,6 +979,7 @@ export default function TareasContent() {
               </div>
             )}
           </div>
+          </div>
         )}
       </div>
 
@@ -951,10 +999,10 @@ export default function TareasContent() {
         ) : (
           <>
             {view === 'kanban' && (
-              <KanbanView tasks={visibleTasks} onToggle={handleToggle} onClickTask={setDrawerTask} onMove={handleReorder} />
+              <KanbanView tasks={viewTasks} tiers={shownTiers} onToggle={handleToggle} onClickTask={setDrawerTask} onMove={handleReorder} />
             )}
             {view === 'lista' && (
-              <ListaView tasks={visibleTasks} onToggle={handleToggle} onClickTask={setDrawerTask} onMove={handleReorder} />
+              <ListaView tasks={viewTasks} tiers={shownTiers} onToggle={handleToggle} onClickTask={setDrawerTask} onMove={handleReorder} />
             )}
           </>
         )}
