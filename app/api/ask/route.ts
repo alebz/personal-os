@@ -2,6 +2,8 @@ import type { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { embed } from '@/lib/openai'
 import { createServerClient } from '@/lib/supabase'
+import { classifyQuery } from '@/lib/router/classifyQuery'
+import { LOOKUP_MODEL, SYNTHESIS_MODEL } from '@/lib/models'
 
 export const runtime = 'nodejs'
 
@@ -41,10 +43,16 @@ export async function POST(req: NextRequest) {
   })
   const context = contextLines.join('\n\n') || 'No hay contexto disponible.'
 
-  // 3. Stream from Claude
+  // 3. Route by query type — lookups (direct facts) go to Haiku; synthesis (reasoning across
+  //    memories) goes to Sonnet 5, where the value is. Fast Haiku classifier; defaults to synthesis
+  //    on any failure. Overrides the global ANTHROPIC_MODEL env so only Cerebro synthesis is routed.
+  const route = await classifyQuery(query.trim())
+  const model = route === 'lookup' ? LOOKUP_MODEL : SYNTHESIS_MODEL
+
+  // 4. Stream from Claude
   const anthropic = new Anthropic()
   const stream = anthropic.messages.stream({
-    model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6',
+    model,
     max_tokens: 2048,
     system: [
       'Eres el asistente personal de Alex. Responde ÚNICAMENTE usando el contexto numerado que se te proporciona.',
