@@ -125,12 +125,69 @@ input::placeholder, textarea::placeholder {
   filter: blur(0);
 }
 
-/*
- * Design tokens — oklch(L C H)
- * Neutral ramp: ink-0 = deepest base surface … ink-4 = brightest foreground.
- * Tuned for a dark-default UI.
- */
-@theme {
+/* ════════════════════════════════════════════════════════════════════════════
+ * DESIGN TOKENS — two layers, built for theming.
+ *   Layer 1 (PRIMITIVES): raw named values — the palette of allowed values.
+ *   Layer 2 (SEMANTIC):   roles that point at primitives — the ONLY thing a
+ *                         component should use. Migrating a component = swap a
+ *                         raw utility for a semantic one; it never picks a value.
+ *
+ * These CSS tokens are the *visual layer* of a theme. A full theme is an
+ * extensible object (id + capabilities/config + this visual layer) that will live
+ * in TS — see the Themes note at the bottom. Here we define ONLY the visual layer;
+ * capabilities (ships/comets/rainbow-trail…) and the dynamic Settings panel are
+ * NOT built yet. Default (no data-theme) = the current "arcade dark" theme.
+ * NOTE: this only DEFINES tokens — no component is migrated yet.
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Layer 1 · PRIMITIVES + Layer 2 · SEMANTIC — all inside ONE @theme static ──
+   Everything lives in a single @theme block. Semantic values reference primitives
+   (var(--r-lg), var(--t-micro)); if a semantic points at a var declared OUTSIDE
+   @theme, Tailwind v4 fails to resolve it and drops the WHOLE :root emission —
+   which blanked the ink ramp and broke the background, vignette, and text colour.
+
+   Why `static`: by default Tailwind v4 tree-shakes @theme output — it emits a var
+   to :root ONLY when it's referenced (by a utility in the markup, or by another
+   theme var's var()). So the Layer-2 semantics (unused until a component migrates)
+   and any unreferenced primitive (--op-*) would be ABSENT from :root. `static`
+   forces every var in the block to emit eagerly, regardless of usage, so the full
+   token contract is always present for JS/runtime to read (the dynamic Settings
+   theme editor needs the whole palette even when no component uses a token). It
+   does NOT change utility generation, and semantics stay `var()` references, so
+   [data-theme] remaps still cascade — theming is untouched. (`inline`, by contrast,
+   would inline values into utilities and break theme remaps — not what we want.)
+
+   --r-/--op-/--t- use non-utility namespaces, so they generate no classes; only
+   the Layer-2 color/radius/text roles do. oklch(L C H). */
+@theme static {
+  /* ---- Layer 1: non-color primitives (raw scales) ---- */
+  /* Radius */
+  --r-none: 0px;
+  --r-sm:   2px;
+  --r-md:   8px;
+  --r-lg:   12px;
+  --r-xl:   16px;
+  --r-2xl:  24px;
+  --r-full: 9999px;
+
+  /* Opacity — the 26 raw slash-steps from the audit collapse to these 5 */
+  --op-faint: 0.06;   /* was /5 /8 /[0.03–0.08]   */
+  --op-line:  0.12;   /* was /10 /15 /18          */
+  --op-soft:  0.25;   /* was /20 /25 /30          */
+  --op-half:  0.50;   /* was /35 /40 /50 /60      */
+  --op-solid: 0.85;   /* was /80 /85 /88 /90 /95  */
+
+  /* Text size — arbitrary [8–17px] collapse onto this scale */
+  --t-micro:   10px;
+  --t-sm:      12px;
+  --t-body:    14px;
+  --t-md:      16px;
+  --t-lg:      20px;
+  --t-xl:      24px;
+  --t-display: 36px;
+
+
+  /* ---- Layer 1: color primitives ---- */
   /* Neutral / ink ramp */
   --color-ink-0: oklch(0.09 0.006 275);
   --color-ink-1: oklch(0.155 0.008 275);
@@ -141,15 +198,69 @@ input::placeholder, textarea::placeholder {
   /* Accent */
   --color-accent: oklch(0.7 0.16 255);
 
-  /* Semantic */
+  /* Semantic hues */
   --color-ok: oklch(0.72 0.17 152);
   --color-warn: oklch(0.8 0.16 85);
   --color-danger: oklch(0.64 0.21 25);
+
+  /* ---- Layer 2: SEMANTIC roles — components use ONLY these ---- */
+  /* Radius → rounded-card / rounded-control / rounded-pill / rounded-sharp */
+  --radius-card:    var(--r-xl);    /* 16px — arcade's card radius (preserves the 47 rounded-2xl cards); themes remap */
+  --radius-control: var(--r-md);    /* 8px */
+  --radius-pill:    var(--r-full);
+  --radius-sharp:   var(--r-sm);
+
+  /* Font size → text-label / text-secondary / text-body / text-md / text-subhead /
+     text-heading / text-display. (--text-subhead, not --text-lg: would clash with
+     Tailwind's built-in text-lg=18px.) */
+  --text-label:     var(--t-micro);   /* 10 */
+  --text-secondary: var(--t-sm);      /* 12 */
+  --text-body:      var(--t-body);    /* 14 */
+  --text-md:        var(--t-md);      /* 16 — emphasised body */
+  --text-subhead:   var(--t-lg);      /* 20 — sub-heading */
+  --text-heading:   var(--t-xl);      /* 24 */
+  --text-display:   var(--t-display); /* 36 — hero / clock */
+
+  /* Color roles → bg-surface-1 / text-fg / border-border … — alpha is baked in
+     via color-mix, so the opacity slashes disappear at migration. Use WITHOUT a
+     slash (e.g. `border-border`, not `border-border/50`). */
+  --color-surface-1:     color-mix(in oklch, var(--color-ink-1) 85%, transparent);  /* card fill     (was bg-ink-1/85)   */
+  --color-surface-2:     color-mix(in oklch, var(--color-ink-2) 30%, transparent);  /* track/raised  (was bg-ink-2/30)   */
+  --color-surface-hover: color-mix(in oklch, var(--color-ink-4) 6%,  transparent);  /* hover fill    (was bg-ink-4/[.06])*/
+  --color-fg:            var(--color-ink-4);   /* primary text   (was text-ink-4) */
+  --color-fg-muted:      var(--color-ink-3);   /* secondary text (was text-ink-3) */
+  --color-fg-faint:      var(--color-ink-2);   /* faint text     (was text-ink-2) */
+  --color-border:        color-mix(in oklch, var(--color-ink-4) 12%, transparent); /* hairline (was border-ink-4/10) */
 }
 
 :root {
   color-scheme: dark;
   --os-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ── Themes · VISUAL LAYER ─────────────────────────────────────────────────────
+   A theme's *visual* half = a [data-theme] block that remaps Layer-2 semantics
+   (and/or overrides a Layer-1 primitive). It never touches a component. Apply
+   with <html data-theme="…">. Default (no attribute) = "arcade dark" (the @theme
+   mapping above). These skeletons are ILLUSTRATIVE — 2–3 sample values to prove
+   the structure holds under a real theme swap; not finished themes. The theme's
+   *other* half (capabilities/config: ships, rainbow-trail, dynamic Settings) will
+   be declared in a TS theme object keyed to the same name — not built here. */
+
+/* "cozy pink lion" — soft corners, warm pink accent */
+:root[data-theme="cozy"] {
+  --radius-card:    var(--r-2xl);  /* 24px — rounder than arcade's 16 */
+  --radius-control: var(--r-lg);   /* 12px — softer controls */
+  --color-accent:   oklch(0.78 0.13 350);   /* pink → re-tints every accent usage */
+  /* a full theme would also remap surfaces/fg + declare its capabilities in TS */
+}
+
+/* "ultraminimal console" — square corners, monochrome */
+:root[data-theme="console"] {
+  --radius-card:    var(--r-none);
+  --radius-control: var(--r-none);
+  --radius-pill:    var(--r-sm);
+  --color-accent:   var(--color-ink-4);     /* accent = foreground (monochrome) */
 }
 
 html {
