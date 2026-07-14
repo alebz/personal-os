@@ -1,18 +1,20 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import Link from 'next/link'
 import { MOODS } from '@/components/sections/DiarioContent'
 import { canonicalKind, kindLabel } from '@/lib/memoryKinds'
 import BrainIndexModal from '@/components/BrainIndexModal'
+import DrumModal from '@/components/DrumModal'
+import CerebroResults from '@/components/CerebroResults'
+import type { QueryRoute } from '@/lib/router/classifyQuery'
 
 // Cerebro — the OS's single command bar. One box, two intents:
 //   • Capturar → Tarea / Nota / Diario (reuses /api/capture, /api/notes, /api/journal). ENTER saves.
 //   • Consultar → searches your own memory (/api/memory/search) as the protagonist; asking the AI
 //     (/api/ask RAG) is a discreet action next to the results, not a headline feature.
-// Design language mirrors CalendarCard (roomy, minimal, ink/accent, subtle glass). No internal
-// scrolls — the drum only ever shows the "living present" (the top TOP_N matches). The full depth
-// of a query graduates to a dedicated page (/brain/q/[query]) that scrolls like a normal page.
+// Design language mirrors CalendarCard (roomy, minimal, ink/accent, subtle glass). The command bar
+// itself never scrolls; a Consultar query opens its results (synthesis + full fragment list) in a
+// DrumModal that floats OVER the drum — a layer apart, so its scroll never traps the tambor.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,14 +36,8 @@ const CAPTURE_MODES = [
 type CapMode = (typeof CAPTURE_MODES)[number]['id']
 
 // Kind label / canonicalization now live in @/lib/memoryKinds (shared with /brain and /brain/q).
-
-const RESULT_FILTERS: { id: string | null; label: string }[] = [
-  { id: null,      label: 'Todo' },
-  { id: 'nota',    label: 'Notas' },
-  { id: 'diario',  label: 'Diario' },
-]
-
-const TOP_N = 3
+// The Consultar results UI (refine bar, kind filters, synthesis, fragment list) lives in
+// @/components/CerebroResults, rendered inside a DrumModal.
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -100,15 +96,19 @@ export default function CerebroContent() {
   const [searching, setSearching] = useState(false)
   const [kindFilter, setKindFilter] = useState<string | null>(null)
   const [showIndex, setShowIndex] = useState(false)   // "ver todo" browse index, as a modal over the drum
+  const [modalOpen, setModalOpen] = useState(false)   // Consultar results, as a modal over the drum
+  const [route,     setRoute]     = useState<QueryRoute | null>(null)   // null until classified
 
-  // Ask the AI (RAG) — the discreet fallback
+  // Ask the AI (RAG) — auto-fired for synthesis-type queries
   const [answer,     setAnswer]     = useState('')
   const [askSources, setAskSources] = useState<MemoryChunk[]>([])
   const [asking,     setAsking]     = useState(false)
 
   const [err, setErr] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const abortRef  = useRef<AbortController | null>(null)
+  // Separate controllers: a Consultar fires search + (auto) ask together — they must not abort each other.
+  const searchAbortRef = useRef<AbortController | null>(null)
+  const askAbortRef    = useRef<AbortController | null>(null)
 
   const capMeta = CAPTURE_MODES.find(m => m.id === capMode) ?? CAPTURE_MODES[0]
 
@@ -175,13 +175,39 @@ export default function CerebroContent() {
     }
   }
 
+  // ── Consultar orchestrator ───────────────────────────────────────────────
+  // One entry point: open the modal, fetch the fragment list, classify, and (only for synthesis-type
+  // queries) auto-fire the RAG synthesis. Search + classify run in parallel so the list never waits.
+  async function runConsult(qRaw: string) {
+    const q = qRaw.trim()
+    if (!q) return
+    setQuery(q)
+    setModalOpen(true)
+    setErr(null); setRoute(null)
+    setAnswer(''); setAskSources([]); setAsking(false)
+
+    void runSearch(q)   // list — independent, sets results/searching
+
+    // Classify to decide auto-synthesis. classifyQuery (and this endpoint) fail toward 'synthesis',
+    // and so do we on a network error: ante la duda, síntesis.
+    let decided: QueryRoute = 'synthesis'
+    try {
+      const r = await fetch('/api/memory/classify', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q }),
+      })
+      if (r.ok) { const d = await r.json(); decided = d.route === 'lookup' ? 'lookup' : 'synthesis' }
+    } catch { /* keep synthesis */ }
+    setRoute(decided)
+    if (decided === 'synthesis') void runAsk(q)
+  }
+
   // ── Search one's own memory ──────────────────────────────────────────────
-  async function runSearch() {
-    const q = query.trim()
-    if (!q || searching) return
-    abortRef.current?.abort()
-    const ctrl = new AbortController(); abortRef.current = ctrl
-    setSearching(true); setErr(null); setSearched(true); setAnswer(''); setAskSources([])
+  async function runSearch(qRaw: string) {
+    const q = qRaw.trim()
+    if (!q) return
+    searchAbortRef.current?.abort()
+    const ctrl = new AbortController(); searchAbortRef.current = ctrl
+    setSearching(true); setErr(null); setSearched(true)
     try {
       const r = await fetch('/api/memory/search', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q }), signal: ctrl.signal,
@@ -196,12 +222,12 @@ export default function CerebroContent() {
     }
   }
 
-  // ── Ask the AI (RAG, streaming) — discreet fallback ──────────────────────
-  async function runAsk() {
-    const q = query.trim()
-    if (!q || asking) return
-    abortRef.current?.abort()
-    const ctrl = new AbortController(); abortRef.current = ctrl
+  // ── Ask the AI (RAG, streaming) — auto-fired for synthesis queries ───────
+  async function runAsk(qRaw: string) {
+    const q = qRaw.trim()
+    if (!q) return
+    askAbortRef.current?.abort()
+    const ctrl = new AbortController(); askAbortRef.current = ctrl
     setAsking(true); setErr(null); setAnswer(''); setAskSources([])
     try {
       const r = await fetch('/api/ask', {
@@ -236,17 +262,22 @@ export default function CerebroContent() {
 
   // Reset the whole consult session so a search never lingers — used by the ✕ and when leaving Consultar.
   function clearSearch() {
-    abortRef.current?.abort()
+    searchAbortRef.current?.abort(); askAbortRef.current?.abort()
     setQuery(''); setResults([]); setSearched(false); setSearching(false)
     setAnswer(''); setAskSources([]); setAsking(false); setKindFilter(null); setErr(null)
+    setRoute(null); setModalOpen(false)
+  }
+
+  // Close the results modal WITHOUT wiping the query/results — reopening (Enter again) re-runs; the
+  // query stays visible in the command-bar input. This is what makes "cerrar/atrás no borra la consulta".
+  function closeModal() {
+    setModalOpen(false)
   }
 
   const filtered = useMemo(
     () => (kindFilter ? results.filter(r => canonicalKind(r.metadata?.kind as string | undefined) === kindFilter) : results),
     [results, kindFilter],
   )
-  const visible = filtered.slice(0, TOP_N)
-  const hasAnswer = answer.length > 0
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
@@ -339,7 +370,7 @@ export default function CerebroContent() {
                 ref={searchRef}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void runSearch() } }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void runConsult(query) } }}
                 placeholder="Busca en tu memoria…"
                 className="w-full bg-transparent py-1 pl-7 pr-8 text-[15px] text-ink-4 placeholder:text-ink-2/60 outline-none"
               />
@@ -355,20 +386,10 @@ export default function CerebroContent() {
               )}
             </div>
 
-            {/* Secondary, discreet: kind filters */}
-            <div className="mt-3 flex items-center gap-1 border-t border-ink-4/8 pt-3">
-              {RESULT_FILTERS.map(f => (
-                <button
-                  key={f.label}
-                  type="button"
-                  onClick={() => setKindFilter(f.id)}
-                  className={`rounded-md px-2 py-0.5 text-[11px] transition-colors ${kindFilter === f.id ? 'bg-ink-4/[0.08] text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            {/* Hint row — quick entry only; results (with kind filters) open in the modal */}
+            <div className="mt-3 flex items-center border-t border-ink-4/8 pt-3">
               {query.trim() ? (
-                <span className="ml-auto text-[11px] text-ink-2/50">Enter para buscar</span>
+                <span className="ml-auto text-[11px] text-ink-2/50">Enter para consultar</span>
               ) : (
                 <button
                   type="button"
@@ -383,70 +404,24 @@ export default function CerebroContent() {
         )}
       </div>
 
-      {/* ── Results / answer — expand below only when there's something ───── */}
-      {intent === 'consultar' && (
-        <div className="mt-5 space-y-4">
-          {err && (
-            <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>
-          )}
-
-          {searching && (
-            <div className="flex items-center gap-3 py-6 text-sm text-ink-3">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
-              Buscando en tu memoria…
-            </div>
-          )}
-
-          {searched && !searching && (
-            filtered.length > 0 ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-ink-3">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
-                  <button onClick={clearSearch} className="text-xs text-ink-3 transition-colors hover:text-ink-4">Limpiar ✕</button>
-                </div>
-                {visible.map(c => <ResultCard key={c.id} chunk={c} />)}
-                {filtered.length > TOP_N && (
-                  <Link
-                    href={`/brain/q/${encodeURIComponent(query.trim())}`}
-                    className="block w-full rounded-xl border border-ink-4/10 py-2 text-center text-xs text-ink-3 transition-colors hover:text-ink-4"
-                  >
-                    Ver los {filtered.length} resultados →
-                  </Link>
-                )}
-                {/* Discreet AI fallback */}
-                {!hasAnswer && !asking && (
-                  <button onClick={() => void runAsk()} className="block w-full pt-1 text-center text-xs text-ink-3 transition-colors hover:text-accent">
-                    ¿No lo encuentras? Pregúntale a Cerebro →
-                  </button>
-                )}
-              </>
-            ) : !hasAnswer && !asking ? (
-              <div className="py-10 text-center">
-                <p className="text-sm italic text-ink-3/60">Nada en tu memoria coincide.</p>
-                <button onClick={() => void runAsk()} className="mt-2 text-xs text-ink-3 transition-colors hover:text-accent">
-                  Pregúntale a Cerebro →
-                </button>
-              </div>
-            ) : null
-          )}
-
-          {/* AI answer (RAG) */}
-          {(asking || hasAnswer) && (
-            <div className="rounded-2xl border border-accent/15 bg-accent/[0.04] px-5 py-4">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-accent/80">Cerebro responde</p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">
-                {answer}
-                {asking && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent align-middle" />}
-              </p>
-              {askSources.length > 0 && (
-                <p className="mt-3 border-t border-ink-4/8 pt-2 text-[11px] text-ink-3">
-                  {askSources.length} fuente{askSources.length === 1 ? '' : 's'} · {[...new Set(askSources.map(s => kindLabel(s.metadata?.kind as string | undefined)))].join(' · ')}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Consultar results — modal overlay over the drum (portals to <body>, so its scroll never
+          traps the tambor). Synthesis ARRIBA (auto for questions), full fragment list ABAJO. */}
+      <DrumModal open={modalOpen} onClose={closeModal} ariaLabel="Resultados de Cerebro">
+        <CerebroResults
+          query={query}
+          onQueryChange={setQuery}
+          onRefine={() => void runConsult(query)}
+          searching={searching}
+          results={filtered}
+          kindFilter={kindFilter}
+          onKindFilter={setKindFilter}
+          route={route}
+          answer={answer}
+          asking={asking}
+          askSources={askSources}
+          err={err}
+        />
+      </DrumModal>
 
       {/* "Ver todo" browse index — modal overlay over the drum (portals to <body>) */}
       <BrainIndexModal open={showIndex} onClose={() => setShowIndex(false)} />
