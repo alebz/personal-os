@@ -194,12 +194,12 @@ function AmountInput({
       onChange={e => setV(e.target.value)}
       onBlur={save}
       onKeyDown={e => e.key === 'Enter' && save()}
-      className={`w-28 rounded border border-accent/50 bg-ink-2/20 px-1 py-0.5 text-right text-sm tabular-nums text-ink-4 outline-none ${className}`}
+      className={`w-28 rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-right text-body tabular-nums text-fg outline-none ${className}`}
     />
   ) : (
     <button
       onClick={() => setFocused(true)}
-      className={`w-28 rounded border border-transparent px-1 py-0.5 text-right text-sm tabular-nums text-ink-4 hover:border-ink-4/10 ${className}`}
+      className={`w-28 rounded border border-transparent px-1 py-0.5 text-right text-body tabular-nums text-fg hover:border-border ${className}`}
     >
       <Mxn v={value} />
     </button>
@@ -208,20 +208,20 @@ function AmountInput({
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
-function SectionCard({ title, note, total, colorClass = 'text-ink-3', children }: {
+function SectionCard({ title, note, total, colorClass = 'text-fg-muted', children }: {
   title: string; note?: string; total?: number; colorClass?: string; children: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-xl border border-ink-4/10 bg-ink-1/60 px-3 pt-3 pb-2 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+    <div className="rounded-card border border-border bg-surface-1 px-3 pt-3 pb-2 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <button onClick={() => setOpen(o => !o)} className="mb-2 flex w-full items-center justify-between">
         <div className="flex items-baseline gap-1.5">
-          <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 shrink-0 text-ink-3/50 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${colorClass}`}>{title}</p>
-          {note && <span className="text-[9px] text-ink-3/60">{note}</span>}
+          <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 shrink-0 text-fg-muted/50 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <p className={`text-label font-bold uppercase tracking-widest ${colorClass}`}>{title}</p>
+          {note && <span className="text-label text-fg-muted/60">{note}</span>}
         </div>
         {total !== undefined && total > 0 && (
-          <span className="text-xs font-semibold tabular-nums text-ink-4"><Mxn v={total} /></span>
+          <span className="text-secondary font-semibold tabular-nums text-fg"><Mxn v={total} /></span>
         )}
       </button>
       {open && children}
@@ -235,7 +235,7 @@ function MethodToggle({ method, onChange }: { method: 'cash' | 'card'; onChange:
   return (
     <button
       onClick={() => onChange(method === 'cash' ? 'card' : 'cash')}
-      className="text-base leading-none opacity-60 hover:opacity-100 transition-opacity"
+      className="text-md leading-none opacity-60 hover:opacity-100 transition-opacity"
       title={method === 'cash' ? 'Efectivo — click para cambiar a tarjeta' : 'Tarjeta — click para cambiar a efectivo'}
     >
       {method === 'cash' ? '💵' : '💳'}
@@ -264,17 +264,17 @@ function PaidCountInput({ paid, total, onSave }: { paid: number; total: number; 
       <input type="number" value={p} autoFocus
         onChange={e => setP(e.target.value)}
         onBlur={save} onKeyDown={e => e.key === 'Enter' && save()}
-        className="w-7 rounded border border-accent/50 bg-ink-2/20 px-0.5 text-center text-[10px] tabular-nums text-ink-3 outline-none" />
-      <span className="text-[10px] text-ink-3/40">/</span>
+        className="w-7 rounded border border-accent/50 bg-surface-2 px-0.5 text-center text-label tabular-nums text-fg-muted outline-none" />
+      <span className="text-label text-fg-muted/40">/</span>
       <input type="number" value={t}
         onChange={e => setT(e.target.value)}
         onBlur={save} onKeyDown={e => e.key === 'Enter' && save()}
-        className="w-7 rounded border border-accent/50 bg-ink-2/20 px-0.5 text-center text-[10px] tabular-nums text-ink-3 outline-none" />
+        className="w-7 rounded border border-accent/50 bg-surface-2 px-0.5 text-center text-label tabular-nums text-fg-muted outline-none" />
     </div>
   )
 
   return (
-    <button onClick={() => setEditing(true)} className="text-[10px] text-ink-3/40 hover:text-ink-3/70 tabular-nums">
+    <button onClick={() => setEditing(true)} className="text-label text-fg-muted/40 hover:text-fg-muted/70 tabular-nums">
       {paid}/{total}
     </button>
   )
@@ -300,13 +300,13 @@ function RentasSection({ rents, month, onToggle, onAmount, onMethod, paidCounts,
         const row = rents.find(r => r.renter === def.id) ?? { renter: def.id, amount: 0, paid: false, method: 'cash' as const }
         const counts = paidCounts[def.id] ?? { paid: 0, total: 12 }
         return (
-          <div key={def.id} className="group flex items-center gap-2 border-t border-ink-4/5 py-1.5 first:border-0">
+          <div key={def.id} className="group flex items-center gap-2 border-t border-border py-1.5 first:border-0">
             <PaidToggle paid={row.paid} onChange={v => onToggle(def.id, v)} />
-            <span className={`flex-1 truncate text-sm ${row.paid ? 'text-ink-3/60 line-through' : 'text-ink-4'}`}>
+            <span className={`flex-1 truncate text-body ${row.paid ? 'text-fg-muted/60 line-through' : 'text-fg'}`}>
               {def.name}
             </span>
             <PaidCountInput paid={counts.paid} total={counts.total} onSave={(p, t) => onCount(def.id, p, t)} />
-            <span className="text-[10px] text-ink-3/50">{def.location}</span>
+            <span className="text-label text-fg-muted/50">{def.location}</span>
             <MethodToggle method={row.method} onChange={m => onMethod(def.id, m)} />
             <AmountInput value={row.amount} onSave={n => onAmount(def.id, n)} />
           </div>
@@ -318,7 +318,7 @@ function RentasSection({ rents, month, onToggle, onAmount, onMethod, paidCounts,
 
 // ─── ExtraSection (income or expense) ────────────────────────────────────────
 
-function ExtraSection({ title, colorClass = 'text-ink-3', items, onAdd, onDelete, onMethod, onAmount }: {
+function ExtraSection({ title, colorClass = 'text-fg-muted', items, onAdd, onDelete, onMethod, onAmount }: {
   title: string; colorClass?: string
   items: ExtraItem[]
   onAdd: (desc: string, amount: number) => void
@@ -341,43 +341,43 @@ function ExtraSection({ title, colorClass = 'text-ink-3', items, onAdd, onDelete
   return (
     <SectionCard title={title} total={total > 0 ? total : undefined} colorClass={colorClass}>
       {items.map(item => (
-        <div key={item.id} className="group flex items-center gap-2 border-t border-ink-4/5 py-1.5 first:border-0">
-          <span className="flex-1 truncate text-sm text-ink-4">{item.description}</span>
+        <div key={item.id} className="group flex items-center gap-2 border-t border-border py-1.5 first:border-0">
+          <span className="flex-1 truncate text-body text-fg">{item.description}</span>
           <MethodToggle method={item.method} onChange={m => onMethod(item.id, m)} />
           <AmountInput value={item.amount} onSave={n => onAmount(item.id, n)} />
           <button
             onClick={() => onDelete(item.id)}
-            className="text-base leading-none text-ink-3/40 opacity-0 hover:text-danger group-hover:opacity-100"
+            className="text-md leading-none text-fg-muted/40 opacity-0 hover:text-danger group-hover:opacity-100"
           >×</button>
         </div>
       ))}
       {items.length === 0 && !adding && (
-        <p className="py-1 text-[11px] italic text-ink-3/40">Sin registros</p>
+        <p className="py-1 text-secondary italic text-fg-muted/40">Sin registros</p>
       )}
       {adding ? (
-        <div className="flex flex-wrap gap-1.5 border-t border-ink-4/10 pt-2">
+        <div className="flex flex-wrap gap-1.5 border-t border-border pt-2">
           <input
             value={desc} onChange={e => setDesc(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
             placeholder="Descripción"
-            className="min-w-0 flex-1 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-xs text-ink-4 placeholder-ink-3/50 outline-none focus:border-accent/50"
+            className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
           />
           <input
             type="number" value={amt} onChange={e => setAmt(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
             placeholder="Monto"
-            className="w-24 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-xs text-ink-4 placeholder-ink-3/50 outline-none focus:border-accent/50"
+            className="w-24 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
           />
           <button
             onClick={submit} disabled={!desc.trim() || !amt}
-            className="rounded-lg bg-accent/20 px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
+            className="rounded-control bg-accent/20 px-2.5 py-1 text-secondary font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
           >+</button>
-          <button onClick={() => setAdding(false)} className="text-xs text-ink-3 hover:text-ink-4">✕</button>
+          <button onClick={() => setAdding(false)} className="text-secondary text-fg-muted hover:text-fg">✕</button>
         </div>
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="mt-1 border-t border-ink-4/5 pt-1.5 w-full text-left text-[10px] font-medium text-accent hover:underline"
+          className="mt-1 border-t border-border pt-1.5 w-full text-left text-label font-medium text-accent hover:underline"
         >+ Agregar</button>
       )}
     </SectionCard>
@@ -448,16 +448,16 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
 
         if (pendingDel) {
           return (
-            <div key={row.category} className="flex items-center justify-between border-t border-ink-4/5 py-1.5 text-[11px] first:border-0">
-              <span className="text-ink-3/70">¿Eliminar <span className="font-semibold text-ink-4">{name}</span> de todos los meses futuros?</span>
+            <div key={row.category} className="flex items-center justify-between border-t border-border py-1.5 text-secondary first:border-0">
+              <span className="text-fg-muted/70">¿Eliminar <span className="font-semibold text-fg">{name}</span> de todos los meses futuros?</span>
               <div className="flex gap-2">
                 <button
                   onClick={async () => { await onDelete(row.category); setConfirmDel(null) }}
-                  className="rounded bg-danger/80 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-danger"
+                  className="rounded bg-danger/80 px-2 py-0.5 text-label font-semibold text-white hover:bg-danger"
                 >Sí</button>
                 <button
                   onClick={() => setConfirmDel(null)}
-                  className="rounded border border-ink-4/10 px-2 py-0.5 text-[10px] text-ink-3 hover:text-ink-4"
+                  className="rounded border border-border px-2 py-0.5 text-label text-fg-muted hover:text-fg"
                 >No</button>
               </div>
             </div>
@@ -465,7 +465,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
         }
 
         return (
-          <div key={row.category} className="group flex items-center gap-2 border-t border-ink-4/5 py-1.5 first:border-0">
+          <div key={row.category} className="group flex items-center gap-2 border-t border-border py-1.5 first:border-0">
             <PaidToggle paid={row.paid} onChange={v => onToggle(row.category, v)} />
             {custom && editingThisName ? (
               <input
@@ -477,22 +477,22 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
                   if (e.key === 'Enter') e.currentTarget.blur()
                   if (e.key === 'Escape') { setEditingName(null) }
                 }}
-                className="flex-1 rounded border border-accent/40 bg-ink-2/20 px-1 py-0.5 text-sm text-ink-4 outline-none"
+                className="flex-1 rounded border border-accent/40 bg-surface-2 px-1 py-0.5 text-body text-fg outline-none"
               />
             ) : (
               <span
-                className={`flex-1 text-sm ${row.paid ? 'text-ink-3/60 line-through' : 'text-ink-4'} ${custom ? 'cursor-text' : ''}`}
+                className={`flex-1 text-body ${row.paid ? 'text-fg-muted/60 line-through' : 'text-fg'} ${custom ? 'cursor-text' : ''}`}
                 onClick={() => { if (custom) { setEditingName(row.category); setNameDraft(name) } }}
               >
                 {name}
               </span>
             )}
-            {note && <span className="text-[9px] text-ink-3/50">{note}</span>}
+            {note && <span className="text-label text-fg-muted/50">{note}</span>}
             <MethodToggle method={row.method} onChange={m => onMethod(row.category, m)} />
             <AmountInput value={row.amount} onSave={n => onAmount(row.category, n)} />
             <button
               onClick={() => setConfirmDel(row.category)}
-              className="ml-1 text-[11px] text-ink-3/30 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+              className="ml-1 text-secondary text-fg-muted/30 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
               title="Eliminar gasto"
             >×</button>
           </div>
@@ -501,7 +501,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
 
       {/* Add form */}
       {addOpen ? (
-        <div className="mt-2 space-y-2 border-t border-ink-4/5 pt-2">
+        <div className="mt-2 space-y-2 border-t border-border pt-2">
           <input
             type="text"
             value={addName}
@@ -509,7 +509,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
             onKeyDown={e => { if (e.key === 'Enter') void handleAdd(); if (e.key === 'Escape') setAddOpen(false) }}
             placeholder="Nombre del gasto"
             autoFocus
-            className="w-full rounded border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-sm text-ink-4 outline-none placeholder:text-ink-3/40 focus:border-accent/40"
+            className="w-full rounded border border-border bg-surface-2 px-2 py-1 text-body text-fg outline-none placeholder:text-fg-muted/40 focus:border-accent/40"
           />
           <div className="flex gap-2">
             <input
@@ -518,12 +518,12 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
               onChange={e => setAddAmount(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') void handleAdd() }}
               placeholder="Monto"
-              className="w-28 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-right text-sm tabular-nums text-ink-4 outline-none placeholder:text-ink-3/40 focus:border-accent/40"
+              className="w-28 rounded border border-border bg-surface-2 px-2 py-1 text-right text-body tabular-nums text-fg outline-none placeholder:text-fg-muted/40 focus:border-accent/40"
             />
             <select
               value={addMethod}
               onChange={e => setAddMethod(e.target.value as 'cash' | 'card')}
-              className="flex-1 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-sm text-ink-4 outline-none focus:border-accent/40"
+              className="flex-1 rounded border border-border bg-surface-2 px-2 py-1 text-body text-fg outline-none focus:border-accent/40"
             >
               <option value="cash">💵 Efectivo</option>
               <option value="card">💳 Tarjeta</option>
@@ -532,19 +532,19 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
           <div className="flex gap-2">
             <button
               onClick={() => { setAddOpen(false); setAddName(''); setAddAmount(''); setAddMethod('cash') }}
-              className="flex-1 rounded border border-ink-4/10 py-1 text-[11px] text-ink-3 hover:text-ink-4"
+              className="flex-1 rounded border border-border py-1 text-secondary text-fg-muted hover:text-fg"
             >Cancelar</button>
             <button
               disabled={adding || !addName.trim()}
               onClick={() => void handleAdd()}
-              className="flex-1 rounded bg-accent/80 py-1 text-[11px] font-semibold text-white hover:bg-accent disabled:opacity-40"
+              className="flex-1 rounded bg-accent/80 py-1 text-secondary font-semibold text-white hover:bg-accent disabled:opacity-40"
             >{adding ? '…' : 'Agregar'}</button>
           </div>
         </div>
       ) : (
         <button
           onClick={() => setAddOpen(true)}
-          className="mt-2 w-full border-t border-ink-4/5 pt-2 text-left text-[11px] text-ink-3/50 hover:text-ink-3"
+          className="mt-2 w-full border-t border-border pt-2 text-left text-secondary text-fg-muted/50 hover:text-fg-muted"
         >+ Agregar gasto fijo</button>
       )}
     </SectionCard>
@@ -568,12 +568,12 @@ function NominaSection({ nomina, month, onToggle, onAmount, onMethod }: {
       {nomina.map(row => {
         const label = sats.find(s => s.num === row.week_num)?.label
         return (
-          <div key={row.week_num} className="flex items-center gap-2 border-t border-ink-4/5 py-1.5 first:border-0">
+          <div key={row.week_num} className="flex items-center gap-2 border-t border-border py-1.5 first:border-0">
             <PaidToggle paid={row.paid} onChange={v => onToggle(row.week_num, v)} />
-            <span className={`flex-1 text-sm ${row.paid ? 'text-ink-3/60 line-through' : 'text-ink-4'}`}>
+            <span className={`flex-1 text-body ${row.paid ? 'text-fg-muted/60 line-through' : 'text-fg'}`}>
               Semana {row.week_num}
             </span>
-            {label && <span className="text-[9px] text-ink-3/50">{label}</span>}
+            {label && <span className="text-label text-fg-muted/50">{label}</span>}
             <MethodToggle method={row.method} onChange={m => onMethod(row.week_num, m)} />
             <AmountInput value={row.amount} onSave={n => onAmount(row.week_num, n)} />
           </div>
@@ -601,17 +601,17 @@ function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
   const previsto = totalIngresos - totalEgresos
 
   return (
-    <div className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+    <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Previsto fin de mes</p>
-          <p className="text-[9px] text-ink-3/50">Si cobras y pagas todo</p>
+          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Previsto fin de mes</p>
+          <p className="text-label text-fg-muted/50">Si cobras y pagas todo</p>
         </div>
-        <p className={`text-2xl font-black tabular-nums ${previsto >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={previsto} /></p>
+        <p className={`text-heading font-black tabular-nums ${previsto >= 0 ? 'text-fg' : 'text-danger'}`}><Mxn v={previsto} /></p>
       </div>
-      <div className="mt-2 flex items-center justify-between border-t border-ink-4/10 pt-2 text-[11px]">
-        <span className="text-ink-3">↑ Ingresos <span className="font-medium text-ok"><Mxn v={totalIngresos} /></span></span>
-        <span className="text-ink-3">↓ Egresos <span className="font-medium text-danger"><Mxn v={totalEgresos} /></span></span>
+      <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-secondary">
+        <span className="text-fg-muted">↑ Ingresos <span className="font-medium text-ok"><Mxn v={totalIngresos} /></span></span>
+        <span className="text-fg-muted">↓ Egresos <span className="font-medium text-danger"><Mxn v={totalEgresos} /></span></span>
       </div>
     </div>
   )
@@ -646,16 +646,16 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
   const saldoActual = (bal.starting_balance || 0) + cobrado - pagado
 
   return (
-    <div className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+    <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Saldo actual</p>
-          <p className="text-[9px] text-ink-3/50">Según lo marcado</p>
+          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Saldo actual</p>
+          <p className="text-label text-fg-muted/50">Según lo marcado</p>
         </div>
-        <p className={`text-2xl font-black tabular-nums ${saldoActual >= 0 ? 'text-ink-4' : 'text-danger'}`}><Mxn v={saldoActual} /></p>
+        <p className={`text-heading font-black tabular-nums ${saldoActual >= 0 ? 'text-fg' : 'text-danger'}`}><Mxn v={saldoActual} /></p>
       </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-ink-4/10 pt-2 text-[11px]">
-        <span className="flex items-center gap-1 text-ink-3">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border pt-2 text-secondary">
+        <span className="flex items-center gap-1 text-fg-muted">
           Inicial
           {editing ? (
             <input
@@ -668,14 +668,14 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
                 if (e.key === 'Enter') e.currentTarget.blur()
                 if (e.key === 'Escape') { setEditing(false); setDraft(String(bal.starting_balance)) }
               }}
-              className="w-20 rounded border border-accent/40 bg-ink-2/20 px-1 py-0.5 text-right tabular-nums text-ink-4 outline-none"
+              className="w-20 rounded border border-accent/40 bg-surface-2 px-1 py-0.5 text-right tabular-nums text-fg outline-none"
             />
           ) : (
-            <button onClick={() => setEditing(true)} className="tabular-nums underline decoration-dotted underline-offset-2 hover:text-ink-4"><Mxn v={bal.starting_balance} /></button>
+            <button onClick={() => setEditing(true)} className="tabular-nums underline decoration-dotted underline-offset-2 hover:text-fg"><Mxn v={bal.starting_balance} /></button>
           )}
         </span>
-        <span className="text-ink-3">+ Cob. <span className="font-medium text-ok"><Mxn v={cobrado} /></span></span>
-        <span className="text-ink-3">− Pag. <span className="font-medium text-danger"><Mxn v={pagado} /></span></span>
+        <span className="text-fg-muted">+ Cob. <span className="font-medium text-ok"><Mxn v={cobrado} /></span></span>
+        <span className="text-fg-muted">− Pag. <span className="font-medium text-danger"><Mxn v={pagado} /></span></span>
       </div>
     </div>
   )
@@ -691,24 +691,24 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
   const faltan = Math.max(0, FONDO_META - fondoTotal)
 
   return (
-    <div className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+    <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Fondo Mantenimiento</p>
-          <p className="text-[10px] text-ink-3">Meta: <Mxn v={FONDO_META} /></p>
+          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Fondo Mantenimiento</p>
+          <p className="text-label text-fg-muted">Meta: <Mxn v={FONDO_META} /></p>
         </div>
         <div className="text-right">
-          <p className="text-lg font-black text-ok"><Mxn v={fondoTotal} /></p>
-          <p className="text-[10px] text-ink-3">{pct.toFixed(1)}% · Faltan <Mxn v={faltan} /></p>
+          <p className="text-subhead font-black text-ok"><Mxn v={fondoTotal} /></p>
+          <p className="text-label text-fg-muted">{pct.toFixed(1)}% · Faltan <Mxn v={faltan} /></p>
         </div>
       </div>
 
-      <div className="mb-2 h-2 overflow-hidden rounded-full bg-ink-2/30">
-        <div className="h-full rounded-full bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
+      <div className="mb-2 h-2 overflow-hidden rounded-pill bg-surface-2">
+        <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
 
       {currentMonthFondo && (
-        <p className={`text-[11px] ${currentMonthFondo.paid ? 'text-ok' : 'text-ink-3'}`}>
+        <p className={`text-secondary ${currentMonthFondo.paid ? 'text-ok' : 'text-fg-muted'}`}>
           {currentMonthFondo.paid
             ? `✓ Aportación este mes: ${mxn(currentMonthFondo.amount)}`
             : currentMonthFondo.amount > 0
@@ -790,27 +790,27 @@ function UptownHistorialTab({ rents, expenses, nomina, extraIncome, extraExpense
           { label: 'Salido',  value: totalOut, cls: 'text-danger' },
           { label: 'Neto',    value: neto,     cls: neto >= 0 ? 'text-ok' : 'text-danger' },
         ].map(({ label, value, cls }) => (
-          <div key={label} className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-            <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-            <p className={`mt-1 text-base font-bold tabular-nums ${cls}`}><Mxn v={value} /></p>
+          <div key={label} className="rounded-card border border-border bg-surface-1 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+            <p className="text-label uppercase tracking-wider text-fg-muted">{label}</p>
+            <p className={`mt-1 text-md font-bold tabular-nums ${cls}`}><Mxn v={value} /></p>
           </div>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
+      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
         {sorted.length === 0 ? (
-          <p className="p-10 text-center text-sm italic text-ink-3">Sin movimientos registrados este mes</p>
+          <p className="p-10 text-center text-body italic text-fg-muted">Sin movimientos registrados este mes</p>
         ) : (
           sorted.map(m => (
             <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-sm text-ink-4">{m.description}</span>
-              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${UPTOWN_METHOD_STYLE[m.method] ?? 'bg-ink-2/20 text-ink-3'}`}>
+              <span className="min-w-0 flex-1 truncate text-body text-fg">{m.description}</span>
+              <span className={`shrink-0 rounded px-1.5 py-0.5 text-label font-bold ${UPTOWN_METHOD_STYLE[m.method] ?? 'bg-surface-2 text-fg-muted'}`}>
                 {UPTOWN_METHOD_LABEL[m.method] ?? m.method}
               </span>
-              <span className="shrink-0 rounded-full bg-ink-2/30 px-2 py-0.5 text-[10px] text-ink-3">
+              <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-muted">
                 {m.category}
               </span>
-              <span className={`shrink-0 text-sm font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
+              <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
                 {m.flow === 'in' ? '+' : '−'}<Mxn v={m.amount} />
               </span>
             </div>
@@ -856,29 +856,29 @@ function ValetWeekCard({
   const complete = VALET_TENANTS.every(t => isPaid(t.id))
 
   return (
-    <div className={`dashboard-card rounded-xl border px-3 pt-3 pb-2 transition-colors ${
-      complete && providerPaid ? 'border-ok/20 bg-ok/5' : 'border-ink-4/10 bg-ink-1/60 backdrop-blur-xl'
+    <div className={`dashboard-card rounded-card border px-3 pt-3 pb-2 transition-colors ${
+      complete && providerPaid ? 'border-ok/20 bg-ok/5' : 'border-border bg-surface-1 backdrop-blur-xl'
     }`}>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-xs font-bold text-ink-4">Semana {weekNum}</span>
-        <span className="text-[10px] text-ink-3">{weekLabel}</span>
-        <span className="flex-1 text-right text-[10px] tabular-nums text-ink-3">
+        <span className="text-secondary font-bold text-fg">Semana {weekNum}</span>
+        <span className="text-label text-fg-muted">{weekLabel}</span>
+        <span className="flex-1 text-right text-label tabular-nums text-fg-muted">
           <Mxn v={cobrado} /> / <Mxn v={totalWeek} />
         </span>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-ink-3">Proveedor</span>
+          <span className="text-label text-fg-muted">Proveedor</span>
           {editingAmt ? (
             <input
               type="number" value={amtDraft} autoFocus
               onChange={e => setAmtDraft(e.target.value)}
               onBlur={saveAmt}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') saveAmt() }}
-              className="w-20 rounded border border-accent/50 bg-ink-2/20 px-1 py-0.5 text-right text-[11px] tabular-nums text-ink-4 outline-none"
+              className="w-20 rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-right text-secondary tabular-nums text-fg outline-none"
             />
           ) : (
             <button
               onClick={() => setEditingAmt(true)}
-              className="text-[11px] tabular-nums text-ink-3 hover:text-ink-4"
+              className="text-secondary tabular-nums text-fg-muted hover:text-fg"
               title="Editar monto proveedor"
             >
               <Mxn v={providerAmount} />
@@ -891,13 +891,13 @@ function ValetWeekCard({
       {VALET_TENANTS.map(t => {
         const paid = isPaid(t.id)
         return (
-          <div key={t.id} className="flex items-center gap-2 border-t border-ink-4/5 py-1 first:border-0">
+          <div key={t.id} className="flex items-center gap-2 border-t border-border py-1 first:border-0">
             <PaidToggle paid={paid} onChange={v => onTenantToggle(t.id, v)} />
-            <span className={`flex-1 text-sm ${paid ? 'text-ink-3/70' : 'text-ink-4'}`}>
+            <span className={`flex-1 text-body ${paid ? 'text-fg-muted/70' : 'text-fg'}`}>
               {t.name}
             </span>
-            <span className="text-[10px] text-ink-3/40">{t.pts}pt</span>
-            <span className={`text-xs tabular-nums font-medium ${paid ? 'text-ok' : 'text-ink-3/30'}`}>
+            <span className="text-label text-fg-muted/40">{t.pts}pt</span>
+            <span className={`text-secondary tabular-nums font-medium ${paid ? 'text-ok' : 'text-fg-muted/30'}`}>
               <Mxn v={tenantAmt(t.pts)} />
             </span>
           </div>
@@ -989,36 +989,36 @@ function ValetTab({ month }: { month: string }) {
 
   if (loading) return (
     <div className="flex items-center justify-center py-32">
-      <p className="animate-pulse text-sm text-ink-3">Cargando…</p>
+      <p className="animate-pulse text-body text-fg-muted">Cargando…</p>
     </div>
   )
   if (error) return (
-    <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>
+    <div className="rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">{error}</div>
   )
 
   return (
     <div className="flex flex-col gap-4">
       {/* Resumen + Configuración */}
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-ink-3">Resumen Valet</p>
+      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+        <p className="mb-3 text-label font-bold uppercase tracking-widest text-fg-muted">Resumen Valet</p>
         <div className="space-y-3">
           <div>
-            <div className="mb-1 flex justify-between text-xs">
-              <span className="text-ink-3">Cobrado</span>
-              <span className="font-medium tabular-nums text-ink-4"><Mxn v={cobrado} /> / <Mxn v={esperado} /></span>
+            <div className="mb-1 flex justify-between text-secondary">
+              <span className="text-fg-muted">Cobrado</span>
+              <span className="font-medium tabular-nums text-fg"><Mxn v={cobrado} /> / <Mxn v={esperado} /></span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-ink-2/30">
-              <div className="h-full rounded-full bg-ok transition-all duration-500"
+            <div className="h-1.5 overflow-hidden rounded-pill bg-surface-2">
+              <div className="h-full rounded-pill bg-ok transition-all duration-500"
                 style={{ width: `${esperado ? Math.min(cobrado / esperado * 100, 100) : 0}%` }} />
             </div>
           </div>
           <div>
-            <div className="mb-1 flex justify-between text-xs">
-              <span className="text-ink-3">Proveedor pagado</span>
-              <span className="font-medium tabular-nums text-ink-4"><Mxn v={proveedorPagado} /> / <Mxn v={proveedorTotal} /></span>
+            <div className="mb-1 flex justify-between text-secondary">
+              <span className="text-fg-muted">Proveedor pagado</span>
+              <span className="font-medium tabular-nums text-fg"><Mxn v={proveedorPagado} /> / <Mxn v={proveedorTotal} /></span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-ink-2/30">
-              <div className="h-full rounded-full bg-accent transition-all duration-500"
+            <div className="h-1.5 overflow-hidden rounded-pill bg-surface-2">
+              <div className="h-full rounded-pill bg-accent transition-all duration-500"
                 style={{ width: `${proveedorTotal ? Math.min(proveedorPagado / proveedorTotal * 100, 100) : 0}%` }} />
             </div>
           </div>
@@ -1026,10 +1026,10 @@ function ValetTab({ month }: { month: string }) {
             const nuEsperado = cobrado - proveedorPagado
             const diferencia = nuEsperado - config.nu_balance
             return (
-              <div className="space-y-1.5 rounded-lg border border-ink-4/10 bg-ink-2/20 px-3 py-2.5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Cuenta NU · real vs esperado</p>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-ink-3">Saldo real</span>
+              <div className="space-y-1.5 rounded-control border border-border bg-surface-2 px-3 py-2.5">
+                <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Cuenta NU · real vs esperado</p>
+                <div className="flex items-center justify-between text-secondary">
+                  <span className="text-fg-muted">Saldo real</span>
                   <input
                     type="number"
                     value={nuDraft}
@@ -1040,14 +1040,14 @@ function ValetTab({ month }: { month: string }) {
                       else setNuDraft(String(config.nu_balance))
                     }}
                     onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right tabular-nums font-bold text-ink-4 outline-none hover:border-ink-4/10 focus:border-accent/50 focus:bg-ink-2/20"
+                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right tabular-nums font-bold text-fg outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-ink-3">Saldo esperado</span>
-                  <span className="tabular-nums text-ink-4"><Mxn v={nuEsperado} /></span>
+                <div className="flex items-center justify-between text-secondary">
+                  <span className="text-fg-muted">Saldo esperado</span>
+                  <span className="tabular-nums text-fg"><Mxn v={nuEsperado} /></span>
                 </div>
-                <div className={`flex items-center justify-between border-t border-ink-4/10 pt-1 text-xs font-bold ${diferencia <= 0 ? 'text-ok' : 'text-danger'}`}>
+                <div className={`flex items-center justify-between border-t border-border pt-1 text-secondary font-bold ${diferencia <= 0 ? 'text-ok' : 'text-danger'}`}>
                   <span>Diferencia</span>
                   <span className="tabular-nums"><Mxn v={diferencia} /></span>
                 </div>
@@ -1056,24 +1056,24 @@ function ValetTab({ month }: { month: string }) {
           })()}
         </div>
         {/* Configuración */}
-        <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-ink-4/10 pt-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Configuración</p>
+        <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-border pt-3">
+        <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Configuración</p>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-ink-3">Semanas:</span>
-          <span className="text-sm font-bold text-ink-4">{numWeeks}</span>
-          <span className="text-[10px] text-ink-3/50">· auto</span>
+          <span className="text-secondary text-fg-muted">Semanas:</span>
+          <span className="text-body font-bold text-fg">{numWeeks}</span>
+          <span className="text-label text-fg-muted/50">· auto</span>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-ink-3">1er sáb:</span>
+          <span className="text-secondary text-fg-muted">1er sáb:</span>
           <input type="date" value={config.week1_date ?? ''}
             onChange={e => void saveConfig({ week1_date: e.target.value || null })}
-            className="rounded border border-ink-4/10 bg-ink-2/20 px-2 py-0.5 text-xs text-ink-4 outline-none focus:border-accent/50" />
+            className="rounded border border-border bg-surface-2 px-2 py-0.5 text-secondary text-fg outline-none focus:border-accent/50" />
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-ink-3">Saldo NU:</span>
+          <span className="text-secondary text-fg-muted">Saldo NU:</span>
           <input type="number" value={nuDraft}
             onChange={e => setNuDraft(e.target.value)}
             onBlur={() => {
@@ -1082,11 +1082,11 @@ function ValetTab({ month }: { month: string }) {
               else setNuDraft(String(config.nu_balance))
             }}
             onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-            className="w-28 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-0.5 text-right text-xs tabular-nums text-ink-4 outline-none focus:border-accent/50" />
+            className="w-28 rounded border border-border bg-surface-2 px-2 py-0.5 text-right text-secondary tabular-nums text-fg outline-none focus:border-accent/50" />
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-ink-3">Monto/pt:</span>
+          <span className="text-secondary text-fg-muted">Monto/pt:</span>
           <input type="number" value={pptDraft}
             onChange={e => setPptDraft(e.target.value)}
             onBlur={() => {
@@ -1095,7 +1095,7 @@ function ValetTab({ month }: { month: string }) {
               else setPptDraft(String(config.price_per_point))
             }}
             onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-            className="w-20 rounded border border-ink-4/10 bg-ink-2/20 px-2 py-0.5 text-right text-xs tabular-nums text-ink-4 outline-none focus:border-accent/50" />
+            className="w-20 rounded border border-border bg-surface-2 px-2 py-0.5 text-right text-secondary tabular-nums text-fg outline-none focus:border-accent/50" />
         </div>
       </div>
       </div>
@@ -1326,31 +1326,31 @@ export default function UptownContent() {
         {/* Header */}
         <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-4">Uptown</h1>
-            <p className="text-xs text-ink-3">León, Guanajuato · MXN</p>
+            <h1 className="text-heading font-bold tracking-tight text-fg">Uptown</h1>
+            <p className="text-secondary text-fg-muted">León, Guanajuato · MXN</p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMonth(m => shiftMonth(m, -1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/85 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+              className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
             >‹</button>
-            <span className="min-w-[148px] text-center text-sm font-semibold capitalize text-ink-4">
+            <span className="min-w-[148px] text-center text-body font-semibold capitalize text-fg">
               {monthLabel(month)}
             </span>
             <button
               onClick={() => setMonth(m => shiftMonth(m, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/85 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+              className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
             >›</button>
           </div>
         </div>
 
         {/* Tab bar */}
-        <div className="mb-5 flex w-fit shrink-0 gap-1 rounded-xl border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
+        <div className="mb-5 flex w-fit shrink-0 gap-1 rounded-card border border-border bg-surface-1 p-1 backdrop-blur-xl">
           {(['finanzas', 'historial', 'valet'] as const).map(t => (
             <button key={t} onClick={() => setPageTab(t)}
-              className={['rounded-lg px-4 py-1.5 text-sm transition-colors',
-                pageTab === t ? 'bg-ink-4/10 font-medium text-ink-4' : 'text-ink-3 hover:text-ink-4',
+              className={['rounded-control px-4 py-1.5 text-body transition-colors',
+                pageTab === t ? 'bg-ink-4/10 font-medium text-fg' : 'text-fg-muted hover:text-fg',
               ].join(' ')}
             >
               {t === 'finanzas' ? 'Finanzas' : t === 'historial' ? 'Historial' : 'Valet'}
@@ -1385,10 +1385,10 @@ export default function UptownContent() {
           />
         ) : loading ? (
           <div className="flex items-center justify-center py-32">
-            <p className="animate-pulse text-sm text-ink-3">Cargando…</p>
+            <p className="animate-pulse text-body text-fg-muted">Cargando…</p>
           </div>
         ) : error ? (
-          <div className="flex items-center gap-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <div className="flex items-center gap-4 rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">
             {error}
             <button onClick={() => void loadMonth(month)} className="underline">Reintentar</button>
           </div>
@@ -1398,7 +1398,7 @@ export default function UptownContent() {
             <div className="grid gap-3 lg:grid-cols-2">
               {/* ── Ingresos ── */}
               <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-ok">↑ Ingresos</p>
+                <p className="text-label font-black uppercase tracking-widest text-ok">↑ Ingresos</p>
                 <RentasSection
                   rents={rents} month={month}
                   onToggle={toggleRent} onAmount={setRentAmount} onMethod={setRentMethod}
@@ -1416,7 +1416,7 @@ export default function UptownContent() {
 
               {/* ── Egresos ── */}
               <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-danger">↓ Egresos</p>
+                <p className="text-label font-black uppercase tracking-widest text-danger">↓ Egresos</p>
                 <GastosFijosSection
                   expenses={expenses} month={month}
                   onToggle={toggleExpense} onAmount={setExpenseAmount} onMethod={setExpenseMethod}

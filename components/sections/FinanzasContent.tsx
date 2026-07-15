@@ -169,7 +169,7 @@ function normMethod(m: string | null | undefined): 'efectivo' | 'tarjeta' {
 export function MethodBadge({ metodo }: { metodo: string }) {
   const m = normMethod(metodo)
   return (
-    <span className="shrink-0 text-sm leading-none" title={METHOD_META[m].label}>
+    <span className="shrink-0 text-body leading-none" title={METHOD_META[m].label}>
       {METHOD_META[m].emoji}
     </span>
   )
@@ -187,7 +187,7 @@ function MethodSelect({
       value={normMethod(value)}
       onChange={e => onChange(e.target.value)}
       onClick={e => e.stopPropagation()}
-      className="shrink-0 rounded border border-ink-4/10 bg-ink-2/30 px-1.5 py-0.5 text-xs text-ink-4 outline-none"
+      className="shrink-0 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-secondary text-fg outline-none"
     >
       <option value="efectivo">💵 Efectivo</option>
       <option value="tarjeta">💳 Tarjeta</option>
@@ -244,12 +244,12 @@ function IncomeRow({
     <div
       onClick={onToggle}
       className={[
-        'flex cursor-pointer items-center gap-2 border-b border-ink-4/5 px-3 py-2.5 last:border-0 transition-all',
-        checked ? 'opacity-55' : 'hover:bg-ink-4/[0.03]',
+        'flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2.5 last:border-0 transition-all',
+        checked ? 'opacity-55' : 'hover:bg-surface-hover',
       ].join(' ')}
     >
       <CheckBox checked={checked} />
-      <span className={`min-w-0 flex-1 truncate text-xs ${checked ? 'line-through text-ink-3' : 'text-ink-4'}`}>
+      <span className={`min-w-0 flex-1 truncate text-secondary ${checked ? 'line-through text-fg-muted' : 'text-fg'}`}>
         {item.nombre}
       </span>
       {checked ? (
@@ -265,13 +265,13 @@ function IncomeRow({
               if (e.key === 'Enter') { commitDraft(); (e.target as HTMLElement).blur() }
               e.stopPropagation()
             }}
-            className="w-20 rounded border border-ink-4/10 bg-ink-2/20 px-1.5 py-0.5 text-right text-xs font-medium text-ok outline-none focus:border-ok/50"
+            className="w-20 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-right text-secondary font-medium text-ok outline-none focus:border-ok/50"
           />
         </>
       ) : (
         <>
           <MethodBadge metodo={item.metodo} />
-          <span className="shrink-0 text-xs tabular-nums text-ink-3"><Mxn v={item.monto} /></span>
+          <span className="shrink-0 text-secondary tabular-nums text-fg-muted"><Mxn v={item.monto} /></span>
         </>
       )}
     </div>
@@ -291,16 +291,16 @@ function GastoRow({
     <div
       onClick={onToggle}
       className={[
-        'flex cursor-pointer items-center gap-2 border-b border-ink-4/5 px-3 py-2.5 last:border-0 transition-all',
-        checked ? 'opacity-55' : 'hover:bg-ink-4/[0.03]',
+        'flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2.5 last:border-0 transition-all',
+        checked ? 'opacity-55' : 'hover:bg-surface-hover',
       ].join(' ')}
     >
       <CheckBox checked={checked} />
-      <span className={`min-w-0 flex-1 truncate text-xs ${checked ? 'line-through text-ink-3' : 'text-ink-4'}`}>
+      <span className={`min-w-0 flex-1 truncate text-secondary ${checked ? 'line-through text-fg-muted' : 'text-fg'}`}>
         {commitment.name}
       </span>
       <MethodBadge metodo={commitment.metodo ?? 'cargo'} />
-      <span className="shrink-0 text-xs tabular-nums text-ink-3"><Mxn v={commitment.amount} /></span>
+      <span className="shrink-0 text-secondary tabular-nums text-fg-muted"><Mxn v={commitment.amount} /></span>
     </div>
   )
 }
@@ -317,21 +317,21 @@ function ExtraRow({
   onDelete: (id: string) => void
 }) {
   return (
-    <div className="group flex items-center gap-2 border-b border-ink-4/5 px-3 py-2.5 last:border-0">
-      <span className="min-w-0 flex-1 truncate text-xs text-ink-4">{mv.description}</span>
+    <div className="group flex items-center gap-2 border-b border-border px-3 py-2.5 last:border-0">
+      <span className="min-w-0 flex-1 truncate text-secondary text-fg">{mv.description}</span>
       {mv.metodo && <MethodBadge metodo={mv.metodo} />}
-      <span className={`shrink-0 text-xs font-medium tabular-nums ${isIncome ? 'text-ok' : 'text-danger'}`}>
+      <span className={`shrink-0 text-secondary font-medium tabular-nums ${isIncome ? 'text-ok' : 'text-danger'}`}>
         {isIncome ? '+' : '−'}<Mxn v={Number(mv.amount)} />
       </span>
       <button
         onClick={() => onEdit(mv)}
-        className="hidden shrink-0 text-[10px] text-ink-3 hover:text-ink-4 group-hover:block"
+        className="hidden shrink-0 text-label text-fg-muted hover:text-fg group-hover:block"
       >
         editar
       </button>
       <button
         onClick={() => onDelete(mv.id)}
-        className="hidden shrink-0 text-sm leading-none text-ink-3/40 hover:text-danger group-hover:block"
+        className="hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block"
       >
         ×
       </button>
@@ -361,13 +361,13 @@ function AddExtraForm({
   }
 
   return (
-    <div className="flex gap-2 border-t border-ink-4/5 px-3 py-3">
+    <div className="flex gap-2 border-t border-border px-3 py-3">
       <input
         value={nombre}
         onChange={e => setNombre(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder={placeholder}
-        className="min-w-0 flex-1 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2.5 py-1.5 text-xs text-ink-4 placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
       />
       <input
         type="number"
@@ -375,12 +375,12 @@ function AddExtraForm({
         onChange={e => setMonto(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="$"
-        className="w-20 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2.5 py-1.5 text-xs text-ink-4 placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
       />
       <select
         value={metodo}
         onChange={e => setMetodo(e.target.value)}
-        className="rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-xs text-ink-4 outline-none"
+        className="rounded-control border border-border bg-surface-2 px-2 py-1.5 text-secondary text-fg outline-none"
       >
         <option value="efectivo">💵 Efectivo</option>
         <option value="tarjeta">💳 Tarjeta</option>
@@ -388,7 +388,7 @@ function AddExtraForm({
       <button
         onClick={submit}
         disabled={!nombre.trim() || !monto}
-        className={`rounded-lg px-2.5 py-1.5 text-xs font-medium ${colorClass} bg-current/10 hover:bg-current/20 disabled:opacity-30`}
+        className={`rounded-control px-2.5 py-1.5 text-secondary font-medium ${colorClass} bg-current/10 hover:bg-current/20 disabled:opacity-30`}
       >
         +
       </button>
@@ -427,27 +427,27 @@ function EditModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm space-y-3 rounded-2xl border border-ink-4/10 bg-ink-1/95 p-5 shadow-2xl backdrop-blur-xl"
+        className="w-full max-w-sm space-y-3 rounded-card border border-border bg-surface-1 p-5 shadow-2xl backdrop-blur-xl"
         onClick={e => e.stopPropagation()}
       >
-        <p className="text-sm font-semibold text-ink-4">Editar movimiento</p>
+        <p className="text-body font-semibold text-fg">Editar movimiento</p>
         <input
           value={desc}
           onChange={e => setDesc(e.target.value)}
           autoFocus
-          className="w-full rounded-xl border border-ink-4/10 bg-ink-2/20 px-3 py-2 text-sm text-ink-4 outline-none focus:border-accent/50"
+          className="w-full rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none focus:border-accent/50"
         />
         <div className="flex gap-2">
           <input
             type="number"
             value={monto}
             onChange={e => setMonto(e.target.value)}
-            className="min-w-0 flex-1 rounded-xl border border-ink-4/10 bg-ink-2/20 px-3 py-2 text-sm text-ink-4 outline-none focus:border-accent/50"
+            className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none focus:border-accent/50"
           />
           <select
             value={metodo}
             onChange={e => setMetodo(normMethod(e.target.value))}
-            className="rounded-xl border border-ink-4/10 bg-ink-2/20 px-3 py-2 text-sm text-ink-4 outline-none"
+            className="rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none"
           >
             <option value="efectivo">💵 Efectivo</option>
             <option value="tarjeta">💳 Tarjeta</option>
@@ -457,13 +457,13 @@ function EditModal({
           <button
             onClick={save}
             disabled={saving || !desc.trim() || !monto}
-            className="flex-1 rounded-xl bg-accent/20 py-2 text-sm font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
+            className="flex-1 rounded-card bg-accent/20 py-2 text-body font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
           <button
             onClick={onClose}
-            className="rounded-xl border border-ink-4/10 px-4 py-2 text-sm text-ink-3 hover:text-ink-4"
+            className="rounded-card border border-border px-4 py-2 text-body text-fg-muted hover:text-fg"
           >
             Cancelar
           </button>
@@ -557,7 +557,7 @@ function PanelTab({
     return (
       <>
         <span className={d < 0 ? 'text-danger' : 'text-ok'}>{d < 0 ? '−' : '+'}<Mxn v={Math.abs(d)} /></span>
-        <span className="text-ink-3"> desde cuadre</span>
+        <span className="text-fg-muted"> desde cuadre</span>
       </>
     )
   }
@@ -568,20 +568,20 @@ function PanelTab({
     label: string; value: number; cls: string; sub?: string; subNode?: React.ReactNode
   }) {
     return (
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-        <p className={`mt-1 text-xl font-black tabular-nums ${cls}`}><Mxn v={value} /></p>
-        {subNode && <p className="mt-0.5 text-[10px]">{subNode}</p>}
-        {sub && <p className="mt-0.5 text-[10px] text-ink-3">{sub}</p>}
+      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+        <p className="text-label uppercase tracking-wider text-fg-muted">{label}</p>
+        <p className={`mt-1 text-subhead font-black tabular-nums ${cls}`}><Mxn v={value} /></p>
+        {subNode && <p className="mt-0.5 text-label">{subNode}</p>}
+        {sub && <p className="mt-0.5 text-label text-fg-muted">{sub}</p>}
       </div>
     )
   }
 
   function SectionHeader({ title, total, cls }: { title: string; total: number; cls: string }) {
     return (
-      <div className="flex items-center justify-between border-b border-ink-4/5 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">{title}</p>
-        <span className={`text-xs font-semibold tabular-nums ${cls}`}><Mxn v={total} /></span>
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <p className="text-secondary font-semibold uppercase tracking-wider text-fg-muted">{title}</p>
+        <span className={`text-secondary font-semibold tabular-nums ${cls}`}><Mxn v={total} /></span>
       </div>
     )
   }
@@ -593,8 +593,8 @@ function PanelTab({
         <PanelCard label="Efectivo"           value={liveEfectivo} cls="text-success" subNode={deltaSub(dEfectivo)} />
         <PanelCard label="Tarjeta"            value={liveTarjeta}  cls="text-info"    subNode={deltaSub(dTarjeta)} />
         <PanelCard label="Caja Fuerte"        value={caja}    cls="text-warn" />
-        <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     subNode={<><span className="text-ink-3">de </span><Mxn v={totalInPrevistos} /></>} />
-        <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" subNode={<><span className="text-ink-3">de </span><Mxn v={totalGastoPrevistos} /></>} />
+        <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     subNode={<><span className="text-fg-muted">de </span><Mxn v={totalInPrevistos} /></>} />
+        <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" subNode={<><span className="text-fg-muted">de </span><Mxn v={totalGastoPrevistos} /></>} />
         <PanelCard label="Flujo del mes"      value={flujo}   cls={flujo >= 0 ? 'text-ok' : 'text-danger'} />
       </div>
 
@@ -603,10 +603,10 @@ function PanelTab({
         {/* ── LEFT: Ingresos ── */}
         <div className="space-y-4">
           {/* Ingresos previstos */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <SectionHeader title="Ingresos Previstos" total={totalInPrevistos} cls="text-ok" />
             {activeIncome.length === 0 && nominaMirror === 'loading' ? (
-              <p className="px-4 py-6 text-center text-xs italic text-ink-3">Sin ingresos previstos — configúralos en Config</p>
+              <p className="px-4 py-6 text-center text-secondary italic text-fg-muted">Sin ingresos previstos — configúralos en Config</p>
             ) : (
               activeIncome.map(item => (
                 <IncomeRow
@@ -623,34 +623,34 @@ function PanelTab({
             )}
             {/* Nómina mirror — read-only from Uptown, all 4 weeks */}
             {nominaMirror !== 'loading' && mirrorRows.map(nm => (
-              <div key={nm.week_num} className={['flex items-center gap-2 border-t border-ink-4/5 px-3 py-2.5', nm.paid ? 'opacity-55' : ''].join(' ')}>
+              <div key={nm.week_num} className={['flex items-center gap-2 border-t border-border px-3 py-2.5', nm.paid ? 'opacity-55' : ''].join(' ')}>
                 <CheckBox checked={nm.paid} />
-                <span className={`min-w-0 flex-1 truncate text-xs ${nm.paid ? 'line-through text-ink-3' : 'text-ink-4'}`}>
+                <span className={`min-w-0 flex-1 truncate text-secondary ${nm.paid ? 'line-through text-fg-muted' : 'text-fg'}`}>
                   Semana {nm.week_num}{nm.week_date ? ` · ${nm.week_date}` : ''}
                 </span>
-                <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-accent/10 text-accent">
+                <span className="shrink-0 rounded px-1.5 py-0.5 text-label font-bold uppercase tracking-wide bg-accent/10 text-accent">
                   ↑ Uptown
                 </span>
                 {nm.amount != null ? (
-                  <span className={`shrink-0 text-xs tabular-nums ${nm.paid ? 'text-ok' : 'text-ink-3'}`}>
+                  <span className={`shrink-0 text-secondary tabular-nums ${nm.paid ? 'text-ok' : 'text-fg-muted'}`}>
                     <Mxn v={nm.amount} />
                   </span>
                 ) : (
-                  <span className="shrink-0 text-[10px] italic text-ink-3/50">Sin registrar</span>
+                  <span className="shrink-0 text-label italic text-fg-muted/50">Sin registrar</span>
                 )}
               </div>
             ))}
           </div>
 
           {/* Freelance / Extras */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <SectionHeader
               title="Freelance / Extras"
               total={freelanceMvs.reduce((s, m) => s + Number(m.amount), 0)}
               cls="text-ok"
             />
             {freelanceMvs.length === 0 ? (
-              <p className="px-4 py-4 text-center text-xs italic text-ink-3">Sin extras este mes</p>
+              <p className="px-4 py-4 text-center text-secondary italic text-fg-muted">Sin extras este mes</p>
             ) : (
               freelanceMvs.map(mv => (
                 <ExtraRow key={mv.id} mv={mv} isIncome onEdit={setEditMov} onDelete={onDeleteMov} />
@@ -667,10 +667,10 @@ function PanelTab({
         {/* ── RIGHT: Gastos ── */}
         <div className="space-y-4">
           {/* Gastos previstos */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <SectionHeader title="Gastos Previstos" total={totalGastoPrevistos} cls="text-danger" />
             {activeCosts.length === 0 ? (
-              <p className="px-4 py-6 text-center text-xs italic text-ink-3">Sin compromisos activos</p>
+              <p className="px-4 py-6 text-center text-secondary italic text-fg-muted">Sin compromisos activos</p>
             ) : (
               activeCosts.map(c => (
                 <GastoRow
@@ -684,14 +684,14 @@ function PanelTab({
           </div>
 
           {/* Gastos Extra */}
-          <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <SectionHeader
               title="Gastos Extra"
               total={gxMvs.reduce((s, m) => s + Number(m.amount), 0)}
               cls="text-danger"
             />
             {gxMvs.length === 0 ? (
-              <p className="px-4 py-4 text-center text-xs italic text-ink-3">Sin gastos extra este mes</p>
+              <p className="px-4 py-4 text-center text-secondary italic text-fg-muted">Sin gastos extra este mes</p>
             ) : (
               gxMvs.map(mv => (
                 <ExtraRow key={mv.id} mv={mv} isIncome={false} onEdit={setEditMov} onDelete={onDeleteMov} />
@@ -747,32 +747,32 @@ function HistorialTab({
         ].map(({ label, value, cls }) => (
           <div
             key={label}
-            className="rounded-xl border border-ink-4/10 bg-ink-1/85 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card"
+            className="rounded-card border border-border bg-surface-1 p-3 text-center shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card"
           >
-            <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-            <p className={`mt-1 text-base font-bold tabular-nums ${cls}`}><Mxn v={value} /></p>
+            <p className="text-label uppercase tracking-wider text-fg-muted">{label}</p>
+            <p className={`mt-1 text-md font-bold tabular-nums ${cls}`}><Mxn v={value} /></p>
           </div>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
+      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
         {sorted.length === 0 ? (
-          <p className="p-10 text-center text-sm italic text-ink-3">Sin movimientos este mes</p>
+          <p className="p-10 text-center text-body italic text-fg-muted">Sin movimientos este mes</p>
         ) : (
           sorted.map(m => (
             <div key={m.id} className="group flex items-center gap-3 px-4 py-2.5">
-              <span className="w-8 shrink-0 text-xs font-medium text-ink-3">{m.date.slice(8)}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-ink-4">{m.description}</span>
+              <span className="w-8 shrink-0 text-secondary font-medium text-fg-muted">{m.date.slice(8)}</span>
+              <span className="min-w-0 flex-1 truncate text-body text-fg">{m.description}</span>
               {m.metodo && <MethodBadge metodo={m.metodo} />}
-              <span className="shrink-0 rounded-full bg-ink-2/30 px-2 py-0.5 text-[10px] text-ink-3">
+              <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-muted">
                 {CAT_LABEL[m.category]}
               </span>
-              <span className={`shrink-0 text-sm font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
+              <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
                 {m.flow === 'in' ? '+' : '−'}<Mxn v={Number(m.amount)} />
               </span>
               <button
                 onClick={() => onDelete(m.id)}
-                className="hidden shrink-0 text-base leading-none text-ink-3/40 hover:text-danger group-hover:block"
+                className="hidden shrink-0 text-md leading-none text-fg-muted/40 hover:text-danger group-hover:block"
               >
                 ×
               </button>
@@ -785,7 +785,7 @@ function HistorialTab({
           ruta dedicada, que scrollea como página normal — nunca dentro del tambor. */}
       <Link
         href="/finance/historial"
-        className="block w-full rounded-xl border border-ink-4/10 py-2.5 text-center text-xs text-ink-3 transition-colors hover:text-ink-4"
+        className="block w-full rounded-card border border-border py-2.5 text-center text-secondary text-fg-muted transition-colors hover:text-fg"
       >
         Ver historial completo →
       </Link>
@@ -848,13 +848,13 @@ function EnvelopeCard({
   const sorted = [...contributions].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+    <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-bold text-ink-4">{env.label}</h3>
-          <div className="flex items-center gap-1.5 text-xs text-ink-3">
+          <h3 className="text-subhead font-bold text-fg">{env.label}</h3>
+          <div className="flex items-center gap-1.5 text-secondary text-fg-muted">
             <span>{env.fecha ? env.fecha : 'Sobrecito vacaciones'}</span>
-            <span className="text-ink-2/50">·</span>
+            <span className="text-fg-faint/50">·</span>
             <input
               type="number"
               value={semDraft}
@@ -864,22 +864,22 @@ function EnvelopeCard({
                 if (e.key === 'Enter') e.currentTarget.blur()
                 if (e.key === 'Escape') setSemDraft(String(Number(env.sem_ahorro) || 0))
               }}
-              className="w-20 rounded border border-ink-4/10 bg-ink-2/20 px-1 py-0.5 tabular-nums text-xs text-ink-4 outline-none focus:border-accent/50"
+              className="w-20 rounded border border-border bg-surface-2 px-1 py-0.5 tabular-nums text-secondary text-fg outline-none focus:border-accent/50"
             />
             <span>/sem</span>
-            {semSaved && <span className="text-[10px] font-medium text-ok">✓</span>}
+            {semSaved && <span className="text-label font-medium text-ok">✓</span>}
           </div>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-black text-ok"><Mxn v={saved} /></p>
-          <p className="text-xs text-ink-3">de <Mxn v={target} /></p>
+          <p className="text-heading font-black text-ok"><Mxn v={saved} /></p>
+          <p className="text-secondary text-fg-muted">de <Mxn v={target} /></p>
         </div>
       </div>
 
-      <div className="mb-1 h-2.5 overflow-hidden rounded-full bg-ink-2/30">
-        <div className="h-full rounded-full bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
+      <div className="mb-1 h-2.5 overflow-hidden rounded-pill bg-surface-2">
+        <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
-      <p className="mb-4 text-right text-[10px] text-ink-3">
+      <p className="mb-4 text-right text-label text-fg-muted">
         {pct.toFixed(1)}% · faltan <Mxn v={Math.max(0, target - saved)} />
       </p>
 
@@ -889,13 +889,13 @@ function EnvelopeCard({
             type="number" value={draft} autoFocus
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditing(false) }}
-            className="flex-1 rounded-xl border border-ink-4/10 bg-ink-2/20 px-3 py-2 text-sm text-ink-4 outline-none focus:border-accent/50"
+            className="flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none focus:border-accent/50"
           />
-          <button onClick={saveMeta} className="rounded-xl bg-accent/20 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/30">OK</button>
-          <button onClick={() => { setDraft(String(target)); setEditing(false) }} className="text-xs text-ink-3 hover:text-ink-4">✕</button>
+          <button onClick={saveMeta} className="rounded-card bg-accent/20 px-3 py-2 text-secondary font-medium text-accent hover:bg-accent/30">OK</button>
+          <button onClick={() => { setDraft(String(target)); setEditing(false) }} className="text-secondary text-fg-muted hover:text-fg">✕</button>
         </div>
       ) : (
-        <button onClick={() => setEditing(true)} className="mb-4 text-[11px] text-ink-3 underline-offset-2 hover:text-ink-4 hover:underline">
+        <button onClick={() => setEditing(true)} className="mb-4 text-secondary text-fg-muted underline-offset-2 hover:text-fg hover:underline">
           Cambiar meta (<Mxn v={target} />)
         </button>
       )}
@@ -905,30 +905,30 @@ function EnvelopeCard({
           value={addDesc} onChange={e => setAddDesc(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && submitContribution()}
           placeholder="Descripción…"
-          className="min-w-0 flex-1 rounded-xl border border-ink-4/10 bg-ink-2/20 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none focus:border-accent/50"
+          className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
         />
         <input
           type="number" value={addAmt} onChange={e => setAddAmt(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && submitContribution()}
           placeholder="$"
-          className="w-24 rounded-xl border border-ink-4/10 bg-ink-2/20 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none focus:border-accent/50"
+          className="w-24 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
         />
         <button
           onClick={submitContribution} disabled={!addDesc.trim() || !addAmt}
-          className="rounded-xl bg-ok/20 px-3 py-2 text-sm font-medium text-ok hover:bg-ok/30 disabled:opacity-30"
+          className="rounded-card bg-ok/20 px-3 py-2 text-body font-medium text-ok hover:bg-ok/30 disabled:opacity-30"
         >
           +
         </button>
       </div>
 
       {sorted.length > 0 && (
-        <div className="border-t border-ink-4/10 pt-4">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-ink-3">Aportaciones</p>
+        <div className="border-t border-border pt-4">
+          <p className="mb-2 text-label font-semibold uppercase tracking-widest text-fg-muted">Aportaciones</p>
           <div className="max-h-44 space-y-1.5 overflow-y-auto">
             {sorted.map(m => (
-              <div key={m.id} className="flex items-center justify-between text-xs">
-                <span className="text-ink-3">{m.date}</span>
-                <span className="flex-1 truncate px-3 text-ink-4">{m.description}</span>
+              <div key={m.id} className="flex items-center justify-between text-secondary">
+                <span className="text-fg-muted">{m.date}</span>
+                <span className="flex-1 truncate px-3 text-fg">{m.description}</span>
                 <span className="font-medium tabular-nums text-ok"><Mxn v={Number(m.amount)} /></span>
               </div>
             ))}
@@ -1015,7 +1015,7 @@ function CommitmentRow({
         )}
       </button>
 
-      <span className={`flex-1 truncate text-sm ${c.active ? 'text-ink-4' : 'text-ink-3/50 line-through'}`}>
+      <span className={`flex-1 truncate text-body ${c.active ? 'text-fg' : 'text-fg-muted/50 line-through'}`}>
         {c.name}
       </span>
 
@@ -1029,9 +1029,9 @@ function CommitmentRow({
           onKeyDown={e => e.key === 'Enter' && saveMeses()}
           placeholder="∞"
           title="Meses"
-          className="w-10 rounded border border-transparent bg-transparent px-1 py-0.5 text-center text-xs text-ink-3 outline-none hover:border-ink-4/10 focus:border-accent/50 focus:bg-ink-2/20"
+          className="w-10 rounded border border-transparent bg-transparent px-1 py-0.5 text-center text-secondary text-fg-muted outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
         />
-        <span className="text-[10px] text-ink-2">ms</span>
+        <span className="text-label text-fg-faint">ms</span>
       </div>
 
       <input
@@ -1039,16 +1039,16 @@ function CommitmentRow({
         onChange={e => setAmt(e.target.value)}
         onBlur={saveAmt}
         onKeyDown={e => e.key === 'Enter' && saveAmt()}
-        className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-sm text-ink-4 outline-none hover:border-ink-4/10 focus:border-accent/50 focus:bg-ink-2/20"
+        className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-body text-fg outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
       />
 
       {c.meses && c.meses > 1 && (
-        <span className="shrink-0 text-[10px] text-ink-3 tabular-nums"><Mxn v={monthly} />/mes</span>
+        <span className="shrink-0 text-label text-fg-muted tabular-nums"><Mxn v={monthly} />/mes</span>
       )}
 
       <button
         onClick={() => onDelete(c.id)}
-        className="hidden shrink-0 text-base leading-none text-ink-3/40 hover:text-danger group-hover:block"
+        className="hidden shrink-0 text-md leading-none text-fg-muted/40 hover:text-danger group-hover:block"
       >
         ×
       </button>
@@ -1090,24 +1090,24 @@ function CompromisoTab({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
         <div className="grid grid-cols-3 divide-x divide-ink-4/10 text-center">
           {[
             { label: 'Total mensual', value: <Mxn v={totalMensual} />, cls: 'text-danger' },
-            { label: 'Activos',       value: String(active.length),  cls: 'text-ink-4' },
+            { label: 'Activos',       value: String(active.length),  cls: 'text-fg' },
             { label: 'Anual',         value: <Mxn v={totalAnual} />, cls: 'text-warn'   },
           ].map(({ label, value, cls }) => (
             <div key={label} className="px-4 py-1">
-              <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
-              <p className={`mt-0.5 text-xl font-black tabular-nums ${cls}`}>{value}</p>
+              <p className="text-label uppercase tracking-wider text-fg-muted">{label}</p>
+              <p className={`mt-0.5 text-subhead font-black tabular-nums ${cls}`}>{value}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
+      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
         {commitments.length === 0 ? (
-          <p className="p-10 text-center text-sm italic text-ink-3">Sin compromisos</p>
+          <p className="p-10 text-center text-body italic text-fg-muted">Sin compromisos</p>
         ) : (
           [...commitments]
             .sort((a, b) => Number(b.active) - Number(a.active) || a.sort_order - b.sort_order)
@@ -1121,28 +1121,28 @@ function CompromisoTab({
         <input
           value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
           placeholder="Netflix, Spotify, renta…"
-          className="min-w-0 flex-1 rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
+          className="min-w-0 flex-1 rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
         />
         <input
           type="number" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
           placeholder="Total $"
-          className="w-24 rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
+          className="w-24 rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
         />
         <input
           type="number" value={meses} onChange={e => setMeses(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
           placeholder="Meses"
-          className="w-20 rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
+          className="w-20 rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
         />
         <select
           value={metodo} onChange={e => setMetodo(e.target.value)}
-          className="rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2 text-sm text-ink-4 outline-none backdrop-blur-xl"
+          className="rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg outline-none backdrop-blur-xl"
         >
           <option value="efectivo">💵 Efectivo</option>
           <option value="tarjeta">💳 Tarjeta</option>
         </select>
         <button
           onClick={submit} disabled={!name.trim() || !amount}
-          className="rounded-xl bg-accent/20 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
+          className="rounded-card bg-accent/20 px-4 py-2 text-body font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
         >
           Agregar
         </button>
@@ -1195,33 +1195,33 @@ function CuadrarTab({
 
   return (
     <div className="max-w-sm">
-      <div className="space-y-4 rounded-2xl border border-ink-4/10 bg-ink-1/85 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+      <div className="space-y-4 rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
         {fields.map(({ label, value, set }) => (
           <div key={label}>
-            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-3">
+            <label className="mb-1.5 block text-label font-semibold uppercase tracking-widest text-fg-muted">
               {label}
             </label>
             <input
               type="number" value={value} onChange={e => set(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()}
               placeholder="0"
-              className="w-full rounded-xl border border-ink-4/10 bg-ink-2/20 px-4 py-3 text-right text-xl font-bold text-ink-4 outline-none focus:border-accent/50"
+              className="w-full rounded-card border border-border bg-surface-2 px-4 py-3 text-right text-subhead font-bold text-fg outline-none focus:border-accent/50"
             />
           </div>
         ))}
 
-        <div className="border-t border-ink-4/10 pt-4">
+        <div className="border-t border-border pt-4">
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-xs text-ink-3">Total</p>
-            <p className="text-2xl font-black tabular-nums text-ink-4"><Mxn v={total} /></p>
+            <p className="text-secondary text-fg-muted">Total</p>
+            <p className="text-heading font-black tabular-nums text-fg"><Mxn v={total} /></p>
           </div>
           <button
             onClick={save} disabled={saving}
-            className="w-full rounded-xl bg-accent/20 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent/30 disabled:opacity-50"
+            className="w-full rounded-card bg-accent/20 py-3 text-body font-semibold text-accent transition-colors hover:bg-accent/30 disabled:opacity-50"
           >
             {saving ? 'Guardando…' : 'Guardar saldos'}
           </button>
           {balance?.updated_at && (
-            <p className="mt-3 text-center text-[10px] text-ink-3">
+            <p className="mt-3 text-center text-label text-fg-muted">
               Actualizado{' '}
               {new Date(balance.updated_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
             </p>
@@ -1253,7 +1253,7 @@ function IncomeConfigRow({
   }
 
   return (
-    <div className="group flex items-center gap-3 border-b border-ink-4/5 px-3 py-2.5 last:border-0">
+    <div className="group flex items-center gap-3 border-b border-border px-3 py-2.5 last:border-0">
       <button
         onClick={() => void onUpdate(item.id, { active: !item.active })}
         className={[
@@ -1267,7 +1267,7 @@ function IncomeConfigRow({
           </svg>
         )}
       </button>
-      <span className={`flex-1 truncate text-xs ${item.active ? 'text-ink-4' : 'text-ink-3/50 line-through'}`}>
+      <span className={`flex-1 truncate text-secondary ${item.active ? 'text-fg' : 'text-fg-muted/50 line-through'}`}>
         {item.nombre}
       </span>
       <MethodBadge metodo={item.metodo} />
@@ -1276,11 +1276,11 @@ function IncomeConfigRow({
         onChange={e => setAmt(e.target.value)}
         onBlur={saveAmt}
         onKeyDown={e => e.key === 'Enter' && saveAmt()}
-        className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-xs text-ink-4 outline-none hover:border-ink-4/10 focus:border-accent/50 focus:bg-ink-2/20"
+        className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-secondary text-fg outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
       />
       <button
         onClick={() => void onDelete(item.id)}
-        className="hidden shrink-0 text-base leading-none text-ink-3/40 hover:text-danger group-hover:block"
+        className="hidden shrink-0 text-md leading-none text-fg-muted/40 hover:text-danger group-hover:block"
       >
         ×
       </button>
@@ -1314,10 +1314,10 @@ function ConfigTab({
   return (
     <div className="max-w-lg space-y-4">
       {/* Income items */}
-      <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <div className="border-b border-ink-4/5 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">Ingresos Recurrentes</p>
-          <p className="mt-0.5 text-[10px] text-ink-3">Los activos aparecen en el Panel cada mes</p>
+      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+        <div className="border-b border-border px-4 py-3">
+          <p className="text-secondary font-semibold uppercase tracking-wider text-fg-muted">Ingresos Recurrentes</p>
+          <p className="mt-0.5 text-label text-fg-muted">Los activos aparecen en el Panel cada mes</p>
         </div>
         {incomeItems.map(item => (
           <IncomeConfigRow
@@ -1328,31 +1328,31 @@ function ConfigTab({
           />
         ))}
         {incomeItems.length === 0 && (
-          <p className="px-4 py-4 text-center text-xs italic text-ink-3">Sin ingresos configurados</p>
+          <p className="px-4 py-4 text-center text-secondary italic text-fg-muted">Sin ingresos configurados</p>
         )}
-        <div className="flex gap-2 border-t border-ink-4/5 px-3 py-3">
+        <div className="flex gap-2 border-t border-border px-3 py-3">
           <input
             value={nombre} onChange={e => setNombre(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && void submit()}
             placeholder="Nombre del ingreso"
-            className="min-w-0 flex-1 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2.5 py-1.5 text-xs text-ink-4 placeholder-ink-3/40 outline-none focus:border-accent/50"
+            className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
           />
           <input
             type="number" value={monto} onChange={e => setMonto(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && void submit()}
             placeholder="$"
-            className="w-20 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2.5 py-1.5 text-xs text-ink-4 placeholder-ink-3/40 outline-none focus:border-accent/50"
+            className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
           />
           <select
             value={metodo} onChange={e => setMetodo(e.target.value)}
-            className="rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1.5 text-xs text-ink-4 outline-none"
+            className="rounded-control border border-border bg-surface-2 px-2 py-1.5 text-secondary text-fg outline-none"
           >
             <option value="efectivo">💵 Efectivo</option>
             <option value="tarjeta">💳 Tarjeta</option>
           </select>
           <button
             onClick={() => void submit()} disabled={!nombre.trim() || !monto}
-            className="rounded-lg bg-ok/20 px-2.5 py-1.5 text-xs font-medium text-ok hover:bg-ok/30 disabled:opacity-30"
+            className="rounded-control bg-ok/20 px-2.5 py-1.5 text-secondary font-medium text-ok hover:bg-ok/30 disabled:opacity-30"
           >
             +
           </button>
@@ -1360,13 +1360,13 @@ function ConfigTab({
       </div>
 
       {/* Info */}
-      <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl space-y-2 dashboard-card">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-ink-3">Tablas Supabase</p>
-        <div className="space-y-1 text-xs text-ink-3">
-          <p>• Gastos recurrentes → <code className="rounded bg-ink-2/30 px-1">finance_commitments</code> (Compromisos)</p>
-          <p>• Vacaciones → <code className="rounded bg-ink-2/30 px-1">finance_envelopes</code> (tab Vacaciones)</p>
-          <p>• Historial → <code className="rounded bg-ink-2/30 px-1">finance_movements</code></p>
-          <p>• Estado Panel → <code className="rounded bg-ink-2/30 px-1">finance_monthly_state</code> (por mes)</p>
+      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl space-y-2 dashboard-card">
+        <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Tablas Supabase</p>
+        <div className="space-y-1 text-secondary text-fg-muted">
+          <p>• Gastos recurrentes → <code className="rounded bg-surface-2 px-1">finance_commitments</code> (Compromisos)</p>
+          <p>• Vacaciones → <code className="rounded bg-surface-2 px-1">finance_envelopes</code> (tab Vacaciones)</p>
+          <p>• Historial → <code className="rounded bg-surface-2 px-1">finance_movements</code></p>
+          <p>• Estado Panel → <code className="rounded bg-surface-2 px-1">finance_monthly_state</code> (por mes)</p>
         </div>
       </div>
     </div>
@@ -1711,24 +1711,24 @@ export default function FinancePage() {
         {/* Header */}
         <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-4">Finanzas Alex</h1>
-            <p className="text-xs text-ink-3">León, Guanajuato · MXN</p>
+            <h1 className="text-heading font-bold tracking-tight text-fg">Finanzas Alex</h1>
+            <p className="text-secondary text-fg-muted">León, Guanajuato · MXN</p>
           </div>
 
           {showMonthNav && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setMonth(m => shiftMonth(m, -1))}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/85 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+                className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
               >
                 ‹
               </button>
-              <span className="min-w-[148px] text-center text-sm font-semibold capitalize text-ink-4">
+              <span className="min-w-[148px] text-center text-body font-semibold capitalize text-fg">
                 {monthLabel(month)}
               </span>
               <button
                 onClick={() => setMonth(m => shiftMonth(m, 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-1/85 text-ink-3 backdrop-blur-xl hover:text-ink-4"
+                className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
               >
                 ›
               </button>
@@ -1737,14 +1737,14 @@ export default function FinancePage() {
         </div>
 
         {/* Tab bar */}
-        <div className="mb-6 flex w-fit shrink-0 gap-1 rounded-xl border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
+        <div className="mb-6 flex w-fit shrink-0 gap-1 rounded-card border border-border bg-surface-1 p-1 backdrop-blur-xl">
           {TABS.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={[
-                'rounded-lg px-4 py-1.5 text-sm transition-colors',
-                tab === t ? 'bg-ink-4/10 font-medium text-ink-4' : 'text-ink-3 hover:text-ink-4',
+                'rounded-control px-4 py-1.5 text-body transition-colors',
+                tab === t ? 'bg-ink-4/10 font-medium text-fg' : 'text-fg-muted hover:text-fg',
               ].join(' ')}
             >
               {t}
@@ -1756,10 +1756,10 @@ export default function FinancePage() {
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <p className="animate-pulse text-sm text-ink-3">Cargando…</p>
+            <p className="animate-pulse text-body text-fg-muted">Cargando…</p>
           </div>
         ) : error ? (
-          <div className="flex items-center gap-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <div className="flex items-center gap-4 rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">
             {error}
             <button onClick={() => { setError(null); void loadMovements(month) }} className="underline">
               Reintentar
