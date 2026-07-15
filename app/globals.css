@@ -223,14 +223,18 @@ input::placeholder, textarea::placeholder {
 
   /* Color roles → bg-surface-1 / text-fg / border-border … — alpha is baked in
      via color-mix, so the opacity slashes disappear at migration. Use WITHOUT a
-     slash (e.g. `border-border`, not `border-border/50`). */
-  --color-surface-1:     color-mix(in oklch, var(--color-ink-1) 85%, transparent);  /* card fill     (was bg-ink-1/85)   */
-  --color-surface-2:     color-mix(in oklch, var(--color-ink-2) 30%, transparent);  /* track/raised  (was bg-ink-2/30)   */
-  --color-surface-hover: color-mix(in oklch, var(--color-ink-4) 6%,  transparent);  /* hover fill    (was bg-ink-4/[.06])*/
+     slash (e.g. `border-border`, not `border-border/50`). Exception: --color-surface-base
+     is SOLID (the base bg is used opaque AND as a scrim), so it keeps its /alpha. */
+  --color-surface-base:   var(--color-ink-0);                                        /* app base bg   (was bg-ink-0*, solid; /alpha ok for scrims) */
+  --color-surface-1:      color-mix(in oklch, var(--color-ink-1) 85%, transparent);  /* card fill     (was bg-ink-1/85)   */
+  --color-surface-2:      color-mix(in oklch, var(--color-ink-2) 30%, transparent);  /* track/raised  (was bg-ink-2/30)   */
+  --color-surface-hover:  color-mix(in oklch, var(--color-ink-4) 6%,  transparent);  /* hover fill    (was bg-ink-4/[.06])*/
+  --color-surface-active: color-mix(in oklch, var(--color-ink-4) 10%, transparent);  /* active/selected fill (was static bg-ink-4/5–10) */
   --color-fg:            var(--color-ink-4);   /* primary text   (was text-ink-4) */
   --color-fg-muted:      var(--color-ink-3);   /* secondary text (was text-ink-3) */
   --color-fg-faint:      var(--color-ink-2);   /* faint text     (was text-ink-2) */
-  --color-border:        color-mix(in oklch, var(--color-ink-4) 12%, transparent); /* hairline (was border-ink-4/10) */
+  --color-border:        color-mix(in oklch, var(--color-ink-4) 12%, transparent); /* hairline (was border-ink-4/5–15) */
+  --color-border-strong: color-mix(in oklch, var(--color-ink-4) 30%, transparent); /* emphasis border/ring (was border-ink-4/20–60, border-ink-3/40) */
 }
 
 :root {
