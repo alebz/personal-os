@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Mxn from '@/components/Mxn'
 
 export type FundMovement = {
@@ -25,6 +26,10 @@ export function FundLedger({ movements, target }: {
   movements: FundMovement[]
   target?: number | null
 }) {
+  const [sortDesc, setSortDesc] = useState(false)   // default asc (oldest first, like a paper cuaderno)
+
+  // Running balance is ALWAYS computed chronologically (oldest → newest), so every movement keeps the
+  // balance it had that day. Sorting only flips how the rows are DISPLAYED — never how the balance adds up.
   let running = 0
   const chron = [...movements].sort((a, b) => a.date.localeCompare(b.date))   // oldest first
   const rows = chron.map((m) => {
@@ -33,6 +38,7 @@ export function FundLedger({ movements, target }: {
     return { ...m, isEntrada, running }
   })
   const saved = running
+  const displayRows = sortDesc ? [...rows].reverse() : rows   // reverse the VIEW only; each row keeps its running balance
   const pct = target ? Math.min(Math.max((saved / target) * 100, 0), 100) : null
 
   const cols = 'grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3'
@@ -56,13 +62,19 @@ export function FundLedger({ movements, target }: {
       ) : (
         <div className="overflow-hidden rounded-card border border-border">
           <div className={`${cols} border-b border-border bg-surface-2 px-3 py-1.5 text-label font-bold uppercase tracking-widest text-fg-muted`}>
-            <span>Fecha</span>
+            <button
+              onClick={() => setSortDesc(d => !d)}
+              className="flex items-center gap-1 text-label font-bold uppercase tracking-widest text-fg-muted transition-colors hover:text-fg"
+              title={sortDesc ? 'Más reciente arriba — click para invertir' : 'Más antiguo arriba — click para invertir'}
+            >
+              Fecha <span aria-hidden className="text-fg-muted/60">{sortDesc ? '↓' : '↑'}</span>
+            </button>
             <span>Concepto</span>
             <span className="text-right">Entrada</span>
             <span className="text-right">Salida</span>
             <span className="text-right">Saldo</span>
           </div>
-          {rows.map((r) => (
+          {displayRows.map((r) => (
             <div key={r.id} className={`${cols} border-b border-border px-3 py-1.5 text-secondary last:border-0`}>
               <span className="tabular-nums text-fg-muted">{fmtDate(r.date)}</span>
               <span className="truncate text-fg">{r.description}</span>
