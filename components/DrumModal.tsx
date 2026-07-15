@@ -45,12 +45,12 @@ export default function DrumModal({
         aria-modal="true"
         aria-label={ariaLabel}
         onClick={e => e.stopPropagation()}   // clicks inside never close
-        className="relative mt-[4vh] w-[min(92vw,46rem)] max-h-[88vh] overflow-y-auto rounded-2xl border border-ink-4/10 bg-ink-0/95 p-6 pr-8 shadow-2xl shadow-black/60 backdrop-blur-xl dashboard-card"
+        className="relative mt-[4vh] w-[min(92vw,46rem)] max-h-[88vh] overflow-y-auto rounded-card border border-border bg-surface-base/95 p-6 pr-8 shadow-2xl shadow-black/60 backdrop-blur-xl dashboard-card"
       >
         <button
           onClick={onClose}
           aria-label="Cerrar"
-          className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/[0.08] hover:text-ink-4"
+          className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
         >
           <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
             <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
