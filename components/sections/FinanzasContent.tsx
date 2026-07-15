@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Mxn from '@/components/Mxn'
+import { MethodCell } from '@/components/finance/MethodCell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,12 +167,15 @@ function normMethod(m: string | null | undefined): 'efectivo' | 'tarjeta' {
   return m === 'efectivo' ? 'efectivo' : 'tarjeta'
 }
 
-export function MethodBadge({ metodo }: { metodo: string }) {
+export function MethodBadge({ metodo }: { metodo?: string | null }) {
+  if (!metodo) return <MethodCell />   // reserve the aligned slot even when a row has no method
   const m = normMethod(metodo)
   return (
-    <span className="shrink-0 text-body leading-none" title={METHOD_META[m].label}>
-      {METHOD_META[m].emoji}
-    </span>
+    <MethodCell>
+      <span className="text-body leading-none" title={METHOD_META[m].label}>
+        {METHOD_META[m].emoji}
+      </span>
+    </MethodCell>
   )
 }
 
@@ -271,7 +275,7 @@ function IncomeRow({
       ) : (
         <>
           <MethodBadge metodo={item.metodo} />
-          <span className="shrink-0 text-secondary tabular-nums text-fg-muted"><Mxn v={item.monto} /></span>
+          <span className="w-24 shrink-0 text-right text-secondary tabular-nums text-fg-muted"><Mxn v={item.monto} /></span>
         </>
       )}
     </div>
@@ -300,7 +304,7 @@ function GastoRow({
         {commitment.name}
       </span>
       <MethodBadge metodo={commitment.metodo ?? 'cargo'} />
-      <span className="shrink-0 text-secondary tabular-nums text-fg-muted"><Mxn v={commitment.amount} /></span>
+      <span className="w-24 shrink-0 text-right text-secondary tabular-nums text-fg-muted"><Mxn v={commitment.amount} /></span>
     </div>
   )
 }
@@ -319,8 +323,8 @@ function ExtraRow({
   return (
     <div className="group flex items-center gap-2 border-b border-border px-3 py-2.5 last:border-0">
       <span className="min-w-0 flex-1 truncate text-secondary text-fg">{mv.description}</span>
-      {mv.metodo && <MethodBadge metodo={mv.metodo} />}
-      <span className={`shrink-0 text-secondary font-medium tabular-nums ${isIncome ? 'text-ok' : 'text-danger'}`}>
+      <MethodBadge metodo={mv.metodo} />
+      <span className={`w-24 shrink-0 text-right text-secondary font-medium tabular-nums ${isIncome ? 'text-ok' : 'text-danger'}`}>
         {isIncome ? '+' : '−'}<Mxn v={Number(mv.amount)} />
       </span>
       <button

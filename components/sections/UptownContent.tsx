@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
+import { MethodCell } from '@/components/finance/MethodCell'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -233,13 +234,15 @@ function SectionCard({ title, note, total, colorClass = 'text-fg-muted', childre
 
 function MethodToggle({ method, onChange }: { method: 'cash' | 'card'; onChange: (m: 'cash' | 'card') => void }) {
   return (
-    <button
-      onClick={() => onChange(method === 'cash' ? 'card' : 'cash')}
-      className="text-md leading-none opacity-60 hover:opacity-100 transition-opacity"
-      title={method === 'cash' ? 'Efectivo — click para cambiar a tarjeta' : 'Tarjeta — click para cambiar a efectivo'}
-    >
-      {method === 'cash' ? '💵' : '💳'}
-    </button>
+    <MethodCell>
+      <button
+        onClick={() => onChange(method === 'cash' ? 'card' : 'cash')}
+        className="text-md leading-none opacity-60 hover:opacity-100 transition-opacity"
+        title={method === 'cash' ? 'Efectivo — click para cambiar a tarjeta' : 'Tarjeta — click para cambiar a efectivo'}
+      >
+        {method === 'cash' ? '💵' : '💳'}
+      </button>
+    </MethodCell>
   )
 }
 
