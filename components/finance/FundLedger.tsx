@@ -8,6 +8,7 @@ export type FundMovement = {
   description: string
   amount: number
   flow: 'in' | 'out'     // 'out' = aportación (money INTO the fund), 'in' = retiro (money OUT)
+  source_key?: string | null   // toggle-managed movements carry one (e.g. 'uptown_fondo:2026-07'); manual ones don't
 }
 
 function fmtDate(iso: string): string {

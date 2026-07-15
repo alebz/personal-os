@@ -24,7 +24,8 @@ const EXPENSE_DEFS: { id: string; name: string; note: string | null; startMonth:
   { id: 'martha',     name: 'Martha limpieza', note: null,        startMonth: null,       defaultAmount: 2_000 },
   { id: 'garrafones', name: 'Garrafones',      note: null,        startMonth: null      },
   { id: 'predial',    name: 'Predial',         note: null,        startMonth: '2026-07' },
-  { id: 'fondo',      name: 'Fondo mto.',      note: 'meta $50k', startMonth: null,      defaultAmount: 4_000 },
+  // 'fondo' is NOT a fixed expense — aportar to your own fund is a transfer, not a gasto. It lives in
+  // the Fondo Mantenimiento card + the fund ledger (finance_movements), out of Egresos.
 ]
 
 const FONDO_META = 50_000
@@ -589,20 +590,23 @@ function NominaSection({ nomina, month, onToggle, onAmount, onMethod }: {
 
 // ─── PrevistoCard ─────────────────────────────────────────────────────────────
 
-function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
+function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses, fondoAportado }: {
   rents: RentRow[]; expenses: ExpenseRow[]; nomina: NominaRow[]
   extraIncome: ExtraItem[]; extraExpenses: ExtraItem[]
+  fondoAportado: number
 }) {
   const totalRentas   = rents.reduce((s, r) => s + r.amount, 0)
   const totalExtraInc = extraIncome.reduce((s, i) => s + i.amount, 0)
   const totalIngresos = totalRentas + totalExtraInc
 
-  const totalFijos    = expenses.reduce((s, e) => s + e.amount, 0)
+  const totalFijos    = expenses.reduce((s, e) => s + e.amount, 0)   // 'fondo' is no longer here — it's a transfer, not a gasto
   const totalNomina   = nomina.reduce((s, n) => s + n.amount, 0)
   const totalExtraExp = extraExpenses.reduce((s, i) => s + i.amount, 0)
   const totalEgresos  = totalFijos + totalNomina + totalExtraExp
 
-  const previsto = totalIngresos - totalEgresos
+  // Egresos are real expenses; the fund contribution is money set aside (a transfer) — not an egreso,
+  // but it still leaves the available cash, so it's subtracted from the projected end-of-month balance.
+  const previsto = totalIngresos - totalEgresos - fondoAportado
 
   return (
     <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
@@ -613,9 +617,12 @@ function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
         </div>
         <p className={`text-heading font-black tabular-nums ${previsto >= 0 ? 'text-fg' : 'text-danger'}`}><Mxn v={previsto} /></p>
       </div>
-      <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-secondary">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border pt-2 text-secondary">
         <span className="text-fg-muted">↑ Ingresos <span className="font-medium text-ok"><Mxn v={totalIngresos} /></span></span>
         <span className="text-fg-muted">↓ Egresos <span className="font-medium text-danger"><Mxn v={totalEgresos} /></span></span>
+        {fondoAportado > 0 && (
+          <span className="text-fg-muted">⊙ Apartado <span className="font-medium text-accent"><Mxn v={fondoAportado} /></span></span>
+        )}
       </div>
     </div>
   )
@@ -623,10 +630,11 @@ function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses }: {
 
 // ─── SaldoActualCard ──────────────────────────────────────────────────────────
 
-function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses, onSave }: {
+function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses, fondoAportado, onSave }: {
   bal: BalanceState
   rents: RentRow[]; expenses: ExpenseRow[]; nomina: NominaRow[]
   extraIncome: ExtraItem[]; extraExpenses: ExtraItem[]
+  fondoAportado: number
   onSave: (starting_balance: number) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -647,7 +655,8 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
   const pagado      = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
                     + nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
                     + extraExpenses.reduce((s, i) => s + i.amount, 0)
-  const saldoActual = (bal.starting_balance || 0) + cobrado - pagado
+  // Fund contribution isn't an egreso, but it left the available cash (a transfer) — subtract it too.
+  const saldoActual = (bal.starting_balance || 0) + cobrado - pagado - fondoAportado
 
   return (
     <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
@@ -680,6 +689,9 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
         </span>
         <span className="text-fg-muted">+ Cob. <span className="font-medium text-ok"><Mxn v={cobrado} /></span></span>
         <span className="text-fg-muted">− Pag. <span className="font-medium text-danger"><Mxn v={pagado} /></span></span>
+        {fondoAportado > 0 && (
+          <span className="text-fg-muted">− Apartado <span className="font-medium text-accent"><Mxn v={fondoAportado} /></span></span>
+        )}
       </div>
     </div>
   )
@@ -687,14 +699,29 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
 
 // ─── FondoCard ────────────────────────────────────────────────────────────────
 
-function FondoCard({ fondoTotal, currentMonthFondo, movements }: {
-  fondoTotal: number
-  currentMonthFondo: ExpenseRow | undefined
+function FondoCard({ saved, aportadoAmount, movements, onAportar, onQuitar }: {
+  saved: number
+  aportadoAmount: number | null            // null = sin aportar este mes; número = ya aportado
   movements: FundMovement[]
+  onAportar: (amount: number) => Promise<void>
+  onQuitar: () => Promise<void>
 }) {
-  const pct = Math.min((fondoTotal / FONDO_META) * 100, 100)
-  const faltan = Math.max(0, FONDO_META - fondoTotal)
+  const pct = Math.min((saved / FONDO_META) * 100, 100)
+  const faltan = Math.max(0, FONDO_META - saved)
   const [showLedger, setShowLedger] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [amtDraft, setAmtDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    const n = parseFloat(amtDraft)
+    if (!n || n <= 0) return
+    setBusy(true)
+    try { await onAportar(n); setEditing(false); setAmtDraft('') } finally { setBusy(false) }
+  }
+
+  const inputCls = 'w-24 rounded border border-border bg-surface-2 px-2 py-0.5 text-right tabular-nums text-fg outline-none focus:border-accent/50'
+  const okBtn    = 'rounded bg-ok/20 px-2 py-0.5 text-label font-medium text-ok hover:bg-ok/30 disabled:opacity-30'
 
   return (
     <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
@@ -704,7 +731,7 @@ function FondoCard({ fondoTotal, currentMonthFondo, movements }: {
           <p className="text-label text-fg-muted">Meta: <Mxn v={FONDO_META} /></p>
         </div>
         <div className="text-right">
-          <p className="text-subhead font-black text-ok"><Mxn v={fondoTotal} /></p>
+          <p className="text-subhead font-black text-ok"><Mxn v={saved} /></p>
           <p className="text-label text-fg-muted">{pct.toFixed(1)}% · Faltan <Mxn v={faltan} /></p>
         </div>
       </div>
@@ -713,15 +740,29 @@ function FondoCard({ fondoTotal, currentMonthFondo, movements }: {
         <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
 
-      {currentMonthFondo && (
-        <p className={`text-secondary ${currentMonthFondo.paid ? 'text-ok' : 'text-fg-muted'}`}>
-          {currentMonthFondo.paid
-            ? `✓ Aportación este mes: ${mxn(currentMonthFondo.amount)}`
-            : currentMonthFondo.amount > 0
-              ? `Pendiente: ${mxn(currentMonthFondo.amount)}`
-              : 'Sin aportación configurada este mes'}
-        </p>
-      )}
+      <div className="text-secondary">
+        {aportadoAmount == null ? (
+          <div className="flex items-center gap-2">
+            <span className="text-fg-muted">Sin aportar este mes</span>
+            <input type="number" value={amtDraft} onChange={e => setAmtDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') void submit() }} placeholder="$" className={inputCls} />
+            <button onClick={() => void submit()} disabled={busy || !amtDraft} className={okBtn}>Aportar</button>
+          </div>
+        ) : editing ? (
+          <div className="flex items-center gap-2">
+            <input type="number" value={amtDraft} autoFocus onChange={e => setAmtDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') void submit(); if (e.key === 'Escape') { setEditing(false); setAmtDraft('') } }} className={inputCls} />
+            <button onClick={() => void submit()} disabled={busy || !amtDraft} className={okBtn}>Guardar</button>
+            <button onClick={() => { setEditing(false); setAmtDraft('') }} className="text-label text-fg-muted hover:text-fg">✕</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-ok">✓ Aportado este mes: {mxn(aportadoAmount)}</span>
+            <button onClick={() => { setEditing(true); setAmtDraft(String(aportadoAmount)) }} className="text-label text-fg-muted hover:text-fg">editar</button>
+            <button onClick={() => void onQuitar()} className="text-label text-fg-muted hover:text-danger">quitar</button>
+          </div>
+        )}
+      </div>
 
       {movements.length > 0 && (
         <div className="mt-2 border-t border-border pt-2">
@@ -1149,8 +1190,7 @@ export default function UptownContent() {
   const [extraIncome, setExtraIncome] = useState<ExtraItem[]>([])
   const [extraExpenses, setExtraExp]  = useState<ExtraItem[]>([])
   const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
-  const [fondoTotal, setFondoTotal]   = useState(0)
-  const [fondoMovements, setFondoMovements] = useState<FundMovement[]>([])   // Mantenimiento fund ledger
+  const [fondoMovements, setFondoMovements] = useState<FundMovement[]>([])   // Mantenimiento fund ledger (source of truth)
   const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
@@ -1166,7 +1206,6 @@ export default function UptownContent() {
       setNomina(mergeNomina(data.nomina, m))
       setExtraIncome(data.extra_income)
       setExtraExp(data.extra_expenses)
-      setFondoTotal(data.fondo_total)
       setPaidCounts(data.paid_counts ?? {})
       // Mantenimiento fund ledger (all-time; lives in finance_envelopes, so a separate fetch)
       try {
@@ -1216,48 +1255,36 @@ export default function UptownContent() {
 
   // ── Expense handlers ──────────────────────────────────────────────────────
 
-  // Keep the Mantenimiento fund total + ledger fresh (single source = the fund movements).
+  // Refresh the Mantenimiento fund ledger (single source of truth = the fund movements).
   async function refreshFondo() {
     try {
-      const [u, f] = await Promise.all([
-        fetch(`/api/uptown?month=${month}`).then(r => r.json()),
-        fetch('/api/finance/funds').then(r => r.json()),
-      ])
-      if (!u.error) setFondoTotal(u.fondo_total)
+      const f = await fetch('/api/finance/funds').then(r => r.json())
       const mto = Array.isArray(f) ? f.find((x: { key?: string }) => x.key === 'mantenimiento') : null
       setFondoMovements(mto?.movements ?? [])
     } catch { /* keep prior */ }
+  }
+
+  // Monthly fund contribution — now driven from the Fondo card, not a fixed expense. Same reversible
+  // mechanism: upsert (aportar/editar) or delete (quitar) keyed by source_key='uptown_fondo:<month>'.
+  async function aportarFondo(amount: number) {
+    await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key: `uptown_fondo:${month}` })
+    await refreshFondo()
+  }
+  async function quitarFondo() {
+    await fetch(`/api/finance/funds/movement?source_key=${encodeURIComponent('uptown_fondo:' + month)}`, { method: 'DELETE' })
+    await refreshFondo()
   }
 
   async function toggleExpense(category: string, paid: boolean) {
     setExpenses(prev => prev.map(e => e.category === category ? { ...e, paid } : e))
     const row = expenses.find(e => e.category === category)
     await post('/api/uptown/expense', { month, category, paid, amount: row?.amount ?? 0 })
-    // Marking/unmarking "Fondo mto." writes to the Mantenimiento fund ledger — upsert on paid, delete
-    // on unpaid, keyed by source_key so it's reversible with no phantom entry.
-    if (category === 'fondo') {
-      const amount = row?.amount ?? 0
-      const source_key = `uptown_fondo:${month}`
-      if (paid && amount > 0) {
-        await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key })
-      } else {
-        await fetch(`/api/finance/funds/movement?source_key=${encodeURIComponent(source_key)}`, { method: 'DELETE' })
-      }
-      await refreshFondo()
-    }
   }
 
   async function setExpenseAmount(category: string, amount: number) {
     setExpenses(prev => prev.map(e => e.category === category ? { ...e, amount } : e))
     const row = expenses.find(e => e.category === category)
     await post('/api/uptown/expense', { month, category, amount, paid: row?.paid ?? false })
-    if (category === 'fondo') {
-      // If it's already paid, re-upsert the aportación with the new amount (same source_key).
-      if (row?.paid && amount > 0) {
-        await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key: `uptown_fondo:${month}` })
-      }
-      await refreshFondo()
-    }
   }
 
   async function setExpenseMethod(category: string, method: 'cash' | 'card') {
@@ -1367,7 +1394,10 @@ export default function UptownContent() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const currentFondo = expenses.find(e => e.category === 'fondo')
+  // Fund saldo (flow-aware) + this month's contribution, both from the fund ledger (source of truth).
+  const fondoSaved = fondoMovements.reduce((s, m) => s + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount)), 0)
+  const fondoMovThisMonth = fondoMovements.find(m => m.source_key === `uptown_fondo:${month}`)
+  const fondoAportado = fondoMovThisMonth ? Number(fondoMovThisMonth.amount) : 0   // transfer set aside this month
 
   return (
     <main className="mx-auto flex h-full max-w-6xl flex-col px-6 pt-6">
@@ -1411,14 +1441,22 @@ export default function UptownContent() {
             <PrevistoCard
               rents={rents} expenses={expenses} nomina={nomina}
               extraIncome={extraIncome} extraExpenses={extraExpenses}
+              fondoAportado={fondoAportado}
             />
             <SaldoActualCard
               bal={balance}
               rents={rents} expenses={expenses} nomina={nomina}
               extraIncome={extraIncome} extraExpenses={extraExpenses}
+              fondoAportado={fondoAportado}
               onSave={saveStartingBalance}
             />
-            <FondoCard fondoTotal={fondoTotal} currentMonthFondo={currentFondo} movements={fondoMovements} />
+            <FondoCard
+              saved={fondoSaved}
+              aportadoAmount={fondoMovThisMonth ? fondoAportado : null}
+              movements={fondoMovements}
+              onAportar={aportarFondo}
+              onQuitar={quitarFondo}
+            />
           </div>
         )}
 
