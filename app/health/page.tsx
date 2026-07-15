@@ -135,18 +135,18 @@ export default function HealthPage() {
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-ink-4">❤️ Salud</h1>
-          <p className="mt-0.5 text-sm text-ink-3">Hábitos · Últimos 30 días</p>
+          <h1 className="text-subhead font-semibold text-fg">❤️ Salud</h1>
+          <p className="mt-0.5 text-body text-fg-muted">Hábitos · Últimos 30 días</p>
         </div>
 
         {loading && (
-          <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-8 text-center backdrop-blur-xl">
-            <p className="animate-pulse text-sm text-ink-3">Cargando hábitos…</p>
+          <div className="rounded-card border border-border bg-surface-1 p-8 text-center backdrop-blur-xl">
+            <p className="animate-pulse text-body text-fg-muted">Cargando hábitos…</p>
           </div>
         )}
 
         {!loading && error && (
-          <div className="rounded-2xl border border-danger/20 bg-danger/5 p-5 text-sm text-danger">
+          <div className="rounded-card border border-danger/20 bg-danger/5 p-5 text-body text-danger">
             ⚠ {error}
           </div>
         )}
@@ -159,23 +159,23 @@ export default function HealthPage() {
               {stats.map(h => (
                 <div
                   key={h.id}
-                  className="rounded-2xl border border-ink-4/10 bg-ink-1/85 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card"
+                  className="rounded-card border border-border bg-surface-1 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card"
                 >
-                  <p className="mb-2.5 truncate text-xs font-semibold text-ink-4">{h.label}</p>
+                  <p className="mb-2.5 truncate text-secondary font-semibold text-fg">{h.label}</p>
                   <div className="flex items-end justify-between gap-1">
                     <div>
-                      <p className="text-xl font-black tabular-nums text-ok leading-none">{h.streak}</p>
-                      <p className="mt-0.5 text-[9px] uppercase tracking-wide text-ink-3">racha</p>
+                      <p className="text-subhead font-black tabular-nums text-ok leading-none">{h.streak}</p>
+                      <p className="mt-0.5 text-label uppercase tracking-wide text-fg-muted">racha</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-base font-bold tabular-nums text-ink-3 leading-none">{h.best}</p>
-                      <p className="mt-0.5 text-[9px] uppercase tracking-wide text-ink-3">mejor</p>
+                      <p className="text-md font-bold tabular-nums text-fg-muted leading-none">{h.best}</p>
+                      <p className="mt-0.5 text-label uppercase tracking-wide text-fg-muted">mejor</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-xl font-black tabular-nums leading-none ${
+                      <p className={`text-subhead font-black tabular-nums leading-none ${
                         h.pct >= 70 ? 'text-ok' : h.pct >= 40 ? 'text-warn' : 'text-danger'
                       }`}>{h.pct}%</p>
-                      <p className="mt-0.5 text-[9px] uppercase tracking-wide text-ink-3">30d</p>
+                      <p className="mt-0.5 text-label uppercase tracking-wide text-fg-muted">30d</p>
                     </div>
                   </div>
                 </div>
@@ -183,7 +183,7 @@ export default function HealthPage() {
             </div>
 
             {/* Heatmap grid */}
-            <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+            <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
               <div className="overflow-x-auto">
                 <div className="min-w-[540px] p-5">
 
@@ -200,8 +200,8 @@ export default function HealthPage() {
                           }`}
                         >
                           {(i % 5 === 0 || d === today) && (
-                            <span className={`text-[8px] tabular-nums leading-none ${
-                              d === today ? 'font-bold text-accent' : 'text-ink-2/60'
+                            <span className={`text-label tabular-nums leading-none ${
+                              d === today ? 'font-bold text-accent' : 'text-fg-faint/60'
                             }`}>
                               {Number(dayLabels[i])}
                             </span>
@@ -215,7 +215,7 @@ export default function HealthPage() {
                   <div className="space-y-[5px]">
                     {stats.map(h => (
                       <div key={h.id} className="flex items-center">
-                        <span className="w-24 shrink-0 truncate pr-2 text-right text-[11px] text-ink-3">
+                        <span className="w-24 shrink-0 truncate pr-2 text-right text-secondary text-fg-muted">
                           {h.label}
                         </span>
                         <div className="flex items-center gap-[3px]">
@@ -233,15 +233,15 @@ export default function HealthPage() {
                                 : 'bg-ok'
                             } else {
                               cls = isToday
-                                ? 'bg-ink-2/20 ring-1 ring-accent/40'
-                                : 'bg-ink-2/20'
+                                ? 'bg-surface-2 ring-1 ring-accent/40'
+                                : 'bg-surface-2'
                             }
 
                             return (
                               <div
                                 key={d}
                                 title={`${d} · ${completed ? '✓' : '✗'}`}
-                                className={`h-3 w-3 shrink-0 rounded-[2px] transition-colors ${cls} ${
+                                className={`h-3 w-3 shrink-0 rounded-sharp transition-colors ${cls} ${
                                   monthBreaks.has(i) ? 'ml-1.5' : ''
                                 }`}
                               />
@@ -255,16 +255,16 @@ export default function HealthPage() {
                   {/* Legend */}
                   <div className="mt-4 flex items-center gap-5 pl-24">
                     <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded-[2px] bg-ok" />
-                      <span className="text-[10px] text-ink-3">Completado</span>
+                      <div className="h-3 w-3 rounded-sharp bg-ok" />
+                      <span className="text-label text-fg-muted">Completado</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded-[2px] bg-ink-2/20" />
-                      <span className="text-[10px] text-ink-3">Sin completar</span>
+                      <div className="h-3 w-3 rounded-sharp bg-surface-2" />
+                      <span className="text-label text-fg-muted">Sin completar</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded-[2px] bg-ink-2/20 ring-1 ring-accent/40" />
-                      <span className="text-[10px] text-ink-3">Hoy</span>
+                      <div className="h-3 w-3 rounded-sharp bg-surface-2 ring-1 ring-accent/40" />
+                      <span className="text-label text-fg-muted">Hoy</span>
                     </div>
                   </div>
 

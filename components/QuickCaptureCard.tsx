@@ -105,8 +105,8 @@ export default function QuickCaptureCard() {
   }
 
   return (
-    <div className="relative rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
-      <h2 className="mb-3 text-sm font-semibold tracking-wide text-ink-4">⚡ Captura rápida</h2>
+    <div className="relative rounded-card border border-border p-5 shadow-xl shadow-black/20 dashboard-card">
+      <h2 className="mb-3 text-body font-semibold tracking-wide text-fg">⚡ Captura rápida</h2>
 
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input
@@ -115,12 +115,12 @@ export default function QuickCaptureCard() {
           onChange={(e) => setValue(e.target.value)}
           placeholder="Tarea, nota, contacto…"
           disabled={submitting}
-          className="flex-1 rounded-xl border border-ink-4/10 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 placeholder:text-ink-2/60 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 disabled:opacity-40"
+          className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg placeholder:text-fg-faint/60 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 disabled:opacity-40"
         />
         <button
           type="submit"
           disabled={submitting || !value.trim()}
-          className="shrink-0 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-card border border-accent/20 bg-accent/10 px-3 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? '…' : '↵'}
         </button>
@@ -128,19 +128,19 @@ export default function QuickCaptureCard() {
 
       {/* Rich confirmation toast */}
       <div
-        className={`absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-lg border border-ink-4/10 bg-ink-1 px-3 py-2 shadow-lg transition-all duration-200 ${
+        className={`absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-control border border-border bg-surface-1 px-3 py-2 shadow-lg transition-all duration-200 ${
           toast ? 'pointer-events-none translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'
         }`}
       >
         {toast && (
-          <div className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+          <div className="flex items-center gap-1.5 whitespace-nowrap text-secondary">
             <span>{toast.icon}</span>
-            <span className="text-ink-4">{toast.summary}</span>
+            <span className="text-fg">{toast.summary}</span>
             {toast.detail && (
-              <span className="text-ink-3">· {toast.detail}</span>
+              <span className="text-fg-muted">· {toast.detail}</span>
             )}
             {toast.destination && (
-              <span className="text-ink-3/60">→ {toast.destination}</span>
+              <span className="text-fg-muted/60">→ {toast.destination}</span>
             )}
           </div>
         )}

@@ -50,7 +50,7 @@ function TaskRow({
           'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
           checking
             ? 'border-accent bg-accent'
-            : 'border-ink-3/40 bg-transparent hover:border-accent/60',
+            : 'border-border-strong bg-transparent hover:border-accent/60',
         ].join(' ')}
         aria-label="Mark complete"
       >
@@ -60,7 +60,7 @@ function TaskRow({
           </svg>
         )}
       </button>
-      <span className="text-sm text-ink-4 leading-snug">{task.title}</span>
+      <span className="text-body text-fg leading-snug">{task.title}</span>
     </li>
   )
 }
@@ -80,11 +80,11 @@ function Section({
 }) {
   return (
     <div>
-      <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-ink-3">
+      <p className="mb-2.5 text-label font-semibold uppercase tracking-widest text-fg-muted">
         {label}
       </p>
       {tasks.length === 0 ? (
-        <p className="text-xs text-ink-3/60 italic">{emptyText}</p>
+        <p className="text-secondary text-fg-muted/60 italic">{emptyText}</p>
       ) : (
         <ul className="space-y-2.5">
           {tasks.map((t) => (
@@ -124,13 +124,13 @@ export default function SessionCard() {
   const weekTasks    = tasks.filter((t) => t.urgency === 'this_week').sort(byPriority).slice(0, 5)
 
   return (
-    <section className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
+    <section className="rounded-card border border-border p-5 shadow-xl shadow-black/20 dashboard-card">
       {/* Card header */}
       <div className="mb-5 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-4">⚡ Resumen del Día</h2>
+        <h2 className="text-body font-semibold tracking-wide text-fg">⚡ Resumen del Día</h2>
         <Link
           href="/crm"
-          className="text-xs text-ink-3 transition-colors hover:text-accent"
+          className="text-secondary text-fg-muted transition-colors hover:text-accent"
         >
           Abrir CRM →
         </Link>
@@ -139,15 +139,15 @@ export default function SessionCard() {
       {loading ? (
         <div className="space-y-6 animate-pulse">
           <div>
-            <div className="mb-3 h-2 w-24 rounded bg-ink-2/40" />
+            <div className="mb-3 h-2 w-24 rounded bg-surface-2" />
             <div className="space-y-2">
-              {[1, 2, 3].map((i) => <div key={i} className="h-4 rounded bg-ink-2/30" style={{ width: `${70 + i * 7}%` }} />)}
+              {[1, 2, 3].map((i) => <div key={i} className="h-4 rounded bg-surface-2" style={{ width: `${70 + i * 7}%` }} />)}
             </div>
           </div>
           <div>
-            <div className="mb-3 h-2 w-20 rounded bg-ink-2/40" />
+            <div className="mb-3 h-2 w-20 rounded bg-surface-2" />
             <div className="space-y-2">
-              {[1, 2].map((i) => <div key={i} className="h-4 rounded bg-ink-2/30" style={{ width: `${60 + i * 10}%` }} />)}
+              {[1, 2].map((i) => <div key={i} className="h-4 rounded bg-surface-2" style={{ width: `${60 + i * 10}%` }} />)}
             </div>
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function SessionCard() {
             emptyText="Sin urgencias hoy — buen momento para adelantar."
             onDone={removeDone}
           />
-          <div className="border-t border-ink-4/10" />
+          <div className="border-t border-border" />
           <Section
             label="Esta Semana"
             tasks={weekTasks}

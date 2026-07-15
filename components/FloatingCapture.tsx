@@ -108,7 +108,7 @@ export default function FloatingCapture() {
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`max-w-xs rounded-xl border px-4 py-2.5 text-sm shadow-xl backdrop-blur-xl transition-all duration-300 ${
+            className={`max-w-xs rounded-card border px-4 py-2.5 text-body shadow-xl backdrop-blur-xl transition-all duration-300 ${
               t.type === 'success'
                 ? 'border-ok/25 bg-ok/10 text-ok'
                 : 'border-danger/25 bg-danger/10 text-danger'
@@ -123,17 +123,17 @@ export default function FloatingCapture() {
       <div ref={containerRef} className="fixed bottom-4 right-4 z-50">
         {/* Expanded panel */}
         <div
-          className={`mb-2 overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-0 shadow-2xl transition-all duration-200 ease-out ${
+          className={`mb-2 overflow-hidden rounded-card border border-border bg-surface-base shadow-2xl transition-all duration-200 ease-out ${
             open
               ? 'max-h-80 w-80 opacity-100 translate-y-0'
               : 'max-h-0 w-80 opacity-0 translate-y-2 pointer-events-none'
           }`}
         >
-          <div className="border-b border-ink-4/10 px-4 py-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-ink-3 uppercase tracking-wider">
+          <div className="border-b border-border px-4 py-3 flex items-center justify-between">
+            <span className="text-secondary font-medium text-fg-muted uppercase tracking-wider">
               ⚡ Captura rápida
             </span>
-            <span className="text-[10px] text-ink-3/50">⌘K para abrir/cerrar</span>
+            <span className="text-label text-fg-muted/50">⌘K para abrir/cerrar</span>
           </div>
 
           <div className="p-4">
@@ -144,15 +144,15 @@ export default function FloatingCapture() {
               onKeyDown={onKeyDown}
               rows={4}
               placeholder="Escribe una tarea, nota, idea, contacto…"
-              className="w-full resize-none rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+              className="w-full resize-none rounded-card border border-border bg-surface-1 px-3 py-2.5 text-body text-fg placeholder:text-fg-faint outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
             />
 
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-[10px] text-ink-3/50">⌘↵ para enviar · Esc para cerrar</span>
+              <span className="text-label text-fg-muted/50">⌘↵ para enviar · Esc para cerrar</span>
               <button
                 onClick={submit}
                 disabled={loading || !text.trim()}
-                className="rounded-xl bg-accent/15 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-card bg-accent/15 px-4 py-1.5 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {loading ? 'Guardando…' : 'Guardar'}
               </button>
@@ -164,10 +164,10 @@ export default function FloatingCapture() {
         <button
           onClick={() => setOpen(o => !o)}
           title="Captura rápida (⌘K)"
-          className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium shadow-xl backdrop-blur-xl transition-colors ${
+          className={`flex items-center gap-2 rounded-pill border px-4 py-2 text-body font-medium shadow-xl backdrop-blur-xl transition-colors ${
             open
               ? 'border-accent/30 bg-accent/15 text-accent'
-              : 'border-ink-4/10 bg-ink-0/80 text-ink-3 hover:border-ink-4/20 hover:text-ink-4'
+              : 'border-border bg-surface-base/80 text-fg-muted hover:border-border-strong hover:text-fg'
           }`}
         >
           <span>{open ? '✕' : '⚡'}</span>

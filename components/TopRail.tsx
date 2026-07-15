@@ -39,7 +39,7 @@ export default function TopRail() {
 
         {/* Col 2 — nav + gear */}
         <div className="col-span-6 hidden items-center justify-center gap-3 md:flex">
-          <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1.5 backdrop-blur-xl">
+          <nav className="flex items-center gap-1 rounded-pill border border-border bg-surface-1 p-1.5 backdrop-blur-xl">
             {TABS.map(({ label, href, color }) => {
               const active = pathname === href
               const baseStyle: React.CSSProperties = {
@@ -54,7 +54,7 @@ export default function TopRail() {
                 <Link
                   key={label}
                   href={href}
-                  className="rounded-full px-5 py-2 text-sm font-medium"
+                  className="rounded-pill px-5 py-2 text-body font-medium"
                   style={baseStyle}
                   onMouseEnter={e => {
                     if (active) return

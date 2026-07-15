@@ -10,7 +10,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   useEffect(() => setMounted(true), [])
 
   return (
-    <div className="relative min-h-dvh text-ink-4" style={{ background: 'transparent' }}>
+    <div className="relative min-h-dvh text-fg" style={{ background: 'transparent' }}>
       <TopRail />
       {mounted ? children : null}
     </div>

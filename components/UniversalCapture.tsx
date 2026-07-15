@@ -106,7 +106,7 @@ export default function UniversalCapture() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+    <div className="rounded-card border border-border bg-surface-1 p-4 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       {/* Mode chips — choose first, the box transforms */}
       <div className="mb-3 flex flex-wrap gap-2">
         {MODES.map(m => (
@@ -114,10 +114,10 @@ export default function UniversalCapture() {
             key={m.id}
             type="button"
             onClick={() => pick(m.id)}
-            className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+            className={`rounded-pill border px-4 py-1.5 text-body transition-colors ${
               mode === m.id
                 ? 'border-accent/40 bg-[oklch(0.24_0.055_255)] font-medium text-accent'
-                : 'border-ink-4/10 bg-ink-1/90 text-ink-3 hover:bg-ink-1 hover:text-ink-4'
+                : 'border-border bg-surface-1 text-fg-muted hover:bg-surface-1 hover:text-fg'
             }`}
           >
             {m.label}
@@ -132,7 +132,7 @@ export default function UniversalCapture() {
         onKeyDown={onKeyDown}
         placeholder={meta.placeholder}
         disabled={submitting}
-        className="w-full resize-none overflow-hidden bg-transparent text-sm leading-relaxed text-ink-4 placeholder:text-ink-2 outline-none disabled:opacity-40"
+        className="w-full resize-none overflow-hidden bg-transparent text-body leading-relaxed text-fg placeholder:text-fg-faint outline-none disabled:opacity-40"
         style={{ minHeight: mode === 'task' ? '44px' : '88px' }}
       />
 
@@ -144,10 +144,10 @@ export default function UniversalCapture() {
               key={m.value}
               type="button"
               onClick={() => setMood(mood === m.value ? '' : m.value)}
-              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              className={`flex items-center gap-1 rounded-pill border px-2.5 py-1 text-secondary font-medium transition-colors ${
                 mood === m.value
                   ? 'border-accent/25 bg-accent/10 text-accent'
-                  : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+                  : 'border-border text-fg-muted hover:text-fg'
               }`}
             >
               <span>{m.emoji}</span><span>{m.label}</span>
@@ -156,15 +156,15 @@ export default function UniversalCapture() {
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-ink-4/8 pt-3">
-        <span className={`text-xs transition-opacity ${feedback ? 'opacity-100' : 'opacity-0'} ${feedback === 'Guardado ✓' ? 'text-accent' : 'text-red-400'}`}>
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+        <span className={`text-secondary transition-opacity ${feedback ? 'opacity-100' : 'opacity-0'} ${feedback === 'Guardado ✓' ? 'text-accent' : 'text-red-400'}`}>
           {feedback ?? ' '}
         </span>
         <button
           type="button"
           onClick={() => void submit()}
           disabled={submitting || !text.trim()}
-          className="shrink-0 rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-card bg-accent/15 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? 'Guardando…' : 'Guardar'}
         </button>

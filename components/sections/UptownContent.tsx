@@ -159,7 +159,7 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
       onClick={() => onChange(!paid)}
       className={[
         'flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
-        paid ? 'border-ok bg-ok' : 'border-ink-3/40 bg-transparent hover:border-ok/60',
+        paid ? 'border-ok bg-ok' : 'border-border-strong bg-transparent hover:border-ok/60',
       ].join(' ')}
       aria-label={paid ? 'Marcar pendiente' : 'Marcar pagado'}
     >
@@ -797,7 +797,7 @@ function UptownHistorialTab({ rents, expenses, nomina, extraIncome, extraExpense
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
+      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-border dashboard-card">
         {sorted.length === 0 ? (
           <p className="p-10 text-center text-body italic text-fg-muted">Sin movimientos registrados este mes</p>
         ) : (
@@ -1350,7 +1350,7 @@ export default function UptownContent() {
           {(['finanzas', 'historial', 'valet'] as const).map(t => (
             <button key={t} onClick={() => setPageTab(t)}
               className={['rounded-control px-4 py-1.5 text-body transition-colors',
-                pageTab === t ? 'bg-ink-4/10 font-medium text-fg' : 'text-fg-muted hover:text-fg',
+                pageTab === t ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg',
               ].join(' ')}
             >
               {t === 'finanzas' ? 'Finanzas' : t === 'historial' ? 'Historial' : 'Valet'}

@@ -68,11 +68,11 @@ function useTypewriter(text: string | null, speed = 18, skip = false): string {
 function TypeBadge({ symbol, label, color, sublabel }: { symbol: string; label: string; color: string; sublabel?: string }) {
   return (
     <div
-      className="flex items-center gap-1.5 rounded-full border px-2.5 py-1"
+      className="flex items-center gap-1.5 rounded-pill border px-2.5 py-1"
       style={{ borderColor: `color-mix(in oklch, ${color} 40%, transparent)`, backgroundColor: `color-mix(in oklch, ${color} 12%, transparent)` }}
     >
-      <span className="text-[11px]" style={{ color }}>{symbol}</span>
-      <span className="text-[9px] font-bold tracking-[0.22em]" style={{ color }}>{sublabel ?? label}</span>
+      <span className="text-secondary" style={{ color }}>{symbol}</span>
+      <span className="text-label font-bold tracking-[0.22em]" style={{ color }}>{sublabel ?? label}</span>
     </div>
   )
 }
@@ -188,7 +188,7 @@ export default function DailyQuoteCard() {
 
   return (
     <div
-      className="relative rounded-2xl border border-ink-4/10 shadow-xl shadow-black/20"
+      className="relative rounded-card border border-border shadow-xl shadow-black/20"
       style={{ perspective: '1000px', minHeight: 290 }}
     >
       {/* Flip container */}
@@ -202,7 +202,7 @@ export default function DailyQuoteCard() {
       >
         {/* ── FRONT FACE ───────────────────────────────────────── */}
         <div
-          className="absolute inset-0 flex flex-col rounded-2xl bg-ink-1/85 px-5 py-5 backdrop-blur-xl"
+          className="absolute inset-0 flex flex-col rounded-card bg-surface-1 px-5 py-5 backdrop-blur-xl"
           style={{ backfaceVisibility: 'hidden', cursor: loading || !message ? 'default' : 'pointer' }}
           onClick={handleFlip}
         >
@@ -215,7 +215,7 @@ export default function DailyQuoteCard() {
                 onClick={handleSave}
                 disabled={saved || !message || loading}
                 aria-label="Guardar resonancia"
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-sm transition-colors hover:bg-ink-4/10 disabled:pointer-events-none"
+                className="flex h-7 w-7 items-center justify-center rounded-control text-body transition-colors hover:bg-surface-hover disabled:pointer-events-none"
                 style={{ color: saved ? color : 'oklch(0.38 0.006 275)' }}
               >
                 {saved ? '♥' : '♡'}
@@ -225,7 +225,7 @@ export default function DailyQuoteCard() {
                 onClick={handleInvocar}
                 disabled={loading}
                 aria-label="Invocar nueva lectura"
-                className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[10px] font-medium transition-colors hover:bg-ink-4/10 disabled:opacity-40"
+                className="flex items-center gap-1 rounded-control border px-2.5 py-1 text-label font-medium transition-colors hover:bg-surface-hover disabled:opacity-40"
                 style={{
                   borderColor: `color-mix(in oklch, ${color} 30%, transparent)`,
                   color,
@@ -240,25 +240,25 @@ export default function DailyQuoteCard() {
           <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center gap-2.5">
-                <div className="h-3 w-3 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent/60" />
-                <span className="text-[11px] text-ink-3/60">consultando…</span>
+                <div className="h-3 w-3 animate-spin rounded-pill border-2 border-border border-t-accent/60" />
+                <span className="text-secondary text-fg-muted/60">consultando…</span>
               </div>
             ) : message ? (
               <p
                 key={msgKey}
-                className="text-[13px] italic leading-relaxed text-ink-4"
+                className="text-body italic leading-relaxed text-fg"
                 style={{ animation: 'oracle-appear 0.5s ease-out both' }}
               >
                 {displayed}
               </p>
             ) : (
-              <p className="text-[12px] italic text-ink-3/50">El cosmos guarda silencio.</p>
+              <p className="text-secondary italic text-fg-muted/50">El cosmos guarda silencio.</p>
             )}
           </div>
 
           {/* Flip hint */}
           {message && !loading && (
-            <p className="mt-4 select-none text-center text-[9px] text-ink-2/30">
+            <p className="mt-4 select-none text-center text-label text-fg-faint/30">
               tocar para expandir la lectura ▾
             </p>
           )}
@@ -266,7 +266,7 @@ export default function DailyQuoteCard() {
 
         {/* ── BACK FACE ────────────────────────────────────────── */}
         <div
-          className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl bg-ink-1/85 px-5 py-5 backdrop-blur-xl"
+          className="absolute inset-0 flex flex-col overflow-hidden rounded-card bg-surface-1 px-5 py-5 backdrop-blur-xl"
           style={{
             backfaceVisibility: 'hidden',
             transform: 'rotateY(180deg)',
@@ -276,7 +276,7 @@ export default function DailyQuoteCard() {
           <div className="flex shrink-0 items-center justify-between">
             <button
               onClick={(e) => { e.stopPropagation(); setFlipped(false) }}
-              className="text-[10px] text-ink-3 transition-colors hover:text-ink-4"
+              className="text-label text-fg-muted transition-colors hover:text-fg"
             >
               ← volver
             </button>
@@ -287,18 +287,18 @@ export default function DailyQuoteCard() {
           <div className="mt-4 flex-1 overflow-y-auto">
             {expanding ? (
               <div className="flex items-center gap-2.5">
-                <div className="h-3 w-3 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent/60" />
-                <span className="text-[11px] text-ink-3/60">profundizando…</span>
+                <div className="h-3 w-3 animate-spin rounded-pill border-2 border-border border-t-accent/60" />
+                <span className="text-secondary text-fg-muted/60">profundizando…</span>
               </div>
             ) : interp ? (
               <p
-                className="text-[13px] leading-relaxed text-ink-3"
+                className="text-body leading-relaxed text-fg-muted"
                 style={{ animation: 'oracle-appear 0.5s ease-out both' }}
               >
                 {interp}
               </p>
             ) : (
-              <p className="text-[12px] italic text-ink-3/50">Sin respuesta del cosmos.</p>
+              <p className="text-secondary italic text-fg-muted/50">Sin respuesta del cosmos.</p>
             )}
           </div>
         </div>

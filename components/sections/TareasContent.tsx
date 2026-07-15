@@ -115,10 +115,10 @@ function DayTag({ day }: { day: Date }) {
   const c = dayColor(day)
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+      className="inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-0.5 text-label font-medium"
       style={{ color: c, background: c + '18' }}
     >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} />
+      <span className="h-1.5 w-1.5 rounded-pill" style={{ background: c }} />
       {DOW_SHORT[day.getDay()]} {day.getDate()}
     </span>
   )
@@ -144,7 +144,7 @@ function TaskCard({
       tabIndex={0}
       draggable
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move' }}
-      className="group cursor-grab rounded-2xl border border-ink-4/10 bg-ink-1/30 p-4 backdrop-blur-sm transition-colors hover:border-ink-4/20 hover:bg-ink-1/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 active:cursor-grabbing"
+      className="group cursor-grab rounded-card border border-border bg-surface-1 p-4 backdrop-blur-sm transition-colors hover:border-border-strong hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 active:cursor-grabbing"
       onClick={() => onClick(task)}
       onKeyDown={(e) => e.key === 'Enter' && onClick(task)}
     >
@@ -154,7 +154,7 @@ function TaskCard({
           onClick={(e) => { e.stopPropagation(); onToggle(task.id, !done) }}
           aria-label={done ? 'Marcar incompleta' : 'Marcar completa'}
         >
-          <div className={`flex h-[18px] w-[18px] items-center justify-center rounded-md border transition-colors ${done ? 'border-ok/60 bg-ok/20' : 'border-ink-4/30 hover:border-ink-4/60'}`}>
+          <div className={`flex h-[18px] w-[18px] items-center justify-center rounded-control border transition-colors ${done ? 'border-ok/60 bg-ok/20' : 'border-border-strong hover:border-border-strong'}`}>
             {done && (
               <svg className="h-2.5 w-2.5 text-ok" viewBox="0 0 10 10" fill="none">
                 <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -164,25 +164,25 @@ function TaskCard({
         </button>
 
         <div className="min-w-0 flex-1">
-          <p className={`text-sm font-medium leading-snug ${done ? 'text-ink-2 line-through' : 'text-ink-4'}`}>
+          <p className={`text-body font-medium leading-snug ${done ? 'text-fg-faint line-through' : 'text-fg'}`}>
             {task.title}
           </p>
 
-          {showDesc && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-3">{task.description}</p>}
+          {showDesc && <p className="mt-1 line-clamp-2 text-secondary leading-relaxed text-fg-muted">{task.description}</p>}
 
           {hasMeta && (
             <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
               {day && <DayTag day={day} />}
-              {task.entity_name && <span className="text-[11px] text-ink-3">{task.entity_name}</span>}
+              {task.entity_name && <span className="text-secondary text-fg-muted">{task.entity_name}</span>}
               {task.tags?.map((tag) => (
-                <span key={tag} className="rounded-full border border-ink-4/10 px-2 py-0.5 text-[10px] text-ink-3">{tag}</span>
+                <span key={tag} className="rounded-pill border border-border px-2 py-0.5 text-label text-fg-muted">{tag}</span>
               ))}
             </div>
           )}
         </div>
 
         {task.key && (
-          <span className="shrink-0 rounded-md border border-ink-4/10 px-1.5 py-0.5 font-mono text-[10px] text-ink-3">{task.key}</span>
+          <span className="shrink-0 rounded-control border border-border px-1.5 py-0.5 font-mono text-label text-fg-muted">{task.key}</span>
         )}
       </div>
     </div>
@@ -213,23 +213,23 @@ function KanbanColumn({
 
   return (
     <div
-      className={`flex flex-col gap-2.5 rounded-3xl border p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card transition-colors ${dragOver ? 'border-accent/50 bg-accent/[0.05]' : 'border-ink-4/10 bg-ink-1/40'}`}
+      className={`flex flex-col gap-2.5 rounded-card border p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card transition-colors ${dragOver ? 'border-accent/50 bg-accent/[0.05]' : 'border-border bg-surface-1'}`}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!dragOver) setDragOver(true) }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false) }}
       onDrop={(e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/plain'); if (id) onMove(id, tier.id) }}
     >
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</span>
-        <span className="tabular-nums text-[11px] text-ink-2">{open.length}</span>
+        <span className="text-secondary font-semibold uppercase tracking-wider text-fg-muted">{tier.label}</span>
+        <span className="tabular-nums text-secondary text-fg-faint">{open.length}</span>
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {open.length === 0 && <p className="py-6 text-center text-xs text-ink-2">Sin tareas abiertas</p>}
+        {open.length === 0 && <p className="py-6 text-center text-secondary text-fg-faint">Sin tareas abiertas</p>}
         {visible.map((task) => (
           <TaskCard key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />
         ))}
         {open.length > COLUMN_TOP_N && (
-          <button onClick={() => setShowAll((s) => !s)} className="rounded-xl border border-ink-4/10 py-2 text-[11px] text-ink-3 transition-colors hover:text-ink-4">
+          <button onClick={() => setShowAll((s) => !s)} className="rounded-card border border-border py-2 text-secondary text-fg-muted transition-colors hover:text-fg">
             {showAll ? 'Ver menos' : `Ver ${open.length - COLUMN_TOP_N} más`}
           </button>
         )}
@@ -237,7 +237,7 @@ function KanbanColumn({
 
       {done.length > 0 && (
         <div className="mt-2">
-          <button onClick={() => setShowDone((v) => !v)} className="text-[11px] text-ink-2 transition-colors hover:text-ink-3">
+          <button onClick={() => setShowDone((v) => !v)} className="text-secondary text-fg-faint transition-colors hover:text-fg-muted">
             {showDone ? '▾' : '▸'} {done.length} completadas
           </button>
           {showDone && (
@@ -304,7 +304,7 @@ function TaskRow({
       tabIndex={0}
       draggable
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move' }}
-      className="group flex cursor-grab items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-ink-4/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/30 active:cursor-grabbing"
+      className="group flex cursor-grab items-center gap-3 rounded-card px-3 py-2.5 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/30 active:cursor-grabbing"
       onClick={() => onClick(task)}
       onKeyDown={(e) => e.key === 'Enter' && onClick(task)}
     >
@@ -313,14 +313,14 @@ function TaskRow({
         onClick={(e) => { e.stopPropagation(); onToggle(task.id, !done) }}
         aria-label={done ? 'Marcar incompleta' : 'Marcar completa'}
       >
-        <div className={`flex h-[18px] w-[18px] items-center justify-center rounded-md border transition-colors ${done ? 'border-ok/60 bg-ok/20' : 'border-ink-4/30 hover:border-ink-4/60'}`}>
+        <div className={`flex h-[18px] w-[18px] items-center justify-center rounded-control border transition-colors ${done ? 'border-ok/60 bg-ok/20' : 'border-border-strong hover:border-border-strong'}`}>
           {done && <svg className="h-2.5 w-2.5 text-ok" viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
         </div>
       </button>
 
-      <span className={`min-w-0 flex-1 truncate text-sm ${done ? 'text-ink-2 line-through' : 'text-ink-4'}`}>{task.title}</span>
+      <span className={`min-w-0 flex-1 truncate text-body ${done ? 'text-fg-faint line-through' : 'text-fg'}`}>{task.title}</span>
 
-      {task.entity_name && <span className="shrink-0 text-[11px] text-ink-3">{task.entity_name}</span>}
+      {task.entity_name && <span className="shrink-0 text-secondary text-fg-muted">{task.entity_name}</span>}
       {day && <DayTag day={day} />}
     </div>
   )
@@ -348,21 +348,21 @@ function ListaSection({
 
   return (
     <section
-      className={`-mx-2 rounded-2xl px-2 py-1 transition-colors ${dragOver ? 'bg-accent/[0.05]' : ''}`}
+      className={`-mx-2 rounded-card px-2 py-1 transition-colors ${dragOver ? 'bg-accent/[0.05]' : ''}`}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!dragOver) setDragOver(true) }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false) }}
       onDrop={(e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('text/plain'); if (id) onMove(id, tier.id) }}
     >
-      <div className="mb-2 flex items-baseline gap-3 border-b border-ink-4/8 pb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">{tier.label}</h3>
-        <span className="tabular-nums text-[11px] text-ink-2">{open.length}</span>
+      <div className="mb-2 flex items-baseline gap-3 border-b border-border pb-2">
+        <h3 className="text-secondary font-semibold uppercase tracking-wider text-fg-muted">{tier.label}</h3>
+        <span className="tabular-nums text-secondary text-fg-faint">{open.length}</span>
       </div>
 
       <div className="flex flex-col">
-        {open.length === 0 && done.length === 0 && <p className="px-3 py-2.5 text-xs italic text-ink-2/60">Sin tareas</p>}
+        {open.length === 0 && done.length === 0 && <p className="px-3 py-2.5 text-secondary italic text-fg-faint/60">Sin tareas</p>}
         {visible.map((task) => <TaskRow key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />)}
         {open.length > COLUMN_TOP_N && (
-          <button onClick={() => setShowAll((s) => !s)} className="mt-1 self-start px-3 text-[11px] text-ink-3 transition-colors hover:text-ink-4">
+          <button onClick={() => setShowAll((s) => !s)} className="mt-1 self-start px-3 text-secondary text-fg-muted transition-colors hover:text-fg">
             {showAll ? 'Ver menos' : `Ver ${open.length - COLUMN_TOP_N} más`}
           </button>
         )}
@@ -370,7 +370,7 @@ function ListaSection({
 
       {done.length > 0 && (
         <div className="mt-1 px-3">
-          <button onClick={() => setShowDone((v) => !v)} className="text-[11px] text-ink-2 transition-colors hover:text-ink-3">
+          <button onClick={() => setShowDone((v) => !v)} className="text-secondary text-fg-faint transition-colors hover:text-fg-muted">
             {showDone ? '▾' : '▸'} {done.length} completadas
           </button>
           {showDone && <div className="mt-1 flex flex-col opacity-50">{done.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onClick={onClickTask} />)}</div>}
@@ -394,7 +394,7 @@ function ListaView({
   onMove: (id: string, urgency: Urgency) => void
 }) {
   return (
-    <div className="mx-auto max-w-3xl rounded-3xl border border-ink-4/10 bg-ink-1/40 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card sm:p-8">
+    <div className="mx-auto max-w-3xl rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card sm:p-8">
       <div className="flex flex-col gap-8">
         {tiers.map((tier) => (
           <ListaSection
@@ -459,14 +459,14 @@ function EntityManager({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-ink-2">
+      <span className="shrink-0 text-label font-semibold uppercase tracking-wider text-fg-faint">
         Filtrar
       </span>
 
       <button
         onClick={() => onFilter(null)}
-        className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-          activeFilter === null ? 'border-accent/30 bg-accent/10 text-accent' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+        className={`rounded-pill border px-2.5 py-0.5 text-secondary transition-colors ${
+          activeFilter === null ? 'border-accent/30 bg-accent/10 text-accent' : 'border-border text-fg-muted hover:text-fg'
         }`}
       >
         Todas
@@ -484,15 +484,15 @@ function EntityManager({
               if (ev.key === 'Enter') handleRename(e.id)
               if (ev.key === 'Escape') setEditingId(null)
             }}
-            className="rounded-full border border-accent/30 bg-ink-1/85 px-3 py-0.5 text-xs text-ink-4 outline-none focus:ring-1 focus:ring-accent/30"
+            className="rounded-pill border border-accent/30 bg-surface-1 px-3 py-0.5 text-secondary text-fg outline-none focus:ring-1 focus:ring-accent/30"
             style={{ width: Math.max(80, editingName.length * 8 + 28) }}
           />
         ) : (
-          <div key={e.id} className={`group flex items-center gap-0.5 rounded-full border py-0.5 pl-2.5 pr-1 ${activeFilter === e.name ? 'border-accent/30 bg-accent/10' : 'border-ink-4/10 bg-ink-1/85'}`}>
-            <button onClick={() => onFilter(activeFilter === e.name ? null : e.name)} className={`text-xs transition-colors ${activeFilter === e.name ? 'font-medium text-accent' : 'text-ink-3 hover:text-ink-4'}`}>{e.name}</button>
+          <div key={e.id} className={`group flex items-center gap-0.5 rounded-pill border py-0.5 pl-2.5 pr-1 ${activeFilter === e.name ? 'border-accent/30 bg-accent/10' : 'border-border bg-surface-1'}`}>
+            <button onClick={() => onFilter(activeFilter === e.name ? null : e.name)} className={`text-secondary transition-colors ${activeFilter === e.name ? 'font-medium text-accent' : 'text-fg-muted hover:text-fg'}`}>{e.name}</button>
             <button
               onClick={() => { setEditingId(e.id); setEditingName(e.name) }}
-              className="rounded-full p-0.5 text-ink-2 opacity-0 transition-all group-hover:opacity-100 hover:text-ink-4"
+              className="rounded-pill p-0.5 text-fg-faint opacity-0 transition-all group-hover:opacity-100 hover:text-fg"
               aria-label={`Renombrar ${e.name}`}
             >
               <svg viewBox="0 0 14 14" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={1.5}>
@@ -501,10 +501,10 @@ function EntityManager({
             </button>
             <button
               onClick={() => handleDelete(e.id)}
-              className={`rounded-full p-0.5 transition-all ${
+              className={`rounded-pill p-0.5 transition-all ${
                 pendingDeleteId === e.id
                   ? 'text-danger opacity-100'
-                  : 'text-ink-2 opacity-0 group-hover:opacity-100 hover:text-danger'
+                  : 'text-fg-faint opacity-0 group-hover:opacity-100 hover:text-danger'
               }`}
               aria-label={pendingDeleteId === e.id ? `Confirmar eliminar ${e.name}` : `Eliminar ${e.name}`}
               title={pendingDeleteId === e.id ? 'Clic para confirmar' : undefined}
@@ -528,12 +528,12 @@ function EntityManager({
             if (ev.key === 'Escape') { setAdding(false); setNewName('') }
           }}
           placeholder="Nombre…"
-          className="rounded-full border border-dashed border-accent/40 bg-transparent px-3 py-0.5 text-xs text-ink-3 outline-none placeholder:text-ink-2/50 focus:border-accent/60"
+          className="rounded-pill border border-dashed border-accent/40 bg-transparent px-3 py-0.5 text-secondary text-fg-muted outline-none placeholder:text-fg-faint/50 focus:border-accent/60"
         />
       ) : (
         <button
           onClick={() => { setAdding(true); setNewName('') }}
-          className="flex items-center gap-1 rounded-full border border-dashed border-ink-4/20 px-2.5 py-0.5 text-[11px] text-ink-2 transition-colors hover:border-ink-4/40 hover:text-ink-3"
+          className="flex items-center gap-1 rounded-pill border border-dashed border-border-strong px-2.5 py-0.5 text-secondary text-fg-faint transition-colors hover:border-border-strong hover:text-fg-muted"
         >
           <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={1.8}>
             <path d="M6 2v8M2 6h8" strokeLinecap="round" />
@@ -655,8 +655,8 @@ function TaskDrawer({
   }
 
   const isOpen = !!task || creating
-  const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-ink-3'
-  const inputCls = 'w-full rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20'
+  const labelCls = 'mb-1.5 block text-label font-semibold uppercase tracking-wider text-fg-muted'
+  const inputCls = 'w-full rounded-card border border-border bg-surface-1 px-3 py-2.5 text-body text-fg placeholder:text-fg-faint transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20'
 
   return createPortal(
     <>
@@ -670,17 +670,17 @@ function TaskDrawer({
 
       <aside
         aria-label={creating ? 'Nueva tarea' : 'Edit task'}
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-ink-4/10 bg-ink-0 shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-surface-base shadow-2xl transition-transform duration-300 ease-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {isOpen && (
           <>
-            <div className="flex items-center justify-between border-b border-ink-4/10 px-6 py-4">
-              <span className="text-xs font-medium uppercase tracking-wider text-ink-3">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <span className="text-secondary font-medium uppercase tracking-wider text-fg-muted">
                 {creating ? 'Nueva tarea' : 'Editar tarea'}
               </span>
-              <button onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
+              <button onClick={onClose} aria-label="Close" className="rounded-control p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
@@ -710,7 +710,7 @@ function TaskDrawer({
               <div>
                 <label className={labelCls}>Día</label>
                 <input type="date" value={form.due_date} onChange={(e) => set('due_date', e.target.value)} className={`${inputCls} [color-scheme:dark]`} />
-                <p className="mt-1 text-[10px] text-ink-2">Le da a la tarjeta el color de ese día de la semana.</p>
+                <p className="mt-1 text-label text-fg-faint">Le da a la tarjeta el color de ese día de la semana.</p>
               </div>
 
               <div>
@@ -737,16 +737,16 @@ function TaskDrawer({
               <div>
                 <label className={labelCls}>Etiquetas</label>
                 <input value={form.tags} onChange={(e) => set('tags', e.target.value)} className={inputCls} placeholder="diseño, cliente, urgente" />
-                <p className="mt-1 text-[10px] text-ink-2">Separadas por coma</p>
+                <p className="mt-1 text-label text-fg-faint">Separadas por coma</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 border-t border-ink-4/10 px-6 py-4">
-              <button onClick={handleSave} disabled={saving || !form.title.trim()} className="flex-1 rounded-xl border border-accent/20 bg-accent/10 py-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40">
+            <div className="flex items-center gap-3 border-t border-border px-6 py-4">
+              <button onClick={handleSave} disabled={saving || !form.title.trim()} className="flex-1 rounded-card border border-accent/20 bg-accent/10 py-2.5 text-body font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40">
                 {saving ? 'Guardando…' : creating ? 'Crear tarea' : 'Guardar cambios'}
               </button>
               {!creating && (
-                <button onClick={handleDelete} disabled={deleting} className="rounded-xl border border-danger/20 px-4 py-2.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
+                <button onClick={handleDelete} disabled={deleting} className="rounded-card border border-danger/20 px-4 py-2.5 text-body font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
                   {deleting ? '…' : 'Eliminar'}
                 </button>
               )}
@@ -903,8 +903,8 @@ export default function TareasContent() {
       <div className="pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-4">Tareas</h1>
-            <p className="mt-1 text-xs text-ink-3">
+            <h1 className="text-heading font-bold tracking-tight text-fg">Tareas</h1>
+            <p className="mt-1 text-secondary text-fg-muted">
               {loading ? 'Cargando…' : `${openCount} tarea${openCount === 1 ? '' : 's'} abierta${openCount === 1 ? '' : 's'}`}
             </p>
           </div>
@@ -912,7 +912,7 @@ export default function TareasContent() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => { setCreating(true); setDrawerTask(null) }}
-              className="flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+              className="flex items-center gap-1.5 rounded-card border border-accent/20 bg-accent/10 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/20"
             >
               <svg viewBox="0 0 12 12" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={2}>
                 <path d="M6 2v8M2 6h8" strokeLinecap="round" />
@@ -920,13 +920,13 @@ export default function TareasContent() {
               Nueva tarea
             </button>
 
-          <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
+          <nav className="flex items-center gap-1 rounded-pill border border-border bg-surface-1 p-1 backdrop-blur-xl">
             {VIEWS.map((v) => (
               <button
                 key={v.id}
                 onClick={() => setView(v.id)}
-                className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
-                  view === v.id ? 'bg-ink-4/10 font-medium text-ink-4' : 'text-ink-3 hover:text-ink-4'
+                className={`rounded-pill px-4 py-1.5 text-body transition-colors ${
+                  view === v.id ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'
                 }`}
               >
                 {v.label}
@@ -938,7 +938,7 @@ export default function TareasContent() {
 
         {!loading && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-          <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
+          <nav className="flex items-center gap-1 rounded-pill border border-border bg-surface-1 p-1 backdrop-blur-xl">
             {([
               { on: true,  label: 'Accionable' },
               { on: false, label: 'Ver todo' },
@@ -946,20 +946,20 @@ export default function TareasContent() {
               <button
                 key={o.label}
                 onClick={() => setActionableOnly(o.on)}
-                className={`rounded-full px-3.5 py-1 text-xs transition-colors ${
-                  actionableOnly === o.on ? 'bg-ink-4/10 font-medium text-ink-4' : 'text-ink-3 hover:text-ink-4'
+                className={`rounded-pill px-3.5 py-1 text-secondary transition-colors ${
+                  actionableOnly === o.on ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'
                 }`}
               >
                 {o.label}
-                {o.on && <span className="ml-1.5 tabular-nums text-ink-2">{actionableCount}</span>}
+                {o.on && <span className="ml-1.5 tabular-nums text-fg-faint">{actionableCount}</span>}
               </button>
             ))}
           </nav>
           <div ref={filterRef} className="relative w-fit">
             <button
               onClick={() => setFilterOpen((o) => !o)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
-                entityFilter ? 'border-accent/30 bg-accent/10 text-accent' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+              className={`flex items-center gap-1.5 rounded-pill border px-3 py-1 text-secondary transition-colors ${
+                entityFilter ? 'border-accent/30 bg-accent/10 text-accent' : 'border-border text-fg-muted hover:text-fg'
               }`}
             >
               <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M1 3h12M3 7h8M5 11h4" strokeLinecap="round" /></svg>
@@ -967,7 +967,7 @@ export default function TareasContent() {
               <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 transition-transform ${filterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
             {filterOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1.5 w-80 rounded-xl border border-ink-4/10 bg-ink-0 p-3 shadow-2xl">
+              <div className="absolute left-0 top-full z-20 mt-1.5 w-80 rounded-card border border-border bg-surface-base p-3 shadow-2xl">
                 <EntityManager
                   entities={entities}
                   activeFilter={entityFilter}
@@ -985,16 +985,16 @@ export default function TareasContent() {
 
       <div className="mt-6">
         {loadError && (
-          <div className="mb-4 flex items-center gap-3 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3">
-            <span className="text-sm text-danger">{loadError}</span>
-            <button onClick={loadAll} className="ml-auto shrink-0 text-xs font-medium text-danger underline-offset-2 hover:underline">
+          <div className="mb-4 flex items-center gap-3 rounded-card border border-danger/20 bg-danger/10 px-4 py-3">
+            <span className="text-body text-danger">{loadError}</span>
+            <button onClick={loadAll} className="ml-auto shrink-0 text-secondary font-medium text-danger underline-offset-2 hover:underline">
               Reintentar
             </button>
           </div>
         )}
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent" />
+            <div className="h-6 w-6 animate-spin rounded-pill border-2 border-border border-t-accent" />
           </div>
         ) : (
           <>

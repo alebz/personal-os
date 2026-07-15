@@ -102,7 +102,7 @@ function GoalSection({
   return (
     <div>
       {/* Section label */}
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-ink-3">
+      <p className="mb-2 text-label font-semibold uppercase tracking-widest text-fg-muted">
         {title}
       </p>
 
@@ -116,7 +116,7 @@ function GoalSection({
                 onClick={() => toggle(g.id)}
                 className={[
                   'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                  g.done ? 'border-accent bg-accent' : 'border-ink-3/40 bg-transparent',
+                  g.done ? 'border-accent bg-accent' : 'border-border-strong bg-transparent',
                 ].join(' ')}
                 aria-label={g.done ? 'Mark incomplete' : 'Mark complete'}
               >
@@ -135,14 +135,14 @@ function GoalSection({
                   onChange={(e) => setEditText(e.target.value)}
                   onBlur={commitEdit}
                   onKeyDown={onEditKey}
-                  className="flex-1 bg-transparent text-sm text-ink-4 outline-none border-b border-accent/50"
+                  className="flex-1 bg-transparent text-body text-fg outline-none border-b border-accent/50"
                 />
               ) : (
                 <span
                   onClick={() => startEdit(g)}
                   className={[
-                    'flex-1 cursor-text text-sm',
-                    g.done ? 'text-ink-3 line-through' : 'text-ink-4',
+                    'flex-1 cursor-text text-body',
+                    g.done ? 'text-fg-muted line-through' : 'text-fg',
                   ].join(' ')}
                 >
                   {g.text}
@@ -152,7 +152,7 @@ function GoalSection({
               {/* Delete */}
               <button
                 onClick={() => remove(g.id)}
-                className="hidden shrink-0 text-ink-3 transition-colors hover:text-danger group-hover:flex"
+                className="hidden shrink-0 text-fg-muted transition-colors hover:text-danger group-hover:flex"
                 aria-label="Delete goal"
               >
                 <svg viewBox="0 0 14 14" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.6}>
@@ -172,12 +172,12 @@ function GoalSection({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKey}
           placeholder="Agregar meta…"
-          className="flex-1 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2.5 py-1.5 text-xs text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50 focus:bg-ink-2/30"
+          className="flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50 focus:bg-surface-2"
         />
         <button
           onClick={add}
           disabled={!draft.trim()}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-ink-4/10 bg-ink-2/20 text-ink-3 transition-colors hover:bg-ink-2/40 hover:text-ink-4 disabled:opacity-30"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control border border-border bg-surface-2 text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-30"
           aria-label="Add"
         >
           <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={1.8}>
@@ -227,12 +227,12 @@ export default function GoalsCard() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
-      <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">🏆 Metas</h2>
+    <div className="rounded-card border border-border p-5 shadow-xl shadow-black/20 dashboard-card">
+      <h2 className="mb-4 text-body font-semibold tracking-wide text-fg">🏆 Metas</h2>
 
       <div className="space-y-5">
         <GoalSection title="Esta Semana" items={week} onChange={handleWeekChange} />
-        <div className="border-t border-ink-4/10" />
+        <div className="border-t border-border" />
         <GoalSection title="Este Mes" items={month} onChange={handleMonthChange} />
       </div>
     </div>

@@ -49,16 +49,16 @@ export default function HabitTracker() {
   const count = habits.filter(h => h.dates.includes(today)).length
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
+    <div className="rounded-card border border-border p-5 shadow-xl shadow-black/20 dashboard-card">
       <div className="mb-4 flex items-center gap-3">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-4">🔥 Hábitos</h2>
+        <h2 className="text-body font-semibold tracking-wide text-fg">🔥 Hábitos</h2>
         {loaded && habits.length > 0 && (
-          <span className="text-xs text-ink-3">{count}/{habits.length} hoy</span>
+          <span className="text-secondary text-fg-muted">{count}/{habits.length} hoy</span>
         )}
       </div>
 
       {loaded && habits.length === 0 ? (
-        <p className="py-2 text-xs text-ink-3/70">Crea tus hábitos en la cara de Hábitos.</p>
+        <p className="py-2 text-secondary text-fg-muted/70">Crea tus hábitos en la cara de Hábitos.</p>
       ) : (
         <>
           <ul className="space-y-0.5">
@@ -68,10 +68,10 @@ export default function HabitTracker() {
                 <li key={h.id}>
                   <button
                     onClick={() => toggle(h)}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-ink-4/5"
+                    className="flex w-full items-center gap-2.5 rounded-control px-1 py-1.5 text-left transition-colors hover:bg-surface-hover"
                   >
                     <span
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-ink-3/40 transition-colors"
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border-strong transition-colors"
                       style={checked ? { backgroundColor: h.color, borderColor: h.color } : undefined}
                     >
                       {checked && (
@@ -80,8 +80,8 @@ export default function HabitTracker() {
                         </svg>
                       )}
                     </span>
-                    <span className="text-sm leading-none">{h.icon}</span>
-                    <span className={`text-sm transition-colors ${checked ? 'text-ink-3 line-through' : 'text-ink-4'}`}>{h.name}</span>
+                    <span className="text-body leading-none">{h.icon}</span>
+                    <span className={`text-body transition-colors ${checked ? 'text-fg-muted line-through' : 'text-fg'}`}>{h.name}</span>
                   </button>
                 </li>
               )
@@ -89,9 +89,9 @@ export default function HabitTracker() {
           </ul>
 
           <div className="mt-4">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-4/10">
+            <div className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-active">
               <div
-                className="h-full rounded-full bg-accent transition-all duration-500"
+                className="h-full rounded-pill bg-accent transition-all duration-500"
                 style={{ width: habits.length > 0 ? `${(count / habits.length) * 100}%` : '0%' }}
               />
             </div>

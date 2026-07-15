@@ -204,7 +204,7 @@ export default function CalendarCard() {
   const showTodayBtn = viewYear !== today.getFullYear() || viewMonth !== today.getMonth()
 
   return (
-    <div className={`relative rounded-3xl border border-ink-4/10 p-6 shadow-xl shadow-black/20 dashboard-card transition-[width] duration-300 ease-out sm:p-8 ${agendaOpen ? 'lg:w-full' : 'lg:mx-auto lg:w-[85%]'}`}>
+    <div className={`relative rounded-card border border-border p-6 shadow-xl shadow-black/20 dashboard-card transition-[width] duration-300 ease-out sm:p-8 ${agendaOpen ? 'lg:w-full' : 'lg:mx-auto lg:w-[85%]'}`}>
 
       {/* Collapse tab — folds the agenda column away so the month fills the full width (lg only) */}
       <button
@@ -212,7 +212,7 @@ export default function CalendarCard() {
         onClick={() => setAgendaOpen(o => !o)}
         aria-label={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
         title={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
-        className="absolute left-full top-1/2 z-10 ml-2 hidden h-16 w-6 -translate-y-1/2 items-center justify-center text-ink-3/70 transition-colors hover:text-ink-4 lg:flex"
+        className="absolute left-full top-1/2 z-10 ml-2 hidden h-16 w-6 -translate-y-1/2 items-center justify-center text-fg-muted/70 transition-colors hover:text-fg lg:flex"
       >
         <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
           <path d={agendaOpen ? 'M10 3L5 8l5 5' : 'M6 3l5 5-5 5'} strokeLinecap="round" strokeLinejoin="round" />
@@ -222,22 +222,22 @@ export default function CalendarCard() {
       {/* Header */}
       <div className="mb-6 flex items-end justify-between">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-2xl font-bold tracking-tight text-ink-4">{MONTHS[viewMonth]}</h2>
-          <span className="text-lg font-light text-ink-3">{viewYear}</span>
+          <h2 className="text-heading font-bold tracking-tight text-fg">{MONTHS[viewMonth]}</h2>
+          <span className="text-subhead font-light text-fg-muted">{viewYear}</span>
         </div>
         <div className="flex items-center gap-2">
           {showTodayBtn && (
             <button
               onClick={goToday}
-              className="rounded-full border border-ink-4/15 px-3 py-1.5 text-xs font-medium text-ink-3 transition-colors hover:border-accent/40 hover:text-accent"
+              className="rounded-pill border border-border px-3 py-1.5 text-secondary font-medium text-fg-muted transition-colors hover:border-accent/40 hover:text-accent"
             >
               Hoy
             </button>
           )}
-          <button onClick={prevMonth} aria-label="Mes anterior" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
+          <button onClick={prevMonth} aria-label="Mes anterior" className="flex h-9 w-9 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button onClick={nextMonth} aria-label="Mes siguiente" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
+          <button onClick={nextMonth} aria-label="Mes siguiente" className="flex h-9 w-9 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
@@ -251,7 +251,7 @@ export default function CalendarCard() {
             {DOW.map((d, i) => (
               <div
                 key={d}
-                className="text-center text-[11px] font-semibold uppercase tracking-wider"
+                className="text-center text-secondary font-semibold uppercase tracking-wider"
                 style={{ color: WEEKDAY_RAINBOW[i] + 'cc' }}
               >
                 {d}
@@ -272,16 +272,16 @@ export default function CalendarCard() {
                 <button
                   key={key}
                   onClick={() => { if (selected !== key) { resetForm(); setAddDate(key) } setSelected(key) }}
-                  className={`group relative flex min-h-[3.5rem] flex-col items-center gap-1 rounded-xl px-1 pt-1.5 pb-1 transition-all ${
-                    isSelected ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-ink-4/[0.06]'
+                  className={`group relative flex min-h-[3.5rem] flex-col items-center gap-1 rounded-card px-1 pt-1.5 pb-1 transition-all ${
+                    isSelected ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-surface-hover'
                   } ${!isCurrentMonth ? 'opacity-35' : ''}`}
                 >
                   <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-sm tabular-nums transition-colors ${
+                    className={`flex h-7 w-7 items-center justify-center rounded-pill text-body tabular-nums transition-colors ${
                       bday ? 'font-bold' :
                       isToday ? 'bg-accent font-semibold text-white' :
                       isSelected ? 'font-semibold text-accent' :
-                      isWeekend ? 'text-ink-3' : 'text-ink-4'
+                      isWeekend ? 'text-fg-muted' : 'text-fg'
                     }`}
                     style={bday ? { background: '#f0b53a', color: '#3a2400', boxShadow: '0 0 0 1px #7a4e12, 0 0 0 2px #ffe08a' } : undefined}
                     title={bday ? '¡Tu cumpleaños! 🎂' : undefined}
@@ -292,9 +292,9 @@ export default function CalendarCard() {
                   {cellEvents.length > 0 && (
                     <div className="flex items-center gap-[3px]">
                       {cellEvents.slice(0, 4).map(ev => (
-                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-full" style={{ background: dayColor(date) }} />
+                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-pill" style={{ background: dayColor(date) }} />
                       ))}
-                      {cellEvents.length > 4 && <span className="text-[9px] leading-none text-ink-3">+{cellEvents.length - 4}</span>}
+                      {cellEvents.length > 4 && <span className="text-label leading-none text-fg-muted">+{cellEvents.length - 4}</span>}
                     </div>
                   )}
                 </button>
@@ -304,58 +304,58 @@ export default function CalendarCard() {
         </div>
 
         {/* ── Agenda for the selected day ────────────────────────── */}
-        <div className="lg:border-l lg:border-ink-4/10 lg:pl-8">
+        <div className="lg:border-l lg:border-border lg:pl-8">
           <div
             className="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
             style={{ gridTemplateRows: agendaOpen ? '1fr' : '0fr', opacity: agendaOpen ? 1 : 0 }}
           >
             <div className="overflow-hidden">
           {!selected ? (
-            <div className="flex h-full min-h-[9rem] items-center justify-center text-center text-sm text-ink-3/50">
+            <div className="flex h-full min-h-[9rem] items-center justify-center text-center text-body text-fg-muted/50">
               Elige un día para ver sus eventos
             </div>
           ) : (
             <>
               <div className="mb-4">
-                <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: selColor }}>{isTodaySel ? 'Hoy' : weekday}</p>
-                <h3 className="text-xl font-semibold capitalize text-ink-4">{dayMonth}</h3>
+                <p className="text-secondary font-semibold uppercase tracking-widest" style={{ color: selColor }}>{isTodaySel ? 'Hoy' : weekday}</p>
+                <h3 className="text-subhead font-semibold capitalize text-fg">{dayMonth}</h3>
               </div>
 
               {selBday && (
-                <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2.5 text-[12px] font-medium text-amber-200/90">
-                  <span className="text-base">🎂</span>
+                <div className="mb-3 flex items-center gap-2 rounded-card border border-amber-300/25 bg-amber-300/10 px-3 py-2.5 text-secondary font-medium text-amber-200/90">
+                  <span className="text-md">🎂</span>
                   <span>¡Feliz vuelta al sol, Matti! Que sea un gran año, Leo 🦁</span>
                 </div>
               )}
 
               {loading ? (
-                <p className="animate-pulse py-4 text-sm text-ink-3">Cargando…</p>
+                <p className="animate-pulse py-4 text-body text-fg-muted">Cargando…</p>
               ) : fetchError ? (
-                <p className="py-4 text-sm text-red-400">⚠ {fetchError}</p>
+                <p className="py-4 text-body text-red-400">⚠ {fetchError}</p>
               ) : dayEvents.length === 0 ? (
-                <p className="py-4 text-sm italic text-ink-3/50">Sin eventos este día</p>
+                <p className="py-4 text-body italic text-fg-muted/50">Sin eventos este día</p>
               ) : (
                 <ul className="max-h-[9.5rem] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
                   {dayEvents.map(ev => (
-                    <li key={ev.uid} className={`group flex items-stretch gap-3 rounded-xl px-3 py-2.5 transition-colors ${editingUid === ev.uid ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-ink-0/40'}`}>
-                      <span className="w-1 shrink-0 rounded-full" style={{ background: selColor }} />
+                    <li key={ev.uid} className={`group flex items-stretch gap-3 rounded-card px-3 py-2.5 transition-colors ${editingUid === ev.uid ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-surface-base/40'}`}>
+                      <span className="w-1 shrink-0 rounded-pill" style={{ background: selColor }} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium leading-snug text-ink-4">{ev.title}</p>
-                        <p className="mt-0.5 text-xs text-ink-3">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</p>
-                        {ev.note && <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-ink-3/80">{ev.note}</p>}
+                        <p className="text-body font-medium leading-snug text-fg">{ev.title}</p>
+                        <p className="mt-0.5 text-secondary text-fg-muted">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</p>
+                        {ev.note && <p className="mt-1 whitespace-pre-wrap text-secondary leading-relaxed text-fg-muted/80">{ev.note}</p>}
                       </div>
 
                       {isEditable(ev) && (confirmDel === ev.uid ? (
                         <div className="flex shrink-0 items-center gap-1 self-start">
-                          <button type="button" onClick={() => deleteEvent(ev)} className="rounded-lg px-2 py-1 text-[11px] font-medium text-red-400 hover:bg-red-400/10">Borrar</button>
-                          <button type="button" onClick={() => setConfirmDel(null)} className="rounded-lg px-2 py-1 text-[11px] text-ink-3 hover:text-ink-4">No</button>
+                          <button type="button" onClick={() => deleteEvent(ev)} className="rounded-control px-2 py-1 text-secondary font-medium text-red-400 hover:bg-red-400/10">Borrar</button>
+                          <button type="button" onClick={() => setConfirmDel(null)} className="rounded-control px-2 py-1 text-secondary text-fg-muted hover:text-fg">No</button>
                         </div>
                       ) : (
-                        <div className="flex shrink-0 items-start gap-0.5 text-ink-3/50 opacity-60 transition-opacity group-hover:opacity-100">
-                          <button type="button" onClick={() => startEdit(ev)} aria-label="Editar" className="rounded-lg p-1.5 hover:bg-ink-4/10 hover:text-ink-4">
+                        <div className="flex shrink-0 items-start gap-0.5 text-fg-muted/50 opacity-60 transition-opacity group-hover:opacity-100">
+                          <button type="button" onClick={() => startEdit(ev)} aria-label="Editar" className="rounded-control p-1.5 hover:bg-surface-hover hover:text-fg">
                             <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.6}><path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
-                          <button type="button" onClick={() => setConfirmDel(ev.uid)} aria-label="Borrar" className="rounded-lg p-1.5 hover:bg-red-400/10 hover:text-red-400">
+                          <button type="button" onClick={() => setConfirmDel(ev.uid)} aria-label="Borrar" className="rounded-control p-1.5 hover:bg-red-400/10 hover:text-red-400">
                             <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.6}><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5l.5-9" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                         </div>
@@ -366,11 +366,11 @@ export default function CalendarCard() {
               )}
 
               {/* Add / edit form */}
-              <form onSubmit={handleAddEvent} onBlur={handleFormBlur} className="mt-4 space-y-2 border-t border-ink-4/10 pt-4">
+              <form onSubmit={handleAddEvent} onBlur={handleFormBlur} className="mt-4 space-y-2 border-t border-border pt-4">
                 {editingUid && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">Editando</span>
-                    <button type="button" onClick={resetForm} className="text-[11px] text-ink-3 transition-colors hover:text-ink-4">Cancelar</button>
+                    <span className="text-secondary font-semibold uppercase tracking-wide text-accent">Editando</span>
+                    <button type="button" onClick={resetForm} className="text-secondary text-fg-muted transition-colors hover:text-fg">Cancelar</button>
                   </div>
                 )}
                 <input
@@ -381,7 +381,7 @@ export default function CalendarCard() {
                   onClick={() => setFormOpen(true)}
                   placeholder={editingUid ? 'Título del evento' : 'Nuevo evento…'}
                   disabled={adding}
-                  className="w-full rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
+                  className="w-full rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
                 />
                 {formOpen && (<>
                 <textarea
@@ -390,7 +390,7 @@ export default function CalendarCard() {
                   placeholder="Nota (opcional)…"
                   disabled={adding}
                   rows={2}
-                  className="w-full resize-none rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
+                  className="w-full resize-none rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none transition-colors focus:border-accent/50"
                 />
                 <div className="flex gap-2">
                   <input
@@ -398,24 +398,24 @@ export default function CalendarCard() {
                     value={addDate}
                     onChange={e => setAddDate(e.target.value)}
                     disabled={adding}
-                    className="flex-1 rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
+                    className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
                   />
                   <input
                     type="time"
                     value={addTime}
                     onChange={e => setAddTime(e.target.value)}
                     disabled={adding}
-                    className="flex-1 rounded-xl border border-ink-4/15 bg-ink-0/50 px-3 py-2 text-sm text-ink-4 outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
+                    className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={adding || !addTitle.trim()}
-                  className="w-full rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                  className="w-full rounded-card bg-accent px-4 py-2 text-body font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   {adding ? '…' : editingUid ? 'Guardar' : 'Agregar'}
                 </button>
-                {addError && <p className="text-xs text-red-400">{addError}</p>}
+                {addError && <p className="text-secondary text-red-400">{addError}</p>}
                 </>)}
               </form>
             </>

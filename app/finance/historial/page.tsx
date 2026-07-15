@@ -56,40 +56,40 @@ export default function FinanceHistorialPage() {
     <Shell>
       <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
         <div className="mb-6">
-          <Link href="/" className="text-xs text-ink-3 transition-colors hover:text-ink-4">← Finanzas</Link>
-          <h1 className="mt-2 text-2xl font-bold text-ink-4">Historial completo</h1>
+          <Link href="/" className="text-secondary text-fg-muted transition-colors hover:text-fg">← Finanzas</Link>
+          <h1 className="mt-2 text-heading font-bold text-fg">Historial completo</h1>
         </div>
 
         {loading ? (
-          <p className="animate-pulse py-10 text-center text-sm text-ink-3">Cargando…</p>
+          <p className="animate-pulse py-10 text-center text-body text-fg-muted">Cargando…</p>
         ) : err ? (
-          <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>
+          <div className="rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">{err}</div>
         ) : groups.length === 0 ? (
-          <p className="py-10 text-center text-sm italic text-ink-3/60">Sin movimientos registrados.</p>
+          <p className="py-10 text-center text-body italic text-fg-muted/60">Sin movimientos registrados.</p>
         ) : (
           <div className="space-y-8">
             {groups.map(({ month, sorted, totalIn, totalOut, neto }) => (
               <section key={month}>
                 <div className="mb-2 flex items-baseline justify-between">
-                  <h2 className="text-sm font-semibold text-ink-4">{monthLabel(month)}</h2>
-                  <span className={`text-xs font-medium tabular-nums ${neto >= 0 ? 'text-ok' : 'text-danger'}`}>
+                  <h2 className="text-body font-semibold text-fg">{monthLabel(month)}</h2>
+                  <span className={`text-secondary font-medium tabular-nums ${neto >= 0 ? 'text-ok' : 'text-danger'}`}>
                     Neto {neto >= 0 ? '+' : '−'}<Mxn v={Math.abs(neto)} />
                   </span>
                 </div>
-                <div className="mb-2 flex gap-4 text-[11px] text-ink-3">
+                <div className="mb-2 flex gap-4 text-secondary text-fg-muted">
                   <span>Entrado <span className="tabular-nums text-ok"><Mxn v={totalIn} /></span></span>
                   <span>Salido <span className="tabular-nums text-danger"><Mxn v={totalOut} /></span></span>
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
+                <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-border dashboard-card">
                   {sorted.map(m => (
                     <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                      <span className="w-8 shrink-0 text-xs font-medium text-ink-3">{m.date.slice(8)}</span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-ink-4">{m.description}</span>
+                      <span className="w-8 shrink-0 text-secondary font-medium text-fg-muted">{m.date.slice(8)}</span>
+                      <span className="min-w-0 flex-1 truncate text-body text-fg">{m.description}</span>
                       {m.metodo && <MethodBadge metodo={m.metodo} />}
-                      <span className="shrink-0 rounded-full bg-ink-2/30 px-2 py-0.5 text-[10px] text-ink-3">
+                      <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-muted">
                         {CAT_LABEL[m.category]}
                       </span>
-                      <span className={`shrink-0 text-sm font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
+                      <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
                         {m.flow === 'in' ? '+' : '−'}<Mxn v={Number(m.amount)} />
                       </span>
                     </div>

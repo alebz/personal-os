@@ -47,9 +47,9 @@ function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={loading}
-          className="w-full rounded-2xl border border-ink-4/15 bg-ink-1/40 px-5 py-3.5 text-center text-sm text-ink-4 placeholder:text-ink-2/50 outline-none backdrop-blur-md transition-colors focus:border-ink-4/40 focus:ring-1 focus:ring-ink-4/10 disabled:opacity-50"
+          className="w-full rounded-card border border-border bg-surface-1 px-5 py-3.5 text-center text-body text-fg placeholder:text-fg-faint/50 outline-none backdrop-blur-md transition-colors focus:border-border-strong focus:ring-1 focus:ring-border disabled:opacity-50"
         />
-        {error && <p className="mt-3 text-center text-xs text-red-400/90">{error}</p>}
+        {error && <p className="mt-3 text-center text-secondary text-red-400/90">{error}</p>}
       </form>
     </main>
   )

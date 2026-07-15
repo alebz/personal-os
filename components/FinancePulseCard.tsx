@@ -99,12 +99,12 @@ function Ticker({
     <div className="flex flex-col gap-1.5">
       {/* Symbol + % change */}
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] font-bold tracking-[0.2em] text-ink-3">
+        <span className="font-mono text-label font-bold tracking-[0.2em] text-fg-muted">
           {symbol}
         </span>
         {d && (
           <span
-            className={`font-mono text-[10px] tabular-nums ${up ? 'text-green-400' : 'text-red-400'}`}
+            className={`font-mono text-label tabular-nums ${up ? 'text-green-400' : 'text-red-400'}`}
           >
             {up ? '▲' : '▼'} {d.pct.toFixed(1)}%
           </span>
@@ -112,12 +112,12 @@ function Ticker({
       </div>
 
       {/* Balance */}
-      <div className="font-mono text-[17px] font-semibold leading-none tabular-nums text-ink-4">
+      <div className="font-mono text-md font-semibold leading-none tabular-nums text-fg">
         {fmt(current)}
       </div>
 
       {/* Sub-label */}
-      <div className="font-mono text-[9px] text-ink-3/70">{sublabel}</div>
+      <div className="font-mono text-label text-fg-muted/70">{sublabel}</div>
 
       {/* Sparkline */}
       <div className="mt-1">
@@ -150,39 +150,39 @@ export default function FinancePulseCard() {
   }, [])
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 p-4 shadow-xl shadow-black/20 dashboard-card">
+    <div className="rounded-card border border-border p-4 shadow-xl shadow-black/20 dashboard-card">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[11px] font-bold tracking-widest text-ink-3">
+        <h2 className="text-secondary font-bold tracking-widest text-fg-muted">
           FINANCE PULSE
         </h2>
         {loading && (
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ink-3/60" />
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-pill bg-surface-2" />
         )}
       </div>
 
       {/* Divider */}
-      <div className="mb-3 h-px bg-ink-4/10" />
+      <div className="mb-3 h-px bg-surface-active" />
 
       {loading ? (
         <div className="grid grid-cols-2 gap-4">
           {[0, 1].map(i => (
             <div key={i} className="flex flex-col gap-2">
-              <div className="h-2.5 w-8 animate-pulse rounded bg-ink-2/20" />
-              <div className="h-5 w-16 animate-pulse rounded bg-ink-2/20" />
-              <div className="h-10 animate-pulse rounded bg-ink-2/10" />
+              <div className="h-2.5 w-8 animate-pulse rounded bg-surface-2" />
+              <div className="h-5 w-16 animate-pulse rounded bg-surface-2" />
+              <div className="h-10 animate-pulse rounded bg-surface-2" />
             </div>
           ))}
         </div>
       ) : data ? (
         <div className="grid grid-cols-2 gap-x-4">
           <Ticker symbol="ALX" points={(data.alx?.length ?? 0) >= 2 ? data.alx : EMPTY} sublabel="30d personal" />
-          <div className="border-l border-ink-4/10 pl-4">
+          <div className="border-l border-border pl-4">
             <Ticker symbol="UPT" points={(data.upt?.length ?? 0) >= 2 ? data.upt : EMPTY} sublabel="6mo uptown" />
           </div>
         </div>
       ) : (
-        <p className="text-xs text-ink-3">Sin datos</p>
+        <p className="text-secondary text-fg-muted">Sin datos</p>
       )}
     </div>
   )

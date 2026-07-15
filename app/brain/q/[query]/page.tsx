@@ -51,10 +51,10 @@ export default function BrainQueryPage() {
     <Shell>
       <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
         <div className="mb-6">
-          <Link href="/" className="text-xs text-ink-3 transition-colors hover:text-ink-4">← Cerebro</Link>
-          <h1 className="mt-2 text-2xl font-bold text-ink-4">“{query}”</h1>
+          <Link href="/" className="text-secondary text-fg-muted transition-colors hover:text-fg">← Cerebro</Link>
+          <h1 className="mt-2 text-heading font-bold text-fg">“{query}”</h1>
           {!loading && !err && (
-            <p className="mt-1 text-xs text-ink-3">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
+            <p className="mt-1 text-secondary text-fg-muted">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
           )}
         </div>
 
@@ -62,7 +62,7 @@ export default function BrainQueryPage() {
           <div className="mb-5 flex flex-wrap gap-1.5">
             <button
               onClick={() => setKindFilter(null)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${kindFilter === null ? 'border-ink-4/20 bg-ink-4/[0.08] text-ink-4' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
+              className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === null ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
             >
               Todo
             </button>
@@ -70,7 +70,7 @@ export default function BrainQueryPage() {
               <button
                 key={k}
                 onClick={() => setKindFilter(k)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${kindFilter === k ? 'border-ink-4/20 bg-ink-4/[0.08] text-ink-4' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
+                className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === k ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
               >
                 {kindLabel(k)}
               </button>
@@ -79,14 +79,14 @@ export default function BrainQueryPage() {
         )}
 
         {loading ? (
-          <div className="flex items-center gap-3 py-10 text-sm text-ink-3">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+          <div className="flex items-center gap-3 py-10 text-body text-fg-muted">
+            <span className="inline-block h-4 w-4 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" />
             Buscando en tu memoria…
           </div>
         ) : err ? (
-          <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>
+          <div className="rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">{err}</div>
         ) : filtered.length === 0 ? (
-          <p className="py-10 text-center text-sm italic text-ink-3/60">Nada en tu memoria coincide.</p>
+          <p className="py-10 text-center text-body italic text-fg-muted/60">Nada en tu memoria coincide.</p>
         ) : (
           <div className="space-y-4">
             {filtered.map(c => <ResultCard key={c.id} chunk={c} />)}

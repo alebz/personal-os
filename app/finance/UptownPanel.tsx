@@ -125,8 +125,8 @@ function MethodBadge({ digital, onToggle }: { digital: boolean; onToggle: () => 
       onClick={e => { e.stopPropagation(); onToggle() }}
       title={digital ? 'Tarjeta/Cuenta' : 'Efectivo'}
       className={[
-        'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold transition-colors',
-        digital ? 'bg-accent/15 text-accent' : 'bg-ink-4/10 text-ink-3',
+        'shrink-0 rounded px-1.5 py-0.5 text-label font-bold transition-colors',
+        digital ? 'bg-accent/15 text-accent' : 'bg-surface-active text-fg-muted',
       ].join(' ')}
     >
       {digital ? '💳' : '💵'}
@@ -159,7 +159,7 @@ function AmountInput({ value, onSave, dim }: { value: number; onSave: (n: number
         onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(value)); setEditing(false) } }}
         onClick={e => e.stopPropagation()}
-        className="w-24 rounded border border-accent/50 bg-ink-2/30 px-1.5 py-0.5 text-right text-xs text-ink-4 outline-none"
+        className="w-24 rounded border border-accent/50 bg-surface-2 px-1.5 py-0.5 text-right text-secondary text-fg outline-none"
       />
     )
   }
@@ -167,7 +167,7 @@ function AmountInput({ value, onSave, dim }: { value: number; onSave: (n: number
   return (
     <button
       onClick={e => { e.stopPropagation(); setEditing(true) }}
-      className={['shrink-0 text-xs tabular-nums font-medium hover:text-accent transition-colors', dim ? 'text-ink-3' : 'text-ink-4'].join(' ')}
+      className={['shrink-0 text-secondary tabular-nums font-medium hover:text-accent transition-colors', dim ? 'text-fg-muted' : 'text-fg'].join(' ')}
     >
       {fmt(value)}
     </button>
@@ -178,8 +178,8 @@ function AmountInput({ value, onSave, dim }: { value: number; onSave: (n: number
 
 function CheckDot({ checked }: { checked: boolean }) {
   return (
-    <div className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
-      checked ? 'border-ok bg-ok' : 'border-ink-3/40'].join(' ')}>
+    <div className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border transition-colors',
+      checked ? 'border-ok bg-ok' : 'border-border-strong'].join(' ')}>
       {checked && (
         <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 stroke-white" strokeWidth={2}>
           <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -200,13 +200,13 @@ function RenterRow({ r, onToggle, onToggleDigital, onSetMonto }: {
   return (
     <li
       onClick={onToggle}
-      className={['flex cursor-pointer items-center gap-2.5 border-b border-ink-4/5 px-3 py-2.5 last:border-0 transition-colors',
-        r.cobrado ? 'bg-ok/5' : 'hover:bg-ink-4/[0.03]'].join(' ')}
+      className={['flex cursor-pointer items-center gap-2.5 border-b border-border px-3 py-2.5 last:border-0 transition-colors',
+        r.cobrado ? 'bg-ok/5' : 'hover:bg-surface-hover'].join(' ')}
     >
       <CheckDot checked={r.cobrado} />
       <div className="min-w-0 flex-1">
-        <p className={['truncate text-xs font-medium', r.cobrado ? 'text-ink-3 line-through' : 'text-ink-4'].join(' ')}>{r.name}</p>
-        {r.sub && <p className="truncate text-[10px] text-ink-2">{r.sub}</p>}
+        <p className={['truncate text-secondary font-medium', r.cobrado ? 'text-fg-muted line-through' : 'text-fg'].join(' ')}>{r.name}</p>
+        {r.sub && <p className="truncate text-label text-fg-faint">{r.sub}</p>}
       </div>
       <MethodBadge digital={r.digital} onToggle={onToggleDigital} />
       <AmountInput value={r.monto} onSave={onSetMonto} dim={r.cobrado} />
@@ -225,13 +225,13 @@ function ExpenseRow({ e, onToggle, onToggleDigital, onSetMonto }: {
   return (
     <li
       onClick={onToggle}
-      className={['flex cursor-pointer items-center gap-2.5 border-b border-ink-4/5 px-3 py-2.5 last:border-0 transition-colors',
-        e.pagado ? 'bg-ok/5' : 'hover:bg-ink-4/[0.03]'].join(' ')}
+      className={['flex cursor-pointer items-center gap-2.5 border-b border-border px-3 py-2.5 last:border-0 transition-colors',
+        e.pagado ? 'bg-ok/5' : 'hover:bg-surface-hover'].join(' ')}
     >
       <CheckDot checked={e.pagado} />
       <div className="min-w-0 flex-1">
-        <p className={['truncate text-xs font-medium', e.pagado ? 'text-ink-3 line-through' : 'text-ink-4'].join(' ')}>{e.name}</p>
-        {e.sub && <p className="truncate text-[10px] text-ink-2">{e.sub}</p>}
+        <p className={['truncate text-secondary font-medium', e.pagado ? 'text-fg-muted line-through' : 'text-fg'].join(' ')}>{e.name}</p>
+        {e.sub && <p className="truncate text-label text-fg-faint">{e.sub}</p>}
       </div>
       <MethodBadge digital={e.digital} onToggle={onToggleDigital} />
       <AmountInput value={e.monto} onSave={onSetMonto} dim={e.pagado} />
@@ -259,7 +259,7 @@ function ExtraIngresoRow({ ei, onToggle, onToggleDigital, onSetMonto, onSetName,
   }
 
   return (
-    <li className={['flex items-center gap-2.5 border-b border-ink-4/5 px-3 py-2 last:border-0 transition-colors',
+    <li className={['flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-0 transition-colors',
       ei.cobrado ? 'bg-ok/5' : ''].join(' ')}>
       <div onClick={onToggle} className="cursor-pointer">
         <CheckDot checked={ei.cobrado} />
@@ -270,18 +270,18 @@ function ExtraIngresoRow({ ei, onToggle, onToggleDigital, onSetMonto, onSetName,
             onChange={e => setNameDraft(e.target.value)}
             onBlur={commitName}
             onKeyDown={e => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') setEditingName(false) }}
-            className="w-full rounded border border-accent/50 bg-ink-2/30 px-1 py-0.5 text-xs text-ink-4 outline-none"
+            className="w-full rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-secondary text-fg outline-none"
           />
         ) : (
           <p
             onClick={() => setEditingName(true)}
-            className={['cursor-text truncate text-xs font-medium', ei.cobrado ? 'text-ink-3 line-through' : 'text-ink-4'].join(' ')}
+            className={['cursor-text truncate text-secondary font-medium', ei.cobrado ? 'text-fg-muted line-through' : 'text-fg'].join(' ')}
           >{ei.name}</p>
         )}
       </div>
       <MethodBadge digital={ei.digital} onToggle={onToggleDigital} />
       <AmountInput value={ei.monto} onSave={onSetMonto} dim={ei.cobrado} />
-      <button onClick={onDelete} className="shrink-0 text-sm leading-none text-ink-3/30 hover:text-danger">×</button>
+      <button onClick={onDelete} className="shrink-0 text-body leading-none text-fg-muted/30 hover:text-danger">×</button>
     </li>
   )
 }
@@ -306,7 +306,7 @@ function ExtraGastoRow({ eg, onToggle, onToggleDigital, onSetMonto, onSetName, o
   }
 
   return (
-    <li className={['flex items-center gap-2.5 border-b border-ink-4/5 px-3 py-2 last:border-0 transition-colors',
+    <li className={['flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-0 transition-colors',
       eg.pagado ? 'bg-ok/5' : ''].join(' ')}>
       <div onClick={onToggle} className="cursor-pointer">
         <CheckDot checked={eg.pagado} />
@@ -317,18 +317,18 @@ function ExtraGastoRow({ eg, onToggle, onToggleDigital, onSetMonto, onSetName, o
             onChange={e => setNameDraft(e.target.value)}
             onBlur={commitName}
             onKeyDown={e => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') setEditingName(false) }}
-            className="w-full rounded border border-accent/50 bg-ink-2/30 px-1 py-0.5 text-xs text-ink-4 outline-none"
+            className="w-full rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-secondary text-fg outline-none"
           />
         ) : (
           <p
             onClick={() => setEditingName(true)}
-            className={['cursor-text truncate text-xs font-medium', eg.pagado ? 'text-ink-3 line-through' : 'text-ink-4'].join(' ')}
+            className={['cursor-text truncate text-secondary font-medium', eg.pagado ? 'text-fg-muted line-through' : 'text-fg'].join(' ')}
           >{eg.name}</p>
         )}
       </div>
       <MethodBadge digital={eg.digital} onToggle={onToggleDigital} />
       <AmountInput value={eg.monto} onSave={onSetMonto} dim={eg.pagado} />
-      <button onClick={onDelete} className="shrink-0 text-sm leading-none text-ink-3/30 hover:text-danger">×</button>
+      <button onClick={onDelete} className="shrink-0 text-body leading-none text-fg-muted/30 hover:text-danger">×</button>
     </li>
   )
 }
@@ -354,10 +354,10 @@ function SaldoCard({ label, saldo, inicio, onSetInicio }: {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/85 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-3">{label}</p>
-      <p className={['text-3xl font-black tabular-nums', saldo >= 0 ? 'text-ok' : 'text-danger'].join(' ')}>{fmt(saldo)}</p>
-      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-ink-2">
+    <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl">
+      <p className="mb-1 text-label font-semibold uppercase tracking-widest text-fg-muted">{label}</p>
+      <p className={['text-display font-black tabular-nums', saldo >= 0 ? 'text-ok' : 'text-danger'].join(' ')}>{fmt(saldo)}</p>
+      <div className="mt-2 flex items-center gap-1.5 text-label text-fg-faint">
         <span>inicio</span>
         {editing ? (
           <input
@@ -365,10 +365,10 @@ function SaldoCard({ label, saldo, inicio, onSetInicio }: {
             onChange={e => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
-            className="w-24 rounded border border-accent/50 bg-ink-2/30 px-1 py-0.5 text-[10px] text-ink-4 outline-none"
+            className="w-24 rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-label text-fg outline-none"
           />
         ) : (
-          <button onClick={() => setEditing(true)} className="text-[10px] text-ink-2 underline-offset-2 hover:text-ink-3 hover:underline">
+          <button onClick={() => setEditing(true)} className="text-label text-fg-faint underline-offset-2 hover:text-fg-muted hover:underline">
             {fmt(inicio)}
           </button>
         )}
@@ -396,26 +396,26 @@ function AddExtraForm({ placeholder, onAdd }: {
   }
 
   return (
-    <div className="flex items-center gap-2 border-t border-ink-4/10 px-3 py-2">
+    <div className="flex items-center gap-2 border-t border-border px-3 py-2">
       <input
         value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder={placeholder}
-        className="min-w-0 flex-1 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-xs text-ink-4 placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
       />
       <input
         type="number" value={monto} onChange={e => setMonto(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="$"
-        className="w-20 rounded-lg border border-ink-4/10 bg-ink-2/20 px-2 py-1 text-xs text-ink-4 placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="w-20 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
       />
       <button
         onClick={() => setDigital(d => !d)}
-        className={['shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold', digital ? 'bg-accent/15 text-accent' : 'bg-ink-4/10 text-ink-3'].join(' ')}
+        className={['shrink-0 rounded px-1.5 py-0.5 text-label font-bold', digital ? 'bg-accent/15 text-accent' : 'bg-surface-active text-fg-muted'].join(' ')}
       >
         {digital ? '💳' : '💵'}
       </button>
       <button
         onClick={submit} disabled={!name.trim() || !monto}
-        className="shrink-0 rounded-lg bg-accent/20 px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
+        className="shrink-0 rounded-control bg-accent/20 px-2.5 py-1 text-secondary font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
       >
         +
       </button>
@@ -427,9 +427,9 @@ function AddExtraForm({ placeholder, onAdd }: {
 
 function SectionHeader({ title, summary }: { title: string; summary?: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-ink-4/10 px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-3">{title}</p>
-      {summary && <p className="text-xs font-medium tabular-nums text-ink-3">{summary}</p>}
+    <div className="flex items-center justify-between border-b border-border px-3 py-2">
+      <p className="text-label font-semibold uppercase tracking-widest text-fg-muted">{title}</p>
+      {summary && <p className="text-secondary font-medium tabular-nums text-fg-muted">{summary}</p>}
     </div>
   )
 }
@@ -445,22 +445,22 @@ function NominaPanel({ nomina, onToggleSemana, onSetMonto }: {
   const pagado = nomina.semanas.reduce((a, v, i) => a + (nomina.pagadas[i] ? v : 0), 0)
 
   return (
-    <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
+    <div className="overflow-hidden rounded-card border border-border bg-surface-1 backdrop-blur-xl">
       <SectionHeader
         title="Nómina semanal"
         summary={`${fmt(pagado)} / ${fmt(total)}`}
       />
-      <div className="grid grid-cols-4 divide-x divide-ink-4/5">
+      <div className="grid grid-cols-4 divide-x divide-border">
         {nomina.semanas.map((monto, i) => (
           <div
             key={i}
             onClick={() => onToggleSemana(i)}
             className={['flex cursor-pointer flex-col items-center gap-1.5 p-3 transition-colors',
-              nomina.pagadas[i] ? 'bg-ok/5' : 'hover:bg-ink-4/[0.03]'].join(' ')}
+              nomina.pagadas[i] ? 'bg-ok/5' : 'hover:bg-surface-hover'].join(' ')}
           >
-            <p className="text-[10px] font-semibold text-ink-3">Sem {i + 1}</p>
+            <p className="text-label font-semibold text-fg-muted">Sem {i + 1}</p>
             <AmountInput value={monto} onSave={n => onSetMonto(i, n)} dim={nomina.pagadas[i]} />
-            <div className={['h-1.5 w-1.5 rounded-full', nomina.pagadas[i] ? 'bg-ok' : 'bg-ink-3/20'].join(' ')} />
+            <div className={['h-1.5 w-1.5 rounded-pill', nomina.pagadas[i] ? 'bg-ok' : 'bg-surface-2'].join(' ')} />
           </div>
         ))}
       </div>
@@ -473,15 +473,15 @@ function NominaPanel({ nomina, onToggleSemana, onSetMonto }: {
 function FondoPanel({ fondoAcum, fondoMeta = 50000 }: { fondoAcum: number; fondoMeta?: number }) {
   const pct = fondoMeta > 0 ? Math.min((fondoAcum / fondoMeta) * 100, 100) : 0
   return (
-    <div className="rounded-xl border border-warn/20 bg-warn/5 p-3">
+    <div className="rounded-card border border-warn/20 bg-warn/5 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-warn/70">Fondo mantenimiento</p>
-        <p className="text-sm font-bold tabular-nums text-warn">{fmt(fondoAcum)}</p>
+        <p className="text-label font-semibold uppercase tracking-widest text-warn/70">Fondo mantenimiento</p>
+        <p className="text-body font-bold tabular-nums text-warn">{fmt(fondoAcum)}</p>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-ink-2/20">
-        <div className="h-full rounded-full bg-warn transition-all duration-700" style={{ width: `${pct}%` }} />
+      <div className="h-2 overflow-hidden rounded-pill bg-surface-2">
+        <div className="h-full rounded-pill bg-warn transition-all duration-700" style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-1 text-right text-[10px] text-ink-2">{pct.toFixed(0)}% · meta {fmt(fondoMeta)}</p>
+      <p className="mt-1 text-right text-label text-fg-faint">{pct.toFixed(0)}% · meta {fmt(fondoMeta)}</p>
     </div>
   )
 }
@@ -642,7 +642,7 @@ export default function UptownPanel({ month }: { month: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <p className="animate-pulse text-sm text-ink-3">Cargando…</p>
+        <p className="animate-pulse text-body text-fg-muted">Cargando…</p>
       </div>
     )
   }
@@ -676,9 +676,9 @@ export default function UptownPanel({ month }: { month: string }) {
           { label: 'Remanente',      value: t.remanente, cls: t.remanente >= 0 ? 'text-ok' : 'text-danger' },
           { label: 'Fondo total',    value: fondoAcum,   cls: 'text-warn'   },
         ].map(({ label, value, cls }) => (
-          <div key={label} className="rounded-xl border border-ink-4/10 bg-ink-1/60 p-3 text-center backdrop-blur-xl">
-            <p className="text-[10px] uppercase tracking-wider text-ink-2">{label}</p>
-            <p className={`mt-0.5 text-lg font-black tabular-nums ${cls}`}>{fmt(value)}</p>
+          <div key={label} className="rounded-card border border-border bg-surface-1 p-3 text-center backdrop-blur-xl">
+            <p className="text-label uppercase tracking-wider text-fg-faint">{label}</p>
+            <p className={`mt-0.5 text-subhead font-black tabular-nums ${cls}`}>{fmt(value)}</p>
           </div>
         ))}
       </div>
@@ -688,10 +688,10 @@ export default function UptownPanel({ month }: { month: string }) {
 
         {/* ── Ingresos ── */}
         <div className="space-y-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-ok">↑ Ingresos</p>
+          <p className="text-label font-bold uppercase tracking-widest text-ok">↑ Ingresos</p>
 
           {/* Rentas */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 backdrop-blur-xl">
             <SectionHeader
               title="Rentas"
               summary={`${fmt(rentasCobradas)} / ${fmt(rentasTotal)}`}
@@ -708,7 +708,7 @@ export default function UptownPanel({ month }: { month: string }) {
           </div>
 
           {/* Ingresos extra */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 backdrop-blur-xl">
             <SectionHeader
               title="Ingresos extra"
               summary={ms.extrasIngresos.length > 0
@@ -717,7 +717,7 @@ export default function UptownPanel({ month }: { month: string }) {
             />
             <ul>
               {ms.extrasIngresos.length === 0 && (
-                <li className="px-3 py-2 text-[11px] italic text-ink-2/40">Sin ingresos extra</li>
+                <li className="px-3 py-2 text-secondary italic text-fg-faint/40">Sin ingresos extra</li>
               )}
               {ms.extrasIngresos.map(ei => (
                 <ExtraIngresoRow key={ei.id} ei={ei}
@@ -735,10 +735,10 @@ export default function UptownPanel({ month }: { month: string }) {
 
         {/* ── Gastos ── */}
         <div className="space-y-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-danger">↓ Gastos</p>
+          <p className="text-label font-bold uppercase tracking-widest text-danger">↓ Gastos</p>
 
           {/* Gastos fijos */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 backdrop-blur-xl">
             <SectionHeader
               title="Gastos fijos"
               summary={`${fmt(gastosFijosPag)} / ${fmt(gastosFijosTotal)}`}
@@ -755,14 +755,14 @@ export default function UptownPanel({ month }: { month: string }) {
           </div>
 
           {/* Gastos extra */}
-          <div className="overflow-hidden rounded-xl border border-ink-4/10 bg-ink-1/60 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-card border border-border bg-surface-1 backdrop-blur-xl">
             <SectionHeader
               title="Gastos extra"
               summary={ms.extras.length > 0 ? fmt(extrasPagados) : undefined}
             />
             <ul>
               {ms.extras.length === 0 && (
-                <li className="px-3 py-2 text-[11px] italic text-ink-2/40">Sin gastos extra</li>
+                <li className="px-3 py-2 text-secondary italic text-fg-faint/40">Sin gastos extra</li>
               )}
               {ms.extras.map(eg => (
                 <ExtraGastoRow key={eg.id} eg={eg}
@@ -779,7 +779,7 @@ export default function UptownPanel({ month }: { month: string }) {
 
           {/* Fondo de mantenimiento (toggle + amount) */}
           {fondo && (
-            <div className="overflow-hidden rounded-xl border border-warn/20 bg-warn/5">
+            <div className="overflow-hidden rounded-card border border-warn/20 bg-warn/5">
               <ExpenseRow
                 e={fondo}
                 onToggle={()        => toggleExpense(fondo.id)}

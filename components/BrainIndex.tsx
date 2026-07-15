@@ -21,12 +21,12 @@ const LS_VIEW = 'brain:view'
 // Compact one-line row shared by the lista and timeline modes.
 function CompactRow({ chunk }: { chunk: MemoryChunk }) {
   return (
-    <div className="flex items-baseline gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-ink-4/[0.04]">
-      <span className="w-24 shrink-0 text-[11px] font-medium uppercase tracking-wide text-ink-3">
+    <div className="flex items-baseline gap-3 rounded-control px-2 py-1.5 transition-colors hover:bg-surface-hover">
+      <span className="w-24 shrink-0 text-secondary font-medium uppercase tracking-wide text-fg-muted">
         {kindLabel(chunk.metadata?.kind as string | undefined)}
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm text-ink-4">{chunk.content}</span>
-      <span className="shrink-0 text-[11px] tabular-nums text-ink-2/60">{fmtDate(chunk.created_at)}</span>
+      <span className="min-w-0 flex-1 truncate text-body text-fg">{chunk.content}</span>
+      <span className="shrink-0 text-secondary tabular-nums text-fg-faint/60">{fmtDate(chunk.created_at)}</span>
     </div>
   )
 }
@@ -93,14 +93,14 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
 
   return (
     <div className="w-full">
-      <h1 className="text-2xl font-bold text-ink-4">Cerebro</h1>
-      <p className="mt-1 text-xs text-ink-3">
+      <h1 className="text-heading font-bold text-fg">Cerebro</h1>
+      <p className="mt-1 text-secondary text-fg-muted">
         {loading ? 'Cargando…' : `${items.length} entradas · todo tu contenido`}
       </p>
 
       {/* Search → redirects to /brain/q (reuses the existing route) */}
-      <div className="mt-5 flex items-center gap-2 rounded-2xl border border-ink-4/10 bg-ink-1/50 px-4 py-2.5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0 text-ink-3" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <div className="mt-5 flex items-center gap-2 rounded-card border border-border bg-surface-1 px-4 py-2.5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+        <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0 text-fg-muted" fill="none" stroke="currentColor" strokeWidth={1.5}>
           <circle cx="7" cy="7" r="5" /><path d="M11 11l3.5 3.5" strokeLinecap="round" />
         </svg>
         <input
@@ -108,21 +108,21 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
           onChange={e => setSearch(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
           placeholder="Buscar en tu memoria…"
-          className="min-w-0 flex-1 bg-transparent text-sm text-ink-4 placeholder:text-ink-2/60 outline-none"
+          className="min-w-0 flex-1 bg-transparent text-body text-fg placeholder:text-fg-faint/60 outline-none"
         />
         {search.trim() && (
-          <button onClick={runSearch} className="shrink-0 text-xs text-ink-3 transition-colors hover:text-accent">Buscar →</button>
+          <button onClick={runSearch} className="shrink-0 text-secondary text-fg-muted transition-colors hover:text-accent">Buscar →</button>
         )}
       </div>
 
       {/* View switch */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <nav className="flex items-center gap-1 rounded-full border border-ink-4/10 bg-ink-1/85 p-1 backdrop-blur-xl">
+        <nav className="flex items-center gap-1 rounded-pill border border-border bg-surface-1 p-1 backdrop-blur-xl">
           {VIEWS.map(v => (
             <button
               key={v.id}
               onClick={() => changeView(v.id)}
-              className={`rounded-full px-3.5 py-1 text-xs transition-colors ${view === v.id ? 'bg-ink-4/10 font-medium text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
+              className={`rounded-pill px-3.5 py-1 text-secondary transition-colors ${view === v.id ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'}`}
             >
               {v.label}
             </button>
@@ -135,7 +135,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
         <div className="mt-3 flex flex-wrap gap-1.5">
           <button
             onClick={() => setKindFilter(null)}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${kindFilter === null ? 'border-ink-4/20 bg-ink-4/[0.08] text-ink-4' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
+            className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === null ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
           >
             Todo
           </button>
@@ -143,7 +143,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
             <button
               key={k}
               onClick={() => setKindFilter(kindFilter === k ? null : k)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${kindFilter === k ? 'border-ink-4/20 bg-ink-4/[0.08] text-ink-4' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
+              className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === k ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
             >
               {kindLabel(k)}
             </button>
@@ -154,17 +154,17 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
       {/* Content */}
       <div className="mt-6">
         {loading ? (
-          <p className="animate-pulse py-10 text-center text-sm text-ink-3">Cargando…</p>
+          <p className="animate-pulse py-10 text-center text-body text-fg-muted">Cargando…</p>
         ) : err ? (
-          <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>
+          <div className="rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">{err}</div>
         ) : filtered.length === 0 ? (
-          <p className="py-10 text-center text-sm italic text-ink-3/60">Nada que mostrar.</p>
+          <p className="py-10 text-center text-body italic text-fg-muted/60">Nada que mostrar.</p>
         ) : view === 'rejilla' ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {filtered.map(c => <ResultCard key={c.id} chunk={c} />)}
           </div>
         ) : view === 'lista' ? (
-          <div className="flex flex-col divide-y divide-ink-4/5 rounded-2xl border border-ink-4/10 bg-ink-1/40 p-2">
+          <div className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface-1 p-2">
             {filtered.map(c => <CompactRow key={c.id} chunk={c} />)}
           </div>
         ) : (
@@ -173,12 +173,12 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
               const c = dayColor(new Date(day + 'T12:00:00'))
               return (
                 <section key={day}>
-                  <div className="mb-2 flex items-center gap-2 border-b border-ink-4/8 pb-1.5">
-                    <span className="h-2 w-2 rounded-full" style={{ background: c }} />
-                    <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: c }}>
+                  <div className="mb-2 flex items-center gap-2 border-b border-border pb-1.5">
+                    <span className="h-2 w-2 rounded-pill" style={{ background: c }} />
+                    <h2 className="text-secondary font-semibold uppercase tracking-wider" style={{ color: c }}>
                       {fmtDate(day)}
                     </h2>
-                    <span className="tabular-nums text-[11px] text-ink-2">{rows.length}</span>
+                    <span className="tabular-nums text-secondary text-fg-faint">{rows.length}</span>
                   </div>
                   <div className="flex flex-col">
                     {rows.map(row => <CompactRow key={row.id} chunk={row} />)}

@@ -26,7 +26,7 @@ function Hero() {
       </div>
 
       {quote && (
-        <p className="max-w-md text-center text-xs italic leading-relaxed text-ink-3/60">
+        <p className="max-w-md text-center text-secondary italic leading-relaxed text-fg-muted/60">
           &ldquo;{quote}&rdquo;
         </p>
       )}

@@ -511,8 +511,8 @@ export default function TarotCard() {
   if (!card) {
     return (
       <div className="relative w-full" style={{ paddingBottom: '150%', position: 'relative', zIndex: 10000 }}>
-        <div className="absolute inset-0 flex items-center justify-center bg-ink-1" style={{ clipPath: CARD_CLIP }}>
-          <div className="h-3 w-3 animate-spin rounded-full border-2 border-ink-4/10 border-t-accent/60" />
+        <div className="absolute inset-0 flex items-center justify-center bg-surface-1" style={{ clipPath: CARD_CLIP }}>
+          <div className="h-3 w-3 animate-spin rounded-pill border-2 border-border border-t-accent/60" />
         </div>
       </div>
     )
@@ -576,7 +576,7 @@ export default function TarotCard() {
                 style={{ background: `color-mix(in oklch, ${color} 12%, oklch(0.10 0.02 275))` }}
               >
                 <span className="text-6xl leading-none" style={{ transform: reversed ? 'rotate(180deg)' : 'none' }}>{card.emoji}</span>
-                <span className="text-center text-xs font-bold uppercase tracking-widest text-white/50">{card.name}</span>
+                <span className="text-center text-secondary font-bold uppercase tracking-widest text-white/50">{card.name}</span>
               </div>
             )}
 
@@ -586,7 +586,7 @@ export default function TarotCard() {
             {/* Numeral — top left */}
             {card.numeral && (
               <div className="absolute top-3 left-3.5 pointer-events-none">
-                <span className="text-white/80 text-sm font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+                <span className="text-white/80 text-body font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                   {card.numeral}
                 </span>
               </div>
@@ -595,7 +595,7 @@ export default function TarotCard() {
             {/* Nueva button — top right */}
             <button
               onClick={drawNew}
-              className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold text-white/70 backdrop-blur-sm transition-colors hover:text-white/95"
+              className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 rounded-pill px-2.5 py-1 text-label font-semibold text-white/70 backdrop-blur-sm transition-colors hover:text-white/95"
               style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)' }}
             >
               ↺ nueva
@@ -609,11 +609,11 @@ export default function TarotCard() {
 
             {/* Card name + orientation — bottom */}
             <div className="absolute bottom-0 left-0 right-0 px-3.5 pb-3 pointer-events-none">
-              <p className="text-white/90 text-[10px] font-bold uppercase tracking-[0.18em] drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+              <p className="text-white/90 text-label font-bold uppercase tracking-[0.18em] drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                 {card.name}
               </p>
               <p
-                className="mt-0.5 text-[9px] font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+                className="mt-0.5 text-label font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
                 style={{ color: reversed ? 'oklch(0.78 0.14 65)' : 'oklch(0.68 0.18 150)' }}
               >
                 {reversed ? '↓ Invertida' : '↑ Derecha'}
@@ -636,12 +636,12 @@ export default function TarotCard() {
             <div className="flex shrink-0 items-center justify-between px-4 pt-4 pb-2">
               <button
                 onClick={e => { e.stopPropagation(); setFlipped(false) }}
-                className="text-[10px] text-white/35 transition-colors hover:text-white/60"
+                className="text-label text-white/35 transition-colors hover:text-white/60"
               >
                 ← volver
               </button>
               <span
-                className="text-[13px] font-bold"
+                className="text-body font-bold"
                 style={{ color: 'oklch(0.78 0.14 65)' }}
               >
                 {reversed ? '↓' : '↑'}
@@ -650,7 +650,7 @@ export default function TarotCard() {
 
             {/* Card name */}
             <div className="shrink-0 px-4 pb-1">
-              <p className="text-white/80 text-[10px] font-bold uppercase tracking-[0.18em]">
+              <p className="text-white/80 text-label font-bold uppercase tracking-[0.18em]">
                 {card.name}
               </p>
               <p
@@ -670,7 +670,7 @@ export default function TarotCard() {
                 {card.body}
               </p>
               <div className="mt-3 border-t pt-3" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] leading-relaxed text-white/32 italic">
+                <p className="text-label leading-relaxed text-white/32 italic">
                   {card.rev}
                 </p>
               </div>

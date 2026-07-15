@@ -47,17 +47,17 @@ function MacroInput({
 }) {
   return (
     <div>
-      <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-ink-3">{label}</p>
+      <p className="mb-0.5 text-label font-semibold uppercase tracking-wider text-fg-muted">{label}</p>
       <div className="relative">
         <input
           type="number"
           min={0}
           value={value || ''}
           onChange={e => onChange(e.target.value)}
-          className="w-full rounded-lg border border-ink-4/10 bg-ink-0/40 px-2 py-1 text-xs text-ink-4 outline-none transition-colors focus:border-accent/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="w-full rounded-control border border-border bg-surface-base/40 px-2 py-1 text-secondary text-fg outline-none transition-colors focus:border-accent/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {unit && (
-          <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-ink-3/50">
+          <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-label text-fg-muted/50">
             {unit}
           </span>
         )}
@@ -130,21 +130,21 @@ function MealRow({
   }
 
   return (
-    <div className="rounded-xl transition-colors">
+    <div className="rounded-card transition-colors">
       {/* Collapsed header row */}
       <div
         onClick={onExpand}
-        className="group flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-ink-4/5"
+        className="group flex cursor-pointer items-center gap-2 rounded-card px-2 py-1.5 transition-colors hover:bg-surface-hover"
       >
-        <span className="w-10 shrink-0 text-[10px] tabular-nums text-ink-3">{meal.t}</span>
-        <span className="min-w-0 flex-1 truncate text-sm text-ink-4">{meal.n}</span>
+        <span className="w-10 shrink-0 text-label tabular-nums text-fg-muted">{meal.t}</span>
+        <span className="min-w-0 flex-1 truncate text-body text-fg">{meal.n}</span>
         {meal.estimated && (
-          <span className="shrink-0 text-[9px] text-ink-3/40">est.</span>
+          <span className="shrink-0 text-label text-fg-muted/40">est.</span>
         )}
-        <span className="shrink-0 text-xs tabular-nums text-ink-3">{meal.kcal} kcal</span>
+        <span className="shrink-0 text-secondary tabular-nums text-fg-muted">{meal.kcal} kcal</span>
         <button
           onClick={onDelete}
-          className="ml-0.5 shrink-0 text-[10px] text-ink-3/20 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+          className="ml-0.5 shrink-0 text-label text-fg-muted/20 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
         >
           ✕
         </button>
@@ -152,19 +152,19 @@ function MealRow({
 
       {/* Inline editor */}
       {expanded && (
-        <div className="mx-1 mb-1 rounded-xl border border-ink-4/10 bg-ink-0/30 p-3">
+        <div className="mx-1 mb-1 rounded-card border border-border bg-surface-base/30 p-3">
           {/* Name + time */}
           <div className="mb-3 flex gap-2">
             <input
               type="time"
               value={edit.t}
               onChange={e => setEdit(em => ({ ...em, t: e.target.value }))}
-              className="w-24 shrink-0 rounded-lg border border-ink-4/10 bg-ink-0/40 px-2 py-1 text-xs text-ink-4 outline-none transition-colors focus:border-accent/30"
+              className="w-24 shrink-0 rounded-control border border-border bg-surface-base/40 px-2 py-1 text-secondary text-fg outline-none transition-colors focus:border-accent/30"
             />
             <input
               value={edit.n}
               onChange={e => setEdit(em => ({ ...em, n: e.target.value }))}
-              className="flex-1 rounded-lg border border-ink-4/10 bg-ink-0/40 px-2 py-1 text-sm text-ink-4 outline-none transition-colors focus:border-accent/30"
+              className="flex-1 rounded-control border border-border bg-surface-base/40 px-2 py-1 text-body text-fg outline-none transition-colors focus:border-accent/30"
             />
           </div>
 
@@ -176,7 +176,7 @@ function MealRow({
             <div className="relative">
               <MacroInput label="kcal" value={edit.kcal} onChange={handleKcal} />
               {redistributing && (
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-accent/70" />
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-pill bg-accent/70" />
               )}
             </div>
           </div>
@@ -184,7 +184,7 @@ function MealRow({
           <div className="flex justify-end">
             <button
               onClick={() => onSave({ ...meal, ...edit })}
-              className="rounded-lg bg-accent/15 px-3 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
+              className="rounded-control bg-accent/15 px-3 py-1 text-secondary font-medium text-accent transition-colors hover:bg-accent/25"
             >
               Guardar
             </button>
@@ -282,9 +282,9 @@ export default function NutritionCard() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/88 p-5 shadow-xl shadow-black/20 dashboard-card">
+    <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 dashboard-card">
       {/* Header */}
-      <h2 className="mb-4 text-sm font-semibold tracking-wide text-ink-4">🥗 Nutrición</h2>
+      <h2 className="mb-4 text-body font-semibold tracking-wide text-fg">🥗 Nutrición</h2>
 
       {/* Input */}
       <div className="mb-1 flex gap-2">
@@ -295,24 +295,24 @@ export default function NutritionCard() {
           onKeyDown={e => e.key === 'Enter' && void addMeal()}
           placeholder="Escribe un alimento y presiona Enter…"
           disabled={estimating}
-          className="flex-1 rounded-xl border border-ink-4/10 bg-ink-0/40 px-3 py-2 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/20 disabled:opacity-50"
+          className="flex-1 rounded-card border border-border bg-surface-base/40 px-3 py-2 text-body text-fg placeholder:text-fg-faint outline-none transition-colors focus:border-accent/20 disabled:opacity-50"
         />
         <button
           onClick={() => void addMeal()}
           disabled={!input.trim() || estimating}
-          className="shrink-0 rounded-xl border border-ink-4/10 bg-ink-0/40 px-3 py-2 text-sm text-ink-3 transition-colors hover:border-accent/20 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-card border border-border bg-surface-base/40 px-3 py-2 text-body text-fg-muted transition-colors hover:border-accent/20 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
         >
           {estimating ? '⏳' : '+'}
         </button>
       </div>
       {estError && (
-        <p className="mb-2 text-[11px] text-danger">⚠ {estError}</p>
+        <p className="mb-2 text-secondary text-danger">⚠ {estError}</p>
       )}
 
       {/* Meal list */}
       <div className="mt-3 min-h-[2rem] space-y-0.5">
         {meals.length === 0 && !estimating ? (
-          <p className="py-2 text-xs italic text-ink-3/50">Sin comidas registradas hoy.</p>
+          <p className="py-2 text-secondary italic text-fg-muted/50">Sin comidas registradas hoy.</p>
         ) : (
           meals.map(meal => (
             <MealRow
@@ -336,27 +336,27 @@ export default function NutritionCard() {
 
       {/* Totals bar */}
       {meals.length > 0 && (
-        <div className="mt-3 border-t border-ink-4/5 pt-3">
+        <div className="mt-3 border-t border-border pt-3">
           <div className="mb-1.5 flex items-baseline justify-between">
-            <span className="text-sm font-semibold tabular-nums text-ink-4">
+            <span className="text-body font-semibold tabular-nums text-fg">
               {totals.kcal.toLocaleString('es-MX')} kcal
             </span>
-            <span className="text-[11px] tabular-nums text-ink-3">
+            <span className="text-secondary tabular-nums text-fg-muted">
               P {totals.p}g · C {totals.c}g · G {totals.f}g
             </span>
           </div>
           {macroCal > 0 && (
-            <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-4/5">
+            <div className="flex h-1.5 overflow-hidden rounded-pill bg-surface-active">
               <div style={{ width: `${pPct}%` }}  className="bg-ok transition-all duration-300" />
               <div style={{ width: `${cPct}%` }}  className="bg-accent transition-all duration-300" />
               <div style={{ width: `${fPct}%` }}  className="bg-warn transition-all duration-300" />
             </div>
           )}
           {macroCal > 0 && (
-            <div className="mt-1 flex gap-3 text-[9px] text-ink-3/60">
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-ok inline-block" />Prot.</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-accent inline-block" />Carb.</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-warn inline-block" />Gras.</span>
+            <div className="mt-1 flex gap-3 text-label text-fg-muted/60">
+              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-pill bg-ok inline-block" />Prot.</span>
+              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-pill bg-accent inline-block" />Carb.</span>
+              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-pill bg-warn inline-block" />Gras.</span>
             </div>
           )}
         </div>

@@ -100,10 +100,10 @@ function HabitModal({
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl border border-ink-4/15 bg-ink-1 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-ink-4/10 px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-ink-4">{editing ? 'Editar hábito' : 'Nuevo hábito'}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-ink-3 hover:bg-ink-4/10 hover:text-ink-4">
+      <div className="relative w-full max-w-md rounded-card border border-border bg-surface-1 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h3 className="text-body font-semibold text-fg">{editing ? 'Editar hábito' : 'Nuevo hábito'}</h3>
+          <button onClick={onClose} className="rounded-control p-1 text-fg-muted hover:bg-surface-hover hover:text-fg">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.6}><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
           </button>
         </div>
@@ -114,7 +114,7 @@ function HabitModal({
             <input
               value={icon}
               onChange={e => setIcon(e.target.value)}
-              className="h-11 w-11 shrink-0 rounded-xl border border-ink-4/15 bg-ink-0/40 text-center text-xl outline-none focus:border-accent/40"
+              className="h-11 w-11 shrink-0 rounded-card border border-border bg-surface-base/40 text-center text-subhead outline-none focus:border-accent/40"
               aria-label="Emoji"
             />
             <input
@@ -123,39 +123,39 @@ function HabitModal({
               placeholder="Nombre del hábito"
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
-              className="h-11 flex-1 rounded-xl border border-ink-4/15 bg-ink-0/40 px-3 text-sm text-ink-4 placeholder:text-ink-2/50 outline-none focus:border-accent/40"
+              className="h-11 flex-1 rounded-card border border-border bg-surface-base/40 px-3 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/40"
             />
           </div>
 
           {/* Emoji suggestions */}
           <div className="flex flex-wrap gap-1.5">
             {EMOJI_SUGGESTIONS.map(e => (
-              <button key={e} onClick={() => setIcon(e)} className="rounded-lg border border-ink-4/10 px-1.5 py-1 text-base hover:bg-ink-4/10">{e}</button>
+              <button key={e} onClick={() => setIcon(e)} className="rounded-control border border-border px-1.5 py-1 text-md hover:bg-surface-hover">{e}</button>
             ))}
           </div>
 
           {/* Category */}
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-ink-3">Categoría</label>
+            <label className="mb-1.5 block text-secondary font-medium uppercase tracking-wide text-fg-muted">Categoría</label>
             <input
               value={category}
               onChange={e => setCategory(e.target.value)}
               list="habit-categories"
               placeholder="Salud, Fitness, Detox…"
-              className="w-full rounded-xl border border-ink-4/15 bg-ink-0/40 px-3 py-2 text-sm text-ink-4 placeholder:text-ink-2/50 outline-none focus:border-accent/40"
+              className="w-full rounded-card border border-border bg-surface-base/40 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/40"
             />
             <datalist id="habit-categories">{CATEGORIES.map(c => <option key={c} value={c} />)}</datalist>
           </div>
 
           {/* Color */}
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-ink-3">Color</label>
+            <label className="mb-1.5 block text-secondary font-medium uppercase tracking-wide text-fg-muted">Color</label>
             <div className="flex flex-wrap gap-2">
               {SWATCHES.map(c => (
                 <button
                   key={c}
                   onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full transition-transform ${color === c ? 'scale-110 ring-2 ring-ink-4/60 ring-offset-2 ring-offset-ink-1' : ''}`}
+                  className={`h-7 w-7 rounded-pill transition-transform ${color === c ? 'scale-110 ring-2 ring-border-strong ring-offset-2 ring-offset-ink-1' : ''}`}
                   style={{ backgroundColor: c }}
                   aria-label={c}
                 />
@@ -164,15 +164,15 @@ function HabitModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-ink-4/10 px-5 py-3.5">
+        <div className="flex items-center justify-between border-t border-border px-5 py-3.5">
           {editing ? (
-            <button onClick={archive} disabled={busy} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
+            <button onClick={archive} disabled={busy} className="rounded-control px-2.5 py-1.5 text-secondary font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
               Archivar
             </button>
           ) : <span />}
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-ink-3 hover:text-ink-4">Cancelar</button>
-            <button onClick={save} disabled={busy || !name.trim()} className="rounded-lg bg-accent/15 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40">
+            <button onClick={onClose} className="rounded-control px-3 py-1.5 text-body text-fg-muted hover:text-fg">Cancelar</button>
+            <button onClick={save} disabled={busy || !name.trim()} className="rounded-control bg-accent/15 px-4 py-1.5 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40">
               {busy ? '…' : 'Guardar'}
             </button>
           </div>
@@ -198,12 +198,12 @@ function HabitRow({
   const doneToday = done.has(today)
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-ink-4/10 bg-ink-1/85 px-3.5 py-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+    <div className="flex items-center gap-3 rounded-card border border-border bg-surface-1 px-3.5 py-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <button onClick={() => onOpen(habit)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-lg" style={{ backgroundColor: habit.color + '22' }}>{habit.icon}</span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-card text-subhead" style={{ backgroundColor: habit.color + '22' }}>{habit.icon}</span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-ink-4">{habit.name}</span>
-          <span className="block truncate text-[11px] text-ink-3">{habit.category}</span>
+          <span className="block truncate text-body font-medium text-fg">{habit.name}</span>
+          <span className="block truncate text-secondary text-fg-muted">{habit.category}</span>
         </span>
       </button>
 
@@ -215,7 +215,7 @@ function HabitRow({
             <span
               key={d}
               title={d}
-              className={`h-4 w-2 rounded-[2px] bg-ink-4/10 ${d === today ? 'ring-1 ring-ink-4/40' : ''}`}
+              className={`h-4 w-2 rounded-sharp bg-surface-active ${d === today ? 'ring-1 ring-border-strong' : ''}`}
               style={filled ? { backgroundColor: habit.color } : undefined}
             />
           )
@@ -226,7 +226,7 @@ function HabitRow({
       <button
         onClick={() => onToggle(habit)}
         aria-label={doneToday ? 'Marcar no hecho' : 'Marcar hecho'}
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border transition-colors ${doneToday ? 'border-transparent text-white' : 'border-ink-4/25 text-transparent hover:border-ink-4/50'}`}
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-card border transition-colors ${doneToday ? 'border-transparent text-white' : 'border-border-strong text-transparent hover:border-border-strong'}`}
         style={doneToday ? { backgroundColor: habit.color } : undefined}
       >
         <svg viewBox="0 0 12 10" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M1 5l3.5 3.5L11 1" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -311,16 +311,16 @@ function HabitDetail({
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-8">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative my-auto w-full max-w-3xl rounded-2xl border border-ink-4/15 bg-ink-1 shadow-2xl">
+      <div className="relative my-auto w-full max-w-3xl rounded-card border border-border bg-surface-1 shadow-2xl">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-ink-4/10 px-5 py-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-2xl" style={{ backgroundColor: habit.color + '22' }}>{habit.icon}</span>
+        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card text-heading" style={{ backgroundColor: habit.color + '22' }}>{habit.icon}</span>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-semibold text-ink-4">{habit.name}</h3>
-            <p className="truncate text-xs text-ink-3">{habit.category}</p>
+            <h3 className="truncate text-md font-semibold text-fg">{habit.name}</h3>
+            <p className="truncate text-secondary text-fg-muted">{habit.category}</p>
           </div>
-          <button onClick={() => onEdit(habit)} className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">Editar</button>
-          <button onClick={onClose} className="shrink-0 rounded-lg p-1 text-ink-3 hover:bg-ink-4/10 hover:text-ink-4" aria-label="Cerrar">
+          <button onClick={() => onEdit(habit)} className="shrink-0 rounded-control px-3 py-1.5 text-secondary font-medium text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">Editar</button>
+          <button onClick={onClose} className="shrink-0 rounded-control p-1 text-fg-muted hover:bg-surface-hover hover:text-fg" aria-label="Cerrar">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.6}><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
           </button>
         </div>
@@ -329,41 +329,41 @@ function HabitDetail({
         <div className="flex gap-8 px-5 py-5">
           <div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-4xl font-bold tabular-nums" style={{ color: habit.color }}>{streak}</span>
-              <span className="text-lg">🔥</span>
+              <span className="text-display font-bold tabular-nums" style={{ color: habit.color }}>{streak}</span>
+              <span className="text-subhead">🔥</span>
             </div>
-            <p className="mt-1 text-xs text-ink-3">Racha actual · {streak === 1 ? '1 día' : `${streak} días`}</p>
+            <p className="mt-1 text-secondary text-fg-muted">Racha actual · {streak === 1 ? '1 día' : `${streak} días`}</p>
           </div>
           <div>
-            <span className="text-4xl font-bold tabular-nums text-ink-4">{total}</span>
-            <p className="mt-1 text-xs text-ink-3">Total completado</p>
+            <span className="text-display font-bold tabular-nums text-fg">{total}</span>
+            <p className="mt-1 text-secondary text-fg-muted">Total completado</p>
           </div>
         </div>
 
         {/* Year heatmap */}
-        <div className="border-t border-ink-4/8 px-5 py-4">
+        <div className="border-t border-border px-5 py-4">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <button onClick={() => setYear(y => y - 1)} className="rounded p-1 text-xs text-ink-3 hover:bg-ink-4/10 hover:text-ink-4">◀</button>
-              <span className="text-sm font-medium tabular-nums text-ink-4">{year}</span>
-              <button onClick={() => setYear(y => Math.min(thisYear, y + 1))} disabled={year >= thisYear} className="rounded p-1 text-xs text-ink-3 hover:bg-ink-4/10 hover:text-ink-4 disabled:opacity-30">▶</button>
+              <button onClick={() => setYear(y => y - 1)} className="rounded p-1 text-secondary text-fg-muted hover:bg-surface-hover hover:text-fg">◀</button>
+              <span className="text-body font-medium tabular-nums text-fg">{year}</span>
+              <button onClick={() => setYear(y => Math.min(thisYear, y + 1))} disabled={year >= thisYear} className="rounded p-1 text-secondary text-fg-muted hover:bg-surface-hover hover:text-fg disabled:opacity-30">▶</button>
             </div>
-            <span className="text-xs text-ink-3">{yearCount} en {year}</span>
+            <span className="text-secondary text-fg-muted">{yearCount} en {year}</span>
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-10"><span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" /></div>
+            <div className="flex justify-center py-10"><span className="inline-block h-5 w-5 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" /></div>
           ) : (
             <div className="overflow-x-auto pb-1">
               <div className="inline-flex flex-col gap-1">
                 {/* Month labels */}
                 <div className="flex gap-[3px] pl-5">
-                  {weeks.map((_, i) => <span key={i} className="w-[11px] shrink-0 whitespace-nowrap text-[9px] text-ink-3">{labels[i]}</span>)}
+                  {weeks.map((_, i) => <span key={i} className="w-[11px] shrink-0 whitespace-nowrap text-label text-fg-muted">{labels[i]}</span>)}
                 </div>
                 <div className="flex gap-[3px]">
                   {/* Weekday labels */}
                   <div className="flex w-5 shrink-0 flex-col gap-[3px]">
-                    {WEEKDAY_LABELS.map((l, r) => <span key={r} className="h-[11px] text-[8px] leading-[11px] text-ink-3">{l}</span>)}
+                    {WEEKDAY_LABELS.map((l, r) => <span key={r} className="h-[11px] text-label leading-[11px] text-fg-muted">{l}</span>)}
                   </div>
                   {/* Week columns */}
                   {weeks.map((wk, i) => (
@@ -372,7 +372,7 @@ function HabitDetail({
                         <span
                           key={r}
                           title={c ? (done.has(c) ? `${c} ✓` : c) : ''}
-                          className="h-[11px] w-[11px] rounded-[2px]"
+                          className="h-[11px] w-[11px] rounded-sharp"
                           style={{ backgroundColor: c ? (done.has(c) ? habit.color : 'rgb(255 255 255 / 0.06)') : 'transparent' }}
                         />
                       ))}
@@ -442,29 +442,29 @@ function MonthlyHeatmap() {
       {/* Month nav — calendar style */}
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-baseline gap-2.5">
-          <h3 className="text-lg font-bold capitalize tracking-tight text-ink-4">{MONTH_NAMES[month]}</h3>
-          <span className="text-sm font-light text-ink-3">{year}</span>
+          <h3 className="text-subhead font-bold capitalize tracking-tight text-fg">{MONTH_NAMES[month]}</h3>
+          <span className="text-body font-light text-fg-muted">{year}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={prev} aria-label="Mes anterior" className="flex h-8 w-8 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4">
+          <button onClick={prev} aria-label="Mes anterior" className="flex h-8 w-8 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button onClick={next} disabled={beyond} aria-label="Mes siguiente" className="flex h-8 w-8 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4 disabled:opacity-30">
+          <button onClick={next} disabled={beyond} aria-label="Mes siguiente" className="flex h-8 w-8 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-30">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" /></div>
+        <div className="flex justify-center py-16"><span className="inline-block h-5 w-5 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" /></div>
       ) : active.length === 0 ? (
-        <p className="py-16 text-center text-sm text-ink-3">Sin hábitos activos.</p>
+        <p className="py-16 text-center text-body text-fg-muted">Sin hábitos activos.</p>
       ) : (
         <>
           {/* DOW headers (weekday rainbow) */}
           <div className="mb-2 grid grid-cols-7">
             {DOW_LABELS.map(d => (
-              <div key={d} className="text-center text-[11px] font-semibold uppercase tracking-wider text-ink-3/70">{d}</div>
+              <div key={d} className="text-center text-secondary font-semibold uppercase tracking-wider text-fg-muted/70">{d}</div>
             ))}
           </div>
 
@@ -476,11 +476,11 @@ function MonthlyHeatmap() {
               return (
                 <div
                   key={i}
-                  className={`flex min-h-[3.75rem] flex-col items-center gap-1.5 rounded-xl px-1 pt-1.5 pb-1.5 ${
-                    isToday ? 'bg-accent/10 ring-1 ring-accent/40' : 'bg-ink-1/40'
+                  className={`flex min-h-[3.75rem] flex-col items-center gap-1.5 rounded-card px-1 pt-1.5 pb-1.5 ${
+                    isToday ? 'bg-accent/10 ring-1 ring-accent/40' : 'bg-surface-1'
                   } ${!inMonth ? 'opacity-30' : ''}`}
                 >
-                  <span className={`text-xs tabular-nums ${isToday ? 'font-semibold text-accent' : 'text-ink-3'}`}>{date.getDate()}</span>
+                  <span className={`text-secondary tabular-nums ${isToday ? 'font-semibold text-accent' : 'text-fg-muted'}`}>{date.getDate()}</span>
                   {inMonth && (
                     <div className="flex max-w-full flex-wrap items-center justify-center gap-1">
                       {active.map(h => {
@@ -489,7 +489,7 @@ function MonthlyHeatmap() {
                           <span
                             key={h.id}
                             title={done ? `${h.name} ✓` : h.name}
-                            className="h-1.5 w-1.5 rounded-full transition-colors"
+                            className="h-1.5 w-1.5 rounded-pill transition-colors"
                             style={{ background: done ? h.color : 'rgb(255 255 255 / 0.08)' }}
                           />
                         )
@@ -504,11 +504,11 @@ function MonthlyHeatmap() {
           {/* Legend + per-habit totals */}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {active.map(h => (
-              <div key={h.id} className="flex items-center gap-1.5 rounded-full border border-ink-4/10 bg-ink-1/40 px-2.5 py-1">
-                <span className="h-2 w-2 rounded-full" style={{ background: h.color }} />
-                <span className="text-sm leading-none">{h.icon}</span>
-                <span className="text-xs text-ink-3">{h.name}</span>
-                <span className="text-xs font-bold tabular-nums" style={{ color: h.color }}>{h.dates.length}</span>
+              <div key={h.id} className="flex items-center gap-1.5 rounded-pill border border-border bg-surface-1 px-2.5 py-1">
+                <span className="h-2 w-2 rounded-pill" style={{ background: h.color }} />
+                <span className="text-body leading-none">{h.icon}</span>
+                <span className="text-secondary text-fg-muted">{h.name}</span>
+                <span className="text-secondary font-bold tabular-nums" style={{ color: h.color }}>{h.dates.length}</span>
               </div>
             ))}
           </div>
@@ -585,24 +585,24 @@ export default function HabitTrackerContent() {
       {/* Header */}
       <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold text-ink-4">Hábitos</h1>
+          <h1 className="text-subhead font-semibold text-fg">Hábitos</h1>
           {view === 'list' && !loading && active.length > 0 && (
-            <span className="text-sm text-ink-3">{doneToday}/{active.length} hoy</span>
+            <span className="text-body text-fg-muted">{doneToday}/{active.length} hoy</span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 rounded-lg border border-ink-4/10 p-0.5">
-            <button onClick={() => setView('list')} title="Lista diaria" className={`rounded-md p-1.5 transition-colors ${view === 'list' ? 'bg-accent/15 text-accent' : 'text-ink-3 hover:text-ink-4'}`}>
+          <div className="flex items-center gap-0.5 rounded-control border border-border p-0.5">
+            <button onClick={() => setView('list')} title="Lista diaria" className={`rounded-control p-1.5 transition-colors ${view === 'list' ? 'bg-accent/15 text-accent' : 'text-fg-muted hover:text-fg'}`}>
               <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.6}><path d="M2 4h12M2 8h12M2 12h12" strokeLinecap="round" /></svg>
             </button>
-            <button onClick={() => setView('month')} title="Vista mensual" className={`rounded-md p-1.5 transition-colors ${view === 'month' ? 'bg-accent/15 text-accent' : 'text-ink-3 hover:text-ink-4'}`}>
+            <button onClick={() => setView('month')} title="Vista mensual" className={`rounded-control p-1.5 transition-colors ${view === 'month' ? 'bg-accent/15 text-accent' : 'text-fg-muted hover:text-fg'}`}>
               <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.4}><rect x="2" y="2" width="12" height="12" rx="1.5" /><path d="M2 6h12M6 6v8M10 6v8" strokeLinecap="round" /></svg>
             </button>
           </div>
           {view === 'list' && (
             <button
               onClick={() => setModal('new')}
-              className="rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+              className="rounded-card border border-accent/20 bg-accent/10 px-3 py-1.5 text-body font-medium text-accent transition-colors hover:bg-accent/20"
             >
               + Nuevo
             </button>
@@ -614,12 +614,12 @@ export default function HabitTrackerContent() {
         {view === 'month' ? <MonthlyHeatmap /> : (<div className="space-y-2">
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+            <span className="inline-block h-5 w-5 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" />
           </div>
         ) : active.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="mb-3 text-4xl">🔥</p>
-            <p className="text-sm text-ink-3">Aún no tienes hábitos activos.<br />Crea el primero con “+ Nuevo”.</p>
+            <p className="mb-3 text-display">🔥</p>
+            <p className="text-body text-fg-muted">Aún no tienes hábitos activos.<br />Crea el primero con “+ Nuevo”.</p>
           </div>
         ) : (
           active.map(h => (
@@ -632,7 +632,7 @@ export default function HabitTrackerContent() {
           <div className="pt-4">
             <button
               onClick={() => setShowArchived(s => !s)}
-              className="flex items-center gap-2 text-xs text-ink-3 transition-colors hover:text-ink-4"
+              className="flex items-center gap-2 text-secondary text-fg-muted transition-colors hover:text-fg"
             >
               <span>{showArchived ? '▾' : '▸'}</span>
               <span>Archivados ({archived.length})</span>
@@ -640,10 +640,10 @@ export default function HabitTrackerContent() {
             {showArchived && (
               <div className="mt-2 space-y-1.5">
                 {archived.map(h => (
-                  <div key={h.id} className="flex items-center gap-3 rounded-xl border border-ink-4/8 bg-ink-1/40 px-3.5 py-2">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-sm opacity-60" style={{ backgroundColor: h.color + '22' }}>{h.icon}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink-3">{h.name}</span>
-                    <button onClick={() => reactivate(h.id)} className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10">
+                  <div key={h.id} className="flex items-center gap-3 rounded-card border border-border bg-surface-1 px-3.5 py-2">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-control text-body opacity-60" style={{ backgroundColor: h.color + '22' }}>{h.icon}</span>
+                    <span className="min-w-0 flex-1 truncate text-body text-fg-muted">{h.name}</span>
+                    <button onClick={() => reactivate(h.id)} className="shrink-0 rounded-control px-2.5 py-1 text-secondary font-medium text-accent transition-colors hover:bg-accent/10">
                       Reactivar
                     </button>
                   </div>

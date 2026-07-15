@@ -31,7 +31,7 @@ export default function RootLayout({
         {/* Apply saved font before first paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var s=localStorage.getItem('os-settings');if(s){var f={system:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",mono:"'JetBrains Mono','Fira Code','Courier New',monospace"};var font=f[JSON.parse(s).font]||f.system;document.documentElement.style.setProperty('--os-font',font);}}catch(e){}})();` }} />
       </head>
-      <body className="bg-ink-0 text-ink-4 antialiased">
+      <body className="bg-surface-base text-fg antialiased">
         <OSSettingsProvider>
           <StarsBackground />
           <LoloCompanionWrapper />

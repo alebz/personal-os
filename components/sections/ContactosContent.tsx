@@ -38,11 +38,11 @@ type Sort   = 'alpha' | 'bday' | 'tipo'
 const CAT_CLS: Record<string, string> = {
   'Familia':           'text-accent border-accent/25 bg-accent/10',
   'Círculo cercano':   'text-ok border-ok/25 bg-ok/10',
-  'Círculo extendido': 'text-ink-3 border-ink-4/15 bg-ink-1/30',
+  'Círculo extendido': 'text-fg-muted border-border bg-surface-1',
   'Proveedores':       'text-warn border-warn/25 bg-warn/10',
   'Clientes':          'text-ok border-ok/15 bg-ok/5',
 }
-const CAT_CLS_DEFAULT = 'text-ink-3 border-ink-4/15 bg-ink-1/30'
+const CAT_CLS_DEFAULT = 'text-fg-muted border-border bg-surface-1'
 
 const SORT_LABELS: Record<Sort, string> = {
   alpha: 'A–Z',
@@ -226,17 +226,17 @@ function CategoryManagerModal({
         role="dialog"
         aria-modal
         aria-label="Gestionar categorías"
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-ink-4/10 bg-ink-0 shadow-2xl"
+        className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-card border border-border bg-surface-base shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-ink-4/10 px-5 py-4">
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <span className="text-secondary font-semibold uppercase tracking-wider text-fg-muted">
             Gestionar categorías
           </span>
           <button
             onClick={onClose}
             aria-label="Cerrar"
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4"
+            className="flex h-6 w-6 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -247,21 +247,21 @@ function CategoryManagerModal({
         {/* Category list */}
         <div className="max-h-64 overflow-y-auto p-2">
           {categories.length === 0 && (
-            <p className="py-6 text-center text-sm italic text-ink-3/50">Sin categorías aún</p>
+            <p className="py-6 text-center text-body italic text-fg-muted/50">Sin categorías aún</p>
           )}
           {categories.map(cat => (
             <div
               key={cat.id}
-              className="group flex items-center gap-3 rounded-xl px-3 py-2 transition-colors hover:bg-ink-2/20"
+              className="group flex items-center gap-3 rounded-card px-3 py-2 transition-colors hover:bg-surface-2"
             >
-              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${catCls(cat.name)}`}>
+              <span className={`shrink-0 rounded-pill border px-2 py-0.5 text-label font-medium ${catCls(cat.name)}`}>
                 {catEmoji(cat.name)} {cat.name}
               </span>
-              <span className="flex-1 truncate text-sm text-ink-4">{cat.name}</span>
+              <span className="flex-1 truncate text-body text-fg">{cat.name}</span>
               <button
                 onClick={() => handleDelete(cat.id, cat.name)}
                 disabled={deletingId === cat.id}
-                className="shrink-0 rounded-lg px-2 py-0.5 text-[10px] text-ink-3/40 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100 disabled:opacity-30"
+                className="shrink-0 rounded-control px-2 py-0.5 text-label text-fg-muted/40 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100 disabled:opacity-30"
               >
                 {deletingId === cat.id ? '…' : 'Eliminar'}
               </button>
@@ -270,9 +270,9 @@ function CategoryManagerModal({
         </div>
 
         {/* Add new */}
-        <div className="border-t border-ink-4/10 p-3 space-y-2">
+        <div className="border-t border-border p-3 space-y-2">
           {addError && (
-            <p className="text-xs text-danger">{addError}</p>
+            <p className="text-secondary text-danger">{addError}</p>
           )}
           <div className="flex gap-2">
             <input
@@ -281,12 +281,12 @@ function CategoryManagerModal({
               onChange={e => { setNewName(e.target.value); setAddError(null) }}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
               placeholder="Nueva categoría…"
-              className="flex-1 rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2 text-sm text-ink-4 placeholder:text-ink-2 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+              className="flex-1 rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg placeholder:text-fg-faint outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
             />
             <button
               onClick={handleAdd}
               disabled={!newName.trim() || adding}
-              className="rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-card bg-accent/15 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {adding ? '…' : '+ Agregar'}
             </button>
@@ -305,28 +305,28 @@ function ContactRow({ contact, onClick }: { contact: Contact; onClick: () => voi
   return (
     <button
       onClick={onClick}
-      className="group flex w-full items-center gap-4 border-t border-ink-4/5 px-5 py-3.5 text-left transition-colors hover:bg-ink-2/10 first:border-t-0"
+      className="group flex w-full items-center gap-4 border-t border-border px-5 py-3.5 text-left transition-colors hover:bg-surface-2 first:border-t-0"
     >
-      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${catCls(contact.category)}`}>
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-pill border text-secondary font-bold ${catCls(contact.category)}`}>
         {ini}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium text-ink-4">{contact.name}</span>
-          <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${catCls(contact.category)}`}>
+          <span className="truncate text-body font-medium text-fg">{contact.name}</span>
+          <span className={`shrink-0 rounded-pill border px-1.5 py-0.5 text-label font-medium ${catCls(contact.category)}`}>
             {catEmoji(contact.category)} {contact.category}
           </span>
         </div>
         {contact.company && (
-          <p className="truncate text-xs text-ink-3">{contact.company}</p>
+          <p className="truncate text-secondary text-fg-muted">{contact.company}</p>
         )}
       </div>
       <div className="shrink-0 text-right">
         {contact.last_contacted && (
-          <p className="text-xs text-ink-3">{relativeDate(contact.last_contacted)}</p>
+          <p className="text-secondary text-fg-muted">{relativeDate(contact.last_contacted)}</p>
         )}
         {contact.birthday && (
-          <p className="text-[10px] text-ink-3/50">🎂 {formatBirthday(contact.birthday)}</p>
+          <p className="text-label text-fg-muted/50">🎂 {formatBirthday(contact.birthday)}</p>
         )}
       </div>
     </button>
@@ -390,9 +390,9 @@ function ContactDrawer({
   }
 
   const isOpen = !!drawer
-  const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-ink-3'
+  const labelCls = 'mb-1.5 block text-label font-semibold uppercase tracking-wider text-fg-muted'
   const inputCls =
-    'w-full rounded-xl border border-ink-4/10 bg-ink-1/85 px-3 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 backdrop-blur-xl'
+    'w-full rounded-card border border-border bg-surface-1 px-3 py-2.5 text-body text-fg placeholder:text-fg-faint transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 backdrop-blur-xl'
 
   // Always include the contact's current category as an option even if it was deleted from the list
   const selectOptions = categoryNames.includes(form.category)
@@ -409,20 +409,20 @@ function ContactDrawer({
         }`}
       />
       <aside
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-ink-4/10 bg-ink-0 shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-surface-base shadow-2xl transition-transform duration-300 ease-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {drawer && (
           <>
-            <div className="flex items-center justify-between border-b border-ink-4/10 px-6 py-4">
-              <span className="text-xs font-medium uppercase tracking-wider text-ink-3">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <span className="text-secondary font-medium uppercase tracking-wider text-fg-muted">
                 {drawer.mode === 'create' ? 'Nuevo contacto' : 'Editar contacto'}
               </span>
               <button
                 onClick={onClose}
                 aria-label="Cerrar"
-                className="rounded-lg p-1 text-ink-3 transition-colors hover:bg-ink-4/10 hover:text-ink-4"
+                className="rounded-control p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
               >
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -457,7 +457,7 @@ function ContactDrawer({
                     ))}
                   </select>
                   <svg
-                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3"
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted"
                     viewBox="0 0 20 20" fill="currentColor" aria-hidden
                   >
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -508,11 +508,11 @@ function ContactDrawer({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 border-t border-ink-4/10 px-6 py-4">
+            <div className="flex items-center gap-3 border-t border-border px-6 py-4">
               <button
                 onClick={handleSave}
                 disabled={saving || !form.name.trim()}
-                className="flex-1 rounded-xl border border-accent/20 bg-accent/10 py-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex-1 rounded-card border border-accent/20 bg-accent/10 py-2.5 text-body font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
@@ -520,7 +520,7 @@ function ContactDrawer({
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="rounded-xl border border-danger/20 px-4 py-2.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
+                  className="rounded-card border border-danger/20 px-4 py-2.5 text-body font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
                 >
                   {deleting ? '…' : 'Eliminar'}
                 </button>
@@ -656,11 +656,11 @@ export default function ContactosContent() {
         {/* Header */}
         <div className="mb-6 flex shrink-0 items-center justify-between">
           <button onClick={() => setListOpen(o => !o)} className="flex items-center gap-2 text-left">
-            <svg viewBox="0 0 12 12" className={`h-3 w-3 shrink-0 text-ink-3/50 transition-transform ${listOpen ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <svg viewBox="0 0 12 12" className={`h-3 w-3 shrink-0 text-fg-muted/50 transition-transform ${listOpen ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-ink-4">Contactos</h1>
+              <h1 className="text-heading font-bold tracking-tight text-fg">Contactos</h1>
               {!loading && (
-                <p className="text-xs text-ink-3">
+                <p className="text-secondary text-fg-muted">
                   {contacts.length} persona{contacts.length !== 1 ? 's' : ''}
                 </p>
               )}
@@ -668,7 +668,7 @@ export default function ContactosContent() {
           </button>
           <button
             onClick={() => setDrawer({ mode: 'create' })}
-            className="rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
+            className="rounded-card bg-accent/15 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/25"
           >
             + Nuevo
           </button>
@@ -680,17 +680,17 @@ export default function ContactosContent() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nombre o empresa…"
-            className="w-full rounded-xl border border-ink-4/10 bg-ink-1/85 px-4 py-2.5 text-sm text-ink-4 placeholder:text-ink-2 backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+            className="w-full rounded-card border border-border bg-surface-1 px-4 py-2.5 text-body text-fg placeholder:text-fg-faint backdrop-blur-xl outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             {/* Filtros dropdown */}
             <div ref={filterRef} className="relative">
               <button
                 onClick={() => setFilterOpen(o => !o)}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                className={`flex items-center gap-1.5 rounded-pill border px-3 py-1 text-secondary transition-colors ${
                   catFilter
                     ? catCls(catFilter)
-                    : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+                    : 'border-border text-fg-muted hover:text-fg'
                 }`}
               >
                 <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M1 3h12M3 7h8M5 11h4" strokeLinecap="round" /></svg>
@@ -698,10 +698,10 @@ export default function ContactosContent() {
                 <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 transition-transform ${filterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
               {filterOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1.5 w-56 rounded-xl border border-ink-4/10 bg-ink-0 p-1.5 shadow-2xl">
+                <div className="absolute left-0 top-full z-20 mt-1.5 w-56 rounded-card border border-border bg-surface-base p-1.5 shadow-2xl">
                   <button
                     onClick={() => { setCatFilter(null); setFilterOpen(false) }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-ink-2/20 ${catFilter === null ? 'text-accent' : 'text-ink-4'}`}
+                    className={`flex w-full items-center justify-between rounded-control px-3 py-1.5 text-secondary transition-colors hover:bg-surface-2 ${catFilter === null ? 'text-accent' : 'text-fg'}`}
                   >
                     Todos {catFilter === null && '✓'}
                   </button>
@@ -709,7 +709,7 @@ export default function ContactosContent() {
                     <button
                       key={cat}
                       onClick={() => { setCatFilter(prev => (prev === cat ? null : cat)); setFilterOpen(false) }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-ink-2/20 ${catFilter === cat ? 'text-accent' : 'text-ink-4'}`}
+                      className={`flex w-full items-center justify-between rounded-control px-3 py-1.5 text-secondary transition-colors hover:bg-surface-2 ${catFilter === cat ? 'text-accent' : 'text-fg'}`}
                     >
                       <span>{catEmoji(cat)} {cat}</span>
                       {catFilter === cat && <span>✓</span>}
@@ -717,7 +717,7 @@ export default function ContactosContent() {
                   ))}
                   <button
                     onClick={() => { setShowCatMgr(true); setFilterOpen(false) }}
-                    className="mt-1 flex w-full items-center gap-1.5 rounded-lg border-t border-ink-4/10 px-3 pt-2 pb-1 text-[11px] text-ink-3 transition-colors hover:text-ink-4"
+                    className="mt-1 flex w-full items-center gap-1.5 rounded-control border-t border-border px-3 pt-2 pb-1 text-secondary text-fg-muted transition-colors hover:text-fg"
                   >
                     ⚙ Gestionar categorías
                   </button>
@@ -731,10 +731,10 @@ export default function ContactosContent() {
                 <button
                   key={s}
                   onClick={() => setSort(s)}
-                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
+                  className={`rounded-pill border px-2.5 py-0.5 text-label font-medium transition-colors ${
                     sort === s
                       ? 'border-accent/30 bg-accent/10 text-accent'
-                      : 'border-ink-4/10 text-ink-3 hover:text-ink-4'
+                      : 'border-border text-fg-muted hover:text-fg'
                   }`}
                 >
                   {SORT_LABELS[s]}
@@ -748,26 +748,26 @@ export default function ContactosContent() {
         {/* Contact list */}
         {loading ? (
           <div className="flex justify-center py-20">
-            <p className="animate-pulse text-sm text-ink-3">Cargando…</p>
+            <p className="animate-pulse text-body text-fg-muted">Cargando…</p>
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <div className="rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">
             {error}{' '}
             <button onClick={load} className="underline">Reintentar</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-sm italic text-ink-3/60">
+            <p className="text-body italic text-fg-muted/60">
               {search || catFilter ? 'Sin resultados.' : '¡Agrega tu primer contacto!'}
             </p>
           </div>
         ) : listOpen ? (
-          <div className="max-h-[55vh] overflow-y-auto rounded-2xl border border-ink-4/10 bg-ink-1/85 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <div className="max-h-[55vh] overflow-y-auto rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             {sort === 'tipo'
               ? groupByType(filtered, catNames).map(({ cat, items }) => (
                   <div key={cat}>
-                    <div className="border-t border-ink-4/5 bg-ink-0/50 px-5 py-2 first:border-t-0">
-                      <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-3">
+                    <div className="border-t border-border bg-surface-base/50 px-5 py-2 first:border-t-0">
+                      <span className="text-label font-semibold uppercase tracking-widest text-fg-muted">
                         {catEmoji(cat)} {cat}
                       </span>
                     </div>

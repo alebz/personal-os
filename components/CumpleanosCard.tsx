@@ -13,7 +13,7 @@ interface Contact {
 const CAT_COLOR: Record<string, string> = {
   'Familia':           'text-accent',
   'Círculo cercano':   'text-ok',
-  'Círculo extendido': 'text-ink-3',
+  'Círculo extendido': 'text-fg-muted',
   'Proveedores':       'text-warn',
   'Clientes':          'text-ok',
   'Enemigos':          'text-danger',
@@ -51,21 +51,21 @@ export default function CumpleanosCard() {
   }, [])
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 p-5 shadow-xl shadow-black/20 dashboard-card">
+    <div className="rounded-card border border-border p-5 shadow-xl shadow-black/20 dashboard-card">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-ink-4">🎂 Cumpleaños</h2>
+        <h2 className="text-body font-semibold tracking-wide text-fg">🎂 Cumpleaños</h2>
         <Link
           href="/contactos"
-          className="text-xs text-ink-3 transition-colors hover:text-accent"
+          className="text-secondary text-fg-muted transition-colors hover:text-accent"
         >
           Ver todos →
         </Link>
       </div>
 
       {loading ? (
-        <p className="animate-pulse text-xs text-ink-3">Cargando…</p>
+        <p className="animate-pulse text-secondary text-fg-muted">Cargando…</p>
       ) : upcoming.length === 0 ? (
-        <p className="text-xs italic text-ink-3/60">
+        <p className="text-secondary italic text-fg-muted/60">
           No hay cumpleaños registrados.
         </p>
       ) : (
@@ -75,22 +75,22 @@ export default function CumpleanosCard() {
             return (
               <li
                 key={c.id}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2 ${
+                className={`flex items-center gap-3 rounded-card px-3 py-2 ${
                   isToday
                     ? 'border border-accent/20 bg-accent/10'
                     : 'border border-transparent'
                 }`}
               >
-                <span className="text-base leading-none">{isToday ? '🎉' : '🎂'}</span>
+                <span className="text-md leading-none">{isToday ? '🎉' : '🎂'}</span>
                 <div className="min-w-0 flex-1">
-                  <p className={`truncate text-sm font-medium ${isToday ? 'text-accent' : 'text-ink-4'}`}>
+                  <p className={`truncate text-body font-medium ${isToday ? 'text-accent' : 'text-fg'}`}>
                     {c.name}
                   </p>
-                  <p className={`text-[10px] ${CAT_COLOR[c.category] ?? 'text-ink-3'}`}>
+                  <p className={`text-label ${CAT_COLOR[c.category] ?? 'text-fg-muted'}`}>
                     {c.category}
                   </p>
                 </div>
-                <span className={`shrink-0 text-xs tabular-nums ${isToday ? 'font-bold text-accent' : 'text-ink-3'}`}>
+                <span className={`shrink-0 text-secondary tabular-nums ${isToday ? 'font-bold text-accent' : 'text-fg-muted'}`}>
                   {isToday ? '¡Hoy!' : c.days === 1 ? 'Mañana' : `en ${c.days}d`}
                 </span>
               </li>

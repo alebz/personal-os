@@ -200,7 +200,7 @@ function CheckBox({ checked }: { checked: boolean }) {
     <div
       className={[
         'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-        checked ? 'border-ok bg-ok' : 'border-ink-3/30',
+        checked ? 'border-ok bg-ok' : 'border-border-strong',
       ].join(' ')}
     >
       {checked && (
@@ -755,7 +755,7 @@ function HistorialTab({
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
+      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-border dashboard-card">
         {sorted.length === 0 ? (
           <p className="p-10 text-center text-body italic text-fg-muted">Sin movimientos este mes</p>
         ) : (
@@ -1005,7 +1005,7 @@ function CommitmentRow({
         onClick={() => onUpdate(c.id, { active: !c.active })}
         className={[
           'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-          c.active ? 'border-accent bg-accent' : 'border-ink-3/40',
+          c.active ? 'border-accent bg-accent' : 'border-border-strong',
         ].join(' ')}
       >
         {c.active && (
@@ -1091,7 +1091,7 @@ function CompromisoTab({
   return (
     <div className="space-y-4">
       <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <div className="grid grid-cols-3 divide-x divide-ink-4/10 text-center">
+        <div className="grid grid-cols-3 divide-x divide-border text-center">
           {[
             { label: 'Total mensual', value: <Mxn v={totalMensual} />, cls: 'text-danger' },
             { label: 'Activos',       value: String(active.length),  cls: 'text-fg' },
@@ -1105,7 +1105,7 @@ function CompromisoTab({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-ink-4/5 dashboard-card">
+      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-border dashboard-card">
         {commitments.length === 0 ? (
           <p className="p-10 text-center text-body italic text-fg-muted">Sin compromisos</p>
         ) : (
@@ -1258,7 +1258,7 @@ function IncomeConfigRow({
         onClick={() => void onUpdate(item.id, { active: !item.active })}
         className={[
           'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-          item.active ? 'border-ok bg-ok' : 'border-ink-3/30',
+          item.active ? 'border-ok bg-ok' : 'border-border-strong',
         ].join(' ')}
       >
         {item.active && (
@@ -1744,7 +1744,7 @@ export default function FinancePage() {
               onClick={() => setTab(t)}
               className={[
                 'rounded-control px-4 py-1.5 text-body transition-colors',
-                tab === t ? 'bg-ink-4/10 font-medium text-fg' : 'text-fg-muted hover:text-fg',
+                tab === t ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg',
               ].join(' ')}
             >
               {t}

@@ -63,15 +63,15 @@ export function ResultCard({ chunk }: { chunk: MemoryChunk }) {
   const pct  = chunk.similarity != null ? Math.round(chunk.similarity * 100) : null
 
   return (
-    <div className="rounded-2xl border border-ink-4/10 bg-ink-1/40 px-4 py-3.5 transition-colors">
-      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-ink-3">
+    <div className="rounded-card border border-border bg-surface-1 px-4 py-3.5 transition-colors">
+      <div className="mb-1.5 flex items-center gap-2 text-secondary text-fg-muted">
         <span className="font-medium uppercase tracking-wide">{kindLabel(chunk.metadata?.kind as string | undefined)}</span>
-        {chunk.created_at && <><span className="text-ink-3/40">·</span><span>{fmtDate(chunk.created_at)}</span></>}
-        {pct != null && <span className="ml-auto tabular-nums text-ink-2/50">{pct}%</span>}
+        {chunk.created_at && <><span className="text-fg-muted/40">·</span><span>{fmtDate(chunk.created_at)}</span></>}
+        {pct != null && <span className="ml-auto tabular-nums text-fg-faint/50">{pct}%</span>}
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">{body}</p>
+      <p className="whitespace-pre-wrap text-body leading-relaxed text-fg">{body}</p>
       {long && (
-        <button onClick={() => setExpanded(e => !e)} className="mt-1.5 text-[11px] text-ink-3 transition-colors hover:text-ink-4">
+        <button onClick={() => setExpanded(e => !e)} className="mt-1.5 text-secondary text-fg-muted transition-colors hover:text-fg">
           {expanded ? 'Mostrar menos' : 'Mostrar más'}
         </button>
       )}
@@ -252,12 +252,12 @@ export default function CerebroContent() {
     <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
 
       {/* ── Command bar ─────────────────────────────────────────────────── */}
-      <div className="rounded-3xl border border-ink-4/10 bg-ink-1/50 p-6 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+      <div className="rounded-card border border-border bg-surface-1 p-6 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
 
         {/* Intent toggle */}
-        <div className="relative mb-5 flex rounded-full border border-ink-4/10 bg-ink-0/40 p-1">
+        <div className="relative mb-5 flex rounded-pill border border-border bg-surface-base/40 p-1">
           <div
-            className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-ink-4/[0.08] transition-transform duration-200 ease-out"
+            className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-pill bg-surface-active transition-transform duration-200 ease-out"
             style={{ transform: intent === 'consultar' ? 'translateX(100%)' : 'translateX(0)' }}
           />
           {(['capturar', 'consultar'] as const).map(i => (
@@ -265,7 +265,7 @@ export default function CerebroContent() {
               key={i}
               type="button"
               onClick={() => { if (i === 'capturar') clearSearch(); setIntent(i) }}
-              className={`relative z-10 flex-1 rounded-full py-1.5 text-sm font-medium capitalize transition-colors ${intent === i ? 'text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
+              className={`relative z-10 flex-1 rounded-pill py-1.5 text-body font-medium capitalize transition-colors ${intent === i ? 'text-fg' : 'text-fg-muted hover:text-fg'}`}
             >
               {i}
             </button>
@@ -281,7 +281,7 @@ export default function CerebroContent() {
                   key={m.id}
                   type="button"
                   onClick={() => { setCapMode(m.id); if (m.id !== 'diario') setMood(''); capRef.current?.focus() }}
-                  className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${capMode === m.id ? 'bg-ink-4/[0.08] text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
+                  className={`rounded-control px-3 py-1 text-secondary font-medium transition-colors ${capMode === m.id ? 'bg-surface-active text-fg' : 'text-fg-muted hover:text-fg'}`}
                 >
                   {m.label}
                 </button>
@@ -295,7 +295,7 @@ export default function CerebroContent() {
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submitCapture() } }}
               placeholder={capMeta.placeholder}
               disabled={saving}
-              className="w-full resize-none overflow-hidden bg-transparent text-[15px] leading-relaxed text-ink-4 placeholder:text-ink-2/60 outline-none disabled:opacity-40"
+              className="w-full resize-none overflow-hidden bg-transparent text-body leading-relaxed text-fg placeholder:text-fg-faint/60 outline-none disabled:opacity-40"
               style={{ minHeight: capMode === 'tarea' ? '32px' : '76px' }}
             />
 
@@ -306,7 +306,7 @@ export default function CerebroContent() {
                     key={m.value}
                     type="button"
                     onClick={() => setMood(mood === m.value ? '' : m.value)}
-                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${mood === m.value ? 'border-accent/25 bg-accent/10 text-accent' : 'border-ink-4/10 text-ink-3 hover:text-ink-4'}`}
+                    className={`flex items-center gap-1 rounded-pill border px-2.5 py-1 text-secondary font-medium transition-colors ${mood === m.value ? 'border-accent/25 bg-accent/10 text-accent' : 'border-border text-fg-muted hover:text-fg'}`}
                   >
                     <span>{m.emoji}</span><span>{m.label}</span>
                   </button>
@@ -314,15 +314,15 @@ export default function CerebroContent() {
               </div>
             )}
 
-            <div className="mt-4 flex items-center justify-between gap-2 border-t border-ink-4/8 pt-3">
-              <span className={`text-xs transition-opacity ${feedback ? 'opacity-100' : 'opacity-0'} ${feedback === 'Guardado ✓' ? 'text-ok' : 'text-danger'}`}>
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+              <span className={`text-secondary transition-opacity ${feedback ? 'opacity-100' : 'opacity-0'} ${feedback === 'Guardado ✓' ? 'text-ok' : 'text-danger'}`}>
                 {feedback ?? ' '}
               </span>
               <button
                 type="button"
                 onClick={() => void submitCapture()}
                 disabled={saving || !capText.trim()}
-                className="shrink-0 rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded-card bg-accent/15 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
@@ -332,7 +332,7 @@ export default function CerebroContent() {
           <>
             {/* Search — the protagonist */}
             <div className="relative">
-              <svg viewBox="0 0 20 20" fill="none" className="pointer-events-none absolute left-1 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" stroke="currentColor" strokeWidth={1.6}>
+              <svg viewBox="0 0 20 20" fill="none" className="pointer-events-none absolute left-1 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" stroke="currentColor" strokeWidth={1.6}>
                 <circle cx="9" cy="9" r="6" /><path d="M14 14l3.5 3.5" strokeLinecap="round" />
               </svg>
               <input
@@ -341,14 +341,14 @@ export default function CerebroContent() {
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void runSearch() } }}
                 placeholder="Busca en tu memoria…"
-                className="w-full bg-transparent py-1 pl-7 pr-8 text-[15px] text-ink-4 placeholder:text-ink-2/60 outline-none"
+                className="w-full bg-transparent py-1 pl-7 pr-8 text-body text-fg placeholder:text-fg-faint/60 outline-none"
               />
               {(query || searched) && (
                 <button
                   type="button"
                   onClick={clearSearch}
                   aria-label="Limpiar búsqueda"
-                  className="absolute right-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-ink-4/[0.08] hover:text-ink-4"
+                  className="absolute right-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
                 >
                   <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.8}><path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" /></svg>
                 </button>
@@ -356,24 +356,24 @@ export default function CerebroContent() {
             </div>
 
             {/* Secondary, discreet: kind filters */}
-            <div className="mt-3 flex items-center gap-1 border-t border-ink-4/8 pt-3">
+            <div className="mt-3 flex items-center gap-1 border-t border-border pt-3">
               {RESULT_FILTERS.map(f => (
                 <button
                   key={f.label}
                   type="button"
                   onClick={() => setKindFilter(f.id)}
-                  className={`rounded-md px-2 py-0.5 text-[11px] transition-colors ${kindFilter === f.id ? 'bg-ink-4/[0.08] text-ink-4' : 'text-ink-3 hover:text-ink-4'}`}
+                  className={`rounded-control px-2 py-0.5 text-secondary transition-colors ${kindFilter === f.id ? 'bg-surface-active text-fg' : 'text-fg-muted hover:text-fg'}`}
                 >
                   {f.label}
                 </button>
               ))}
               {query.trim() ? (
-                <span className="ml-auto text-[11px] text-ink-2/50">Enter para buscar</span>
+                <span className="ml-auto text-secondary text-fg-faint/50">Enter para buscar</span>
               ) : (
                 <button
                   type="button"
                   onClick={() => setShowIndex(true)}
-                  className="ml-auto text-[11px] text-ink-3 transition-colors hover:text-accent"
+                  className="ml-auto text-secondary text-fg-muted transition-colors hover:text-accent"
                 >
                   ver todo →
                 </button>
@@ -387,12 +387,12 @@ export default function CerebroContent() {
       {intent === 'consultar' && (
         <div className="mt-5 space-y-4">
           {err && (
-            <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>
+            <div className="rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-body text-danger">{err}</div>
           )}
 
           {searching && (
-            <div className="flex items-center gap-3 py-6 text-sm text-ink-3">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+            <div className="flex items-center gap-3 py-6 text-body text-fg-muted">
+              <span className="inline-block h-4 w-4 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" />
               Buscando en tu memoria…
             </div>
           )}
@@ -401,29 +401,29 @@ export default function CerebroContent() {
             filtered.length > 0 ? (
               <>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-ink-3">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
-                  <button onClick={clearSearch} className="text-xs text-ink-3 transition-colors hover:text-ink-4">Limpiar ✕</button>
+                  <p className="text-secondary text-fg-muted">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>
+                  <button onClick={clearSearch} className="text-secondary text-fg-muted transition-colors hover:text-fg">Limpiar ✕</button>
                 </div>
                 {visible.map(c => <ResultCard key={c.id} chunk={c} />)}
                 {filtered.length > TOP_N && (
                   <Link
                     href={`/brain/q/${encodeURIComponent(query.trim())}`}
-                    className="block w-full rounded-xl border border-ink-4/10 py-2 text-center text-xs text-ink-3 transition-colors hover:text-ink-4"
+                    className="block w-full rounded-card border border-border py-2 text-center text-secondary text-fg-muted transition-colors hover:text-fg"
                   >
                     Ver los {filtered.length} resultados →
                   </Link>
                 )}
                 {/* Discreet AI fallback */}
                 {!hasAnswer && !asking && (
-                  <button onClick={() => void runAsk()} className="block w-full pt-1 text-center text-xs text-ink-3 transition-colors hover:text-accent">
+                  <button onClick={() => void runAsk()} className="block w-full pt-1 text-center text-secondary text-fg-muted transition-colors hover:text-accent">
                     ¿No lo encuentras? Pregúntale a Cerebro →
                   </button>
                 )}
               </>
             ) : !hasAnswer && !asking ? (
               <div className="py-10 text-center">
-                <p className="text-sm italic text-ink-3/60">Nada en tu memoria coincide.</p>
-                <button onClick={() => void runAsk()} className="mt-2 text-xs text-ink-3 transition-colors hover:text-accent">
+                <p className="text-body italic text-fg-muted/60">Nada en tu memoria coincide.</p>
+                <button onClick={() => void runAsk()} className="mt-2 text-secondary text-fg-muted transition-colors hover:text-accent">
                   Pregúntale a Cerebro →
                 </button>
               </div>
@@ -432,14 +432,14 @@ export default function CerebroContent() {
 
           {/* AI answer (RAG) */}
           {(asking || hasAnswer) && (
-            <div className="rounded-2xl border border-accent/15 bg-accent/[0.04] px-5 py-4">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-accent/80">Cerebro responde</p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-4">
+            <div className="rounded-card border border-accent/15 bg-accent/[0.04] px-5 py-4">
+              <p className="mb-2 text-secondary font-medium uppercase tracking-wide text-accent/80">Cerebro responde</p>
+              <p className="whitespace-pre-wrap text-body leading-relaxed text-fg">
                 {answer}
                 {asking && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent align-middle" />}
               </p>
               {askSources.length > 0 && (
-                <p className="mt-3 border-t border-ink-4/8 pt-2 text-[11px] text-ink-3">
+                <p className="mt-3 border-t border-border pt-2 text-secondary text-fg-muted">
                   {askSources.length} fuente{askSources.length === 1 ? '' : 's'} · {[...new Set(askSources.map(s => kindLabel(s.metadata?.kind as string | undefined)))].join(' · ')}
                 </p>
               )}
