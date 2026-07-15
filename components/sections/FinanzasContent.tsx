@@ -5,6 +5,10 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
+import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
+
+// A fund = a finance_envelopes row with its flow-aware balance + ledger, from /api/finance/funds.
+interface Fund { id: string; key: string | null; label: string; target: number | null; saved: number; movements: FundMovement[] }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -849,8 +853,6 @@ function EnvelopeCard({
     setAddAmt('')
   }
 
-  const sorted = [...contributions].sort((a, b) => b.date.localeCompare(a.date))
-
   return (
     <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
       <div className="mb-4 flex items-start justify-between">
@@ -925,17 +927,11 @@ function EnvelopeCard({
         </button>
       </div>
 
-      {sorted.length > 0 && (
+      {contributions.length > 0 && (
         <div className="border-t border-border pt-4">
-          <p className="mb-2 text-label font-semibold uppercase tracking-widest text-fg-muted">Aportaciones</p>
-          <div className="max-h-44 space-y-1.5 overflow-y-auto">
-            {sorted.map(m => (
-              <div key={m.id} className="flex items-center justify-between text-secondary">
-                <span className="text-fg-muted">{m.date}</span>
-                <span className="flex-1 truncate px-3 text-fg">{m.description}</span>
-                <span className="font-medium tabular-nums text-ok"><Mxn v={Number(m.amount)} /></span>
-              </div>
-            ))}
+          <p className="mb-2 text-label font-semibold uppercase tracking-widest text-fg-muted">Libreta</p>
+          <div className="max-h-56 overflow-y-auto">
+            <FundLedger movements={contributions} />
           </div>
         </div>
       )}
@@ -1160,9 +1156,11 @@ function CompromisoTab({
 function CuadrarTab({
   balance,
   onSave,
+  cajaFund,
 }: {
   balance: Balance | null
   onSave: (b: { tarjeta: number; efectivo: number; caja_fuerte: number }) => Promise<void>
+  cajaFund?: Fund
 }) {
   const [tarjeta,  setTarjeta]  = useState('')
   const [efectivo, setEfectivo] = useState('')
@@ -1198,8 +1196,8 @@ function CuadrarTab({
   ]
 
   return (
-    <div className="max-w-sm">
-      <div className="space-y-4 rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+    <div className="max-w-2xl space-y-5">
+      <div className="max-w-sm space-y-4 rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
         {fields.map(({ label, value, set }) => (
           <div key={label}>
             <label className="mb-1.5 block text-label font-semibold uppercase tracking-widest text-fg-muted">
@@ -1232,6 +1230,12 @@ function CuadrarTab({
           )}
         </div>
       </div>
+      {cajaFund && (
+        <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <p className="mb-3 text-label font-bold uppercase tracking-widest text-fg-muted">Libreta · Caja Fuerte</p>
+          <FundLedger movements={cajaFund.movements} />
+        </div>
+      )}
     </div>
   )
 }
@@ -1390,6 +1394,7 @@ export default function FinancePage() {
   const [movements,    setMovements]    = useState<Movement[]>([])
   const [commitments,  setCommitments]  = useState<Commitment[]>([])
   const [envelopes,    setEnvelopes]    = useState<Envelope[]>([])
+  const [funds,        setFunds]        = useState<Fund[]>([])
   const [vacMovements, setVacMovements] = useState<Movement[]>([])
   const [balance,      setBalance]      = useState<Balance | null>(null)
   const [incomeItems,  setIncomeItems]  = useState<IncomeItem[]>([])
@@ -1434,16 +1439,18 @@ export default function FinancePage() {
       setLoading(true)
       setError(null)
       try {
-        const [comms, envs, bal, vacMovs, incItems, nomina] = await Promise.all([
+        const [comms, envs, bal, vacMovs, incItems, nomina, fundList] = await Promise.all([
           apiFetch<Commitment[]>('/api/finance/commitments'),
           apiFetch<Envelope[]>('/api/finance/envelopes'),
           apiFetch<Balance | null>('/api/finance/balance'),
           apiFetch<Movement[]>('/api/finance/movements?category=vacaciones'),
           apiFetch<IncomeItem[]>('/api/finance/income'),
           fetch(`/api/uptown/nomina?month=${currMonth()}`).then(r => r.ok ? r.json() as Promise<NominaMirror[]> : []).catch(() => []),
+          apiFetch<Fund[]>('/api/finance/funds'),
         ])
         setCommitments(comms)
         setEnvelopes(envs)
+        setFunds(fundList)
         setBalance(bal)
         setVacMovements(vacMovs)
         setIncomeItems(incItems)
@@ -1810,7 +1817,7 @@ export default function FinancePage() {
               />
             )}
             {tab === 'Cuadrar' && (
-              <CuadrarTab balance={balance} onSave={saveBalance} />
+              <CuadrarTab balance={balance} onSave={saveBalance} cajaFund={funds.find(f => f.key === 'caja_fuerte')} />
             )}
             {tab === 'Config' && (
               <ConfigTab

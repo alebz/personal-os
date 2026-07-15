@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
+import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -686,12 +687,14 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
 
 // ─── FondoCard ────────────────────────────────────────────────────────────────
 
-function FondoCard({ fondoTotal, currentMonthFondo }: {
+function FondoCard({ fondoTotal, currentMonthFondo, movements }: {
   fondoTotal: number
   currentMonthFondo: ExpenseRow | undefined
+  movements: FundMovement[]
 }) {
   const pct = Math.min((fondoTotal / FONDO_META) * 100, 100)
   const faltan = Math.max(0, FONDO_META - fondoTotal)
+  const [showLedger, setShowLedger] = useState(false)
 
   return (
     <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
@@ -718,6 +721,18 @@ function FondoCard({ fondoTotal, currentMonthFondo }: {
               ? `Pendiente: ${mxn(currentMonthFondo.amount)}`
               : 'Sin aportación configurada este mes'}
         </p>
+      )}
+
+      {movements.length > 0 && (
+        <div className="mt-2 border-t border-border pt-2">
+          <button
+            onClick={() => setShowLedger(s => !s)}
+            className="text-label font-medium text-fg-muted transition-colors hover:text-fg"
+          >
+            {showLedger ? 'Ocultar libreta ▲' : 'Ver libreta ▼'}
+          </button>
+          {showLedger && <div className="mt-2"><FundLedger movements={movements} /></div>}
+        </div>
       )}
     </div>
   )
@@ -1135,6 +1150,7 @@ export default function UptownContent() {
   const [extraExpenses, setExtraExp]  = useState<ExtraItem[]>([])
   const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
   const [fondoTotal, setFondoTotal]   = useState(0)
+  const [fondoMovements, setFondoMovements] = useState<FundMovement[]>([])   // Mantenimiento fund ledger
   const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
@@ -1152,6 +1168,12 @@ export default function UptownContent() {
       setExtraExp(data.extra_expenses)
       setFondoTotal(data.fondo_total)
       setPaidCounts(data.paid_counts ?? {})
+      // Mantenimiento fund ledger (all-time; lives in finance_envelopes, so a separate fetch)
+      try {
+        const funds = await (await fetch('/api/finance/funds')).json()
+        const mto = Array.isArray(funds) ? funds.find((f: { key?: string }) => f.key === 'mantenimiento') : null
+        setFondoMovements(mto?.movements ?? [])
+      } catch { /* leave prior movements */ }
       // Auto-fill starting balance from previous month when no balance record exists yet
       if (!data.has_balance && m >= '2026-07' && data.prev_saldo != null && data.prev_saldo > 0) {
         const autoBalance = { starting_balance: data.prev_saldo, cuenta_bancaria: 0, efectivo: 0 }
@@ -1373,7 +1395,7 @@ export default function UptownContent() {
               extraIncome={extraIncome} extraExpenses={extraExpenses}
               onSave={saveStartingBalance}
             />
-            <FondoCard fondoTotal={fondoTotal} currentMonthFondo={currentFondo} />
+            <FondoCard fondoTotal={fondoTotal} currentMonthFondo={currentFondo} movements={fondoMovements} />
           </div>
         )}
 
