@@ -1027,7 +1027,7 @@ function ValetTab({ month }: { month: string }) {
           </div>
           {(() => {
             const nuEsperado = cobrado - proveedorPagado
-            const diferencia = nuEsperado - config.nu_balance
+            const diferencia = config.nu_balance - nuEsperado   // saldoReal − esperado: sobrante +, faltante −
             return (
               <div className="space-y-1.5 rounded-control border border-border bg-surface-2 px-3 py-2.5">
                 <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Cuenta NU · real vs esperado</p>
@@ -1050,7 +1050,7 @@ function ValetTab({ month }: { month: string }) {
                   <span className="text-fg-muted">Saldo esperado</span>
                   <span className="tabular-nums text-fg"><Mxn v={nuEsperado} /></span>
                 </div>
-                <div className={`flex items-center justify-between border-t border-border pt-1 text-secondary font-bold ${diferencia <= 0 ? 'text-ok' : 'text-danger'}`}>
+                <div className={`flex items-center justify-between border-t border-border pt-1 text-secondary font-bold ${diferencia < 0 ? 'text-danger' : 'text-ok'}`}>
                   <span>Diferencia</span>
                   <span className="tabular-nums"><Mxn v={diferencia} /></span>
                 </div>
