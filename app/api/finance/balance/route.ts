@@ -50,15 +50,21 @@ export async function POST(req: NextRequest) {
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const date  = now.toISOString().slice(0, 10)
 
-  const fields: Array<{ label: string; diff: number }> = [
-    { label: 'Tarjeta',     diff: newTarjeta    - oldTarjeta    },
-    { label: 'Efectivo',    diff: newEfectivo   - oldEfectivo   },
-    { label: 'Caja fuerte', diff: newCajaFuerte - oldCajaFuerte },
+  // Caja Fuerte is now a fund — route its reconciliation INTO the fund ledger so the adjustment is
+  // named, not a hidden number overwrite. Tarjeta/Efectivo stay wallet 'ajuste' audit entries.
+  const { data: cajaFund } = await supabase
+    .from('finance_envelopes').select('id').eq('key', 'caja_fuerte').maybeSingle()
+
+  const fields: Array<{ label: string; diff: number; fund: boolean }> = [
+    { label: 'Tarjeta',     diff: newTarjeta    - oldTarjeta,    fund: false },
+    { label: 'Efectivo',    diff: newEfectivo   - oldEfectivo,   fund: false },
+    { label: 'Caja Fuerte', diff: newCajaFuerte - oldCajaFuerte, fund: true  },
   ]
 
   const adjustments: unknown[] = []
-  for (const { label, diff } of fields) {
+  for (const { label, diff, fund } of fields) {
     if (diff === 0) continue
+    const toFund = fund && !!cajaFund
     const { data: mov, error: movErr } = await supabase
       .from('finance_movements')
       .insert({
@@ -66,10 +72,12 @@ export async function POST(req: NextRequest) {
         date,
         description: `Ajuste · ${label}`,
         amount:      Math.abs(diff),
-        flow:        diff > 0 ? 'in' : 'out',
-        category:    'ajuste',
+        // Wallet audit = cashflow perspective (increase → 'in'); a fund adjustment = fund perspective
+        // (increase = money set aside → 'out').
+        flow:        toFund ? (diff > 0 ? 'out' : 'in') : (diff > 0 ? 'in' : 'out'),
+        category:    toFund ? 'fondo' : 'ajuste',
         commitment_id: null,
-        envelope_id:   null,
+        envelope_id:   toFund ? cajaFund!.id : null,
       })
       .select()
       .single()

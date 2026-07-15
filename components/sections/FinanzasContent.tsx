@@ -1694,6 +1694,8 @@ export default function FinancePage() {
     setBalance(bal)
     if (adjustments.length > 0) setMovements(prev => [...adjustments, ...prev])
     await loadMovements(month)
+    // Refresh funds so the Caja Fuerte libreta reflects the named adjustment.
+    try { setFunds(await apiFetch<Fund[]>('/api/finance/funds')) } catch { /* keep prior */ }
   }
 
   async function addIncomeItem(nombre: string, monto: number, metodo: string) {

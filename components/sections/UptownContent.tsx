@@ -1216,14 +1216,34 @@ export default function UptownContent() {
 
   // ── Expense handlers ──────────────────────────────────────────────────────
 
+  // Keep the Mantenimiento fund total + ledger fresh (single source = the fund movements).
+  async function refreshFondo() {
+    try {
+      const [u, f] = await Promise.all([
+        fetch(`/api/uptown?month=${month}`).then(r => r.json()),
+        fetch('/api/finance/funds').then(r => r.json()),
+      ])
+      if (!u.error) setFondoTotal(u.fondo_total)
+      const mto = Array.isArray(f) ? f.find((x: { key?: string }) => x.key === 'mantenimiento') : null
+      setFondoMovements(mto?.movements ?? [])
+    } catch { /* keep prior */ }
+  }
+
   async function toggleExpense(category: string, paid: boolean) {
     setExpenses(prev => prev.map(e => e.category === category ? { ...e, paid } : e))
     const row = expenses.find(e => e.category === category)
     await post('/api/uptown/expense', { month, category, paid, amount: row?.amount ?? 0 })
-    // Fondo total changes when fondo is toggled — refresh
+    // Marking/unmarking "Fondo mto." writes to the Mantenimiento fund ledger — upsert on paid, delete
+    // on unpaid, keyed by source_key so it's reversible with no phantom entry.
     if (category === 'fondo') {
-      const data = await (await fetch(`/api/uptown?month=${month}`)).json()
-      if (!data.error) setFondoTotal(data.fondo_total)
+      const amount = row?.amount ?? 0
+      const source_key = `uptown_fondo:${month}`
+      if (paid && amount > 0) {
+        await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key })
+      } else {
+        await fetch(`/api/finance/funds/movement?source_key=${encodeURIComponent(source_key)}`, { method: 'DELETE' })
+      }
+      await refreshFondo()
     }
   }
 
@@ -1232,8 +1252,11 @@ export default function UptownContent() {
     const row = expenses.find(e => e.category === category)
     await post('/api/uptown/expense', { month, category, amount, paid: row?.paid ?? false })
     if (category === 'fondo') {
-      const data = await (await fetch(`/api/uptown?month=${month}`)).json()
-      if (!data.error) setFondoTotal(data.fondo_total)
+      // If it's already paid, re-upsert the aportación with the new amount (same source_key).
+      if (row?.paid && amount > 0) {
+        await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key: `uptown_fondo:${month}` })
+      }
+      await refreshFondo()
     }
   }
 
