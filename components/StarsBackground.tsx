@@ -230,8 +230,8 @@ const SCRAPE_DMG_MAX = 3      // hp lost on a hard-but-not-frontal clip
 // final speed is throttle × maxSpeed × ONE capped situational factor. Kills the old stack of
 // berserk×rampage×underdog×respect multipliers that could compound to absurd or crawling speeds.
 const THROTTLE_EASE  = 0.006  // per-ms approach rate toward target throttle (accel/brake feel)
-const SITU_MIN       = 0.5    // hard floor on the combined situational speed factor
-const SITU_MAX       = 1.6    // hard ceiling — no more 2.25× berserk+rampage+underdog blurs
+const SITU_MIN       = 0.75   // tighter clamp — more uniform, legible speeds (less glitchy variance)
+const SITU_MAX       = 1.3    // hard ceiling
 const REGEN_DELAY    = 5000   // ms of no hull damage before a ship starts patching up (must also be clear of enemies)
 const REGEN_INTERVAL = 3500   // ms per +1 HP while safe — slow, so wounds still matter in a fight
 const MAX_PROJS      = 44     // global projectile cap — scaled for up to 16 ships/fleet (salvos + bursts + beams)
@@ -242,11 +242,7 @@ const SCORE_DECAY    = 0.9994 // battle-score multiplier per 60s (~19h half-life
 const NOSE_OFFSET    = 22     // px — projectiles spawn from the ship's nose, not its centre
 const FIRE_CONE      = 0.28   // rad (~16°) — may only fire when the nose points at the target
 const MUZZLE_DUR     = 260    // ms — one-shot weapon firing (muzzle) animation length
-// Morale thresholds (drama layer): a ship breaks below ROUT, must climb back over RECOVER to
-// rejoin (hysteresis so it doesn't flicker), and fights emboldened above RALLY.
-const ROUT_MORALE    = 0.25
-const RALLY_RECOVER  = 0.5
-const RALLY_MORALE   = 0.8
+// (Morale system removed — deathmatch: no rout, no rally. Ships fight to the death regardless of nerve.)
 
 // ─── Unified race table — SINGLE SOURCE OF TRUTH for per-race stats ────────────
 // speed / armor / turnRate / fireRate are base stat POINTS (0–10). Equipment
@@ -255,16 +251,16 @@ const RALLY_MORALE   = 0.8
 // params the FSM reads live. Every value here is tunable and actually used — no
 // dead fields. (Replaces the former split RACE_STATS + RACE_BASE tables.)
 const RACE = {
-  klaed:    { speed: 7, armor: 3, turnRate: 8, fireRate: 7, behavior: 'aggressive', minRange:  80, maxRange: 150, retreatThreshold: 1, hitRadius: 15, shieldRecharge: 4000 },
-  nairan:   { speed: 5, armor: 5, turnRate: 5, fireRate: 5, behavior: 'tactical',   minRange: 200, maxRange: 300, retreatThreshold: 2, hitRadius: 20, shieldRecharge: 8000 },
-  nautolan: { speed: 3, armor: 8, turnRate: 3, fireRate: 3, behavior: 'tank',       minRange: 120, maxRange: 180, retreatThreshold: 0, hitRadius: 25, shieldRecharge: 6000 },
-  mainship: { speed: 8, armor: 4, turnRate: 9, fireRate: 5, behavior: 'survivor',   minRange: 250, maxRange: 350, retreatThreshold: 2, hitRadius: 15, shieldRecharge: 5000 },
+  klaed:    { speed: 7, armor: 3, turnRate: 8, fireRate: 7, dmg: 0, behavior: 'aggressive', minRange:  80, maxRange: 150, retreatThreshold: 1, hitRadius: 15, shieldRecharge: 4000 },
+  nairan:   { speed: 5, armor: 5, turnRate: 5, fireRate: 5, dmg: 1, behavior: 'tactical',   minRange: 200, maxRange: 300, retreatThreshold: 2, hitRadius: 20, shieldRecharge: 8000 },
+  nautolan: { speed: 3, armor: 6, turnRate: 3, fireRate: 3, dmg: 2, behavior: 'tank',       minRange: 120, maxRange: 180, retreatThreshold: 0, hitRadius: 25, shieldRecharge: 6000 },
+  mainship: { speed: 8, armor: 4, turnRate: 9, fireRate: 5, dmg: 1, behavior: 'survivor',   minRange: 250, maxRange: 350, retreatThreshold: 2, hitRadius: 15, shieldRecharge: 5000 },
 } as const
 
 // Projectiles are now rendered as self-contained pixel-art SVG sprites (see
 // ProjectileSprite below) instead of external spritesheet PNGs, which never
 // clipped to a single frame cleanly. Visual is chosen by weapon kind, tinted per race.
-const PROJ_DEFAULT_RANGE = 300
+const PROJ_DEFAULT_RANGE = 195
 
 // ─── Pickup assets ───────────────────────────────────────────────────────────
 
@@ -341,10 +337,10 @@ function chooseFormation(intent: 'advance' | 'defend' | 'cruise', size: number, 
 const FLIGHT: Record<AgentFleetType, {
   wiggleAmp: number; wiggleFreq: number; spacing: number; parkChance: number
 }> = {
-  klaed:    { wiggleAmp: 0.07, wiggleFreq: 0.0012, spacing: 1.0,  parkChance: 0.06 },
-  nairan:   { wiggleAmp: 0.10, wiggleFreq: 0.0009, spacing: 0.9,  parkChance: 0.22 },
-  nautolan: { wiggleAmp: 0.06, wiggleFreq: 0.0007, spacing: 1.05, parkChance: 0.18 },
-  mainship: { wiggleAmp: 0.30, wiggleFreq: 0.0019, spacing: 1.0,  parkChance: 0.15 },
+  klaed:    { wiggleAmp: 0.0,  wiggleFreq: 0.0012, spacing: 1.0,  parkChance: 0.06 },
+  nairan:   { wiggleAmp: 0.0,  wiggleFreq: 0.0009, spacing: 0.9,  parkChance: 0.22 },
+  nautolan: { wiggleAmp: 0.0,  wiggleFreq: 0.0007, spacing: 1.05, parkChance: 0.18 },
+  mainship: { wiggleAmp: 0.0,  wiggleFreq: 0.0019, spacing: 1.0,  parkChance: 0.15 },
 }
 
 // Pilot character per race — cómo una PERSONA en la cabina evita colisiones.
@@ -444,10 +440,10 @@ const SHIELD_MODS: Record<ShieldKey, { armor: number; speed: number; turn: numbe
 }
 const WEAPON_MODS: Record<WeaponKey, { fireRate: number; damage: number; range: number; splash: boolean }> = {
   none:        { fireRate:  0, damage: 0, range: 0,   splash: false },
-  autocannon:  { fireRate:  3, damage: 1, range: 240, splash: false },
-  bigspacegun: { fireRate: -2, damage: 3, range: 320, splash: false },
-  rocket:      { fireRate: -1, damage: 2, range: 280, splash: true  },
-  zapper:      { fireRate:  2, damage: 2, range: 220, splash: false },
+  autocannon:  { fireRate:  3, damage: 1, range: 156, splash: false },
+  bigspacegun: { fireRate: -2, damage: 3, range: 208, splash: false },
+  rocket:      { fireRate: -1, damage: 2, range: 182, splash: true  },
+  zapper:      { fireRate:  2, damage: 2, range: 143, splash: false },
 }
 
 // Per-race engine tint so fleets are distinguishable from afar
@@ -476,9 +472,11 @@ interface ShipAgent {
   avx:          number    // px/ms — actual velocity, eased toward (vx,vy) for inertia/smoothness
   avy:          number
   angle:        number    // radians, 0=right, π/2=down
+  avel:         number    // angular velocity (rad/ms) — rotational momentum: torque eases this toward
+                          // the desired turn rate, and it eases back to 0, so ships never pivot in place
   cruiseAngle:  number    // straight-line heading for cruising
   wavePhase:    number    // sine wave accumulator
-  state:        'cruising' | 'engaging' | 'retreating' | 'regrouping' | 'pickup_seeking' | 'routing' | 'victory_cruise' | 'dying'
+  state:        'cruising' | 'engaging' | 'retreating' | 'regrouping' | 'pickup_seeking' | 'routing' | 'dying'
   hp:           number
   wingSlot:     number    // 0=leader, 1,2,3…=wing index (reassigned dynamically by proximity clustering)
   formation:    Formation // the tactical shape this ship's cluster is currently holding
@@ -537,9 +535,6 @@ interface ShipAgent {
   evadeUntil:       number   // committed to an evasive bank until this ms timestamp
   evadeAngle:       number   // world-heading being banked toward during the current evade
   nextEvadeCheck:   number   // won't re-scan for threats before this (reaction time)
-  // ── Morale (0..1) — the seam the drama layer will read (routs, rally, standoffs).
-  //    Evolves from contagion + local balance + kin deaths; not yet wired to behaviour/visuals. ──
-  morale:           number
 }
 
 interface ProjData {
@@ -572,29 +567,6 @@ interface BattleScore {
 type WarFleet = 'klaed' | 'nairan' | 'nautolan'
 const WAR_FLEETS: WarFleet[] = ['klaed', 'nairan', 'nautolan']
 
-// Damage/kills dealt BY each fleet AGAINST each rival (grudge fuel)
-type WarMemory = Record<WarFleet, Record<WarFleet, number>>
-
-function emptyWarMemory(): WarMemory {
-  return {
-    klaed:    { klaed: 0, nairan: 0, nautolan: 0 },
-    nairan:   { klaed: 0, nairan: 0, nautolan: 0 },
-    nautolan: { klaed: 0, nairan: 0, nautolan: 0 },
-  }
-}
-
-// Ships lost per fleet per zone (4 cols × 3 rows = 12 zones)
-const ZONE_COLS = 4, ZONE_ROWS = 3, ZONE_COUNT = ZONE_COLS * ZONE_ROWS
-type ZoneMemory = Record<WarFleet, number[]>
-function emptyZoneMemory(): ZoneMemory {
-  return { klaed: new Array(ZONE_COUNT).fill(0), nairan: new Array(ZONE_COUNT).fill(0), nautolan: new Array(ZONE_COUNT).fill(0) }
-}
-function zoneIndexOf(x: number, y: number, W: number, H: number): number {
-  const col = Math.max(0, Math.min(ZONE_COLS - 1, Math.floor(x / (W / ZONE_COLS))))
-  const row = Math.max(0, Math.min(ZONE_ROWS - 1, Math.floor(y / (H / ZONE_ROWS))))
-  return row * ZONE_COLS + col
-}
-
 // Drifting wreckage left behind by a destroyed ship
 interface WreckData {
   id:        string
@@ -624,7 +596,9 @@ interface AsteroidData {
   vx:    number; vy: number  // drift px/ms
   spin:  number              // current rotation (rad)
   spinRate: number           // rad/ms
-  opacity: number
+  opacity: number            // CURRENT animated opacity (eases from 0 on spawn; ramps to 0 on despawn)
+  targetOpacity: number      // the rock's natural steady opacity once faded in
+  fadeOutAt: number          // timestamp to BEGIN the slow fade-out (0 = not yet leaving)
   born:  number
   dead:  boolean
 }
@@ -659,6 +633,39 @@ function dist2D(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt(dx * dx + dy * dy)
 }
 
+// ── PILOT PREDICTION ────────────────────────────────────────────────────
+// Where a mover will BE by the time something travelling at projSpeed reaches it — the classic
+// intercept solution a real pilot leads with (deflection shooting / cut-off pursuit), instead of
+// chasing/aiming at where the target is NOW. Solves |targetPos + targetVel*t| = projSpeed*t for t.
+//   tx,ty  = target centre;  tvx,tvy = target velocity (px/ms);  sx,sy = shooter/pursuer centre.
+//   skill ∈ 0..1 scales how much lead is applied — an ace leads fully, a clumsy pilot under-leads.
+function predictIntercept(
+  sx: number, sy: number, tx: number, ty: number,
+  tvx: number, tvy: number, projSpeed: number, skill: number,
+): { x: number; y: number; t: number } {
+  const rx = tx - sx, ry = ty - sy
+  const a = tvx * tvx + tvy * tvy - projSpeed * projSpeed
+  const b = 2 * (rx * tvx + ry * tvy)
+  const c = rx * rx + ry * ry
+  let t = 0
+  if (Math.abs(a) < 1e-9) {
+    // Target speed ≈ projectile speed: linear fallback.
+    if (Math.abs(b) > 1e-9) t = -c / b
+  } else {
+    const disc = b * b - 4 * a * c
+    if (disc >= 0) {
+      const sq = Math.sqrt(disc)
+      const t1 = (-b - sq) / (2 * a), t2 = (-b + sq) / (2 * a)
+      // smallest positive root = soonest possible intercept
+      t = Math.min(t1 > 0 ? t1 : Infinity, t2 > 0 ? t2 : Infinity)
+      if (!isFinite(t)) t = 0
+    }
+  }
+  if (t < 0) t = 0
+  const lead = t * Math.max(0, Math.min(1, skill))   // under-lead when unskilled
+  return { x: tx + tvx * lead, y: ty + tvy * lead, t }
+}
+
 // The on-hull weapon/shield sprite a ship should display once it equips one via pickup.
 // Prefer its own archetype layer; fall back to any layer from the same faction so even
 // weapon-less archetypes (support/bomber) visibly gain hardware.
@@ -685,7 +692,7 @@ const MAX_TURN_PER_FRAME = 0.08  // radians (hard ceiling)
 // Turning is arc-based, never a pivot: a ship always moves forward while it rotates, so its
 // turn radius ≈ v² / lateral-accel. TURN_ACCEL is the baseline lateral accel; each ship scales
 // it by AGILITY (its turn stat), so nimble races carve tighter arcs — faster ships still arc wider.
-const TURN_ACCEL = 0.00006
+const TURN_ACCEL = 0.00009
 // Hard ceiling on angular velocity (rad/ms). Guards against a slow ship whipping around in place
 // (the erratic low-speed spin the old inert turn-cap allowed). Keeps every turn smooth & ship-like.
 const OMEGA_MAX  = 0.004
@@ -695,6 +702,26 @@ function clampTurn(cur: number, tgt: number, max: number): number {
   const diff = ((tgt - cur + Math.PI * 3) % (Math.PI * 2)) - Math.PI
   const cap  = Math.min(max, MAX_TURN_PER_FRAME)
   return cur + Math.max(-cap, Math.min(cap, diff))
+}
+
+// Angular-velocity steering (rotational momentum — the “real pilot” turn).
+// Instead of snapping the heading a fixed step toward the target each frame, a ship carries an
+// angular velocity (avel) that TORQUE ramps up toward the turn it wants, then eases back to 0.
+// The result: turns start gently, sustain, and settle — no instant direction flips, no pivoting.
+//   • maxRate  = the frame's turn cap (already speed-scaled by the caller), the ceiling on |avel|.
+//   • desired  = proportional controller: aim avel at the error, clamped to ±maxRate.
+//   • TORQUE   = how fast avel can change per ms (angular acceleration) — the “mass” of the turn.
+const TORQUE = 0.00003   // rad/ms² — lower = heavier/slower to start & stop turning
+function steerAngle(ship: ShipAgent, tgt: number, maxRate: number, dt: number): number {
+  const err = ((tgt - ship.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+  // Desired angular velocity: proportional to error, but capped and eased near the target so the
+  // ship decelerates its spin as it lines up (critical-damping feel) instead of overshooting.
+  const approach = Math.max(-1, Math.min(1, err / 0.35))   // ramp down within ~20° of target
+  const desired  = approach * maxRate
+  // Ramp avel toward desired at TORQUE (angular acceleration); never exceed the frame cap.
+  const dv = Math.max(-TORQUE * dt, Math.min(TORQUE * dt, desired - ship.avel))
+  ship.avel = Math.max(-maxRate, Math.min(maxRate, ship.avel + dv))
+  return ship.angle + ship.avel * dt
 }
 
 // Recompute a ship's derived stats from race base + equipped engine/shield/weapon.
@@ -711,13 +738,13 @@ function computeStats(ship: ShipAgent) {
   const totalFireRate = base.fireRate + wpn.fireRate
 
   ship.maxSpeed     = Math.max(1, totalSpeed)    * BASE_SPEED * (ship.sizeSpeedMult || 1)
-  ship.maxHp        = Math.max(1, totalArmor)
+  ship.maxHp        = Math.max(2, Math.round(totalArmor * 2.4))   // beefier hulls — ~50% longer, sustained fights
   // Agility → lateral accel: the turn stat (minus engine/shield penalties) scales how tight an
   // arc the ship carves. Clamped so it never gets glitchy-nimble; equipment that adds speed also
   // costs agility (fast engines turn -1..-3), a natural handling trade-off. Nairan (5) = baseline.
   ship.turnAccel    = TURN_ACCEL * Math.max(0.6, Math.min(1.6, totalTurn / 5))
-  ship.fireInterval = Math.max(500, 4000 - totalFireRate * 300)
-  ship.damage       = Math.max(1, wpn.damage)
+  ship.fireInterval = Math.max(180, 2400 - totalFireRate * 230)   // decompressed so fireRate truly differentiates cadence
+  ship.damage       = Math.max(1, wpn.damage + (base.dmg ?? 0))     // race adds a damage floor (klaed spray=+0, nautolan heavy=+2)
   ship.range        = wpn.range || 0
   ship.splash       = wpn.splash
   ship.shieldHp     = shd.shieldHp
@@ -997,7 +1024,9 @@ const ASTEROID_EXPLODE: DestructData = {
 }
 const MAX_PICKUPS      = 22   // cap on pickups on the field at once (more ships need arming)
 const PICKUP_TARGET    = 14   // persistent field: keep this many pickups floating; refill toward it
-const MAX_ASTEROIDS    = 16   // ambient count kept drifting (tall field)
+const MAX_ASTEROIDS    = 26   // ambient count kept drifting (more rocks in the field)
+const ASTEROID_FADE_IN  = 2200  // ms slow fade-in from invisible on spawn (like ships materialising)
+const ASTEROID_FADE_OUT = 2600  // ms slow fade-out before removal when drifting off-field
 const ASTEROID_HARD_CAP = 64  // never exceed (ambient + a heavy multi-row belt wave)
 const ASTEROID_DMG     = 3    // serious blast damage to nearby ships
 const ASTEROID_BLAST   = 78   // px — radius of the damaging shockwave
@@ -1426,10 +1455,18 @@ function ScoreHUD({ ships, tourney }: {
 }
 
 // El campo de batalla es FIELD_MULT× el alto de la ventana; el wrap vertical lo hace sentir infinito.
-const FIELD_MULT = 3
+// (Bajado a 2.0: la vuelta vertical completa era demasiado larga — ahora la estación de referencia
+//  reaparece en ~82° de drum en vez de ~150°, mucho más ágil sin perder el colchón de wrap invisible.)
+const FIELD_MULT = 2.0
+// El campo también es un poco MÁS ANCHO que la ventana (WFIELD_MULT×). Las naves wrappean estilo
+// Pac-Man por los lados, cruzando ese margen extra (fuera de vista) para reaparecer del otro lado
+// sin un salto brusco. La cámara se centra en el campo, así que ves el centro y los márgenes quedan
+// justo fuera del borde de la ventana.
+const WFIELD_MULT = 1.15
 // Parallax: px de desplazamiento del campo por grado de rotación del drum. Signo = dirección
-// (negativo invierte); magnitud = qué tan marcado. ~-18 mapea casi todo el recorrido del drum al campo.
-const PARALLAX = -18
+// (negativo invierte); magnitud = qué tan marcado. -22 mantiene el scroll lento pero ayuda a que la
+// vuelta vertical no sea eterna (junto con FIELD_MULT 2.2).
+const PARALLAX = -22
 
 // Wrap a FIELD y-coordinate to its on-screen (scrolled) y — the same math as SY() inside the tick.
 // React-rendered one-shot effects (ship explosions, asteroid blasts, hit sparks, collect flashes)
@@ -1439,6 +1476,13 @@ function wrapFieldY(fieldY: number): number {
   const H = window.innerHeight * FIELD_MULT
   const scrollY = ((window as unknown as { __osScroll?: number }).__osScroll ?? 0) * PARALLAX
   return ((fieldY - scrollY) % H + H) % H
+}
+// Horizontal mirror of wrapFieldY: shift a FIELD x-coordinate to its on-screen x (the same as SX()
+// inside the tick). One-shot effects must bake this in or they draw marginX px off from the entity.
+function wrapFieldX(fieldX: number): number {
+  const W = window.innerWidth
+  const marginX = (W * WFIELD_MULT - W) / 2
+  return fieldX - marginX
 }
 
 function SpaceSim() {
@@ -1470,9 +1514,9 @@ function SpaceSim() {
   // Capture beacons (spawner objectives) + per-faction ship caps (grown by capturing beacons).
   const beacons     = useRef(new Map<string, { id: string; x: number; y: number; born: number }>())
   const beaconEls   = useRef(new Map<string, HTMLDivElement>())
-  const factionCap  = useRef<Record<WarFleet, number>>({ klaed: 6, nairan: 6, nautolan: 6 })
+  const factionCap  = useRef<Record<WarFleet, number>>({ klaed: 3, nairan: 3, nautolan: 3 })
   // Round state: fielded factions, elimination order (banked), winner, and the round-phase machine.
-  const roundRef    = useRef<{ contenders: WarFleet[]; resting: WarFleet | null; everAlive: WarFleet[]; deathOrder: WarFleet[]; winner: WarFleet | null; phase: 'active' | 'resolving' | 'peace'; phaseAt: number }>({ contenders: ['klaed', 'nairan'], resting: 'nautolan', everAlive: [], deathOrder: [], winner: null, phase: 'active', phaseAt: 0 })
+  const roundRef    = useRef<{ contenders: WarFleet[]; resting: WarFleet | null; everAlive: WarFleet[]; deathOrder: WarFleet[]; winner: WarFleet | null; phase: 'active' | 'resolving' | 'peace'; phaseAt: number }>({ contenders: ['klaed', 'nairan'], resting: 'nautolan', everAlive: [], deathOrder: [], winner: null, phase: 'peace', phaseAt: 0 })
 
   const [pickupKeys,     setPickupKeys]     = useState<string[]>([])
   const [beaconKeys,     setBeaconKeys]     = useState<string[]>([])
@@ -1481,15 +1525,12 @@ function SpaceSim() {
   const [hits,           setHits]           = useState<HitData[]>([])
   const [asteroidKeys,   setAsteroidKeys]   = useState<string[]>([])
 
-  // ── Ancient Races Ecosystem persistent memory ──
-  const warMemoryRef = useRef<WarMemory>(emptyWarMemory())
-  const zoneMemRef   = useRef<ZoneMemory>(emptyZoneMemory())
   const [shipStats, setShipStats] = useState<ShipStats>(emptyShipStats)
   // Live tournament state for the scoreboard HUD: who's fighting, the phase, the winner, and
   // (in peace) how many whole seconds remain before the next match ignites.
   const [tourney, setTourney] = useState<{
     contenders: WarFleet[]; phase: 'active' | 'resolving' | 'peace'; winner: WarFleet | null; countdown: number
-  }>({ contenders: ['klaed', 'nairan'], phase: 'active', winner: null, countdown: 0 })
+  }>({ contenders: ['klaed', 'nairan'], phase: 'peace', winner: null, countdown: 0 })
 
   const EMPTY_SCORE: BattleScore = { klaed: 0, nairan: 0, nautolan: 0, mainshipDeaths: 0 }
   const [battleScore, setBattleScore] = useState<BattleScore>(() => {
@@ -1502,52 +1543,31 @@ function SpaceSim() {
     let lastTime = performance.now()
     let active = true
     let nextBalanceCheck = 0  // fires on first tick
-    let nautilanEdge     = 0  // alternates TOP / BOTTOM for nautolan
     let nextAsteroidSpawn = performance.now() + 6000   // first hazard drifts in ~6s
     let nextAsteroidBelt  = performance.now() + 35000  // first belt ~35s in
+    let nextAsteroidCluster = performance.now() + 18000 // first dense clump ~18s in
+    let nextCull         = 0  // paces the end-of-match chain of explosions
     let nextBeaconSpawn  = 0  // capture-beacon respawn timer (fires on first tick)
     let deployWave       = 0  // staggered fly-in progress for a new round
     let nextDeploy       = 0  // next deploy-wave timestamp
     let nextClusterCheck = 0  // next emergent-formation re-cluster pass (fires on first tick)
-    const fleetRetreating         = new Set<string>()
-    const fleetRetreatingCooldown = new Map<string, number>()
-    const fleetOriginalCounts     = new Map<string, number>()
+    // (fleet-wide retreat removed — deathmatch: fleets fight to the last ship, never flee as a group)
     // Stationing: fleetId → parked anchor + heading + expiry (fleet holds formation in place)
     const fleetPark = new Map<string, { until: number; x: number; y: number; heading: number }>()
     // Persistent pickup field: refill timer only (no more weighted events / scarcity).
     let nextPickupEvent  = 0
 
-    // ── Ancient Races Ecosystem state ──
-    try { const w = localStorage.getItem('war-memory'); if (w) warMemoryRef.current = { ...emptyWarMemory(), ...JSON.parse(w) } } catch {}
-    try { const z = localStorage.getItem('zone-memory'); if (z) zoneMemRef.current = { ...emptyZoneMemory(), ...JSON.parse(z) } } catch {}
-    const warMemory = warMemoryRef.current
-    const zoneMem   = zoneMemRef.current
-    let dominantFleet: WarFleet | null = null
-    let underdogFleet: WarFleet | null = null
-    let ghostAlliance = false                                   // true while a fleet is dominant
-    const grudge: Record<WarFleet, WarFleet | null> = { klaed: null, nairan: null, nautolan: null }
-    const zoneContested: Record<WarFleet, boolean[]> = {
-      klaed: new Array(ZONE_COUNT).fill(false), nairan: new Array(ZONE_COUNT).fill(false), nautolan: new Array(ZONE_COUNT).fill(false),
-    }
-    let nextDominanceCheck = 0   // every 5s
     let nextStatsUpdate    = 0   // every ~1s — live ship counts for the HUD
-    let nextMoraleUpdate   = 0   // every ~350ms — morale drift + contagion (drama seam)
-    let nextWarDecay       = performance.now() + 60000   // every 60s
+    let nextRegenScan      = 0   // every ~350ms — out-of-combat HP regen scan
     let nextScoreDecay     = performance.now() + 60000   // every 60s
-    let nextZoneDecay      = performance.now() + 300000  // every 5min
 
     const isWarFleet = (ft: AgentFleetType): ft is WarFleet => ft !== 'mainship'
-    // Two ships are enemies unless same fleet, or bound by a ghost-alliance truce.
-    // The main ship is everyone's enemy and never allied.
+    // Two ships are enemies unless same fleet. The main ship is a neutral landmark, allied to no one.
     function isEnemy(a: AgentFleetType, b: AgentFleetType): boolean {
       if (a === b) return false
-      return true   // 1v1 to the death: different fleet = enemy, always. (No ghost alliances.)
+      if (a === 'mainship' || b === 'mainship') return false   // the parked main ship is a neutral landmark
+      return true   // 1v1 to the death: different fleet = enemy, always.
     }
-    // Recompute contested zones for a fleet after its loss counters change
-    function refreshContested(ft: WarFleet) {
-      for (let i = 0; i < ZONE_COUNT; i++) zoneContested[ft][i] = zoneMem[ft][i] >= 3
-    }
-    WAR_FLEETS.forEach(refreshContested)
 
     function pickType(): AgentFleetType {
       const fl = fleetRef.current
@@ -1564,23 +1584,13 @@ function SpaceSim() {
     }
 
     function typedEdgeSpawn(type: AgentFleetType, W: number, H: number): { x: number; y: number; angle: number; homeEdge: number } {
-      const m = 120
-      if (type === 'klaed') {
-        return { x: W + m, y: m + Math.random() * (H - m * 2), angle: Math.PI + (Math.random() - 0.5) * 0.4, homeEdge: 1 }
-      }
-      if (type === 'nairan') {
-        return { x: -m, y: m + Math.random() * (H - m * 2), angle: (Math.random() - 0.5) * 0.4, homeEdge: 3 }
-      }
-      if (type === 'nautolan') {
-        const fromLeft = (nautilanEdge++ % 2 === 0)
-        return fromLeft
-          ? { x: -m,    y: m + Math.random() * (H - m * 2), angle:          (Math.random() - 0.5) * 0.4, homeEdge: 3 }
-          : { x: W + m, y: m + Math.random() * (H - m * 2), angle: Math.PI + (Math.random() - 0.5) * 0.4, homeEdge: 1 }
-      }
-      // Todo entra por los lados (campo alto con wrap vertical): nada cae de arriba/abajo
-      return Math.random() < 0.5
-        ? { x: -m,    y: m + Math.random() * (H - m * 2), angle:          (Math.random() - 0.5) * 0.4, homeEdge: 3 }
-        : { x: W + m, y: m + Math.random() * (H - m * 2), angle: Math.PI + (Math.random() - 0.5) * 0.4, homeEdge: 1 }
+      // Toroidal field: no edges to enter from. Every ship appears at a fully random point across the
+      // whole field (WF wide via WFIELD_MULT × H tall) with a random heading — maximum chaos of entry.
+      const WF = W * WFIELD_MULT
+      const a = Math.random() * Math.PI * 2
+      // homeEdge picks the side a LEAVING ship heads for later (left/right), kept for flee/exit logic.
+      const homeEdge = Math.random() < 0.5 ? 3 : 1
+      return { x: Math.random() * WF, y: Math.random() * H, angle: a, homeEdge }
     }
 
     function spawnFleet(type?: AgentFleetType, count?: number, inSpeedMult?: number) {
@@ -1617,7 +1627,7 @@ function SpaceSim() {
           y: perSpawn.y,
           vx: 0, vy: 0,    // real velocity is set from computed maxSpeed just below
           avx: 0, avy: 0,
-          angle: perSpawn.angle, cruiseAngle: perSpawn.angle,
+          angle: perSpawn.angle, avel: 0, cruiseAngle: perSpawn.angle,
           wavePhase: Math.random() * Math.PI * 2,
           state: 'cruising',
           hp: 1, prevHp: 1,   // set from computed maxHp just below
@@ -1663,7 +1673,6 @@ function SpaceSim() {
                     : ft === 'nairan'   ? 0.93 + Math.random() * 0.06
                     : 0.85,
           evadeUntil: 0, evadeAngle: 0, nextEvadeCheck: 0,
-          morale: 0.7,   // confident but with room to swell (rally) or crack (rout)
         }
       })
 
@@ -1681,7 +1690,6 @@ function SpaceSim() {
       const leaderId = newAgents[0].id
       newAgents.slice(1).forEach(a => { a.leaderId = leaderId })
       newAgents.forEach(a => agents.current.set(a.id, a))
-      fleetOriginalCounts.set(fleetId, sz)
       setAgentKeys(prev => [...prev, ...newAgents.map(a => a.id)])
     }
 
@@ -1751,23 +1759,23 @@ function SpaceSim() {
       if (blocked) return false
 
       if (pattern === 'salvo') {
-        // 6-shot fan across a ~34° arc — the torpedo ship's signature volley
+        // 6-shot fan across a ~34° arc — the torpedo ship's signature volley, centred on the target bearing
         for (let i = 0; i < SALVO_SHOTS; i++) {
           const t = (i / (SALVO_SHOTS - 1)) - 0.5   // -0.5 … 0.5
-          spawnProjectile(agent, { angle: agent.angle + t * 0.6, dmg: 1 })   // area denial — each round hits light
+          spawnProjectile(agent, { angle: bearing + t * 0.6, dmg: 1 })   // area denial — each round hits light
         }
         agent.salvoCharges -= 1
         agent.fireStopUntil = now + 1900
       } else if (pattern === 'burst') {
-        // 3-round quick burst — staggered down the barrel so it reads as a stream
-        for (let i = 0; i < 3; i++) spawnProjectile(agent, { posOffset: i * 15 })
+        // 3-round quick burst — fired straight at the (predicted) target bearing, not the nose
+        for (let i = 0; i < 3; i++) spawnProjectile(agent, { angle: bearing, posOffset: i * 15 })
         agent.fireStopUntil = now + 1300
       } else if (pattern === 'beam') {
-        // laser: a fast, long streak that crosses the screen
-        spawnProjectile(agent, { beam: true, speedMul: 3.4, rangeMul: 4 })
+        // laser: a fast, long streak that crosses the screen, straight at the target bearing
+        spawnProjectile(agent, { angle: bearing, beam: true, speedMul: 3.4, rangeMul: 4 })
         agent.fireStopUntil = now + 1400
       } else {
-        spawnProjectile(agent)
+        spawnProjectile(agent, { angle: bearing })
         agent.fireStopUntil = now + 1500
       }
       agent.lastShot = now
@@ -1791,8 +1799,7 @@ function SpaceSim() {
       setBattleScore(next)
       // War memory: killer fleet's grudge fuel against the victim fleet grows
       if (isWarFleet(killerType) && isWarFleet(victimFleetType)) {
-        warMemory[killerType][victimFleetType] += pts
-        localStorage.setItem('war-memory', JSON.stringify(warMemory))
+        // (war-memory grudge fuel removed — no cross-faction rivalry in a 1v1 deathmatch)
       }
     }
 
@@ -1816,7 +1823,7 @@ function SpaceSim() {
 
     // Pop a brief impact spark where a hull was hit (capped so it can't pile up)
     function spawnHit(x: number, y: number) {
-      setHits(prev => (prev.length > 14 ? prev : [...prev, { id: genId(), x, y: wrapFieldY(y) }]))
+      setHits(prev => (prev.length > 14 ? prev : [...prev, { id: genId(), x: wrapFieldX(x), y: wrapFieldY(y) }]))
     }
 
     // Low-level: add one asteroid at (x,y) drifting (vx,vy). Respects the hard cap.
@@ -1827,7 +1834,9 @@ function SpaceSim() {
         id, x, y, size, vx, vy,
         spin: Math.random() * Math.PI * 2,
         spinRate: (Math.random() - 0.5) * 0.0012,        // gentle tumble
-        opacity: 0.45 + Math.random() * 0.35,
+        opacity: 0,                                       // fade IN slowly from invisible
+        targetOpacity: 0.45 + Math.random() * 0.35,
+        fadeOutAt: 0,
         born: now, dead: false,
       })
       setAsteroidKeys([...asteroids.current.keys()])
@@ -1848,6 +1857,33 @@ function SpaceSim() {
       // Small rocks tend to move a bit quicker than big ones — varied but not extreme
       const spd = (0.004 + Math.random() * 0.011) * (1 + (48 - size) / 160)   // ~0.004–0.016 px/ms
       addAsteroid(x, y, Math.cos(a) * spd, Math.sin(a) * spd, size, now)
+    }
+
+    // A DENSE CLUSTER: a tight clump of rocks drifting together as one mass — a little asteroid pile.
+    // Sizes vary (a couple of big ones ringed by rubble) and they share a common drift so the clump
+    // holds together as it crosses. Denser and more clustered than the evenly-scattered ambient rocks.
+    function spawnAsteroidCluster(now: number) {
+      const W = window.innerWidth, VH = window.innerHeight, H = VH * FIELD_MULT
+      const WF = W * WFIELD_MULT
+      const scrollY = ((window as unknown as { __osScroll?: number }).__osScroll ?? 0) * PARALLAX
+      const count = 5 + Math.floor(Math.random() * 6)          // 5–10 rocks in the clump
+      const cx = Math.random() * WF
+      const cy = scrollY + VH * (0.12 + Math.random() * 0.76)  // anchored in the visible band
+      const a = Math.random() * Math.PI * 2
+      const spd = 0.004 + Math.random() * 0.006                 // slow, ponderous mass
+      const dvx = Math.cos(a) * spd, dvy = Math.sin(a) * spd
+      const spread = 60 + Math.random() * 50                    // tight packing radius
+      for (let i = 0; i < count; i++) {
+        // Cluster around the centre (biased toward the middle so it reads as a pile, not a ring)
+        const r = Math.pow(Math.random(), 0.6) * spread
+        const ang = Math.random() * Math.PI * 2
+        const x = cx + Math.cos(ang) * r
+        const y = cy + Math.sin(ang) * r
+        const size = 22 + Math.round(Math.pow(Math.random(), 1.7) * 58)   // mostly small rubble + a few big
+        // Slight per-rock velocity jitter so the clump breathes a little without dispersing
+        const jx = (Math.random() - 0.5) * 0.002, jy = (Math.random() - 0.5) * 0.002
+        addAsteroid(x, y, dvx + jx, dvy + jy, size, now)
+      }
     }
 
     // A random asteroid belt EVENT: a dense field of rocks crossing the screen together. Intensity is
@@ -1894,13 +1930,16 @@ function SpaceSim() {
     // Detonate an asteroid: big blast sprite + serious damage to every ship in range
     function explodeAsteroid(ast: AsteroidData, now: number) {
       if (ast.dead) return
+      // Don't detonate a rock that's still barely visible (mid fade-in) or almost gone (mid fade-out):
+      // it would show a blast where the player sees no asteroid. Only solid, visible rocks explode.
+      if (ast.opacity < 0.25) { ast.dead = true; asteroids.current.delete(ast.id); asteroidEls.current.delete(ast.id); return }
       ast.dead = true
       const cx = ast.x + ast.size / 2, cy = ast.y + ast.size / 2
       const el = asteroidEls.current.get(ast.id)
       if (el) el.style.visibility = 'hidden'
       // Blast sprite (scaled up from the asteroid)
       const blast = Math.max(64, ast.size * 2.2)
-      const exp: ExpData = { id: genId(), x: cx - blast / 2, y: wrapFieldY(cy) - blast / 2, destruction: ASTEROID_EXPLODE, born: now, size: blast }
+      const exp: ExpData = { id: genId(), x: wrapFieldX(cx - blast / 2), y: wrapFieldY(cy) - blast / 2, destruction: ASTEROID_EXPLODE, born: now, size: blast }
       exps.current.set(exp.id, exp)
       setExpList([...exps.current.values()])
       // Serious shockwave damage to nearby ships (neutral hazard — hits everyone)
@@ -1935,7 +1974,6 @@ function SpaceSim() {
       agent.wavePhase   = Math.random() * Math.PI * 2
       agent.state       = 'cruising'
       agent.respawnAt   = 0
-      agent.morale      = 0.7   // fresh nerve on revival (else it'd rout instantly)
       agent.targetId    = null; agent.retreatStart = 0
       agent.lastShot    = 0
       agent.shieldHp    = 0
@@ -1971,34 +2009,13 @@ function SpaceSim() {
       const el = agentEls.current.get(agent.id)
       if (el) el.style.visibility = 'hidden'
       if (agent.destruction) {
-        const exp: ExpData = { id: genId(), x: agent.x, y: wrapFieldY(agent.y), destruction: agent.destruction, born: now }
+        const exp: ExpData = { id: genId(), x: wrapFieldX(agent.x), y: wrapFieldY(agent.y), destruction: agent.destruction, born: now }
         exps.current.set(exp.id, exp)
         setExpList([...exps.current.values()])
       }
       // Battle relic — leave wreckage where the ship fell
       if (agent.fleetType !== 'mainship') spawnWreck(agent, now)
-      // Morale shockwave (drama seam): kin who witness this ship fall lose heart — more so for a
-      // leader, and more the closer they are. The killer, meanwhile, swells with confidence.
-      {
-        const shock = agent.isLeader ? 0.35 : 0.22
-        agents.current.forEach(b => {
-          if (b.id === agent.id || b.state === 'dying' || isEnemy(agent.fleetType, b.fleetType)) return
-          const d = dist2D(agent.x + 24, agent.y + 24, b.x + 24, b.y + 24)
-          if (d < 240) b.morale = Math.max(0, b.morale - shock * (1 - d / 240))
-        })
-        if (killerId) {
-          const killer = agents.current.get(killerId)
-          if (killer && killer.state !== 'dying') killer.morale = Math.min(1, killer.morale + 0.18)
-        }
-      }
       // Emotional territory — record the loss in this zone (memory of where kin fell)
-      if (isWarFleet(agent.fleetType)) {
-        const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
-        const zi = zoneIndexOf(agent.x + 24, agent.y + 24, W, H)
-        zoneMem[agent.fleetType][zi] += 1
-        refreshContested(agent.fleetType)
-        localStorage.setItem('zone-memory', JSON.stringify(zoneMem))
-      }
       if (killerType) awardKill(killerType, agent.isLeader, agent.fleetType)
       // Kla'ed victory spiral — the killer celebrates with a defiant spin
       if (killerType === 'klaed' && killerId) {
@@ -2026,9 +2043,9 @@ function SpaceSim() {
 
     function spawnPickup(type: 'engine' | 'shield' | 'weapon', now: number) {
       const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
-      const m = 100
-      const x = m + Math.random() * (W - m * 2)
-      const y = m + Math.random() * (H - m * 2)
+      const WF = W * WFIELD_MULT
+      const x = Math.random() * WF   // anywhere across the toroidal field width
+      const y = Math.random() * H
       const id = genId()
       let src = '', key = 'none', speedMult = 1.0, shieldStrength = 1, shieldDuration = 0, pickupFireInterval = 800
       if (type === 'engine') {
@@ -2084,7 +2101,7 @@ function SpaceSim() {
       { const types: ('engine' | 'shield' | 'weapon')[] = ['engine', 'shield', 'weapon']
         spawnPickup(types[Math.floor(Math.random() * types.length)], now) }
       setPickupKeys([...pickups.current.keys()])
-      setCollectFlashes(prev => [...prev, { id: genId(), x: pickup.x, y: wrapFieldY(pickup.y), src: pickup.src }])
+      setCollectFlashes(prev => [...prev, { id: genId(), x: wrapFieldX(pickup.x), y: wrapFieldY(pickup.y), src: pickup.src }])
       agent.seekingPickupId = null
       agent.state = 'cruising'
       setAgentKeys([...agents.current.keys()])  // force re-render so the new gear shows
@@ -2094,12 +2111,25 @@ function SpaceSim() {
       const dt = Math.min(now - lastTime, 50)
       lastTime = now
 
+      // First tick: seed the round clock to NOW so the opening peace lasts its full duration (phaseAt
+      // was 0, which would make the peace timer read as already-expired and skip straight to combat).
+      if (roundRef.current.phaseAt === 0) {
+        roundRef.current.phaseAt = now
+      }
+
       const W = window.innerWidth, H = window.innerHeight * FIELD_MULT
 
       // ── GALCON SPAWN SYSTEM ─────────────────────────────────────────────────
       // Balance check every 3s: fleet-wide retreat trigger + reinforcement
       const scrollY = ((window as unknown as { __osScroll?: number }).__osScroll ?? 0) * PARALLAX
       const SY = (yy: number) => ((yy - scrollY) % H + H) % H
+      // Horizontal wrap (Pac-Man): the field is WF wide — a bit wider than the window — and the view is
+      // centred on it, so the extra width (marginX on each side) sits just off screen. A ship's X is
+      // kept in [0,WF) by wrapping its position; SX just shifts field-X into screen-X. When a ship is
+      // out in a hidden margin it draws off the window edge, then wraps and returns from the far side.
+      const WF = W * WFIELD_MULT
+      const marginX = (WF - W) / 2
+      const SX = (xx: number) => xx - marginX
 
       // ── BATTLE MODE routing ─────────────────────────────────────────────────
       // 'eternal' runs the auto war↔peace cycle (rounds + a 3-min peace between them). 'peace' forces
@@ -2112,29 +2142,8 @@ function SpaceSim() {
       if (now >= nextBalanceCheck) {
         nextBalanceCheck = now + 3000
         fleetPark.forEach((v, k) => { if (now > v.until + 30000) fleetPark.delete(k) })  // prune stale park anchors
-        // Fleet-wide retreat: any fleet ≤ 40% of original count
-        const checkedFleets = new Set<string>()
-        agents.current.forEach(a => {
-          if (a.fleetType === 'mainship' || checkedFleets.has(a.fleetId)) return
-          checkedFleets.add(a.fleetId)
-          if (fleetRetreating.has(a.fleetId)) return
-          if ((fleetRetreatingCooldown.get(a.fleetId) ?? 0) > now) return
-          const original = fleetOriginalCounts.get(a.fleetId) ?? 0
-          if (original < 3) return
-          let alive = 0
-          agents.current.forEach(b => { if (b.fleetId === a.fleetId && b.state !== 'dying') alive++ })
-          if (alive / original <= 0.4) {
-            fleetRetreating.add(a.fleetId)
-            fleetRetreatingCooldown.set(a.fleetId, now + 60000)
-            agents.current.forEach(b => {
-              if (b.fleetId !== a.fleetId || b.state === 'dying') return
-              b.state = 'retreating'; b.retreatStart = now
-              if (b.shieldType !== 'none' && b.shieldCooldown === 0) {
-                b.shieldActive = true; b.shieldHp = SHIELD_MODS[b.shieldType].shieldHp
-              }
-            })
-          }
-        })
+        // DEATHMATCH: no fleet-wide retreat. A losing fleet doesn't flee — it fights to the last ship.
+        // (The whole outnumbered-fleet-runs system was removed; it deflated the action.)
       }
       // ── CAPTURE BEACONS: the ONLY way factions grow. Keep ~2 floating; a ship that touches one
       // bumps its faction's cap +1 and calls in a side-entering reinforcement. Consumed → respawns later.
@@ -2155,7 +2164,7 @@ function SpaceSim() {
         agents.current.forEach(a => { if (!taker && a.state !== 'dying' && isWarFleet(a.fleetType) && dist2D(b.x, b.y, a.x + 24, a.y + 24) < 30) taker = a })
         if (taker) {
           const f = (taker as ShipAgent).fleetType as WarFleet
-          factionCap.current[f] = Math.min(16, factionCap.current[f] + 1)   // beacon reinforcement, hard cap 16 per fleet
+          factionCap.current[f] = Math.min(10, factionCap.current[f] + 1)   // beacon reinforcement, hard cap 10 per fleet (smaller field)
           spawnFleet(f, 1)                                   // reinforcement flies in from the side
           beacons.current.delete(id); beaconEls.current.delete(id)
           nextBeaconSpawn = Math.max(nextBeaconSpawn, now + 5000 + Math.random() * 3000)
@@ -2166,7 +2175,7 @@ function SpaceSim() {
             // No size bounce (it read as jelly). Fixed scale; the “alive” feel is a gentle glow pulse
             // driven by opacity so the silhouette stays crisp and still.
             const g = 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(now * 0.0035 + b.born))
-            el.style.transform = `translate(${b.x}px,${SY(b.y)}px)`
+            el.style.transform = `translate(${SX(b.x)}px,${SY(b.y)}px)`
             el.style.opacity = String(g)
           }
         }
@@ -2181,31 +2190,15 @@ function SpaceSim() {
             beacons.current.clear(); beaconEls.current.clear(); setBeaconKeys([])   // objectives close out
           }
         } else if (RF.phase === 'resolving') {
-          if (now - RF.phaseAt > 3500) {                      // after a VICTORIA beat, everyone leaves BY FLIGHT
-            agents.current.forEach(a => {
-              if (a.state === 'dying') return
-              if (a.fleetType === RF.winner) { if (a.state !== 'victory_cruise') { a.state = 'victory_cruise'; a.targetId = null; a.retreatStart = now } }
-              else if (isWarFleet(a.fleetType) && a.state !== 'routing') { a.state = 'routing'; a.retreatStart = now }
-            })
+          // After a brief VICTORIA beat, cull the whole field in a rapid CHAIN of explosions — one ship
+          // detonates every ~140ms, winner included, until the arena is empty. No more fly-off exits.
+          if (now - RF.phaseAt > 3000 && now >= nextCull) {
+            nextCull = now + 140
+            let victim: ShipAgent | null = null
+            agents.current.forEach(a => { if (!victim && isWarFleet(a.fleetType) && a.state !== 'dying') victim = a })
+            if (victim) killAgent(victim, now)
           }
-          if (now - RF.phaseAt > 22000) {                     // safety net: clear stragglers that never left
-            agents.current.forEach((a, id) => {
-              if (!isWarFleet(a.fleetType)) return
-              // Only remove ships already OFF-SCREEN. A winner still cruising across view shouldn't
-              // vanish mid-screen — fade it out over a grace window, and only hard-remove past 30s.
-              const sx = a.x, sy = wrapFieldY(a.y)
-              const offScreen = sx < -80 || sx > window.innerWidth + 80 || sy < -80 || sy > window.innerHeight + 80
-              const el = agentEls.current.get(id)
-              if (offScreen || now - RF.phaseAt > 30000) {
-                if (el) el.style.visibility = 'hidden'
-                agents.current.delete(id); agentEls.current.delete(id)
-              } else if (el) {
-                el.style.opacity = String(Math.max(0, 1 - (now - RF.phaseAt - 22000) / 8000))
-              }
-            })
-            setAgentKeys([...agents.current.keys()])
-          }
-          let anyWar = false; agents.current.forEach(a => { if (isWarFleet(a.fleetType)) anyWar = true })
+          let anyWar = false; agents.current.forEach(a => { if (isWarFleet(a.fleetType) && a.state !== 'dying') anyWar = true })
           if (!anyWar) {                                      // field cleared → rotate the bracket, then PEACE
             // Winner goes to REST; the next match is (loser of this round) vs (whoever was resting).
             const champ = RF.winner
@@ -2216,7 +2209,7 @@ function SpaceSim() {
               RF.resting = champ                    // champion takes the bench
             }
             RF.everAlive = []; RF.deathOrder = []; RF.winner = null
-            factionCap.current = { klaed: 6, nairan: 6, nautolan: 6 }
+            factionCap.current = { klaed: 3, nairan: 3, nautolan: 3 }
             deployWave = 0; nextDeploy = now + 800
             RF.phase = 'peace'; RF.phaseAt = now
           }
@@ -2225,8 +2218,10 @@ function SpaceSim() {
             RF.contenders.forEach(f => spawnFleet(f, 1))
             deployWave++; nextDeploy = now + 2600
           }
-          if (now - RF.phaseAt > 45000) {                     // peace over → ignite the MATCH (top both contenders up)
-            RF.contenders.forEach(f => spawnFleet(f, 6))
+          if (now - RF.phaseAt > 45000) {                     // peace over → ignite the MATCH
+            // No free top-up here: a fleet goes to war with exactly what it fielded in peace (the
+            // deploy waves) PLUS whatever it earned by capturing beacons. Beacons are the ONLY way to
+            // grow a flotilla — no hidden reinforcements at the bell.
             RF.phase = 'active'; RF.phaseAt = now
           }
         }
@@ -2245,7 +2240,7 @@ function SpaceSim() {
       // ships keep their distance via the strong separation nudge, so a touch is a genuine failure
       // and it costs both hulls. On contact they're hard-shoved apart so they never stack (2D — no
       // overlapping sprites) and don't re-hit every frame. Regrouping ships are exempt.
-      const bumpSafe = (s: ShipAgent['state']) => s === 'dying' || s === 'regrouping' || s === 'victory_cruise' || s === 'routing'
+      const bumpSafe = (s: ShipAgent['state']) => s === 'dying' || s === 'regrouping' || s === 'routing'
       agents.current.forEach((aA, idA) => {
         if (bumpSafe(aA.state)) return
         agents.current.forEach((aB, idB) => {
@@ -2283,12 +2278,7 @@ function SpaceSim() {
         })
       })
 
-      // ── WAR MEMORY DECAY: old grudges fade 5% every 60s ──
-      if (now >= nextWarDecay) {
-        nextWarDecay = now + 60000
-        WAR_FLEETS.forEach(a => WAR_FLEETS.forEach(b => { warMemory[a][b] *= 0.95 }))
-        localStorage.setItem('war-memory', JSON.stringify(warMemory))
-      }
+      // (War-memory decay removed — grudge system is gone.)
       // ── BATTLE SCORE DECAY: rivalries fade slowly (~19h half-life) so leadership
       // never ossifies — the daily reading keeps memory of past days without freezing. ──
       if (now >= nextScoreDecay) {
@@ -2304,37 +2294,21 @@ function SpaceSim() {
         localStorage.setItem('battle-score', JSON.stringify(next))
         setBattleScore(next)
       }
-      // ── ZONE MEMORY DECAY: contested ground cools 10% every 5min ──
-      if (now >= nextZoneDecay) {
-        nextZoneDecay = now + 300000
-        WAR_FLEETS.forEach(ft => { for (let i = 0; i < ZONE_COUNT; i++) zoneMem[ft][i] *= 0.9; refreshContested(ft) })
-        localStorage.setItem('zone-memory', JSON.stringify(zoneMem))
-      }
+      // (Zone-memory decay removed — contested-ground system is gone.)
 
       // ── MORALE DRIFT + CONTAGION (every ~350ms) — the drama seam ──
-      // Each ship's morale eases toward a baseline, spreads to/from nearby allies (panic and
-      // confidence are contagious), and tilts with local numbers + the power cycle. Kin-death
-      // shocks and kill-confidence are applied event-driven in killAgent. Not yet wired to
-      // behaviour — this just keeps a live, trustworthy signal ready for routs/rally/standoffs.
-      if (now >= nextMoraleUpdate) {
-        nextMoraleUpdate = now + 350
+      // ── HP REGEN: out of combat (no enemy within 260px) and no recent hull damage, ships slowly
+      //    patch up. (Formerly also drove the morale seam — morale is gone; only the regen remains.)
+      if (now >= nextRegenScan) {
+        nextRegenScan = now + 350
         agents.current.forEach(a => {
           if (a.state === 'dying') return
-          let allyMoraleSum = 0, allyN = 0, enemyN = 0
+          let enemyN = 0
           agents.current.forEach(b => {
             if (b.id === a.id || b.state === 'dying') return
             if (dist2D(a.x + 24, a.y + 24, b.x + 24, b.y + 24) > 260) return
             if (isEnemy(a.fleetType, b.fleetType)) enemyN++
-            else { allyN++; allyMoraleSum += b.morale }
           })
-          let m = a.morale
-          m += (0.7 - m) * 0.06                                          // regen toward baseline
-          if (allyN > 0) m += (allyMoraleSum / allyN - m) * 0.12         // contagion with nearby kin
-          m += Math.max(-0.05, Math.min(0.05, (allyN - enemyN) * 0.02))  // outnumber = bold, outnumbered = afraid
-          if (dominantFleet === a.fleetType) m += 0.02                   // riding high
-          if (underdogFleet  === a.fleetType) m -= 0.02                  // on the back foot
-          a.morale = Math.max(0, Math.min(1, m))
-          // HP regen: out of combat (no enemy within 260px) and no recent hull damage → slowly patch up
           if (enemyN === 0 && a.hp < a.maxHp && now >= a.regenReadyAt) {
             a.hp += 1
             a.regenReadyAt = now + REGEN_INTERVAL
@@ -2383,21 +2357,21 @@ function SpaceSim() {
       }
 
       // ── POWER CYCLES + GHOST ALLIANCES + GRUDGE TARGETING (every 5s) ──
-      if (now >= nextDominanceCheck) {
-        nextDominanceCheck = now + 5000
-        // 1v1 to the death: no dominance tiers, no ghost alliance, no cross-faction grudge. These were
-        // 3-race ecosystem mechanics that made ships hesitate and wander. Kept null/neutral so the many
-        // downstream reads stay inert; targeting simply falls back to “hunt the nearest enemy”.
-        dominantFleet = null; underdogFleet = null; ghostAlliance = false
-      }
-      // SINGLE situational speed factor (replaces the old berserk×rampage×underdog×respect stack).
-      // Everything that used to multiply speed now folds into ONE value, hard-clamped to
-      // [SITU_MIN, SITU_MAX] so no ship ever blurs at 2.25× or crawls at 0.5× by accident.
+      // SINGLE situational speed factor: everything that modifies speed folds into ONE value,
+      // hard-clamped to [SITU_MIN, SITU_MAX] so no ship ever blurs or crawls by accident.
       const situ = (a: ShipAgent) => {
         let f = 1
-        if (a.fleetType === underdogFleet) f += 0.25                       // survival adrenaline
-        if (a.fleetType === 'klaed' && (fleetActive.klaed ?? 0) === 1) f += 0.5   // berserk last-stand
-        if (a.fleetType === 'klaed' && a.engineType === 'burst') f += 0.2  // rampage
+        // LAST-STAND buff — every race gets one when it's the last of its fleet alive, so no race has
+        // an unanswered advantage. Flavoured to identity: kla'ed goes berserk-fast, nairan gets a
+        // desperate speed surge, nautolan digs in (smaller boost — it's the immovable one).
+        if ((fleetActive[a.fleetType as WarFleet] ?? 0) === 1) {
+          if (a.fleetType === 'klaed')    f += 0.5   // berserk last-stand (glass cannon lashes out)
+          if (a.fleetType === 'nairan')   f += 0.4   // desperate surge (tactician breaks discipline)
+          if (a.fleetType === 'nautolan') f += 0.3   // dig in (the tank presses forward)
+        }
+        if (a.fleetType === 'klaed'    && a.engineType === 'burst') f += 0.2  // rampage
+        if (a.fleetType === 'nairan'   && a.engineType === 'burst') f += 0.2  // matched engine buff
+        if (a.fleetType === 'nautolan' && a.engineType === 'burst') f += 0.2  // matched engine buff
         if (now < a.respectUntil) f -= 0.5                                 // mourning slowdown
         if (now < a.boostUntil)  f += 0.2                                  // post near-death adrenaline
         return Math.max(SITU_MIN, Math.min(SITU_MAX, f))
@@ -2506,71 +2480,34 @@ function SpaceSim() {
         const speedNow = Math.hypot(agent.avx, agent.avy)
         // Speed-matched arc, scaled by this ship's agility, hard-capped at OMEGA_MAX so it can
         // never spin in place — fast ships still arc wider, nimble races carve tighter.
-        const turnCap  = speedNow > 0.002 ? Math.min(OMEGA_MAX, agent.turnAccel / speedNow) : OMEGA_MAX
+        // Speed-gated turn rate — a REAL ship needs airflow/momentum to turn: nearly stopped it can
+        // barely rotate (no pivoting in place), at cruise it turns best, and at high speed it arcs
+        // wide again (lateral-accel limit). This bell-shaped gate is what kills the amoeba spin.
+        const cruiseSpeed = agent.maxSpeed * 0.6
+        const speedFrac   = speedNow / (cruiseSpeed || 1)
+        // rises from ~0.15 when stopped to 1.0 near cruise, then falls off as speed climbs past it
+        const turnGate    = Math.max(0.35, Math.min(1, speedFrac)) * Math.min(1, (cruiseSpeed * 1.8) / (speedNow + cruiseSpeed * 0.8))
+        const turnCap     = Math.min(OMEGA_MAX, agent.turnAccel / (cruiseSpeed || 1)) * turnGate
 
-        // ── Ecosystem context for this ship (cheap per-frame lookups) ──
-        const isDom    = dominantFleet === agent.fleetType   // arrogant tyrant
-        const isUnder  = underdogFleet === agent.fleetType   // desperate survivor
         const berserk  = agent.fleetType === 'klaed' && (fleetActive.klaed ?? 0) === 1  // last kla'ed alive
-        const zoneC    = isWarFleet(agent.fleetType) && zoneContested[agent.fleetType][zoneIndexOf(agent.x + 24, agent.y + 24, W, H)]
         const situFactor = situ(agent)   // single capped situational speed factor (mourning/berserk/underdog/etc)
         // Morale: high-morale crews press the attack (rally), broken ones run (rout, below)
-        const rallied = agent.morale > RALLY_MORALE
-        // Aggression: dominant +2, contested +1, vengeance +1, berserk +3, rallied +1
-        const aggro = (isDom ? 2 : 0) + (zoneC ? 1 : 0) + (now < agent.vengeanceUntil ? 1 : 0) + (berserk ? 3 : 0) + (rallied ? 1 : 0)
-        // Retreat suppression: tyrants, berserkers, and emboldened crews hold; contested ground stiffens resolve
-        const noRetreat = isDom || berserk || rallied
+        const aggro = 0   // DEATHMATCH: flat aggression (dominance/contested/vengeance/berserk/rally all gone)
         // Contested ground stiffens resolve: -1 to the HP at which this ship would run. Note a base-1
         // race (klaed) or base-0 (nautolan) bottoms out at 0 here = “won't retreat on contested turf”,
         // which is the intended read — morale (rout) is the only thing that can still break them there.
-        const effRetreatThreshold = zoneC ? Math.max(0, agent.retreatThreshold - 1) : agent.retreatThreshold
+        const effRetreatThreshold = agent.retreatThreshold
 
         // ── ROUT / RALLY (morale-driven — the drama layer) ──────────────────────────
         // A ship whose nerve cracks breaks and runs; contagion spreads the panic to nearby kin,
         // so routs cascade. It must steady itself (climb back over RALLY_RECOVER) to rejoin the
         // fight — hysteresis stops flicker. Berserk last-stands and juggernauts are fearless.
-        const fearless = berserk || juggernaut
-        if (agent.state !== 'routing' && agent.state !== 'regrouping' && agent.state !== 'victory_cruise' && !fearless && agent.morale < ROUT_MORALE) {
+        if (false) {
           agent.state = 'routing'; agent.targetId = null; agent.seekingPickupId = null
-        } else if (agent.state === 'routing' && (agent.morale >= RALLY_RECOVER || fearless)) {
-          agent.state = 'cruising'
         }
 
         // ── REGROUPING ──────────────────────────────────────────────────────────
-        if (agent.state === 'regrouping') {
-          const regroupDur = 4000
-          // Cluster toward fleet center
-          let fcx = 0, fcy = 0, fc = 0
-          agents.current.forEach(a => {
-            if (a.fleetId === agent.fleetId && a.state === 'regrouping') { fcx += a.x + 24; fcy += a.y + 24; fc++ }
-          })
-          if (fc > 1) {
-            fcx /= fc; fcy /= fc
-            const rdx = fcx - (agent.x + 24), rdy = fcy - (agent.y + 24)
-            const rd  = Math.sqrt(rdx * rdx + rdy * rdy) || 1
-            if (rd > 48) {   // stay above collision distance so re-forming ships don't detonate
-              agent.angle = clampTurn(agent.angle, Math.atan2(rdy, rdx), turnCap * dt)
-              agent.vx = Math.cos(agent.angle) * 0.05; agent.vy = Math.sin(agent.angle) * 0.05
-            } else { agent.vx = 0; agent.vy = 0 }
-          } else { agent.vx = 0; agent.vy = 0 }
-
-          if (now - agent.regroupStart >= regroupDur) {
-            computeStats(agent)
-            agent.hp = agent.maxHp; agent.prevHp = agent.maxHp
-            if (agent.shieldType !== 'none') { agent.shieldActive = true; agent.shieldHp = SHIELD_MODS[agent.shieldType].shieldHp; agent.shieldCooldown = 0 }
-            const toCenter = Math.atan2(H / 2 - (agent.y + 24), W / 2 - (agent.x + 24))
-            agent.cruiseAngle = toCenter
-            agent.angle = clampTurn(agent.angle, toCenter, turnCap * dt)
-            agent.vx = Math.cos(agent.angle) * agent.maxSpeed
-            agent.vy = Math.sin(agent.angle) * agent.maxSpeed
-            agent.state = 'cruising'; agent.regroupStart = 0; agent.retreatStart = 0
-            agentChanged = true
-          }
-          agent.x += agent.vx * dt; agent.y += agent.vy * dt
-          const el2 = agentEls.current.get(agent.id)
-          if (el2) { el2.style.transform = `translate(${agent.x}px,${SY(agent.y)}px) rotate(${agent.angle * 180 / Math.PI + 90}deg)`; el2.style.visibility = 'visible' }
-          return
-        }
+        // (Regrouping state removed — only reachable via fleet-wide retreat, which is gone.)
 
         // Shield pickup expiry — the shield generator wears off entirely; stats revert
         if (agent.shieldPickupExpiry > 0 && now >= agent.shieldPickupExpiry) {
@@ -2589,13 +2526,26 @@ function SpaceSim() {
         //   nautolan: shield → weapon (craves All-Around / Invincibility)
         //   mainship: engine → weapon → shield (speed is survival)
         // Scarcity events set a global scramble flag so everyone rushes the lone pickup.
-        if (!fleetRetreating.has(agent.fleetId) && agent.state !== 'routing' && agent.state !== 'victory_cruise') {
+        // PEACE PRIORITY: a beacon = a bigger fleet = a real edge in the coming war, so in peace a
+        // beacon on the field outranks ANY loot. Skip pickup-seeking entirely while one exists; the
+        // beaconHunt logic below then steers the ship to it. (In war there are no beacons, so this
+        // never blocks combat loot.)
+        const beaconOnField = peaceNow && beacons.current.size > 0
+        // If a beacon just appeared, drop any in-progress loot chase so the ship re-prioritises to the
+        // beacon (it only reaches the beaconHunt logic from the 'cruising' state).
+        if (beaconOnField && agent.state === 'pickup_seeking') { agent.state = 'cruising'; agent.seekingPickupId = null }
+        if (agent.state !== 'routing' && !beaconOnField) {
           const needsWeapon = agent.weaponType === 'none'
           const needsShield = agent.shieldType === 'none'
           const needsEngine = agent.engineType === 'none'
-          // Ships only actively SEEK a weapon (so they can fight); shields/engines are grabbed on
-          // contact but never chased — an armed ship stays free to HUNT BEACONS, not wander for loot.
-          const priority: PickupData['type'][] = needsWeapon ? ['weapon'] : []
+          // Seeking priority: a weapon is essential (chased even mid-fight); shields and engines are
+          // worth going for too, but only when NOT actively engaging — so ships don't wander off from a
+          // fight for loot. Order = weapon → shield → engine (most to least combat-critical).
+          const inFight = agent.state === 'engaging'
+          const priority: PickupData['type'][] =
+            needsWeapon ? (inFight ? ['weapon'] : ['weapon', 'shield', 'engine'])
+            : inFight   ? []
+            : ['shield', 'engine']
 
           const wants = (t: PickupData['type']) =>
             (t === 'weapon' && needsWeapon) || (t === 'shield' && needsShield) || (t === 'engine' && needsEngine)
@@ -2607,13 +2557,22 @@ function SpaceSim() {
             pickups.current.forEach(p => {
               if (p.type !== t) return
               const d = dist2D(agent.x+24, agent.y+24, p.x, p.y)
+              // CLAIMING: skip a pickup another ship is already seeking AND sits closer to — they'll get
+              // it first, so we shouldn't all pile onto the same one. This spreads the fleet across the
+              // available loot instead of the whole group chasing (and re-chasing) a single item.
+              let takenByCloser = false
+              agents.current.forEach(o => {
+                if (o.id === agent.id || o.state === 'dying' || o.seekingPickupId !== p.id) return
+                if (dist2D(o.x+24, o.y+24, p.x, p.y) < d) takenByCloser = true
+              })
+              if (takenByCloser) return
               if (d < bestPkD) { bestPkD = d; bestPk = p }
             })
             if (bestPk) { chosen = bestPk; break }
           }
           // Break off combat for a pickup when: it's an underdog, OR the ship is UNARMED and
           // this is a weapon (a weaponless ship is useless in a fight, so it goes to arm up).
-          const breakOff = agent.state !== 'engaging' || isUnder || ((chosen as PickupData | null)?.type === 'weapon' && needsWeapon)
+          const breakOff = agent.state !== 'engaging' || ((chosen as PickupData | null)?.type === 'weapon' && needsWeapon)
           if (chosen && breakOff && now >= agent.targetLockedUntil) {
             agent.seekingPickupId = (chosen as PickupData).id; agent.state = 'pickup_seeking'
             agent.targetLockedUntil = now + 2000
@@ -2676,16 +2635,7 @@ function SpaceSim() {
           })
           const flee = (threat > 0 ? Math.atan2(fy, fx) : homeAngle(agent.homeEdge))
                      + Math.sin(now * 0.02 + agent.wingSlot) * 0.5   // erratic panic wobble
-          agent.angle = clampTurn(agent.angle, flee, turnCap * dt * 1.4)
-          agent.vx = Math.cos(agent.angle) * spd
-          agent.vy = Math.sin(agent.angle) * spd
-
-        // ── VICTORY CRUISE (round winner peels off in a confident lap and flies OUT of frame) ──
-        } else if (agent.state === 'victory_cruise') {
-          const spd = agent.maxSpeed * 1.05 * situFactor
-          const exit = homeAngle(agent.homeEdge)   // head back out the side it flew in from
-          agent.cruiseAngle = exit
-          agent.angle = clampTurn(agent.angle, exit + Math.sin(now * 0.0016 + agent.wingSlot) * 0.12, turnCap * dt)
+          agent.angle = steerAngle(agent, flee, turnCap * 1.4, dt)
           agent.vx = Math.cos(agent.angle) * spd
           agent.vy = Math.sin(agent.angle) * spd
 
@@ -2716,7 +2666,8 @@ function SpaceSim() {
                 const ed = dist2D(agent.x+24, agent.y+24, o.x+24, o.y+24)
                 if (ed < 100) desiredAngle = Math.atan2((agent.y+24)-(o.y+24), (agent.x+24)-(o.x+24))
               })
-              agent.angle = clampTurn(agent.angle, desiredAngle, turnCap * dt)
+              agent.angle = steerAngle(agent, desiredAngle, turnCap, dt)
+              // (evade steer)
               agent.vx = Math.cos(agent.angle) * spd
               agent.vy = Math.sin(agent.angle) * spd
             }
@@ -2728,7 +2679,10 @@ function SpaceSim() {
           const leader = agent.leaderId ? agents.current.get(agent.leaderId) : null
           const park   = fleetPark.get(agent.fleetId)
           const parked = !!park && now < park.until
-          const isLead = agent.isLeader || !agent.leaderId || !leader || leader.state === 'dying'
+          // SOLO PILOTS: every ship flies for itself — no hierarchy, no wings. Forcing isLead=true means
+          // the WING (formation-orbit) branch below never runs; each ship cruises, hunts, and seeks on
+          // its own. (The leader/cluster machinery is left inert; it simply no longer shapes flight.)
+          const isLead = true
 
           // ══ TARGETING PRIORITY differs by phase ═════════════════════════════════════
           // WAR  = hunt & kill. The nearest enemy is the objective; ships ADVANCE on it decisively
@@ -2753,11 +2707,13 @@ function SpaceSim() {
             beacons.current.forEach(b => { const d = dist2D(agent.x + 24, agent.y + 24, b.x, b.y); if (d < bd) { bd = d; bx = b.x; by = b.y } })
             agent.cruiseAngle = Math.atan2(by - (agent.y + 24), bx - (agent.x + 24))   // aim STRAIGHT at it
             fleetPark.delete(agent.fleetId)
-          } else if (!peaceNow && isLead && enemyNear && nearEnemy) {
-            // WAR: charge the nearest foe. Advance in formation while far, but this drives the whole
-            // squad toward the enemy instead of milling about — the leader points hard at the target.
+          } else if (!peaceNow && isLead && enemyNear && nearEnemy && agent.hasWeapon) {
+            // WAR: charge the nearest foe — but CUT IT OFF, don't dog-chase. Steer toward where the
+            // enemy will be (intercept), so the squad angles ahead of the target instead of trailing
+            // it. Only an ARMED leader charges — a weaponless one keeps cruising (and seeking a gun).
             const ne = nearEnemy as ShipAgent
-            agent.cruiseAngle = lerpAngle(agent.cruiseAngle, Math.atan2(ne.y + 24 - (agent.y + 24), ne.x + 24 - (agent.x + 24)), 0.14)
+            const ip = predictIntercept(agent.x + 24, agent.y + 24, ne.x + 24, ne.y + 24, ne.avx, ne.avy, agent.maxSpeed, agent.pilotSkill)
+            agent.cruiseAngle = lerpAngle(agent.cruiseAngle, Math.atan2(ip.y - (agent.y + 24), ip.x - (agent.x + 24)), 0.14)
             fleetPark.delete(agent.fleetId)
           }
 
@@ -2767,18 +2723,18 @@ function SpaceSim() {
               const dx = park.x - agent.x, dy = park.y - agent.y
               const d = Math.hypot(dx, dy)
               if (d > 5) {
-                agent.angle = clampTurn(agent.angle, Math.atan2(dy, dx), turnCap * dt)
+                agent.angle = steerAngle(agent, Math.atan2(dy, dx), turnCap, dt)
                 const s = Math.min(d * 0.03, spd * 0.4)
                 agent.vx = Math.cos(agent.angle) * s; agent.vy = Math.sin(agent.angle) * s
               } else {
                 agent.vx *= 0.86; agent.vy *= 0.86
-                agent.angle = clampTurn(agent.angle, park.heading + Math.sin(now * 0.0009) * 0.16, turnCap * dt)
+                agent.angle = steerAngle(agent, park.heading + Math.sin(now * 0.0009) * 0.16, turnCap, dt)
               }
             } else {
               // Family wiggle: serpentine cruise (klaed loose & jittery, nautolan rigid)
               agent.wavePhase += fl.wiggleFreq * dt
               const waveAngle = agent.cruiseAngle + (beaconHunt ? 0 : Math.sin(agent.wavePhase + agent.wingSlot * 1.3) * fl.wiggleAmp)
-              agent.angle = clampTurn(agent.angle, waveAngle, turnCap * dt)
+              agent.angle = steerAngle(agent, waveAngle, turnCap, dt)
               agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd
               // Decide to station the whole fleet when it's calm out
               if (now >= agent.nextParkCheck) {
@@ -2803,17 +2759,19 @@ function SpaceSim() {
             const d  = Math.hypot(dx, dy) || 1
             const wig = d < 34 ? Math.sin(now * fl.wiggleFreq + agent.wingSlot * 1.7) * fl.wiggleAmp * 0.5 : 0
             const aimAngle = d < 46 ? lerpAngle(Math.atan2(dy, dx), hd, 0.55) : Math.atan2(dy, dx)
-            agent.angle = clampTurn(agent.angle, aimAngle + wig, turnCap * dt)
+            agent.angle = steerAngle(agent, aimAngle + wig, turnCap, dt)
             const s = Math.min(d * 0.06, spd * 1.35)
             agent.vx = Math.cos(agent.angle) * s; agent.vy = Math.sin(agent.angle) * s
             agent.cruiseAngle = leader.cruiseAngle
           }
 
           // WAR: break to combat EARLY and individually. The moment an enemy is within detection
-          // range, every ship peels off to hunt its own target — no waiting for firing range, no
-          // waiting for the leader. This is the chaotic, deadly clash: formation dissolves on contact.
+          // range, every ARMED ship peels off to hunt its own target — no waiting for firing range,
+          // no waiting for the leader. This is the chaotic, deadly clash: formation dissolves on
+          // contact. An UNARMED ship does NOT commit to a chase it can't finish — it keeps seeking a
+          // weapon (or stays with the formation) instead of pointlessly running the enemy down.
           // (A brief commit distance guard so they don't peel the instant they spawn far apart.)
-          const commit = !peaceNow && enemyNear && nearED < detectRange
+          const commit = !peaceNow && enemyNear && nearED < detectRange && agent.hasWeapon
           if (commit) {
             agent.state = 'engaging'
             fleetPark.delete(agent.fleetId)   // battle stations
@@ -2834,11 +2792,22 @@ function SpaceSim() {
           const paused = agent.fleetType === 'nairan' && now < agent.engagePauseUntil
 
           if (agent.isLeader || !agent.leaderId) {
-            // Retreat rules per race + ecosystem overrides:
-            //  klaed  — only hp==1 & no shield;  nairan — hp ≤ threshold;  nautolan — never
-            //  dominant arrogance & berserk never retreat; contested ground stiffens resolve
-            const klaedHold = agent.fleetType === 'klaed' && (rampage || agent.shieldActive)
-            const wantRetreat = !noRetreat && !klaedHold && effRetreatThreshold > 0 && agent.hp <= effRetreatThreshold
+            // SELF-PRESERVATION (aligned with the win condition: staying alive IS how you win). A
+            // ship replegates only when holding its ground would just hand the enemy a free kill:
+            // it's critically hurt AND outnumbered right here. It's not cowardice — it peels off to
+            // break the enemy's focus / let its shield recharge, then returns. Tuned so it stays rare
+            // and never turns the battle into a run-away: nautolan (threshold 0) never flinches;
+            // rampaging kla'ed never retreats; a ship with a live shield stands firm.
+            let localEnemies = 0
+            agents.current.forEach(o => {
+              if (o.state === 'dying' || !isEnemy(agent.fleetType, o.fleetType)) return
+              if (dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24) < 220) localEnemies++
+            })
+            const critical  = agent.hp <= rs.retreatThreshold           // race sets how hurt is “too hurt” (0 = never)
+            const outnumbered = localEnemies >= 2                        // more than one gun on me right here
+            const canRegroup  = agent.shieldType !== 'none' && !agent.shieldActive  // a shield worth recharging
+            const wantRetreat = critical && outnumbered && !rampage && !agent.shieldActive
+                                && (canRegroup || localEnemies >= 3)
             if (wantRetreat) {
               agent.state = 'retreating'; agent.retreatStart = now
             } else {
@@ -2847,13 +2816,11 @@ function SpaceSim() {
               if (!agent.targetId || now >= agent.targetLockedUntil) {
                 agent.lastTargetUpdate = now
                 agent.targetLockedUntil = now + 2000
-                const myGrudge = isWarFleet(agent.fleetType) ? grudge[agent.fleetType] : null
                 let hpOneT: ShipAgent | null = null,    hpOneD   = Infinity
                 let noShieldT: ShipAgent | null = null, noShieldD = Infinity
                 let leaderT: ShipAgent | null = null,   leaderD   = Infinity
                 let nearestT: ShipAgent | null = null,  nearestD  = Infinity
                 let mainT: ShipAgent | null = null,     mainD     = Infinity
-                let grudgeT: ShipAgent | null = null,   grudgeD   = Infinity
                 agents.current.forEach(o => {
                   if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying' || o.state === 'regrouping') return
                   const d = dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24)
@@ -2862,13 +2829,12 @@ function SpaceSim() {
                   if (!o.shieldActive && d < noShieldD) { noShieldD = d; noShieldT = o }
                   if (o.isLeader && d < leaderD) { leaderD = d; leaderT = o }
                   if (o.fleetType === 'mainship' && d < 400 && d < mainD) { mainD = d; mainT = o }
-                  if (myGrudge && o.fleetType === myGrudge && d < grudgeD) { grudgeD = d; grudgeT = o }
                 })
                 const selT = (hpOneT ?? noShieldT ?? leaderT ?? nearestT) as ShipAgent | null
-                // Berserk ignores tactics (nearest); else the grudge fleet takes priority (vendetta)
+                // Berserk ignores tactics and just hits the nearest; otherwise pick the tactical target.
                 const finalT = berserk ? nearestT
                   : (mainT && agent.fleetType !== 'mainship') ? mainT as ShipAgent
-                  : (grudgeT ?? selT)
+                  : selT
                 agent.targetId = finalT ? finalT.id : null
               }
               let target = agent.targetId ? agents.current.get(agent.targetId) ?? null : null
@@ -2898,39 +2864,54 @@ function SpaceSim() {
 
                 const firingStop = now < agent.fireStopUntil
                 const drag = Math.pow(0.999, dt)
+                // DIRECT AIM: shoot straight at the target's current position. (Predictive deflection
+                // was removed — it assumes straight-line motion, but these ships orbit and turn
+                // constantly, so leading the shot missed systematically. Direct aim tracks cleanly.)
                 const aimAngle = Math.atan2(dy, dx)
+                const aimPt = { x: tx, y: ty }
                 // Ready to shoot and target in range → point the nose straight at it to line up
                 const wantsFire = agent.hasWeapon && !paused && now - agent.lastShot > agent.fireInterval
                   && now >= agent.fireStopUntil && projs.current.size < MAX_PROJS && d <= rs.maxRange
 
                 if (tooClose) {
-                  agent.angle = clampTurn(agent.angle, repulseAngle, turnCap * dt * 3)
+                  // Back off a crowding neighbour — gentle now that inertia carries the turn (a hard
+                  // 3× whip made a knot of aggressive ships jitter into a clump).
+                  agent.angle = steerAngle(agent, repulseAngle, turnCap * 1.4, dt)
                   agent.vx = Math.cos(agent.angle) * spd
                   agent.vy = Math.sin(agent.angle) * spd
                 } else if (rs.behavior === 'aggressive') {
-                  // Orbit target; but when ready to fire, aim the nose right at it
+                  // Orbit target; when ready to fire, aim the nose right at it. The orbit side is keyed
+                  // to each ship's slot so a pack SPREADS around the target instead of all converging
+                  // on the same point (that was the ugly kla'ed clumping).
+                  const orbitSide = (agent.wingSlot % 2 === 0 ? 1 : -1)
+                  const orbitSpread = Math.PI / 5 + (agent.wingSlot % 3) * 0.35
                   const desiredAngle = wantsFire ? aimAngle
-                    : d > rs.maxRange ? aimAngle : aimAngle + Math.PI / 5
-                  agent.angle = clampTurn(agent.angle, desiredAngle, turnCap * dt)
+                    : d > rs.maxRange ? aimAngle : aimAngle + orbitSide * orbitSpread
+                  agent.angle = steerAngle(agent, desiredAngle, turnCap, dt)
                   if (firingStop) { agent.vx *= drag; agent.vy *= drag }
                   else { agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd }
-                  tryFireNose(agent, tx, ty, now)
+                  tryFireNose(agent, aimPt.x, aimPt.y, now)
 
                 } else if (rs.behavior === 'tactical') {
                   // Hold range band; arc in-band, but aim the nose when about to fire.
                   const desiredAngle = wantsFire ? aimAngle
                     : d > rs.maxRange ? aimAngle : aimAngle + Math.PI / 5
-                  agent.angle = clampTurn(agent.angle, desiredAngle, turnCap * dt)
+                  agent.angle = steerAngle(agent, desiredAngle, turnCap, dt)
+                  // (sep steer B)
                   if (firingStop || paused) { agent.vx *= drag; agent.vy *= drag }
                   else { agent.vx = Math.cos(agent.angle) * spd * 0.8; agent.vy = Math.sin(agent.angle) * spd * 0.8 }
-                  if (!paused) tryFireNose(agent, tx, ty, now)
+                  if (!paused) tryFireNose(agent, aimPt.x, aimPt.y, now)
 
                 } else if (rs.behavior === 'tank') {
-                  // Nautolan: inexorable constant advance, nose always on target — fires when lined up
-                  agent.angle = clampTurn(agent.angle, aimAngle, turnCap * dt)
+                  // Nautolan: inexorable constant advance. It's slow to turn, so it points its nose at
+                  // the target's CURRENT bearing (a stable aim it can actually line up on) rather than
+                  // chasing the moving predicted point — otherwise its nose never settles inside the
+                  // fire cone and it never shoots. Deflection still applies to the round via aimPt.
+                  const noseAngle = Math.atan2(dy, dx)
+                  agent.angle = steerAngle(agent, noseAngle, turnCap, dt)
                   agent.vx = Math.cos(agent.angle) * spd * 0.6
                   agent.vy = Math.sin(agent.angle) * spd * 0.6
-                  tryFireNose(agent, tx, ty, now)
+                  tryFireNose(agent, tx, ty, now)   // nose & shot both on the CURRENT bearing so the cone lines up
 
                 } else {
                   // 'survivor' (mainship): evade or counter-attack if cornered
@@ -2957,7 +2938,7 @@ function SpaceSim() {
                         dist2D(agent.x+24, agent.y+24, a.x+24, a.y+24) < dist2D(agent.x+24, agent.y+24, b.x+24, b.y+24) ? a : b)
                       agent.targetId = closest.id
                       const cdx = closest.x+24-(agent.x+24), cdy = closest.y+24-(agent.y+24)
-                      agent.angle = clampTurn(agent.angle, Math.atan2(cdy, cdx), turnCap * dt)  // nose onto target
+                      agent.angle = steerAngle(agent, Math.atan2(cdy, cdx), turnCap, dt)  // nose onto target
                       const firingStop2 = now < agent.fireStopUntil
                       if (firingStop2) { agent.vx *= Math.pow(0.999, dt); agent.vy *= Math.pow(0.999, dt) }
                       else { agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd }
@@ -2971,7 +2952,7 @@ function SpaceSim() {
                         avgDx += ex/el; avgDy += ey/el
                       })
                       const al = Math.sqrt(avgDx*avgDx + avgDy*avgDy) || 1
-                      agent.angle = clampTurn(agent.angle, Math.atan2(-avgDy/al, -avgDx/al), turnCap * dt)
+                      agent.angle = steerAngle(agent, Math.atan2(-avgDy/al, -avgDx/al), turnCap, dt)
                       agent.vx = Math.cos(agent.angle) * spd * 1.2
                       agent.vy = Math.sin(agent.angle) * spd * 1.2
                       agent.targetId = null
@@ -2990,7 +2971,7 @@ function SpaceSim() {
               agent.wingAngle += 0.0012 * dt
               // Dominant arrogance: formation discipline -50% (wings drift much wider)
               const baseRadius = rs.behavior === 'tank' ? 48 : agent.wingSlot <= 2 ? 95 : 120
-              const wingRadius = baseRadius * (isDom ? 1.5 : 1)
+              const wingRadius = baseRadius
               const slotOffset = (agent.wingSlot - 1) * (Math.PI / 3)
               const orbitAngle = agent.wingAngle + slotOffset
               const tx = leader.x + 24 + Math.cos(orbitAngle) * wingRadius - 24
@@ -2998,7 +2979,7 @@ function SpaceSim() {
               const dx = tx - agent.x, dy = ty - agent.y
               const d  = Math.sqrt(dx*dx + dy*dy) || 1
               const catchAngle = Math.atan2(dy, dx)
-              agent.angle = clampTurn(agent.angle, catchAngle, turnCap * dt * 1.5)
+              agent.angle = steerAngle(agent, catchAngle, turnCap * 1.5, dt)
               const catchSpd = Math.min(d * 0.1, spd * 1.5)
               agent.vx = Math.cos(agent.angle) * catchSpd
               agent.vy = Math.sin(agent.angle) * catchSpd
@@ -3028,7 +3009,7 @@ function SpaceSim() {
                   if (wantsFire) {
                     // Break orbit briefly to bring the nose onto the target for the shot
                     const aimA = Math.atan2(wt.y + 24 - (agent.y + 24), wt.x + 24 - (agent.x + 24))
-                    agent.angle = clampTurn(agent.angle, aimA, turnCap * dt)
+                    agent.angle = steerAngle(agent, aimA, turnCap, dt)
                     const cs = Math.sqrt(agent.vx * agent.vx + agent.vy * agent.vy)
                     agent.vx = Math.cos(agent.angle) * cs; agent.vy = Math.sin(agent.angle) * cs
                   }
@@ -3046,30 +3027,22 @@ function SpaceSim() {
         // ── RETREATING ──────────────────────────────────────────────────────────
         } else if (agent.state === 'retreating') {
           const rs = RACE[agent.fleetType as keyof typeof RACE] || RACE.klaed
-          if (fleetRetreating.has(agent.fleetId)) {
-            // Fleet-wide retreat: turn toward home edge, move forward
-            const spd = agent.maxSpeed * 1.4 * situFactor
-            const ha  = homeAngle(agent.homeEdge)
-            agent.angle = clampTurn(agent.angle, ha, turnCap * dt)
-            agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd
-          } else {
-            // Individual HP-based retreat: turn away from nearest enemy, move forward
-            const spd = agent.maxSpeed * COMBAT_RATIO * 1.2 * situFactor
-            let retreatFrom: ShipAgent | null = null, nearD = Infinity
-            agents.current.forEach(o => {
-              if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying') return
-              const d = dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24)
-              if (d < nearD) { nearD = d; retreatFrom = o }
-            })
-            if (retreatFrom) {
-              const dx = agent.x - (retreatFrom as ShipAgent).x, dy = agent.y - (retreatFrom as ShipAgent).y
-              const awayAngle = Math.atan2(dy, dx)
-              agent.angle = clampTurn(agent.angle, awayAngle, turnCap * dt)
-            }
-            agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd
-            const retreatMs = rs.behavior === 'tactical' ? 4000 : 5000
-            if (now - agent.retreatStart > retreatMs) { agent.state = 'cruising'; agent.retreatStart = 0 }
+          // Individual retreat: turn away from nearest enemy, move forward, return to cruising after a beat.
+          const spd = agent.maxSpeed * COMBAT_RATIO * 1.2 * situFactor
+          let retreatFrom: ShipAgent | null = null, nearD = Infinity
+          agents.current.forEach(o => {
+            if (!isEnemy(agent.fleetType, o.fleetType) || o.state === 'dying') return
+            const d = dist2D(agent.x + 24, agent.y + 24, o.x + 24, o.y + 24)
+            if (d < nearD) { nearD = d; retreatFrom = o }
+          })
+          if (retreatFrom) {
+            const dx = agent.x - (retreatFrom as ShipAgent).x, dy = agent.y - (retreatFrom as ShipAgent).y
+            agent.angle = steerAngle(agent, Math.atan2(dy, dx), turnCap, dt)
+            // (engage fallback steer)
           }
+          agent.vx = Math.cos(agent.angle) * spd; agent.vy = Math.sin(agent.angle) * spd
+          const retreatMs = rs.behavior === 'tactical' ? 4000 : 5000
+          if (now - agent.retreatStart > retreatMs) { agent.state = 'cruising'; agent.retreatStart = 0 }
         }
 
         // Adrenaline: a near-fatally-wounded ship gets a brief speed burst to break away from its attacker.
@@ -3077,19 +3050,35 @@ function SpaceSim() {
         // ── Evasion — asteroids by steering, crowding by a soft separation nudge ──
         // Juggernaut ignores all evasion and plows straight ahead.
         if (!juggernaut) {
-          // Asteroids are lethal and NOT in agents.current — swerve wide of any rock ahead.
+          const pc    = PILOT[agent.fleetType] ?? PILOT.klaed
+          const skill = agent.pilotSkill
+          // Asteroids are lethal and NOT in agents.current — a real pilot reads the rock's path AHEAD
+          // of time and banks early. We check not just rocks that are close NOW, but where THIS ship
+          // will be over the next lookahead window, and swerve sooner the sooner the collision looms.
           let avoidAngle = agent.angle
+          const lookMs = pc.lookAheadMs * (0.5 + skill * 0.7)   // sharper pilots read further ahead
           asteroids.current.forEach(ast => {
             const acx = ast.x + ast.size / 2, acy = ast.y + ast.size / 2
-            const dx = agent.x + 24 - acx, dy = agent.y + 24 - acy
-            const d  = Math.sqrt(dx * dx + dy * dy) || 1
+            // Relative motion: close on the rock using the ship's real velocity (avx/avy). Find the
+            // moment of closest approach within the lookahead window (t ≥ 0), then judge the gap THEN.
+            const rx = (agent.x + 24) - acx, ry = (agent.y + 24) - acy
+            const rvx = agent.avx - (ast.vx || 0), rvy = agent.avy - (ast.vy || 0)
+            const rv2 = rvx * rvx + rvy * rvy
+            let tHit = 0
+            if (rv2 > 1e-9) tHit = Math.max(0, Math.min(lookMs, -(rx * rvx + ry * rvy) / rv2))
+            const fx = rx + rvx * tHit, fy = ry + rvy * tHit   // gap vector at closest approach
+            const fd = Math.hypot(fx, fy) || 1
             const danger = ast.size / 2 + 82        // rock radius + a generous berth
-            if (d >= danger) return
+            if (fd >= danger) return                // will clear it comfortably — ignore
             // ignore rocks well behind the ship's heading (don't curve back toward one already passed)
-            const facing = (Math.cos(agent.angle) * -dx + Math.sin(agent.angle) * -dy) / d
+            const dx = (agent.x + 24) - acx, dy = (agent.y + 24) - acy
+            const dNow = Math.hypot(dx, dy) || 1
+            const facing = (Math.cos(agent.angle) * -dx + Math.sin(agent.angle) * -dy) / dNow
             if (facing < -0.25) return
-            const turn = (danger - d) / danger * turnCap * dt * 5   // urgent — hard swerve when close
-            avoidAngle = clampTurn(avoidAngle, Math.atan2(dy, dx), turn)
+            // Swerve away from the PROJECTED gap; more urgent the sooner impact comes.
+            const urgency = (1 - tHit / lookMs)
+            const turn = (danger - fd) / danger * turnCap * dt * 5 * (0.5 + urgency)
+            avoidAngle = clampTurn(avoidAngle, Math.atan2(fy, fx), turn)
           })
           // ── Anticipatory collision avoidance — cada nave vuela como piloto, no como riel ──
           // Sin campo de fuerza. El piloto vigila su cono de vuelo, predice el cruce más
@@ -3097,8 +3086,7 @@ function SpaceSim() {
           // compromete un banco decidido y LO SOSTIENE. Entre amenazas reales no hace nada más
           // que volar su intención. Qué tan tarde / fuerte / limpio = carácter de raza × skill.
           {
-            const pc    = PILOT[agent.fleetType] ?? PILOT.klaed
-            const skill = agent.pilotSkill
+            // (pc & skill declared once at the top of this !juggernaut block)
             if (now < agent.evadeUntil) {
               // en plena maniobra: sigue volando el banco comprometido (la decisión, sostenida)
               avoidAngle = clampTurn(avoidAngle, agent.evadeAngle, turnCap * dt * (0.7 + skill * 0.9))
@@ -3134,13 +3122,8 @@ function SpaceSim() {
               }
             }
           }
-          // Horizontal soft boundary — fighting ships stay in the visible WIDTH (only fleeing/winning
-          // ships leave the sides). Keeps chases in frame; the tall field still handles up/down.
-          if (agent.state !== 'routing' && agent.state !== 'retreating' && agent.state !== 'victory_cruise') {
-            const mgn = 100
-            if (agent.x < mgn)          avoidAngle = clampTurn(avoidAngle, 0,       (mgn - agent.x) / mgn * turnCap * dt * 5)
-            else if (agent.x > W - mgn) avoidAngle = clampTurn(avoidAngle, Math.PI, (agent.x - (W - mgn)) / mgn * turnCap * dt * 5)
-          }
+          // (No horizontal soft boundary anymore — the field wraps Pac-Man style on both axes, so a
+          //  chase that runs off a side simply reappears on the other. Nothing to fence in.)
           if (avoidAngle !== agent.angle) {
             const curSpd = Math.sqrt(agent.vx*agent.vx + agent.vy*agent.vy)
             agent.angle = avoidAngle
@@ -3165,18 +3148,20 @@ function SpaceSim() {
             const d = Math.hypot(rx, ry)
             if (d < nnd) { nnd = d; nnx = rx; nny = ry }
           })
-          // 1) Crowd bank: if someone is inside SEP_RADIUS, lean away from them. Skilled pilots hold
-          //    tighter (react later, cleaner); the crunch is scaled by how deep inside the bubble.
+          // 1) Crowd bank: if someone is inside SEP_RADIUS, ease the heading away from them. With
+          //    angular momentum now in play, this is a GENTLE nudge blended into the turn — a hard
+          //    override here made ships over-rotate and jitter (bumper-cars). We just bias the target
+          //    heading away from the neighbour and let steerAngle's inertia carry it smoothly.
           let crowd = 0
           if (nnd < SEP_RADIUS && nnd > 0.1) {
             crowd = (SEP_RADIUS - nnd) / SEP_RADIUS               // 0..1, 1 = almost touching
             const away = Math.atan2(nny, nnx)
-            const lean = crowd * SEP_TURN * turnCap * dt * (1.15 - agent.pilotSkill * 0.35)
-            agent.angle = clampTurn(agent.angle, away, lean)
-            // re-point current velocity along the new heading (keep its magnitude; throttle handles speed)
-            const curSpd = Math.hypot(agent.vx, agent.vy)
-            agent.vx = Math.cos(agent.angle) * curSpd
-            agent.vy = Math.sin(agent.angle) * curSpd
+            // Blend current heading toward “away” proportional to crowding, then steer to it with
+            // the normal (inertial) turn cap — no 5.5× whip, no velocity re-pointing.
+            const bias = lerpAngle(agent.angle, away, Math.min(0.6, crowd * 0.8))
+            agent.angle = steerAngle(agent, bias, turnCap, dt)
+            // NB: velocity is NOT re-pointed here — inertia (avx/avy easing) handles the drift so the
+            //     ship banks into the gap instead of snapping sideways.
           }
           // 2) Throttle target: full ahead by default, feather off when crowding (don't ram the
           //    neighbour) and brake into a hard heading change (the turn you can SEE them commit to).
@@ -3205,18 +3190,23 @@ function SpaceSim() {
         // (overlap now self-resolves: touching ships explode — no hard separation push,
         //  which used to teleport ships apart and looked glitchy)
 
-        // Leaving ships (fled or victorious) despawn once they clear ANY edge. Fighting ships still
-        // WRAP vertically (tall field, scroll to follow) but BOUNCE back in horizontally, so a chase
-        // never vanishes out the sides — the soft boundary above keeps them in the visible width.
-        const m = 60
-        if (agent.x < -m || agent.x > W + m || agent.y < -m || agent.y > H + m) {
-          if (agent.state === 'retreating' || agent.state === 'routing' || agent.state === 'victory_cruise') {
-            toRemoveAgents.push(agent.id); agentChanged = true; return
-          }
-          if      (agent.x > W + m) { agent.x = W + m; agent.vx = -Math.abs(agent.vx); agent.avx = -Math.abs(agent.avx) }
-          else if (agent.x < -m)    { agent.x = -m;    agent.vx =  Math.abs(agent.vx); agent.avx =  Math.abs(agent.avx) }
-          if      (agent.y > H + m) agent.y = -m
-          else if (agent.y < -m)    agent.y = H + m
+        // Toroidal field: BOTH axes wrap every frame as a clean modulo, so the sprite's on-screen
+        // position (SX/SY) is always continuous — no bounce, no teleport. Ships that cross a side slide
+        // through the hidden margin and reappear from the opposite edge, Pac-Man style.
+        // EXCEPTION: ships that are LEAVING (fled/victorious) don't wrap horizontally — they're allowed
+        // to sail off the side and despawn, otherwise they'd loop forever and never exit.
+        const leaving = agent.state === 'retreating' || agent.state === 'routing'
+        if      (agent.y >= H)  agent.y -= H
+        else if (agent.y < 0)   agent.y += H
+        if (!leaving) {
+          if      (agent.x >= WF) agent.x -= WF
+          else if (agent.x < 0)   agent.x += WF
+        }
+
+        // Leaving ships despawn once they've had time to sail off AND are actually out past the field
+        // edge — never mid-view. The 9s floor keeps them visible long enough to read as exiting.
+        if (leaving && now - agent.retreatStart > 9000 && (agent.x < -40 || agent.x > WF + 40)) {
+          toRemoveAgents.push(agent.id); agentChanged = true; return
         }
 
         // DOM update — face the actual travel direction (smooth banking, hides steering jitter)
@@ -3224,7 +3214,7 @@ function SpaceSim() {
         if (el) {
           const sp = Math.hypot(agent.avx, agent.avy)
           const heading = sp > 0.004 ? Math.atan2(agent.avy, agent.avx) : agent.angle
-          el.style.transform  = `translate(${agent.x}px,${SY(agent.y)}px) rotate(${heading * 180/Math.PI + 90}deg)`
+          el.style.transform  = `translate(${SX(agent.x)}px,${SY(agent.y)}px) rotate(${heading * 180/Math.PI + 90}deg)`
           el.style.visibility = 'visible'
           // Visual state cues (legible, not noisy):
           //  • ROUTING → lights FLICKER (failing power) + desaturate — clearly a broken ship.
@@ -3238,7 +3228,7 @@ function SpaceSim() {
             const b   = 0.7 + Math.sin(now * 0.005 + agent.wavePhase) * 0.04 - (g > 0.55 ? 0.22 : 0)
             el.style.filter = `brightness(${b.toFixed(2)}) saturate(0.4)`
           } else {
-            const bright = berserk ? 1.6 : (isDom || rallied) ? 1.3 : 1
+            const bright = berserk ? 1.6 : 1
             if (agent.hp / agent.maxHp <= 0.34) {
               const pulse = Math.sin(now * 0.012 + agent.wavePhase) * 0.5 + 0.5   // 0 … 1
               el.style.filter = `brightness(${bright}) drop-shadow(0 0 5px rgba(235,45,35,${(0.2 + pulse * 0.6).toFixed(2)}))`
@@ -3267,22 +3257,6 @@ function SpaceSim() {
           } else {
             weaponEl.style.backgroundPositionX = '0%'
           }
-        }
-      })
-
-      // Fleet-wide retreat → regroup transition: all survivors reached home edge
-      fleetRetreating.forEach(fleetId => {
-        const survivors: ShipAgent[] = []
-        let allAtEdge = true
-        agents.current.forEach(a => {
-          if (a.fleetId !== fleetId || a.state === 'dying') return
-          survivors.push(a)
-          if (!atHomeEdge(a, W, H)) allAtEdge = false
-        })
-        if (survivors.length > 0 && allAtEdge) {
-          fleetRetreating.delete(fleetId)
-          survivors.forEach(a => { a.state = 'regrouping'; a.regroupStart = now; a.vx = 0; a.vy = 0 })
-          agentChanged = true
         }
       })
 
@@ -3361,7 +3335,7 @@ function SpaceSim() {
           const el = projEls.current.get(proj.id)
           if (el) {
             const deg = Math.atan2(proj.vy, proj.vx) * 180 / Math.PI
-            el.style.transform = `translate(${proj.x}px,${SY(proj.y)}px) rotate(${deg}deg)`
+            el.style.transform = `translate(${SX(proj.x)}px,${SY(proj.y)}px) rotate(${deg}deg)`
             // Fade out over the last 35% of the trajectory (bullet dissipating)
             const frac = dist2D(proj.x, proj.y, proj.ox, proj.oy) / proj.maxRange
             el.style.opacity = frac > 0.65 ? String(Math.max(0, (1 - frac) / 0.35)) : '1'
@@ -3384,7 +3358,7 @@ function SpaceSim() {
         const el = wreckEls.current.get(id)
         if (el) {
           const fade = age > WRECK_LIFE - WRECK_FADE ? (WRECK_LIFE - age) / WRECK_FADE : 1
-          el.style.transform = `translate(${w.x}px,${SY(w.y)}px) rotate(${w.angle * 180 / Math.PI}deg)`
+          el.style.transform = `translate(${SX(w.x)}px,${SY(w.y)}px) rotate(${w.angle * 180 / Math.PI}deg)`
           el.style.opacity = String(0.4 * fade)
         }
       })
@@ -3400,21 +3374,32 @@ function SpaceSim() {
         nextAsteroidBelt = now + 50000 + Math.random() * 60000
         spawnAsteroidBelt(now)
       }
+      // Dense clusters: a tight rubble pile drifts through every ~20–40s (respects the hard cap).
+      if (now >= nextAsteroidCluster && asteroids.current.size < ASTEROID_HARD_CAP - 10) {
+        nextAsteroidCluster = now + 20000 + Math.random() * 20000
+        spawnAsteroidCluster(now)
+      }
       let astChanged = false
       asteroids.current.forEach(ast => {
         if (ast.dead) return
         ast.x += ast.vx * dt; ast.y += ast.vy * dt
         ast.spin += ast.spinRate * dt
-        // Despawn once it has fully drifted off the far side
+        // Slow fade-IN from invisible on spawn (like ships materialising).
+        const inAge = now - ast.born
+        const fadeIn = inAge < ASTEROID_FADE_IN ? inAge / ASTEROID_FADE_IN : 1
+        // Once fully drifted off the field, don't pop — begin a slow fade-OUT, then remove.
         const m = ast.size + 40
-        if (ast.x < -m || ast.x > W + m || ast.y < -m || ast.y > H + m) {
-          asteroids.current.delete(ast.id); asteroidEls.current.delete(ast.id); astChanged = true; return
+        const offField = ast.x < -m || ast.x > W * WFIELD_MULT + m || ast.y < -m || ast.y > H + m
+        if (offField && ast.fadeOutAt === 0) ast.fadeOutAt = now
+        let fadeOut = 1
+        if (ast.fadeOutAt > 0) {
+          const outAge = now - ast.fadeOutAt
+          if (outAge >= ASTEROID_FADE_OUT) { asteroids.current.delete(ast.id); asteroidEls.current.delete(ast.id); astChanged = true; return }
+          fadeOut = 1 - outAge / ASTEROID_FADE_OUT
         }
-        // Spontaneous detonation: any rock can go unstable and blow on its own — low odds, and only
-        // once it's had a moment on-screen (so they don't pop the instant they spawn). ~1.6%/sec.
-        if (now - ast.born > 2500 && ast.x > -ast.size && ast.x < W + ast.size) {
-          if (Math.random() < 0.016 * (dt / 1000)) { explodeAsteroid(ast, now); astChanged = true; return }
-        }
+        ast.opacity = ast.targetOpacity * fadeIn * fadeOut
+        // (Spontaneous detonation removed: asteroids now ONLY explode on impact — a bullet hit, a ship
+        //  grazing them, or a collision. No more random self-destructing rocks.)
         // A ship passing very close sets it off
         const cx = ast.x + ast.size / 2, cy = ast.y + ast.size / 2
         const trigger = ast.size / 2 + 16
@@ -3437,7 +3422,8 @@ function SpaceSim() {
         // DOM update (position + tumble)
         const el = asteroidEls.current.get(ast.id)
         if (el) {
-          el.style.transform = `translate(${ast.x}px,${SY(ast.y)}px) rotate(${ast.spin * 180 / Math.PI}deg)`
+          el.style.transform = `translate(${SX(ast.x)}px,${SY(ast.y)}px) rotate(${ast.spin * 180 / Math.PI}deg)`
+          el.style.opacity = String(ast.opacity)
           el.style.visibility = 'visible'
         }
       })
@@ -3451,10 +3437,11 @@ function SpaceSim() {
         // Persistent: pickups never expire or fade — they sit until a ship collects one (which then
         // seeds a replacement elsewhere). They just drift and bounce off the field edges.
         pk.x += pk.vx * dt; pk.y += pk.vy * dt
-        if (pk.x < 40)      { pk.x = 40;      pk.vx = Math.abs(pk.vx) }
-        if (pk.x > W - 40)  { pk.x = W - 40;  pk.vx = -Math.abs(pk.vx) }
-        if (pk.y < 60)      { pk.y = 60;      pk.vy = Math.abs(pk.vy) }
-        if (pk.y > H - 40)  { pk.y = H - 40;  pk.vy = -Math.abs(pk.vy) }
+        // Toroidal: pickups wrap on both axes instead of bouncing (they live in field coords 0..WF/0..H).
+        if      (pk.x >= WF) pk.x -= WF
+        else if (pk.x < 0)   pk.x += WF
+        if      (pk.y >= H)  pk.y -= H
+        else if (pk.y < 0)   pk.y += H
         // Contact pickup — a ship that wants this type and touches it grabs it, any state
         let taker: ShipAgent | null = null
         agents.current.forEach(a => {
@@ -3465,7 +3452,7 @@ function SpaceSim() {
           if (wants && dist2D(pk.x, pk.y, a.x + 24, a.y + 24) < 28) taker = a
         })
         if (taker) { collectPickup(taker, pk, now); return }
-        if (el) el.style.transform = `translate(${pk.x - 10}px,${SY(pk.y) - 10}px)`
+        if (el) el.style.transform = `translate(${SX(pk.x) - 10}px,${SY(pk.y) - 10}px)`
       })
       if (pickupChanged) setPickupKeys([...pickups.current.keys()])
 
@@ -3494,9 +3481,9 @@ function SpaceSim() {
       if (active) rafId = requestAnimationFrame(tick)
     }
 
-    // Initial spawn: only the two opening contenders field squads (6 each; cap grows to 16 via beacons).
+    // Initial spawn: only the two opening contenders field squads (3 each; cap grows to 10 via beacons).
     // (roundRef starts as klaed+nairan contending, nautolan benched.)
-    roundRef.current.contenders.forEach(f => spawnFleet(f, 6))
+    roundRef.current.contenders.forEach(f => spawnFleet(f, 3))
     rafId = requestAnimationFrame(tick)
     return () => { active = false; cancelAnimationFrame(rafId) }
   }, [])
@@ -3534,7 +3521,7 @@ function SpaceSim() {
               position: 'absolute', top: 0, left: 0, width: a.size, height: a.size,
               imageRendering: 'pixelated', transformOrigin: 'center center',
               willChange: 'transform', opacity: a.opacity, zIndex: 1, pointerEvents: 'none',
-              transform: `translate(${a.x}px,${wrapFieldY(a.y)}px) rotate(${a.spin * 180 / Math.PI}deg)`,
+              transform: `translate(${wrapFieldX(a.x)}px,${wrapFieldY(a.y)}px) rotate(${a.spin * 180 / Math.PI}deg)`,
             }}
           />
         )
