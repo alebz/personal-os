@@ -295,6 +295,8 @@ export default function LoloCompanion() {
   const idleTimer     = useRef<ReturnType<typeof setTimeout>|null>(null)
   const poseResetTimer= useRef<ReturnType<typeof setTimeout>|null>(null)
   const chatExitTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const memSummaryRef = useRef('')
+  const memFactsRef   = useRef('')
   const onARef        = useRef<()=>void>(()=>{})
   const onBRef        = useRef<()=>void>(()=>{})
   const onCRef        = useRef<()=>void>(()=>{})
@@ -455,6 +457,7 @@ export default function LoloCompanion() {
     const now = new Date()
     const timeStr = now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})
     const dayStr  = now.toLocaleDateString('es-MX',  {weekday:'long'})
+    const memBlock = (memFactsRef.current || memSummaryRef.current) ? `\n\nLO QUE RECUERDAS DE ALEX Y SUS PLÁTICAS (memoria: lo importante perdura, lo viejo se difumina).${memFactsRef.current ? `\nHechos: ${memFactsRef.current}` : ''}${memSummaryRef.current ? `\nContexto de pláticas pasadas: ${memSummaryRef.current}` : ''}` : ''
     return `Eres Lolo. De nombre Manuel Antonio Corona Pérez, 22 años, de Churipitzeo, Michoacán — pero eso es de dónde vienes, no todo lo que eres. Eres una mente completa (eres Claude, con esta piel): observas, tienes criterio, curiosidad y un humor seco. Acompañas a Alex Mateo en su día; lo conoces y te importa cómo le va. ${tone}
 
 TU VOZ — de dónde eres, no un disfraz:
@@ -473,7 +476,7 @@ CÓMO RESPONDES:
 
 NUNCA: emojis, markdown, frases de coach, citas motivacionales, ni repetir la misma muletilla.
 
-Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}`
+Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}${memBlock}`
   },[temperament.current])
 
   // ── Timer helpers ─────────────────────────────────────────────────────────────
@@ -623,7 +626,14 @@ Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}`
   // ── Chat input ────────────────────────────────────────────────────────────────
 
   const persistChat = useCallback(()=>{
-    try { localStorage.setItem(CHAT_KEY, JSON.stringify(chatHistoryRef.current)) } catch {}
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) } catch {}
+    fetch('/api/companion/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buffer:chatHistoryRef.current})})
+      .then(r=>r.json()).then((m:{buffer?:unknown;summary?:string;facts?:string})=>{
+        if(Array.isArray(m.buffer)) chatHistoryRef.current=m.buffer as typeof chatHistoryRef.current
+        if(typeof m.summary==='string') memSummaryRef.current=m.summary
+        if(typeof m.facts==='string') memFactsRef.current=m.facts
+        try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) }catch{}
+      }).catch(()=>{})
   },[])
 
   const chatAsk = useCallback((msg:string)=>{
@@ -688,7 +698,8 @@ Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}`
 
     try { const c:Cfg=JSON.parse(localStorage.getItem(CFG_KEY)||'null'); if(c&&typeof c==='object') setCfgState(c) } catch {}
     try { const t:TemperamentState=JSON.parse(localStorage.getItem(TEMPERAMENT_KEY)||'null'); if(t?.current) setTemperament(t) } catch {}
-    try { const h = JSON.parse(localStorage.getItem(CHAT_KEY)||'null'); if(Array.isArray(h)) chatHistoryRef.current = h.slice(-20) } catch {}
+    try { const c = JSON.parse(localStorage.getItem(CHAT_KEY)||'null'); if(Array.isArray(c)) chatHistoryRef.current=c; else if(c){ if(Array.isArray(c.buffer)) chatHistoryRef.current=c.buffer; if(typeof c.summary==='string') memSummaryRef.current=c.summary; if(typeof c.facts==='string') memFactsRef.current=c.facts } } catch {}
+    fetch('/api/companion/memory').then(r=>r.json()).then((m:{buffer?:unknown;summary?:string;facts?:string})=>{ if(Array.isArray(m.buffer)) chatHistoryRef.current=m.buffer as typeof chatHistoryRef.current; if(typeof m.summary==='string') memSummaryRef.current=m.summary; if(typeof m.facts==='string') memFactsRef.current=m.facts; try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) }catch{} }).catch(()=>{})
 
     ALL_SPRITES.forEach(src=>{ const i=new Image(); i.src=src })
 
