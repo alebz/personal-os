@@ -225,19 +225,29 @@ export async function GET(req: NextRequest) {
   // FINANZAS
   // ═══════════════════════════════════════════════════════════
   try {
-    const [balRes, commRes, envRes, incRes] = await Promise.all([
-      supabase.from('finance_balance').select('tarjeta,efectivo,caja_fuerte').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+    const [balRes, commRes, envRes, incRes, fundMovsRes] = await Promise.all([
+      supabase.from('finance_balance').select('tarjeta,efectivo').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('finance_commitments').select('name,amount,active').eq('active', true).order('sort_order'),
-      supabase.from('finance_envelopes').select('name,goal,saved').order('created_at'),
+      supabase.from('finance_envelopes').select('id,key,label,target').order('sort_order'),
       supabase.from('finance_income_items').select('nombre,monto,metodo').eq('active', true).order('sort_order'),
+      supabase.from('finance_movements').select('envelope_id,amount,flow').not('envelope_id', 'is', null),
     ])
+
+    // Per-fund saved (flow-aware). "Guardado" = Σ of every fund EXCEPT mantenimiento (Uptown's).
+    // Replaces the now-frozen finance_balance.caja_fuerte snapshot column.
+    const mantId = (envRes.data ?? []).find((e: { key: string | null }) => e.key === 'mantenimiento')?.id
+    const savedByEnv: Record<string, number> = {}
+    for (const m of (fundMovsRes.data ?? []) as Array<{ envelope_id: string | null; amount: number; flow: string }>) {
+      if (m.envelope_id) savedByEnv[m.envelope_id] = (savedByEnv[m.envelope_id] ?? 0) + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount))
+    }
+    const guardado = Object.entries(savedByEnv).reduce((s, [envId, v]) => envId === mantId ? s : s + v, 0)
 
     const fLines: string[] = []
 
     const bal = balRes.data
     if (bal) {
-      const total = (bal.tarjeta ?? 0) + (bal.efectivo ?? 0) + (bal.caja_fuerte ?? 0)
-      fLines.push(`Balance: $${total.toLocaleString('es-MX')} total (tarjeta $${(bal.tarjeta??0).toLocaleString('es-MX')}, efectivo $${(bal.efectivo??0).toLocaleString('es-MX')}, caja $${(bal.caja_fuerte??0).toLocaleString('es-MX')})`)
+      const total = (bal.tarjeta ?? 0) + (bal.efectivo ?? 0) + guardado
+      fLines.push(`Balance: $${total.toLocaleString('es-MX')} total (tarjeta $${(bal.tarjeta??0).toLocaleString('es-MX')}, efectivo $${(bal.efectivo??0).toLocaleString('es-MX')}, guardado $${guardado.toLocaleString('es-MX')})`)
     }
 
     const incs = incRes.data ?? []
@@ -252,10 +262,15 @@ export async function GET(req: NextRequest) {
       fLines.push(`Compromisos fijos: $${totalComm.toLocaleString('es-MX')}/mes (${comms.map(c => `${c.name}: $${Number(c.amount).toLocaleString('es-MX')}`).join(', ')})`)
     }
 
-    const envs = envRes.data ?? []
-    if (envs.length) {
-      const eList = envs.map(e => `${e.name}: $${Number(e.saved??0).toLocaleString('es-MX')}/$${Number(e.goal??0).toLocaleString('es-MX')}`)
-      fLines.push(`Sobres de ahorro: ${eList.join(', ')}`)
+    const apartados = (envRes.data ?? []).filter((e: { key: string | null }) => e.key !== 'mantenimiento')
+    if (apartados.length) {
+      const eList = apartados.map((e: { id: string; label: string; target: number | null }) => {
+        const s = savedByEnv[e.id] ?? 0
+        return e.target
+          ? `${e.label}: $${s.toLocaleString('es-MX')}/$${Number(e.target).toLocaleString('es-MX')}`
+          : `${e.label}: $${s.toLocaleString('es-MX')}`
+      })
+      fLines.push(`Apartados (Caja Fuerte): ${eList.join(', ')}`)
     }
 
     if (fLines.length) sections.push('FINANZAS\n' + fLines.join('\n'))

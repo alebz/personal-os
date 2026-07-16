@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 
 // GET /api/finance/envelopes
@@ -30,4 +31,25 @@ export async function GET() {
 
   const result = (envs ?? []).map((e) => ({ ...e, saved: savedMap[e.id] ?? 0 }))
   return NextResponse.json(result)
+}
+
+// POST /api/finance/envelopes — create a new apartado in the Caja Fuerte section.
+// body: { label, target? }  — target=null → colchón/asset (no meta); target=number → savings goal.
+// Created keyless (key=null); its saved starts at 0 and grows via fund movements (aportar/retirar).
+export async function POST(req: NextRequest) {
+  let b: { label?: string; target?: number | null; sort_order?: number }
+  try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  if (!b.label || !b.label.trim()) {
+    return NextResponse.json({ error: 'label required' }, { status: 400 })
+  }
+
+  const supabase = createServerClient()
+  const { data, error } = await supabase
+    .from('finance_envelopes')
+    .insert({ label: b.label.trim(), target: b.target ?? null, key: null, sort_order: b.sort_order ?? 100 })
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ...data, saved: 0 }, { status: 201 })
 }

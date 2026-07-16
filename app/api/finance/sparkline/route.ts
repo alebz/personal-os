@@ -18,10 +18,10 @@ export async function GET() {
     days.push(d.toISOString().slice(0, 10))
   }
 
-  const [balRes, movsRes] = await Promise.all([
+  const [balRes, movsRes, envRes, fundMovsRes] = await Promise.all([
     supabase
       .from('finance_balance')
-      .select('tarjeta, efectivo, caja_fuerte')
+      .select('tarjeta, efectivo')
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -32,12 +32,20 @@ export async function GET() {
       .lte('date', days[days.length - 1])
       .order('date', { ascending: false })
       .order('created_at', { ascending: false }),
+    supabase.from('finance_envelopes').select('id, key'),
+    supabase.from('finance_movements').select('envelope_id, amount, flow').not('envelope_id', 'is', null),
   ])
 
+  // "Guardado" = flow-aware sum of every fund's movements, EXCEPT mantenimiento (that's Uptown's).
+  // Replaces the now-frozen finance_balance.caja_fuerte snapshot column.
+  const mantId = (envRes.data ?? []).find(e => e.key === 'mantenimiento')?.id
+  const guardado = ((fundMovsRes.data ?? []) as Array<{ envelope_id: string | null; amount: number; flow: string }>)
+    .reduce((s, m) => m.envelope_id === mantId ? s : s + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount)), 0)
+
   const currentTotal =
-    Number(balRes.data?.tarjeta    ?? 0) +
-    Number(balRes.data?.efectivo   ?? 0) +
-    Number(balRes.data?.caja_fuerte ?? 0)
+    Number(balRes.data?.tarjeta  ?? 0) +
+    Number(balRes.data?.efectivo ?? 0) +
+    guardado
 
   // Group movements by date
   const byDate: Record<string, Array<{ amount: number; flow: string }>> = {}

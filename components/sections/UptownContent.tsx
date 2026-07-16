@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
 import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
+import DrumModal from '@/components/DrumModal'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -767,14 +768,23 @@ function FondoCard({ saved, aportadoAmount, movements, onAportar, onQuitar }: {
       {movements.length > 0 && (
         <div className="mt-2 border-t border-border pt-2">
           <button
-            onClick={() => setShowLedger(s => !s)}
+            onClick={() => setShowLedger(true)}
             className="text-label font-medium text-fg-muted transition-colors hover:text-fg"
           >
-            {showLedger ? 'Ocultar libreta ▲' : 'Ver libreta ▼'}
+            Ver libreta →
           </button>
-          {showLedger && <div className="mt-2"><FundLedger movements={movements} /></div>}
         </div>
       )}
+
+      <DrumModal open={showLedger} onClose={() => setShowLedger(false)} ariaLabel="Libreta · Fondo Mantenimiento">
+        <div className="mb-4 flex items-baseline justify-between gap-3">
+          <h3 className="text-subhead font-bold text-fg">Fondo Mantenimiento</h3>
+          <p className="text-heading font-black text-ok"><Mxn v={saved} /></p>
+        </div>
+        {movements.length > 0
+          ? <FundLedger movements={movements} />
+          : <p className="py-6 text-center text-body italic text-fg-muted">Sin movimientos todavía</p>}
+      </DrumModal>
     </div>
   )
 }

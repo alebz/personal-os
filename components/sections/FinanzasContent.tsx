@@ -6,13 +6,14 @@ import Link from 'next/link'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
 import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
+import DrumModal from '@/components/DrumModal'
 
 // A fund = a finance_envelopes row with its flow-aware balance + ledger, from /api/finance/funds.
 interface Fund { id: string; key: string | null; label: string; target: number | null; saved: number; movements: FundMovement[] }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab      = 'Panel' | 'Historial' | 'Vacaciones'
+type Tab      = 'Panel' | 'Historial' | 'Caja Fuerte'
 type Flow     = 'in' | 'out'
 type Category = 'nomina' | 'freelance' | 'gasto_fijo' | 'gasto_extra' | 'vacaciones' | 'ajuste'
 
@@ -49,15 +50,6 @@ function installmentNumero(c: Commitment, viewedMonth: string): number | null {
   return mn(viewedMonth) - mn(c.start_month) + 1
 }
 
-interface Envelope {
-  id: string
-  label: string
-  target: number
-  saved: number
-  sem_ahorro: number
-  fecha: string | null
-  pausado: boolean
-}
 
 interface Balance {
   tarjeta: number
@@ -656,6 +648,7 @@ interface PanelTabProps {
   onAddIncome: (nombre: string, monto: number, metodo: string) => Promise<void>
   onUpdateIncome: (id: string, u: Partial<IncomeItem>) => void
   onDeleteIncome: (id: string) => void
+  onOpenCajaFuerte: () => void
 }
 
 function PanelTab({
@@ -682,9 +675,9 @@ function PanelTab({
   onAddIncome,
   onUpdateIncome,
   onDeleteIncome,
+  onOpenCajaFuerte,
 }: PanelTabProps) {
   const [editMov, setEditMov] = useState<Movement | null>(null)
-  const [cajaLedgerOpen, setCajaLedgerOpen] = useState(false)
 
   const { checks, realM } = monthChecks
 
@@ -718,7 +711,9 @@ function PanelTab({
     gxMvs.reduce((s, m) => s + Number(m.amount), 0)
 
   const flujo = cobrado - pagado
-  const caja  = Number(balance?.caja_fuerte ?? 0)
+  // "Guardado" = Σ of every fund in the Caja Fuerte section (all funds except mantenimiento, Uptown's).
+  // The card is a read-only rollup now — editing happens per-fund inside the Caja Fuerte tab.
+  const guardado = funds.filter(f => f.key !== 'mantenimiento').reduce((s, f) => s + Number(f.saved), 0)
 
   // ── Saldos vivos: última foto de "Cuadrar" ± movimientos creados después, por método ──
   const snapAt = balance?.updated_at ? new Date(balance.updated_at).getTime() : 0
@@ -759,17 +754,18 @@ function PanelTab({
     )
   }
 
-  const shown = { tarjeta: liveTarjeta, efectivo: liveEfectivo, caja_fuerte: caja }
-  const cajaFund = funds.find(f => f.key === 'caja_fuerte')
+  // caja_fuerte here is the (now frozen) snapshot column — passed through so an efectivo/tarjeta edit
+  // re-baselines the snapshot without disturbing it. The card no longer reads it.
+  const shown = { tarjeta: liveTarjeta, efectivo: liveEfectivo, caja_fuerte: Number(balance?.caja_fuerte ?? 0) }
 
-  // A position card whose number is editable in place. Committing records a NAMED adjustment (the diff
-  // vs the shown value, via onAdjustPosition) — never a silent overwrite. Optional ledger toggle for
-  // Caja Fuerte (the wallets are informative, no libreta).
+  // A wallet position card, editable in place. Committing records a NAMED adjustment (the diff vs the
+  // shown value, via onAdjustPosition) — never a silent overwrite. Only Efectivo/Tarjeta use this;
+  // Caja Fuerte is now a read-only rollup (see below).
   function EditablePositionCard({
-    account, label, value, cls, subNode, onToggleLedger, ledgerOpen,
+    account, label, value, cls, subNode,
   }: {
-    account: 'tarjeta' | 'efectivo' | 'caja_fuerte'; label: string; value: number; cls: string
-    subNode?: React.ReactNode; onToggleLedger?: () => void; ledgerOpen?: boolean
+    account: 'tarjeta' | 'efectivo'; label: string; value: number; cls: string
+    subNode?: React.ReactNode
   }) {
     const [editing, setEditing] = useState(false)
     const [draft, setDraft]     = useState('')
@@ -807,11 +803,6 @@ function PanelTab({
           </button>
         )}
         {subNode && <p className="mt-0.5 text-label">{subNode}</p>}
-        {onToggleLedger && (
-          <button onClick={onToggleLedger} className="mt-1 text-label text-fg-muted transition-colors hover:text-fg">
-            {ledgerOpen ? 'Ocultar libreta ▲' : 'Ver libreta ▼'}
-          </button>
-        )}
       </div>
     )
   }
@@ -827,24 +818,22 @@ function PanelTab({
 
   return (
     <div className="space-y-5">
-      {/* 6 summary cards — the three positions (Efectivo/Tarjeta/Caja Fuerte) are editable in place */}
+      {/* 6 summary cards — Efectivo/Tarjeta editable (wallets); Caja Fuerte is a read-only rollup */}
       <div className="grid grid-cols-3 gap-3">
-        <EditablePositionCard account="efectivo"    label="Efectivo"    value={liveEfectivo} cls="text-success" subNode={deltaSub(dEfectivo)} />
-        <EditablePositionCard account="tarjeta"     label="Tarjeta"     value={liveTarjeta}  cls="text-info"    subNode={deltaSub(dTarjeta)} />
-        <EditablePositionCard account="caja_fuerte" label="Caja Fuerte" value={caja}         cls="text-warn"
-          onToggleLedger={cajaFund ? () => setCajaLedgerOpen(o => !o) : undefined} ledgerOpen={cajaLedgerOpen} />
+        <EditablePositionCard account="efectivo" label="Efectivo" value={liveEfectivo} cls="text-success" subNode={deltaSub(dEfectivo)} />
+        <EditablePositionCard account="tarjeta"  label="Tarjeta"  value={liveTarjeta}  cls="text-info"    subNode={deltaSub(dTarjeta)} />
+        <button
+          onClick={onOpenCajaFuerte} title="Ver apartados en Caja Fuerte"
+          className="rounded-card border border-border bg-surface-1 p-4 text-left shadow-xl shadow-black/20 backdrop-blur-xl transition-colors hover:bg-surface-hover dashboard-card"
+        >
+          <p className="text-label uppercase tracking-wider text-fg-muted">Caja Fuerte</p>
+          <p className="mt-1 text-subhead font-black tabular-nums text-warn"><Mxn v={guardado} /></p>
+          <p className="mt-0.5 text-label text-fg-muted">total guardado →</p>
+        </button>
         <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     subNode={<><span className="text-fg-muted">de </span><Mxn v={totalInPrevistos} /></>} />
         <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" subNode={<><span className="text-fg-muted">de </span><Mxn v={totalGastoPrevistos} /></>} />
         <PanelCard label="Flujo del mes"      value={flujo}   cls={flujo >= 0 ? 'text-ok' : 'text-danger'} />
       </div>
-
-      {/* Caja Fuerte libreta — lives here now (Cuadrar is gone); full width for readability */}
-      {cajaLedgerOpen && cajaFund && (
-        <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-          <p className="mb-3 text-label font-bold uppercase tracking-widest text-fg-muted">Libreta · Caja Fuerte</p>
-          <FundLedger movements={cajaFund.movements} />
-        </div>
-      )}
 
       {/* Two-column layout */}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -1047,178 +1036,232 @@ function HistorialTab({
   )
 }
 
-// ─── EnvelopeCard ─────────────────────────────────────────────────────────────
+// ─── Caja Fuerte section (funds / apartados) ───────────────────────────────────
 
-function EnvelopeCard({
-  env,
-  contributions,
-  onUpdateTarget,
-  onAddContribution,
-  onUpdateSemAhorro,
-}: {
-  env: Envelope
-  contributions: Movement[]
-  onUpdateTarget: (id: string, target: number) => void
-  onAddContribution: (desc: string, amount: number) => void
-  onUpdateSemAhorro: (id: string, sem: number) => void
+// Aportar (out, money set aside → saved up) / Retirar (in → saved down) for any fund. Manual, no
+// source_key. Fresh build for Step 3 (the WIP's FundMovementControl isn't on main yet).
+function FundMovementControl({ onSubmit }: {
+  onSubmit: (flow: 'in' | 'out', desc: string, amount: number) => void
 }) {
-  const saved  = Number(env.saved)
-  const target = Number(env.target)
-  const pct    = target > 0 ? Math.min((saved / target) * 100, 100) : 0
-  const [editing,    setEditing]    = useState(false)
-  const [draft,      setDraft]      = useState(String(target))
-  const [addDesc,    setAddDesc]    = useState('')
-  const [addAmt,     setAddAmt]     = useState('')
-  const [semDraft, setSemDraft] = useState(String(Number(env.sem_ahorro) || 0))
-  const [semSaved, setSemSaved] = useState(false)
+  const [desc, setDesc] = useState('')
+  const [amt,  setAmt]  = useState('')
+  const ready = !!desc.trim() && !!amt
 
-  useEffect(() => { setDraft(String(Number(env.target))) }, [env.target])
-  useEffect(() => { setSemDraft(String(Number(env.sem_ahorro) || 0)) }, [env.sem_ahorro])
-
-  function saveMeta() {
-    const n = parseFloat(draft)
-    if (n > 0 && n !== target) onUpdateTarget(env.id, n)
-    setEditing(false)
-  }
-
-  function saveSem() {
-    const n = parseFloat(semDraft)
-    if (isNaN(n) || n < 0) { setSemDraft(String(Number(env.sem_ahorro) || 0)); return }
-    if (n !== Number(env.sem_ahorro)) {
-      onUpdateSemAhorro(env.id, n)
-      setSemSaved(true)
-      setTimeout(() => setSemSaved(false), 2000)
-    }
-  }
-
-  function submitContribution() {
-    const a = parseFloat(addAmt)
-    if (!addDesc.trim() || !a || a <= 0) return
-    onAddContribution(addDesc.trim(), a)
-    setAddDesc('')
-    setAddAmt('')
+  function submit(flow: 'in' | 'out') {
+    const a = parseFloat(amt)
+    if (!desc.trim() || !a || a <= 0) return
+    onSubmit(flow, desc.trim(), a); setDesc(''); setAmt('')
   }
 
   return (
-    <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-subhead font-bold text-fg">{env.label}</h3>
-          <div className="flex items-center gap-1.5 text-secondary text-fg-muted">
-            <span>{env.fecha ? env.fecha : 'Sobrecito vacaciones'}</span>
-            <span className="text-fg-faint/50">·</span>
-            <input
-              type="number"
-              value={semDraft}
-              onChange={e => setSemDraft(e.target.value)}
-              onBlur={saveSem}
-              onKeyDown={e => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-                if (e.key === 'Escape') setSemDraft(String(Number(env.sem_ahorro) || 0))
-              }}
-              className="w-20 rounded border border-border bg-surface-2 px-1 py-0.5 tabular-nums text-secondary text-fg outline-none focus:border-accent/50"
-            />
-            <span>/sem</span>
-            {semSaved && <span className="text-label font-medium text-ok">✓</span>}
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-heading font-black text-ok"><Mxn v={saved} /></p>
-          <p className="text-secondary text-fg-muted">de <Mxn v={target} /></p>
-        </div>
-      </div>
-
-      <div className="mb-1 h-2.5 overflow-hidden rounded-pill bg-surface-2">
-        <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="mb-4 text-right text-label text-fg-muted">
-        {pct.toFixed(1)}% · faltan <Mxn v={Math.max(0, target - saved)} />
-      </p>
-
-      {editing ? (
-        <div className="mb-4 flex gap-2">
-          <input
-            type="number" value={draft} autoFocus
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditing(false) }}
-            className="flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none focus:border-accent/50"
-          />
-          <button onClick={saveMeta} className="rounded-card bg-accent/20 px-3 py-2 text-secondary font-medium text-accent hover:bg-accent/30">OK</button>
-          <button onClick={() => { setDraft(String(target)); setEditing(false) }} className="text-secondary text-fg-muted hover:text-fg">✕</button>
-        </div>
-      ) : (
-        <button onClick={() => setEditing(true)} className="mb-4 text-secondary text-fg-muted underline-offset-2 hover:text-fg hover:underline">
-          Cambiar meta (<Mxn v={target} />)
-        </button>
-      )}
-
-      <div className="mb-4 flex gap-2">
-        <input
-          value={addDesc} onChange={e => setAddDesc(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && submitContribution()}
-          placeholder="Descripción…"
-          className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
-        />
-        <input
-          type="number" value={addAmt} onChange={e => setAddAmt(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && submitContribution()}
-          placeholder="$"
-          className="w-24 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
-        />
-        <button
-          onClick={submitContribution} disabled={!addDesc.trim() || !addAmt}
-          className="rounded-card bg-ok/20 px-3 py-2 text-body font-medium text-ok hover:bg-ok/30 disabled:opacity-30"
-        >
-          +
-        </button>
-      </div>
-
-      {contributions.length > 0 && (
-        <div className="border-t border-border pt-4">
-          <p className="mb-2 text-label font-semibold uppercase tracking-widest text-fg-muted">Libreta</p>
-          <div className="max-h-56 overflow-y-auto">
-            <FundLedger movements={contributions} />
-          </div>
-        </div>
-      )}
+    <div className="flex gap-2">
+      <input
+        value={desc} onChange={e => setDesc(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit('out')}
+        placeholder="Concepto…"
+        className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+      />
+      <input
+        type="number" value={amt} onChange={e => setAmt(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit('out')}
+        placeholder="$"
+        className="w-24 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+      />
+      <button onClick={() => submit('out')} disabled={!ready} title="Aportar al fondo"
+        className="rounded-card bg-ok/20 px-3 py-2 text-body font-medium text-ok hover:bg-ok/30 disabled:opacity-30">Aportar</button>
+      <button onClick={() => submit('in')} disabled={!ready} title="Retirar del fondo"
+        className="rounded-card bg-danger/15 px-3 py-2 text-body font-medium text-danger hover:bg-danger/25 disabled:opacity-30">Retirar</button>
     </div>
   )
 }
 
-// ─── VacacionesTab ────────────────────────────────────────────────────────────
-
-function VacacionesTab({
-  envelopes,
-  vacMovements,
+// ─── FundCard ─────────────────────────────────────────────────────────────────
+// One apartado in the Caja Fuerte section. target=null → colchón/asset (no meta, no bar);
+// target=number → savings goal with progress. saved = flow-aware Σ of its movements (from /funds).
+function FundCard({
+  fund,
+  onAportaRetira,
   onUpdateTarget,
-  onUpdateSemAhorro,
-  onAdd,
+  onUpdateLabel,
+  onDelete,
 }: {
-  envelopes: Envelope[]
-  vacMovements: Movement[]
-  onUpdateTarget: (id: string, target: number) => void
-  onUpdateSemAhorro: (id: string, sem: number) => void
-  onAdd: (envId: string, desc: string, amount: number) => void
+  fund: Fund
+  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number) => void
+  onUpdateTarget: (id: string, target: number | null) => void
+  onUpdateLabel: (id: string, label: string) => void
+  onDelete: (id: string) => void
 }) {
+  const saved  = Number(fund.saved)
+  const target = fund.target != null ? Number(fund.target) : null
+  const pct    = target && target > 0 ? Math.min((saved / target) * 100, 100) : 0
+  const [editingMeta, setEditingMeta] = useState(false)
+  const [metaDraft, setMetaDraft]     = useState(target != null ? String(target) : '')
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft]     = useState(fund.label)
+  const [modalOpen, setModalOpen]     = useState(false)
+  const isEmergencia = fund.key === 'caja_fuerte'   // foundational fund — not deletable
+
+  useEffect(() => { setMetaDraft(fund.target != null ? String(Number(fund.target)) : '') }, [fund.target])
+  useEffect(() => { setNameDraft(fund.label) }, [fund.label])
+
+  function saveMeta() {
+    const t = metaDraft.trim() === '' ? null : parseFloat(metaDraft)
+    onUpdateTarget(fund.id, t != null && t > 0 ? t : null)
+    setEditingMeta(false)
+  }
+  function saveName() {
+    const n = nameDraft.trim()
+    if (n && n !== fund.label) onUpdateLabel(fund.id, n)
+    setEditingName(false)
+  }
+
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      {envelopes.map(env => (
-        <EnvelopeCard
-          key={env.id}
-          env={env}
-          contributions={vacMovements.filter(m => m.envelope_id === env.id)}
-          onUpdateTarget={onUpdateTarget}
-          onUpdateSemAhorro={onUpdateSemAhorro}
-          onAddContribution={(desc, amount) => onAdd(env.id, desc, amount)}
-        />
-      ))}
+    <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="group min-w-0 flex-1">
+          {editingName ? (
+            <input
+              value={nameDraft} autoFocus onChange={e => setNameDraft(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setNameDraft(fund.label); setEditingName(false) } }}
+              className="w-full rounded border border-border bg-surface-2 px-2 py-0.5 text-subhead font-bold text-fg outline-none focus:border-accent/50"
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setEditingName(true)} title="Editar nombre"
+                className="truncate text-subhead font-bold text-fg decoration-dotted underline-offset-4 hover:underline">{fund.label}</button>
+              {!isEmergencia && (
+                <button onClick={() => onDelete(fund.id)}
+                  className="hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block" title="Eliminar apartado">×</button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="shrink-0 text-right">
+          <p className={`text-heading font-black ${saved < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={saved} /></p>
+          {target != null && <p className="text-secondary text-fg-muted">de <Mxn v={target} /></p>}
+        </div>
+      </div>
+
+      {target != null && (
+        <>
+          <div className="mb-1 h-2.5 overflow-hidden rounded-pill bg-surface-2">
+            <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mb-3 text-right text-label text-fg-muted">
+            {pct.toFixed(1)}% · faltan <Mxn v={Math.max(0, target - saved)} />
+          </p>
+        </>
+      )}
+
+      <div className="flex items-center justify-between gap-2">
+        {editingMeta ? (
+          <div className="flex flex-1 gap-2">
+            <input
+              type="number" value={metaDraft} autoFocus placeholder="Meta (vacío = sin meta)"
+              onChange={e => setMetaDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditingMeta(false) }}
+              className="flex-1 rounded-card border border-border bg-surface-2 px-3 py-1.5 text-secondary text-fg outline-none focus:border-accent/50"
+            />
+            <button onClick={saveMeta} className="rounded-card bg-accent/20 px-3 py-1.5 text-label font-medium text-accent hover:bg-accent/30">OK</button>
+            <button onClick={() => setEditingMeta(false)} className="text-label text-fg-muted hover:text-fg">✕</button>
+          </div>
+        ) : (
+          <button onClick={() => setEditingMeta(true)} className="text-secondary text-fg-muted underline-offset-2 hover:text-fg hover:underline">
+            {target != null ? <>Cambiar meta (<Mxn v={target} />)</> : 'Poner meta'}
+          </button>
+        )}
+        {!editingMeta && (
+          <button onClick={() => setModalOpen(true)}
+            className="shrink-0 rounded-card border border-border px-3 py-1.5 text-secondary font-medium text-fg-muted transition-colors hover:text-fg">
+            Ver libreta →
+          </button>
+        )}
+      </div>
+
+      <DrumModal open={modalOpen} onClose={() => setModalOpen(false)} ariaLabel={`Libreta · ${fund.label}`}>
+        <div className="mb-4 flex items-baseline justify-between gap-3">
+          <h3 className="text-subhead font-bold text-fg">{fund.label}</h3>
+          <p className={`text-heading font-black ${saved < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={saved} /></p>
+        </div>
+        <div className="mb-4">
+          <FundMovementControl onSubmit={(flow, desc, amount) => onAportaRetira(fund.id, flow, desc, amount)} />
+        </div>
+        {fund.movements.length > 0
+          ? <FundLedger movements={fund.movements} />
+          : <p className="py-6 text-center text-body italic text-fg-muted">Sin movimientos todavía</p>}
+      </DrumModal>
+    </div>
+  )
+}
+
+// ─── CajaFuerteTab ────────────────────────────────────────────────────────────
+// The section where every apartado/asset lives. Data = /funds minus mantenimiento (Uptown's).
+function CajaFuerteTab({
+  funds,
+  onAportaRetira,
+  onUpdateTarget,
+  onUpdateLabel,
+  onDelete,
+  onCreate,
+}: {
+  funds: Fund[]
+  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number) => void
+  onUpdateTarget: (id: string, target: number | null) => void
+  onUpdateLabel: (id: string, label: string) => void
+  onDelete: (id: string) => void
+  onCreate: (label: string, target: number | null) => void
+}) {
+  const [name, setName] = useState('')
+  const [meta, setMeta] = useState('')
+  const section = funds.filter(f => f.key !== 'mantenimiento')
+  const total   = section.reduce((s, f) => s + Number(f.saved), 0)
+
+  function create() {
+    if (!name.trim()) return
+    const t = meta.trim() === '' ? null : parseFloat(meta)
+    onCreate(name.trim(), t != null && t > 0 ? t : null)
+    setName(''); setMeta('')
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Total guardado + create apartado */}
+      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Total guardado</p>
+          <p className={`text-subhead font-black tabular-nums ${total < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={total} /></p>
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
+            placeholder="Nuevo apartado (retiro, joya, obra…)"
+            className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+          />
+          <input
+            type="number" value={meta} onChange={e => setMeta(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
+            placeholder="Meta (opcional)"
+            className="w-36 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+          />
+          <button onClick={create} disabled={!name.trim()}
+            className="rounded-card bg-accent/20 px-4 py-2 text-body font-medium text-accent hover:bg-accent/30 disabled:opacity-30">Crear</button>
+        </div>
+      </div>
+
+      {section.length === 0 ? (
+        <p className="py-10 text-center text-body italic text-fg-muted">Sin apartados todavía</p>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {section.map(f => (
+            <FundCard key={f.id} fund={f} onAportaRetira={onAportaRetira} onUpdateTarget={onUpdateTarget} onUpdateLabel={onUpdateLabel} onDelete={onDelete} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── FinancePage ──────────────────────────────────────────────────────────────
 
-const TABS: Tab[] = ['Panel', 'Historial', 'Vacaciones']
+const TABS: Tab[] = ['Panel', 'Historial', 'Caja Fuerte']
 
 const EMPTY_CHECKS: MonthChecks = { checks: {}, realM: {}, movIds: {} }
 
@@ -1228,9 +1271,7 @@ export default function FinancePage() {
 
   const [movements,    setMovements]    = useState<Movement[]>([])
   const [commitments,  setCommitments]  = useState<Commitment[]>([])
-  const [envelopes,    setEnvelopes]    = useState<Envelope[]>([])
   const [funds,        setFunds]        = useState<Fund[]>([])
-  const [vacMovements, setVacMovements] = useState<Movement[]>([])
   const [balance,      setBalance]      = useState<Balance | null>(null)
   const [incomeItems,  setIncomeItems]  = useState<IncomeItem[]>([])
   const [monthChecks,  setMonthChecks]  = useState<MonthChecks>(EMPTY_CHECKS)
@@ -1274,20 +1315,16 @@ export default function FinancePage() {
       setLoading(true)
       setError(null)
       try {
-        const [comms, envs, bal, vacMovs, incItems, nomina, fundList] = await Promise.all([
+        const [comms, bal, incItems, nomina, fundList] = await Promise.all([
           apiFetch<Commitment[]>('/api/finance/commitments'),
-          apiFetch<Envelope[]>('/api/finance/envelopes'),
           apiFetch<Balance | null>('/api/finance/balance'),
-          apiFetch<Movement[]>('/api/finance/movements?category=vacaciones'),
           apiFetch<IncomeItem[]>('/api/finance/income'),
           fetch(`/api/uptown/nomina?month=${currMonth()}`).then(r => r.ok ? r.json() as Promise<NominaMirror[]> : []).catch(() => []),
           apiFetch<Fund[]>('/api/finance/funds'),
         ])
         setCommitments(comms)
-        setEnvelopes(envs)
         setFunds(fundList)
         setBalance(bal)
-        setVacMovements(vacMovs)
         setIncomeItems(incItems)
         setNominaMirror(nomina ?? [])
       } catch (e) {
@@ -1419,32 +1456,34 @@ export default function FinancePage() {
     }
   }
 
-  async function toggleVacSem(viaje: Envelope, week: number) {
-    const desc     = `${viaje.label} · Sem ${week}`
-    const existing = movements.find(m =>
-      m.category === 'vacaciones' && m.envelope_id === viaje.id && m.description === desc
-    )
-    if (!existing) {
-      const amount = Number(viaje.sem_ahorro) || 600
-      const mov    = await apiPost<Movement>('/api/finance/movements', {
-        month, date: todayStr(),
-        description: desc, amount,
-        flow: 'out', category: 'vacaciones',
-        commitment_id: null, envelope_id: viaje.id, metodo: null,
-      })
-      setMovements(prev => [mov, ...prev])
-      setVacMovements(prev => [mov, ...prev])
-      setEnvelopes(prev => prev.map(e =>
-        e.id === viaje.id ? { ...e, saved: Number(e.saved) + amount } : e
-      ))
-    } else {
-      await apiDel(`/api/finance/movements/${existing.id}`)
-      setMovements(prev => prev.filter(x => x.id !== existing.id))
-      setVacMovements(prev => prev.filter(x => x.id !== existing.id))
-      setEnvelopes(prev => prev.map(e =>
-        e.id === viaje.id ? { ...e, saved: Math.max(0, Number(e.saved) - Number(existing.amount)) } : e
-      ))
-    }
+  // ── Caja Fuerte section: funds (apartados) ─────────────────────────────────
+  async function refreshFunds() {
+    try { setFunds(await apiFetch<Fund[]>('/api/finance/funds')) } catch { /* keep prior */ }
+  }
+  // Aportar (flow 'out' → saved up) / Retirar (flow 'in' → saved down). Manual, no source_key,
+  // written by envelope_id straight to finance_movements (category 'fondo'). Negatives allowed.
+  async function aportaRetiraFund(envelopeId: string, flow: 'in' | 'out', desc: string, amount: number) {
+    await apiPost('/api/finance/movements', {
+      month, date: todayStr(), description: desc, amount, flow, category: 'fondo',
+      commitment_id: null, envelope_id: envelopeId, metodo: null,
+    })
+    await Promise.all([refreshFunds(), loadMovements(month)])
+  }
+  async function createApartado(label: string, target: number | null) {
+    await apiPost('/api/finance/envelopes', { label, target })
+    await refreshFunds()
+  }
+  async function updateApartadoTarget(id: string, target: number | null) {
+    await apiPatch(`/api/finance/envelopes/${id}`, { target })
+    await refreshFunds()
+  }
+  async function updateApartadoLabel(id: string, label: string) {
+    await apiPatch(`/api/finance/envelopes/${id}`, { label })
+    await refreshFunds()
+  }
+  async function deleteApartado(id: string) {
+    await apiDel(`/api/finance/envelopes/${id}`)
+    await refreshFunds()
   }
 
   // ── General mutations ─────────────────────────────────────────────────────
@@ -1452,32 +1491,11 @@ export default function FinancePage() {
   async function addMovement(partial: Omit<Movement, 'id' | 'month' | 'created_at'>) {
     const mov = await apiPost<Movement>('/api/finance/movements', { ...partial, month })
     setMovements(prev => [mov, ...prev])
-    if (partial.category === 'vacaciones' && partial.envelope_id) {
-      setVacMovements(prev => [mov, ...prev])
-      setEnvelopes(prev =>
-        prev.map(e =>
-          e.id === partial.envelope_id
-            ? { ...e, saved: Number(e.saved) + Number(partial.amount) }
-            : e
-        )
-      )
-    }
   }
 
   async function deleteMovement(id: string) {
-    const m = movements.find(x => x.id === id)
     await apiDel(`/api/finance/movements/${id}`)
     setMovements(prev => prev.filter(x => x.id !== id))
-    if (m?.category === 'vacaciones' && m.envelope_id) {
-      setVacMovements(prev => prev.filter(x => x.id !== id))
-      setEnvelopes(prev =>
-        prev.map(e =>
-          e.id === m.envelope_id
-            ? { ...e, saved: Math.max(0, Number(e.saved) - Number(m.amount)) }
-            : e
-        )
-      )
-    }
   }
 
   async function editMovement(id: string, description: string, amount: number, metodo: string) {
@@ -1506,20 +1524,6 @@ export default function FinancePage() {
   async function deleteCommitment(id: string) {
     await apiDel(`/api/finance/commitments/${id}`)
     setCommitments(prev => prev.filter(x => x.id !== id))
-  }
-
-  async function updateEnvelopeTarget(id: string, target: number) {
-    await apiPatch(`/api/finance/envelopes/${id}`, { target })
-    setEnvelopes(prev => prev.map(e => e.id === id ? { ...e, target } : e))
-  }
-
-  async function updateEnvelopeSemAhorro(id: string, sem_ahorro: number) {
-    await apiPatch(`/api/finance/envelopes/${id}`, { sem_ahorro })
-    setEnvelopes(prev => prev.map(e => e.id === id ? { ...e, sem_ahorro } : e))
-  }
-
-  async function addVacacionesContribution(envId: string, desc: string, amount: number) {
-    await addMovement({ date: todayStr(), description: desc, amount, flow: 'out', category: 'vacaciones', commitment_id: null, envelope_id: envId, metodo: null })
   }
 
   // Edit a position card in place → record a NAMED adjustment (diff vs the shown value) and re-baseline.
@@ -1638,6 +1642,7 @@ export default function FinancePage() {
                 onDeleteMov={deleteMovement}
                 onAddGX={addGX}
                 onAdjustPosition={adjustPosition}
+                onOpenCajaFuerte={() => setTab('Caja Fuerte')}
                 onAddCommitment={addCommitment}
                 onUpdateCommitment={updateCommitment}
                 onDeleteCommitment={deleteCommitment}
@@ -1649,13 +1654,14 @@ export default function FinancePage() {
             {tab === 'Historial' && (
               <HistorialTab movements={movements} onDelete={deleteMovement} />
             )}
-            {tab === 'Vacaciones' && (
-              <VacacionesTab
-                envelopes={envelopes}
-                vacMovements={vacMovements}
-                onUpdateTarget={updateEnvelopeTarget}
-                onUpdateSemAhorro={updateEnvelopeSemAhorro}
-                onAdd={addVacacionesContribution}
+            {tab === 'Caja Fuerte' && (
+              <CajaFuerteTab
+                funds={funds}
+                onAportaRetira={aportaRetiraFund}
+                onUpdateTarget={updateApartadoTarget}
+                onUpdateLabel={updateApartadoLabel}
+                onDelete={deleteApartado}
+                onCreate={createApartado}
               />
             )}
           </>

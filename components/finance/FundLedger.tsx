@@ -26,7 +26,7 @@ export function FundLedger({ movements, target }: {
   movements: FundMovement[]
   target?: number | null
 }) {
-  const [sortDesc, setSortDesc] = useState(false)   // default asc (oldest first, like a paper cuaderno)
+  const [sortDesc, setSortDesc] = useState(true)   // default DESC (newest on top, like the bank app); running balance stays chronological
 
   // Running balance is ALWAYS computed chronologically (oldest → newest), so every movement keeps the
   // balance it had that day. Sorting only flips how the rows are DISPLAYED — never how the balance adds up.
