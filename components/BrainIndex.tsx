@@ -18,6 +18,22 @@ const VIEWS: { id: ViewMode; label: string }[] = [
 ]
 const LS_VIEW = 'brain:view'
 
+// Local calendar day of a UTC timestamp — the day it happened in the viewer's timezone (León, UTC−6).
+// A capture at 8pm local on the 15th is "the 15th" even though it's already the 16th in UTC. Grouping,
+// the day header, and the row labels ALL key off this one local day so they stay consistent.
+function localDayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Format a local 'YYYY-MM-DD' key — built from its Y/M/D via a LOCAL Date, so it never re-parses as
+// UTC midnight (the old header bug: new Date('YYYY-MM-DD') = UTC midnight → shown a day early in a
+// negative-offset timezone).
+function fmtDayKey(key: string): string {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 // Compact one-line row shared by the lista and timeline modes.
 function CompactRow({ chunk }: { chunk: MemoryChunk }) {
   return (
@@ -76,7 +92,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
   const timeline = useMemo(() => {
     const byDay = new Map<string, MemoryChunk[]>()
     for (const i of filtered) {
-      const day = i.created_at.slice(0, 10)
+      const day = localDayKey(i.created_at)   // local calendar day, not the raw UTC slice
       const arr = byDay.get(day) ?? []
       arr.push(i)
       byDay.set(day, arr)
@@ -176,7 +192,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
                   <div className="mb-2 flex items-center gap-2 border-b border-border pb-1.5">
                     <span className="h-2 w-2 rounded-pill" style={{ background: c }} />
                     <h2 className="text-secondary font-semibold uppercase tracking-wider" style={{ color: c }}>
-                      {fmtDate(day)}
+                      {fmtDayKey(day)}
                     </h2>
                     <span className="tabular-nums text-secondary text-fg-faint">{rows.length}</span>
                   </div>
