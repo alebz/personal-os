@@ -228,17 +228,19 @@ export async function GET(req: NextRequest) {
     const [balRes, commRes, envRes, incRes, fundMovsRes] = await Promise.all([
       supabase.from('finance_balance').select('tarjeta,efectivo').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('finance_commitments').select('name,amount,active').eq('active', true).order('sort_order'),
-      supabase.from('finance_envelopes').select('id,key,label,target').order('sort_order'),
+      supabase.from('finance_envelopes').select('id,key,label,target,archived').eq('archived', false).order('sort_order'),
       supabase.from('finance_income_items').select('nombre,monto,metodo').eq('active', true).order('sort_order'),
       supabase.from('finance_movements').select('envelope_id,amount,flow').not('envelope_id', 'is', null),
     ])
 
-    // Per-fund saved (flow-aware). "Guardado" = Σ of every fund EXCEPT mantenimiento (Uptown's).
-    // Replaces the now-frozen finance_balance.caja_fuerte snapshot column.
+    // Per-fund saved (flow-aware). "Guardado" = Σ of every ACTIVE fund EXCEPT mantenimiento (Uptown's).
+    // envRes is already filtered to active funds; archived ones simply aren't in it. Replaces the
+    // now-frozen finance_balance.caja_fuerte snapshot column.
+    const activeIds = new Set((envRes.data ?? []).map((e: { id: string }) => e.id))
     const mantId = (envRes.data ?? []).find((e: { key: string | null }) => e.key === 'mantenimiento')?.id
     const savedByEnv: Record<string, number> = {}
     for (const m of (fundMovsRes.data ?? []) as Array<{ envelope_id: string | null; amount: number; flow: string }>) {
-      if (m.envelope_id) savedByEnv[m.envelope_id] = (savedByEnv[m.envelope_id] ?? 0) + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount))
+      if (m.envelope_id && activeIds.has(m.envelope_id)) savedByEnv[m.envelope_id] = (savedByEnv[m.envelope_id] ?? 0) + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount))
     }
     const guardado = Object.entries(savedByEnv).reduce((s, [envId, v]) => envId === mantId ? s : s + v, 0)
 

@@ -17,6 +17,8 @@ export async function PATCH(
   const allowed: Record<string, unknown> = {}
   if (body.label      !== undefined) allowed.label      = body.label
   if (body.target     !== undefined) allowed.target     = body.target
+  if (body.archived   !== undefined) allowed.archived   = body.archived   // soft-delete: archive/restore
+  if (body.sort_order !== undefined) allowed.sort_order = body.sort_order
   if (body.sem_ahorro !== undefined) allowed.sem_ahorro = body.sem_ahorro
   if (body.fecha      !== undefined) allowed.fecha      = body.fecha
   if (body.pausado    !== undefined) allowed.pausado    = body.pausado
@@ -33,9 +35,9 @@ export async function PATCH(
   return NextResponse.json(data)
 }
 
-// DELETE /api/finance/envelopes/[id] — remove an apartado AND its ledger (cascade the fund's
-// movements), so nothing is left orphaned in the "guardado" sum. Guard: never delete the keyed
-// foundational funds (caja_fuerte / mantenimiento).
+// DELETE /api/finance/envelopes/[id] — HARD delete, allowed ONLY for empty funds (0 movements).
+// A fund with any history must be archived (PATCH { archived: true }), never hard-deleted — its
+// libreta is irreplaceable. Also guarded against the keyed foundational funds.
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -48,9 +50,12 @@ export async function DELETE(
     return NextResponse.json({ error: 'no se puede eliminar un fondo base (caja_fuerte / mantenimiento)' }, { status: 400 })
   }
 
-  // Remove the fund's movements first (its ledger goes with the apartado), then the envelope.
-  const { error: mErr } = await supabase.from('finance_movements').delete().eq('envelope_id', id)
-  if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 })
+  const { count } = await supabase
+    .from('finance_movements').select('id', { count: 'exact', head: true }).eq('envelope_id', id)
+  if ((count ?? 0) > 0) {
+    return NextResponse.json({ error: 'el fondo tiene movimientos — archívalo, no lo elimines' }, { status: 400 })
+  }
+
   const { error } = await supabase.from('finance_envelopes').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return new NextResponse(null, { status: 204 })
