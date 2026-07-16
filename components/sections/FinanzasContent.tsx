@@ -12,7 +12,7 @@ interface Fund { id: string; key: string | null; label: string; target: number |
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab      = 'Panel' | 'Historial' | 'Vacaciones' | 'Compromisos' | 'Cuadrar' | 'Config'
+type Tab      = 'Panel' | 'Historial' | 'Vacaciones' | 'Compromisos' | 'Config'
 type Flow     = 'in' | 'out'
 type Category = 'nomina' | 'freelance' | 'gasto_fijo' | 'gasto_extra' | 'vacaciones' | 'ajuste'
 
@@ -490,6 +490,7 @@ interface PanelTabProps {
   movements: Movement[]
   monthChecks: MonthChecks
   balance: Balance | null
+  funds: Fund[]
   nominaMirror: NominaMirror[] | 'loading'
   onToggleIncome: (item: IncomeItem) => Promise<void>
   onSetRealMonto: (itemId: string, monto: number) => void
@@ -499,6 +500,7 @@ interface PanelTabProps {
   onEditMov: (id: string, description: string, amount: number, metodo: string) => Promise<void>
   onDeleteMov: (id: string) => Promise<void>
   onAddGX: (nombre: string, monto: number, metodo: string) => Promise<void>
+  onAdjustPosition: (account: 'tarjeta' | 'efectivo' | 'caja_fuerte', to: number, shown: { tarjeta: number; efectivo: number; caja_fuerte: number }) => Promise<void>
 }
 
 function PanelTab({
@@ -507,6 +509,7 @@ function PanelTab({
   movements,
   monthChecks,
   balance,
+  funds,
   nominaMirror,
   onToggleIncome,
   onSetRealMonto,
@@ -516,8 +519,10 @@ function PanelTab({
   onEditMov,
   onDeleteMov,
   onAddGX,
+  onAdjustPosition,
 }: PanelTabProps) {
   const [editMov, setEditMov] = useState<Movement | null>(null)
+  const [cajaLedgerOpen, setCajaLedgerOpen] = useState(false)
 
   const { checks, realM } = monthChecks
 
@@ -585,6 +590,63 @@ function PanelTab({
     )
   }
 
+  const shown = { tarjeta: liveTarjeta, efectivo: liveEfectivo, caja_fuerte: caja }
+  const cajaFund = funds.find(f => f.key === 'caja_fuerte')
+
+  // A position card whose number is editable in place. Committing records a NAMED adjustment (the diff
+  // vs the shown value, via onAdjustPosition) — never a silent overwrite. Optional ledger toggle for
+  // Caja Fuerte (the wallets are informative, no libreta).
+  function EditablePositionCard({
+    account, label, value, cls, subNode, onToggleLedger, ledgerOpen,
+  }: {
+    account: 'tarjeta' | 'efectivo' | 'caja_fuerte'; label: string; value: number; cls: string
+    subNode?: React.ReactNode; onToggleLedger?: () => void; ledgerOpen?: boolean
+  }) {
+    const [editing, setEditing] = useState(false)
+    const [draft, setDraft]     = useState('')
+    const skipCommit = useRef(false)
+
+    function begin() { setDraft(String(value)); skipCommit.current = false; setEditing(true) }
+    function commit() {
+      if (skipCommit.current) { skipCommit.current = false; setEditing(false); return }
+      setEditing(false)
+      const v = parseFloat(draft)
+      if (isNaN(v) || v === value) return
+      void onAdjustPosition(account, v, shown)
+    }
+
+    return (
+      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+        <p className="text-label uppercase tracking-wider text-fg-muted">{label}</p>
+        {editing ? (
+          <input
+            autoFocus type="number" value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') { skipCommit.current = true; e.currentTarget.blur() }
+            }}
+            className={`mt-1 w-full rounded border border-border bg-surface-2 px-1.5 py-0.5 text-subhead font-black tabular-nums ${cls} outline-none focus:border-accent/50`}
+          />
+        ) : (
+          <button
+            onClick={begin} title="Click para ajustar"
+            className={`mt-1 block text-subhead font-black tabular-nums ${cls} decoration-dotted underline-offset-4 hover:underline`}
+          >
+            <Mxn v={value} />
+          </button>
+        )}
+        {subNode && <p className="mt-0.5 text-label">{subNode}</p>}
+        {onToggleLedger && (
+          <button onClick={onToggleLedger} className="mt-1 text-label text-fg-muted transition-colors hover:text-fg">
+            {ledgerOpen ? 'Ocultar libreta ▲' : 'Ver libreta ▼'}
+          </button>
+        )}
+      </div>
+    )
+  }
+
   function SectionHeader({ title, total, cls }: { title: string; total: number; cls: string }) {
     return (
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -596,15 +658,24 @@ function PanelTab({
 
   return (
     <div className="space-y-5">
-      {/* 4 summary cards */}
+      {/* 6 summary cards — the three positions (Efectivo/Tarjeta/Caja Fuerte) are editable in place */}
       <div className="grid grid-cols-3 gap-3">
-        <PanelCard label="Efectivo"           value={liveEfectivo} cls="text-success" subNode={deltaSub(dEfectivo)} />
-        <PanelCard label="Tarjeta"            value={liveTarjeta}  cls="text-info"    subNode={deltaSub(dTarjeta)} />
-        <PanelCard label="Caja Fuerte"        value={caja}    cls="text-warn" />
+        <EditablePositionCard account="efectivo"    label="Efectivo"    value={liveEfectivo} cls="text-success" subNode={deltaSub(dEfectivo)} />
+        <EditablePositionCard account="tarjeta"     label="Tarjeta"     value={liveTarjeta}  cls="text-info"    subNode={deltaSub(dTarjeta)} />
+        <EditablePositionCard account="caja_fuerte" label="Caja Fuerte" value={caja}         cls="text-warn"
+          onToggleLedger={cajaFund ? () => setCajaLedgerOpen(o => !o) : undefined} ledgerOpen={cajaLedgerOpen} />
         <PanelCard label="Ingresos cobrados"  value={cobrado} cls="text-ok"     subNode={<><span className="text-fg-muted">de </span><Mxn v={totalInPrevistos} /></>} />
         <PanelCard label="Gastos pagados"     value={pagado}  cls="text-danger" subNode={<><span className="text-fg-muted">de </span><Mxn v={totalGastoPrevistos} /></>} />
         <PanelCard label="Flujo del mes"      value={flujo}   cls={flujo >= 0 ? 'text-ok' : 'text-danger'} />
       </div>
+
+      {/* Caja Fuerte libreta — lives here now (Cuadrar is gone); full width for readability */}
+      {cajaLedgerOpen && cajaFund && (
+        <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <p className="mb-3 text-label font-bold uppercase tracking-widest text-fg-muted">Libreta · Caja Fuerte</p>
+          <FundLedger movements={cajaFund.movements} />
+        </div>
+      )}
 
       {/* Two-column layout */}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -1151,95 +1222,6 @@ function CompromisoTab({
   )
 }
 
-// ─── CuadrarTab ───────────────────────────────────────────────────────────────
-
-function CuadrarTab({
-  balance,
-  onSave,
-  cajaFund,
-}: {
-  balance: Balance | null
-  onSave: (b: { tarjeta: number; efectivo: number; caja_fuerte: number }) => Promise<void>
-  cajaFund?: Fund
-}) {
-  const [tarjeta,  setTarjeta]  = useState('')
-  const [efectivo, setEfectivo] = useState('')
-  const [caja,     setCaja]     = useState('')
-  const [saving,   setSaving]   = useState(false)
-
-  useEffect(() => {
-    if (!balance) return
-    setTarjeta(String(Number(balance.tarjeta)))
-    setEfectivo(String(Number(balance.efectivo)))
-    setCaja(String(Number(balance.caja_fuerte)))
-  }, [balance])
-
-  const total = (parseFloat(tarjeta) || 0) + (parseFloat(efectivo) || 0) + (parseFloat(caja) || 0)
-
-  async function save() {
-    setSaving(true)
-    try {
-      await onSave({
-        tarjeta: parseFloat(tarjeta) || 0,
-        efectivo: parseFloat(efectivo) || 0,
-        caja_fuerte: parseFloat(caja) || 0,
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const fields = [
-    { label: 'Tarjeta',     value: tarjeta,  set: setTarjeta  },
-    { label: 'Efectivo',    value: efectivo, set: setEfectivo },
-    { label: 'Caja Fuerte', value: caja,     set: setCaja     },
-  ]
-
-  return (
-    <div className="max-w-2xl space-y-5">
-      <div className="max-w-sm space-y-4 rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        {fields.map(({ label, value, set }) => (
-          <div key={label}>
-            <label className="mb-1.5 block text-label font-semibold uppercase tracking-widest text-fg-muted">
-              {label}
-            </label>
-            <input
-              type="number" value={value} onChange={e => set(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()}
-              placeholder="0"
-              className="w-full rounded-card border border-border bg-surface-2 px-4 py-3 text-right text-subhead font-bold text-fg outline-none focus:border-accent/50"
-            />
-          </div>
-        ))}
-
-        <div className="border-t border-border pt-4">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-secondary text-fg-muted">Total</p>
-            <p className="text-heading font-black tabular-nums text-fg"><Mxn v={total} /></p>
-          </div>
-          <button
-            onClick={save} disabled={saving}
-            className="w-full rounded-card bg-accent/20 py-3 text-body font-semibold text-accent transition-colors hover:bg-accent/30 disabled:opacity-50"
-          >
-            {saving ? 'Guardando…' : 'Guardar saldos'}
-          </button>
-          {balance?.updated_at && (
-            <p className="mt-3 text-center text-label text-fg-muted">
-              Actualizado{' '}
-              {new Date(balance.updated_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
-            </p>
-          )}
-        </div>
-      </div>
-      {cajaFund && (
-        <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-          <p className="mb-3 text-label font-bold uppercase tracking-widest text-fg-muted">Libreta · Caja Fuerte</p>
-          <FundLedger movements={cajaFund.movements} />
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── ConfigTab ────────────────────────────────────────────────────────────────
 
 function IncomeConfigRow({
@@ -1383,7 +1365,7 @@ function ConfigTab({
 
 // ─── FinancePage ──────────────────────────────────────────────────────────────
 
-const TABS: Tab[] = ['Panel', 'Historial', 'Vacaciones', 'Compromisos', 'Cuadrar', 'Config']
+const TABS: Tab[] = ['Panel', 'Historial', 'Vacaciones', 'Compromisos', 'Config']
 
 const EMPTY_CHECKS: MonthChecks = { checks: {}, realM: {}, movIds: {} }
 
@@ -1687,14 +1669,18 @@ export default function FinancePage() {
     await addMovement({ date: todayStr(), description: desc, amount, flow: 'out', category: 'vacaciones', commitment_id: null, envelope_id: envId, metodo: null })
   }
 
-  async function saveBalance(data: { tarjeta: number; efectivo: number; caja_fuerte: number }) {
-    const { balance: bal, adjustments } = await apiPost<{ balance: Balance; adjustments: Movement[] }>(
-      '/api/finance/balance', data,
+  // Edit a position card in place → record a NAMED adjustment (diff vs the shown value) and re-baseline.
+  // Wallets' ajuste lands in the Historial; Caja Fuerte's lands in its libreta. Refresh both.
+  async function adjustPosition(
+    account: 'tarjeta' | 'efectivo' | 'caja_fuerte',
+    to: number,
+    shown: { tarjeta: number; efectivo: number; caja_fuerte: number },
+  ) {
+    const { balance: bal } = await apiPost<{ balance: Balance; adjustment: Movement | null }>(
+      '/api/finance/balance/adjust', { account, to, shown },
     )
     setBalance(bal)
-    if (adjustments.length > 0) setMovements(prev => [...adjustments, ...prev])
     await loadMovements(month)
-    // Refresh funds so the Caja Fuerte libreta reflects the named adjustment.
     try { setFunds(await apiFetch<Fund[]>('/api/finance/funds')) } catch { /* keep prior */ }
   }
 
@@ -1787,6 +1773,7 @@ export default function FinancePage() {
                 movements={movements}
                 monthChecks={monthChecks}
                 balance={balance}
+                funds={funds}
                 nominaMirror={nominaMirror}
                 onToggleIncome={toggleIncome}
                 onSetRealMonto={setRealMonto}
@@ -1796,6 +1783,7 @@ export default function FinancePage() {
                 onEditMov={editMovement}
                 onDeleteMov={deleteMovement}
                 onAddGX={addGX}
+                onAdjustPosition={adjustPosition}
               />
             )}
             {tab === 'Historial' && (
@@ -1817,9 +1805,6 @@ export default function FinancePage() {
                 onUpdate={updateCommitment}
                 onDelete={deleteCommitment}
               />
-            )}
-            {tab === 'Cuadrar' && (
-              <CuadrarTab balance={balance} onSave={saveBalance} cajaFund={funds.find(f => f.key === 'caja_fuerte')} />
             )}
             {tab === 'Config' && (
               <ConfigTab
