@@ -25,7 +25,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { name, amount, active = true, sort_order = 0 } = body
+  const {
+    name, amount, active = true, sort_order = 0,
+    meses = null, metodo = 'tarjeta', start_month = null,
+  } = body
   if (!name || !amount) {
     return NextResponse.json({ error: 'name and amount required' }, { status: 400 })
   }
@@ -33,7 +36,7 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('finance_commitments')
-    .insert({ name, amount, active, sort_order })
+    .insert({ name, amount, active, sort_order, meses, metodo, start_month })
     .select()
     .single()
 

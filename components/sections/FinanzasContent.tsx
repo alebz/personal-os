@@ -12,7 +12,7 @@ interface Fund { id: string; key: string | null; label: string; target: number |
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab      = 'Panel' | 'Historial' | 'Vacaciones' | 'Compromisos' | 'Config'
+type Tab      = 'Panel' | 'Historial' | 'Vacaciones'
 type Flow     = 'in' | 'out'
 type Category = 'nomina' | 'freelance' | 'gasto_fijo' | 'gasto_extra' | 'vacaciones' | 'ajuste'
 
@@ -33,11 +33,20 @@ export interface Movement {
 interface Commitment {
   id: string
   name: string
-  amount: number
-  meses: number | null
+  amount: number          // the MONTHLY payment (never divided)
+  meses: number | null    // number of payments (the term); null = indefinite subscription
+  start_month: string | null   // 'YYYY-MM' the plan began; with meses gives "N de M"
   active: boolean
   sort_order: number
   metodo: string | null
+}
+
+// Installment number of a commitment for a given viewed month. null = indefinite / no start.
+// numero 1..meses = within term (meses = the last payment); >meses = finished; <1 = not started yet.
+function installmentNumero(c: Commitment, viewedMonth: string): number | null {
+  if (c.meses == null || !c.start_month) return null
+  const mn = (ym: string) => { const [y, m] = ym.split('-').map(Number); return y * 12 + (m - 1) }
+  return mn(viewedMonth) - mn(c.start_month) + 1
 }
 
 interface Envelope {
@@ -143,11 +152,6 @@ async function apiDel(url: string) {
   await fetch(url, { method: 'DELETE' })
 }
 
-function monthlyCost(c: Commitment): number {
-  const amt = Number(c.amount)
-  return c.meses && c.meses > 1 ? amt / c.meses : amt
-}
-
 // ─── Category meta ────────────────────────────────────────────────────────────
 
 export const CAT_LABEL: Record<Category, string> = {
@@ -230,6 +234,8 @@ function IncomeRow({
   onToggle,
   onSetMonto,
   onSetMetodo,
+  onUpdate,
+  onDelete,
 }: {
   item: IncomeItem
   checked: boolean
@@ -238,8 +244,14 @@ function IncomeRow({
   onToggle: () => void
   onSetMonto: (n: number) => void
   onSetMetodo: (m: string) => void
+  onUpdate: (id: string, u: Partial<IncomeItem>) => void
+  onDelete: (id: string) => void
 }) {
   const [draft, setDraft] = useState(String(realMonto))
+  const [editing, setEditing] = useState(false)
+  const [name, setName]       = useState(item.nombre)
+  const [baseAmt, setBaseAmt] = useState(String(Number(item.monto)))
+  const [baseMetodo, setBaseMetodo] = useState(normMethod(item.metodo))
   useEffect(() => { setDraft(String(realMonto)) }, [realMonto])
 
   function commitDraft() {
@@ -247,12 +259,38 @@ function IncomeRow({
     if (n > 0) onSetMonto(n)
     else setDraft(String(realMonto))
   }
+  function begin() {
+    setName(item.nombre); setBaseAmt(String(Number(item.monto))); setBaseMetodo(normMethod(item.metodo))
+    setEditing(true)
+  }
+  function save() {
+    const a = parseFloat(baseAmt)
+    if (!name.trim() || !a || a <= 0) { setEditing(false); return }
+    onUpdate(item.id, { nombre: name.trim(), monto: a, metodo: baseMetodo })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 border-b border-border bg-surface-2/40 px-3 py-2 last:border-0">
+        <input value={name} autoFocus onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+          className="min-w-0 flex-1 rounded border border-border bg-surface-2 px-2 py-0.5 text-secondary text-fg outline-none focus:border-accent/50" />
+        <MethodSelect value={baseMetodo} onChange={v => setBaseMetodo(normMethod(v))} />
+        <input type="number" value={baseAmt} onChange={e => setBaseAmt(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+          className="w-20 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-right text-secondary text-fg outline-none focus:border-accent/50" />
+        <button onClick={save} className="text-label font-medium text-ok hover:underline">OK</button>
+        <button onClick={() => setEditing(false)} className="text-label text-fg-muted hover:text-fg">✕</button>
+      </div>
+    )
+  }
 
   return (
     <div
       onClick={onToggle}
       className={[
-        'flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2.5 last:border-0 transition-all',
+        'group flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2.5 last:border-0 transition-all',
         checked ? 'opacity-55' : 'hover:bg-surface-hover',
       ].join(' ')}
     >
@@ -280,6 +318,10 @@ function IncomeRow({
         <>
           <MethodBadge metodo={item.metodo} />
           <span className="w-24 shrink-0 text-right text-secondary tabular-nums text-fg-muted"><Mxn v={item.monto} /></span>
+          <button onClick={e => { e.stopPropagation(); begin() }}
+            className="hidden shrink-0 text-label text-fg-muted hover:text-fg group-hover:block">editar</button>
+          <button onClick={e => { e.stopPropagation(); onDelete(item.id) }}
+            className="hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block">×</button>
         </>
       )}
     </div>
@@ -289,17 +331,60 @@ function IncomeRow({
 function GastoRow({
   commitment,
   checked,
+  numero,
   onToggle,
+  onUpdate,
+  onDelete,
 }: {
   commitment: Commitment
   checked: boolean
+  numero: number | null   // installment number for the viewed month; null = indefinite
   onToggle: () => void
+  onUpdate: (id: string, u: Partial<Omit<Commitment, 'id'>>) => void
+  onDelete: (id: string) => void
 }) {
+  const [editing, setEditing] = useState(false)
+  const [name,   setName]   = useState(commitment.name)
+  const [amt,    setAmt]    = useState(String(Number(commitment.amount)))
+  const [meses,  setMeses]  = useState(commitment.meses ? String(commitment.meses) : '')
+  const [metodo, setMetodo] = useState(normMethod(commitment.metodo))
+
+  function begin() {
+    setName(commitment.name); setAmt(String(Number(commitment.amount)))
+    setMeses(commitment.meses ? String(commitment.meses) : ''); setMetodo(normMethod(commitment.metodo))
+    setEditing(true)
+  }
+  function save() {
+    const a = parseFloat(amt)
+    if (!name.trim() || !a || a <= 0) { setEditing(false); return }
+    const m = meses.trim() ? parseInt(meses, 10) : null
+    onUpdate(commitment.id, { name: name.trim(), amount: a, meses: m && m > 0 ? m : null, metodo })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 border-b border-border bg-surface-2/40 px-3 py-2 last:border-0">
+        <input value={name} autoFocus onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+          className="min-w-0 flex-1 rounded border border-border bg-surface-2 px-2 py-0.5 text-secondary text-fg outline-none focus:border-accent/50" />
+        <input type="number" value={meses} onChange={e => setMeses(e.target.value)} placeholder="∞" title="Nº de pagos (vacío = indefinido)"
+          className="w-12 rounded border border-border bg-surface-2 px-1 py-0.5 text-center text-secondary text-fg-muted outline-none focus:border-accent/50" />
+        <MethodSelect value={metodo} onChange={v => setMetodo(normMethod(v))} />
+        <input type="number" value={amt} onChange={e => setAmt(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+          className="w-20 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-right text-secondary text-fg outline-none focus:border-accent/50" />
+        <button onClick={save} className="text-label font-medium text-ok hover:underline">OK</button>
+        <button onClick={() => setEditing(false)} className="text-label text-fg-muted hover:text-fg">✕</button>
+      </div>
+    )
+  }
+
   return (
     <div
       onClick={onToggle}
       className={[
-        'flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2.5 last:border-0 transition-all',
+        'group flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2.5 last:border-0 transition-all',
         checked ? 'opacity-55' : 'hover:bg-surface-hover',
       ].join(' ')}
     >
@@ -307,8 +392,17 @@ function GastoRow({
       <span className={`min-w-0 flex-1 truncate text-secondary ${checked ? 'line-through text-fg-muted' : 'text-fg'}`}>
         {commitment.name}
       </span>
+      {numero != null && commitment.meses != null && (
+        <span className="shrink-0 rounded-pill bg-surface-2 px-1.5 py-0.5 text-label tabular-nums text-fg-muted" title="Pago actual de total">
+          {numero} de {commitment.meses}
+        </span>
+      )}
       <MethodBadge metodo={commitment.metodo ?? 'cargo'} />
       <span className="w-24 shrink-0 text-right text-secondary tabular-nums text-fg-muted"><Mxn v={commitment.amount} /></span>
+      <button onClick={e => { e.stopPropagation(); begin() }}
+        className="hidden shrink-0 text-label text-fg-muted hover:text-fg group-hover:block">editar</button>
+      <button onClick={e => { e.stopPropagation(); onDelete(commitment.id) }}
+        className="hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block">×</button>
     </div>
   )
 }
@@ -482,6 +576,60 @@ function EditModal({
   )
 }
 
+// Add a recurring commitment from the Panel. amount = MONTHLY payment; meses = nº of payments
+// (empty = indefinite). start_month is set by the parent to the viewed month.
+function AddCommitmentForm({
+  onAdd,
+}: {
+  onAdd: (name: string, amount: number, meses: number | null, metodo: string) => void
+}) {
+  const [name,  setName]  = useState('')
+  const [monto, setMonto] = useState('')
+  const [meses, setMeses] = useState('')
+  const [metodo, setMetodo] = useState('tarjeta')
+
+  function submit() {
+    const a = parseFloat(monto)
+    if (!name.trim() || !a || a <= 0) return
+    const m = meses.trim() ? parseInt(meses, 10) : null
+    onAdd(name.trim(), a, m && m > 0 ? m : null, metodo)
+    setName(''); setMonto(''); setMeses('')
+  }
+
+  return (
+    <div className="flex gap-2 border-t border-border px-3 py-3">
+      <input
+        value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
+        placeholder="Netflix, renta…"
+        className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+      />
+      <input
+        type="number" value={monto} onChange={e => setMonto(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
+        placeholder="$/mes"
+        className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+      />
+      <input
+        type="number" value={meses} onChange={e => setMeses(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
+        placeholder="meses" title="Nº de pagos (vacío = indefinido)"
+        className="w-16 rounded-control border border-border bg-surface-2 px-2 py-1.5 text-center text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+      />
+      <select
+        value={metodo} onChange={e => setMetodo(e.target.value)}
+        className="rounded-control border border-border bg-surface-2 px-2 py-1.5 text-secondary text-fg outline-none"
+      >
+        <option value="efectivo">💵 Efectivo</option>
+        <option value="tarjeta">💳 Tarjeta</option>
+      </select>
+      <button
+        onClick={submit} disabled={!name.trim() || !monto}
+        className="rounded-control bg-danger/10 px-2.5 py-1.5 text-secondary font-medium text-danger hover:bg-danger/20 disabled:opacity-30"
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
 // ─── PanelTab ─────────────────────────────────────────────────────────────────
 
 interface PanelTabProps {
@@ -491,6 +639,7 @@ interface PanelTabProps {
   monthChecks: MonthChecks
   balance: Balance | null
   funds: Fund[]
+  month: string
   nominaMirror: NominaMirror[] | 'loading'
   onToggleIncome: (item: IncomeItem) => Promise<void>
   onSetRealMonto: (itemId: string, monto: number) => void
@@ -501,6 +650,12 @@ interface PanelTabProps {
   onDeleteMov: (id: string) => Promise<void>
   onAddGX: (nombre: string, monto: number, metodo: string) => Promise<void>
   onAdjustPosition: (account: 'tarjeta' | 'efectivo' | 'caja_fuerte', to: number, shown: { tarjeta: number; efectivo: number; caja_fuerte: number }) => Promise<void>
+  onAddCommitment: (data: Omit<Commitment, 'id'>) => Promise<void>
+  onUpdateCommitment: (id: string, u: Partial<Omit<Commitment, 'id'>>) => void
+  onDeleteCommitment: (id: string) => void
+  onAddIncome: (nombre: string, monto: number, metodo: string) => Promise<void>
+  onUpdateIncome: (id: string, u: Partial<IncomeItem>) => void
+  onDeleteIncome: (id: string) => void
 }
 
 function PanelTab({
@@ -510,6 +665,7 @@ function PanelTab({
   monthChecks,
   balance,
   funds,
+  month,
   nominaMirror,
   onToggleIncome,
   onSetRealMonto,
@@ -520,6 +676,12 @@ function PanelTab({
   onDeleteMov,
   onAddGX,
   onAdjustPosition,
+  onAddCommitment,
+  onUpdateCommitment,
+  onDeleteCommitment,
+  onAddIncome,
+  onUpdateIncome,
+  onDeleteIncome,
 }: PanelTabProps) {
   const [editMov, setEditMov] = useState<Movement | null>(null)
   const [cajaLedgerOpen, setCajaLedgerOpen] = useState(false)
@@ -530,7 +692,14 @@ function PanelTab({
   const gxMvs           = movements.filter(m => m.category === 'gasto_extra')
 
   const activeIncome  = incomeItems.filter(i => i.active)
-  const activeCosts   = commitments.filter(c => c.active)
+  // Shown this month: active + (indefinite OR within its installment window). A finished plan
+  // (numero > meses) drops out next month; the last month shows "meses de meses".
+  const activeCosts   = commitments.filter(c => {
+    if (!c.active) return false
+    if (c.meses == null) return true
+    const n = installmentNumero(c, month)
+    return n != null && n >= 1 && n <= c.meses
+  })
 
   const mirrorRows  = nominaMirror !== 'loading' ? nominaMirror : []
   const mirrorTotal = mirrorRows.reduce((s, r) => s + (r.amount ?? 0), 0)
@@ -684,22 +853,20 @@ function PanelTab({
           {/* Ingresos previstos */}
           <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <SectionHeader title="Ingresos Previstos" total={totalInPrevistos} cls="text-ok" />
-            {activeIncome.length === 0 && nominaMirror === 'loading' ? (
-              <p className="px-4 py-6 text-center text-secondary italic text-fg-muted">Sin ingresos previstos — configúralos en Config</p>
-            ) : (
-              activeIncome.map(item => (
-                <IncomeRow
-                  key={item.id}
-                  item={item}
-                  checked={!!checks[item.id]}
-                  realMonto={Number(realM[item.id] ?? item.monto)}
-                  realMetodo={String(realM['mt|' + item.id] ?? item.metodo)}
-                  onToggle={() => void onToggleIncome(item)}
-                  onSetMonto={n => onSetRealMonto(item.id, n)}
-                  onSetMetodo={m => onSetRealMetodo(item.id, m)}
-                />
-              ))
-            )}
+            {activeIncome.map(item => (
+              <IncomeRow
+                key={item.id}
+                item={item}
+                checked={!!checks[item.id]}
+                realMonto={Number(realM[item.id] ?? item.monto)}
+                realMetodo={String(realM['mt|' + item.id] ?? item.metodo)}
+                onToggle={() => void onToggleIncome(item)}
+                onSetMonto={n => onSetRealMonto(item.id, n)}
+                onSetMetodo={m => onSetRealMetodo(item.id, m)}
+                onUpdate={onUpdateIncome}
+                onDelete={onDeleteIncome}
+              />
+            ))}
             {/* Nómina mirror — read-only from Uptown, all 4 weeks */}
             {nominaMirror !== 'loading' && mirrorRows.map(nm => (
               <div key={nm.week_num} className={['flex items-center gap-2 border-t border-border px-3 py-2.5', nm.paid ? 'opacity-55' : ''].join(' ')}>
@@ -719,6 +886,7 @@ function PanelTab({
                 )}
               </div>
             ))}
+            <AddExtraForm placeholder="Nombre del ingreso" colorClass="text-ok" onAdd={onAddIncome} />
           </div>
 
           {/* Freelance / Extras */}
@@ -748,18 +916,25 @@ function PanelTab({
           {/* Gastos previstos */}
           <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             <SectionHeader title="Gastos Previstos" total={totalGastoPrevistos} cls="text-danger" />
-            {activeCosts.length === 0 ? (
-              <p className="px-4 py-6 text-center text-secondary italic text-fg-muted">Sin compromisos activos</p>
-            ) : (
-              activeCosts.map(c => (
-                <GastoRow
-                  key={c.id}
-                  commitment={c}
-                  checked={!!checks[c.id]}
-                  onToggle={() => void onToggleGasto(c)}
-                />
-              ))
+            {activeCosts.length === 0 && (
+              <p className="px-4 py-5 text-center text-secondary italic text-fg-muted">Sin compromisos este mes</p>
             )}
+            {activeCosts.map(c => (
+              <GastoRow
+                key={c.id}
+                commitment={c}
+                checked={!!checks[c.id]}
+                numero={installmentNumero(c, month)}
+                onToggle={() => void onToggleGasto(c)}
+                onUpdate={onUpdateCommitment}
+                onDelete={onDeleteCommitment}
+              />
+            ))}
+            <AddCommitmentForm
+              onAdd={(name, amount, meses, metodo) =>
+                void onAddCommitment({ name, amount, meses, start_month: month, active: true, sort_order: 0, metodo })
+              }
+            />
           </div>
 
           {/* Gastos Extra */}
@@ -1041,331 +1216,9 @@ function VacacionesTab({
   )
 }
 
-// ─── CommitmentRow ────────────────────────────────────────────────────────────
-
-function CommitmentRow({
-  c,
-  onUpdate,
-  onDelete,
-}: {
-  c: Commitment
-  onUpdate: (id: string, u: Partial<Omit<Commitment, 'id'>>) => void
-  onDelete: (id: string) => void
-}) {
-  const [amt,   setAmt]   = useState(String(Number(c.amount)))
-  const [meses, setMeses] = useState(c.meses ? String(c.meses) : '')
-  useEffect(() => { setAmt(String(Number(c.amount))) },            [c.amount])
-  useEffect(() => { setMeses(c.meses ? String(c.meses) : '') }, [c.meses])
-
-  function saveAmt() {
-    const n = parseFloat(amt)
-    if (n > 0 && n !== Number(c.amount)) onUpdate(c.id, { amount: n })
-    else setAmt(String(Number(c.amount)))
-  }
-
-  function saveMeses() {
-    const n = meses.trim() === '' ? null : parseInt(meses, 10)
-    if (n !== c.meses) onUpdate(c.id, { meses: n && n > 0 ? n : null })
-  }
-
-  const monthly = monthlyCost(c)
-
-  return (
-    <div className="group flex items-center gap-3 px-4 py-3">
-      <button
-        onClick={() => onUpdate(c.id, { active: !c.active })}
-        className={[
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-          c.active ? 'border-accent bg-accent' : 'border-border-strong',
-        ].join(' ')}
-      >
-        {c.active && (
-          <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5" stroke="currentColor" strokeWidth={1.8}>
-            <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-
-      <span className={`flex-1 truncate text-body ${c.active ? 'text-fg' : 'text-fg-muted/50 line-through'}`}>
-        {c.name}
-      </span>
-
-      {c.metodo && <MethodBadge metodo={c.metodo} />}
-
-      <div className="flex items-center gap-1">
-        <input
-          type="number" value={meses}
-          onChange={e => setMeses(e.target.value)}
-          onBlur={saveMeses}
-          onKeyDown={e => e.key === 'Enter' && saveMeses()}
-          placeholder="∞"
-          title="Meses"
-          className="w-10 rounded border border-transparent bg-transparent px-1 py-0.5 text-center text-secondary text-fg-muted outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
-        />
-        <span className="text-label text-fg-faint">ms</span>
-      </div>
-
-      <input
-        type="number" value={amt}
-        onChange={e => setAmt(e.target.value)}
-        onBlur={saveAmt}
-        onKeyDown={e => e.key === 'Enter' && saveAmt()}
-        className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-body text-fg outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
-      />
-
-      {c.meses && c.meses > 1 && (
-        <span className="shrink-0 text-label text-fg-muted tabular-nums"><Mxn v={monthly} />/mes</span>
-      )}
-
-      <button
-        onClick={() => onDelete(c.id)}
-        className="hidden shrink-0 text-md leading-none text-fg-muted/40 hover:text-danger group-hover:block"
-      >
-        ×
-      </button>
-    </div>
-  )
-}
-
-// ─── CompromisoTab ────────────────────────────────────────────────────────────
-
-function CompromisoTab({
-  commitments,
-  onAdd,
-  onUpdate,
-  onDelete,
-}: {
-  commitments: Commitment[]
-  onAdd: (c: Omit<Commitment, 'id'>) => void
-  onUpdate: (id: string, u: Partial<Omit<Commitment, 'id'>>) => void
-  onDelete: (id: string) => void
-}) {
-  const [name,   setName]   = useState('')
-  const [amount, setAmount] = useState('')
-  const [meses,  setMeses]  = useState('')
-  const [metodo, setMetodo] = useState('tarjeta')
-
-  const active       = commitments.filter(c => c.active)
-  const totalMensual = active.reduce((s, c) => s + monthlyCost(c), 0)
-  const totalAnual   = totalMensual * 12
-
-  function submit() {
-    const a = parseFloat(amount)
-    if (!name.trim() || !a || a <= 0) return
-    const m = meses.trim() ? parseInt(meses, 10) : null
-    onAdd({ name: name.trim(), amount: a, meses: m && m > 0 ? m : null, active: true, sort_order: commitments.length, metodo })
-    setName('')
-    setAmount('')
-    setMeses('')
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <div className="grid grid-cols-3 divide-x divide-border text-center">
-          {[
-            { label: 'Total mensual', value: <Mxn v={totalMensual} />, cls: 'text-danger' },
-            { label: 'Activos',       value: String(active.length),  cls: 'text-fg' },
-            { label: 'Anual',         value: <Mxn v={totalAnual} />, cls: 'text-warn'   },
-          ].map(({ label, value, cls }) => (
-            <div key={label} className="px-4 py-1">
-              <p className="text-label uppercase tracking-wider text-fg-muted">{label}</p>
-              <p className={`mt-0.5 text-subhead font-black tabular-nums ${cls}`}>{value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl divide-y divide-border dashboard-card">
-        {commitments.length === 0 ? (
-          <p className="p-10 text-center text-body italic text-fg-muted">Sin compromisos</p>
-        ) : (
-          [...commitments]
-            .sort((a, b) => Number(b.active) - Number(a.active) || a.sort_order - b.sort_order)
-            .map(c => (
-              <CommitmentRow key={c.id} c={c} onUpdate={onUpdate} onDelete={onDelete} />
-            ))
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
-          placeholder="Netflix, Spotify, renta…"
-          className="min-w-0 flex-1 rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
-        />
-        <input
-          type="number" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
-          placeholder="Total $"
-          className="w-24 rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
-        />
-        <input
-          type="number" value={meses} onChange={e => setMeses(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
-          placeholder="Meses"
-          className="w-20 rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none backdrop-blur-xl focus:border-accent/50"
-        />
-        <select
-          value={metodo} onChange={e => setMetodo(e.target.value)}
-          className="rounded-card border border-border bg-surface-1 px-3 py-2 text-body text-fg outline-none backdrop-blur-xl"
-        >
-          <option value="efectivo">💵 Efectivo</option>
-          <option value="tarjeta">💳 Tarjeta</option>
-        </select>
-        <button
-          onClick={submit} disabled={!name.trim() || !amount}
-          className="rounded-card bg-accent/20 px-4 py-2 text-body font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
-        >
-          Agregar
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── ConfigTab ────────────────────────────────────────────────────────────────
-
-function IncomeConfigRow({
-  item,
-  onUpdate,
-  onDelete,
-}: {
-  item: IncomeItem
-  onUpdate: (id: string, u: Partial<IncomeItem>) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-}) {
-  const [amt, setAmt] = useState(String(item.monto))
-  useEffect(() => { setAmt(String(item.monto)) }, [item.monto])
-
-  function saveAmt() {
-    const n = parseFloat(amt)
-    if (n > 0 && n !== item.monto) void onUpdate(item.id, { monto: n })
-    else setAmt(String(item.monto))
-  }
-
-  return (
-    <div className="group flex items-center gap-3 border-b border-border px-3 py-2.5 last:border-0">
-      <button
-        onClick={() => void onUpdate(item.id, { active: !item.active })}
-        className={[
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-          item.active ? 'border-ok bg-ok' : 'border-border-strong',
-        ].join(' ')}
-      >
-        {item.active && (
-          <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5" stroke="white" strokeWidth={1.8}>
-            <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-      <span className={`flex-1 truncate text-secondary ${item.active ? 'text-fg' : 'text-fg-muted/50 line-through'}`}>
-        {item.nombre}
-      </span>
-      <MethodBadge metodo={item.metodo} />
-      <input
-        type="number" value={amt}
-        onChange={e => setAmt(e.target.value)}
-        onBlur={saveAmt}
-        onKeyDown={e => e.key === 'Enter' && saveAmt()}
-        className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-secondary text-fg outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
-      />
-      <button
-        onClick={() => void onDelete(item.id)}
-        className="hidden shrink-0 text-md leading-none text-fg-muted/40 hover:text-danger group-hover:block"
-      >
-        ×
-      </button>
-    </div>
-  )
-}
-
-function ConfigTab({
-  incomeItems,
-  onAddIncome,
-  onUpdateIncome,
-  onDeleteIncome,
-}: {
-  incomeItems: IncomeItem[]
-  onAddIncome: (nombre: string, monto: number, metodo: string) => Promise<void>
-  onUpdateIncome: (id: string, u: Partial<IncomeItem>) => Promise<void>
-  onDeleteIncome: (id: string) => Promise<void>
-}) {
-  const [nombre, setNombre] = useState('')
-  const [monto,  setMonto]  = useState('')
-  const [metodo, setMetodo] = useState('efectivo')
-
-  async function submit() {
-    const n = parseFloat(monto)
-    if (!nombre.trim() || !n || n <= 0) return
-    await onAddIncome(nombre.trim(), n, metodo)
-    setNombre('')
-    setMonto('')
-  }
-
-  return (
-    <div className="max-w-lg space-y-4">
-      {/* Income items */}
-      <div className="overflow-hidden rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <div className="border-b border-border px-4 py-3">
-          <p className="text-secondary font-semibold uppercase tracking-wider text-fg-muted">Ingresos Recurrentes</p>
-          <p className="mt-0.5 text-label text-fg-muted">Los activos aparecen en el Panel cada mes</p>
-        </div>
-        {incomeItems.map(item => (
-          <IncomeConfigRow
-            key={item.id}
-            item={item}
-            onUpdate={onUpdateIncome}
-            onDelete={onDeleteIncome}
-          />
-        ))}
-        {incomeItems.length === 0 && (
-          <p className="px-4 py-4 text-center text-secondary italic text-fg-muted">Sin ingresos configurados</p>
-        )}
-        <div className="flex gap-2 border-t border-border px-3 py-3">
-          <input
-            value={nombre} onChange={e => setNombre(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && void submit()}
-            placeholder="Nombre del ingreso"
-            className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
-          />
-          <input
-            type="number" value={monto} onChange={e => setMonto(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && void submit()}
-            placeholder="$"
-            className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
-          />
-          <select
-            value={metodo} onChange={e => setMetodo(e.target.value)}
-            className="rounded-control border border-border bg-surface-2 px-2 py-1.5 text-secondary text-fg outline-none"
-          >
-            <option value="efectivo">💵 Efectivo</option>
-            <option value="tarjeta">💳 Tarjeta</option>
-          </select>
-          <button
-            onClick={() => void submit()} disabled={!nombre.trim() || !monto}
-            className="rounded-control bg-ok/20 px-2.5 py-1.5 text-secondary font-medium text-ok hover:bg-ok/30 disabled:opacity-30"
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl space-y-2 dashboard-card">
-        <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Tablas Supabase</p>
-        <div className="space-y-1 text-secondary text-fg-muted">
-          <p>• Gastos recurrentes → <code className="rounded bg-surface-2 px-1">finance_commitments</code> (Compromisos)</p>
-          <p>• Vacaciones → <code className="rounded bg-surface-2 px-1">finance_envelopes</code> (tab Vacaciones)</p>
-          <p>• Historial → <code className="rounded bg-surface-2 px-1">finance_movements</code></p>
-          <p>• Estado Panel → <code className="rounded bg-surface-2 px-1">finance_monthly_state</code> (por mes)</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── FinancePage ──────────────────────────────────────────────────────────────
 
-const TABS: Tab[] = ['Panel', 'Historial', 'Vacaciones', 'Compromisos', 'Config']
+const TABS: Tab[] = ['Panel', 'Historial', 'Vacaciones']
 
 const EMPTY_CHECKS: MonthChecks = { checks: {}, realM: {}, movIds: {} }
 
@@ -1774,6 +1627,7 @@ export default function FinancePage() {
                 monthChecks={monthChecks}
                 balance={balance}
                 funds={funds}
+                month={month}
                 nominaMirror={nominaMirror}
                 onToggleIncome={toggleIncome}
                 onSetRealMonto={setRealMonto}
@@ -1784,6 +1638,12 @@ export default function FinancePage() {
                 onDeleteMov={deleteMovement}
                 onAddGX={addGX}
                 onAdjustPosition={adjustPosition}
+                onAddCommitment={addCommitment}
+                onUpdateCommitment={updateCommitment}
+                onDeleteCommitment={deleteCommitment}
+                onAddIncome={addIncomeItem}
+                onUpdateIncome={updateIncomeItem}
+                onDeleteIncome={deleteIncomeItem}
               />
             )}
             {tab === 'Historial' && (
@@ -1796,22 +1656,6 @@ export default function FinancePage() {
                 onUpdateTarget={updateEnvelopeTarget}
                 onUpdateSemAhorro={updateEnvelopeSemAhorro}
                 onAdd={addVacacionesContribution}
-              />
-            )}
-            {tab === 'Compromisos' && (
-              <CompromisoTab
-                commitments={commitments}
-                onAdd={addCommitment}
-                onUpdate={updateCommitment}
-                onDelete={deleteCommitment}
-              />
-            )}
-            {tab === 'Config' && (
-              <ConfigTab
-                incomeItems={incomeItems}
-                onAddIncome={addIncomeItem}
-                onUpdateIncome={updateIncomeItem}
-                onDeleteIncome={deleteIncomeItem}
               />
             )}
           </>
