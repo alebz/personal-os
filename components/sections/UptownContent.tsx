@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
-import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
-import DrumModal from '@/components/DrumModal'
+import { CajaFuerteSection } from '@/components/finance/CajaFuerteSection'
+import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -28,8 +28,6 @@ const EXPENSE_DEFS: { id: string; name: string; note: string | null; startMonth:
   // 'fondo' is NOT a fixed expense — aportar to your own fund is a transfer, not a gasto. It lives in
   // the Fondo Mantenimiento card + the fund ledger (finance_movements), out of Egresos.
 ]
-
-const FONDO_META = 50_000
 
 // ─── Valet constants ──────────────────────────────────────────────────────────
 
@@ -698,21 +696,20 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
   )
 }
 
-// ─── FondoCard ────────────────────────────────────────────────────────────────
-
-function FondoCard({ saved, aportadoAmount, movements, onAportar, onQuitar }: {
-  saved: number
+// ─── UptownCajaFuerteCard ───────────────────────────────────────────────────────
+// Panel card: read-only rollup (Σ Uptown funds) that opens the Caja Fuerte tab, plus the mantenimiento
+// MONTHLY contribution toggle (it feeds saldoActual, so it stays in the month view). Fund detail —
+// balances, metas, libretas, other funds — lives in the tab.
+function UptownCajaFuerteCard({ total, aportadoAmount, onAportar, onQuitar, onOpen }: {
+  total: number
   aportadoAmount: number | null            // null = sin aportar este mes; número = ya aportado
-  movements: FundMovement[]
   onAportar: (amount: number) => Promise<void>
   onQuitar: () => Promise<void>
+  onOpen: () => void
 }) {
-  const pct = Math.min((saved / FONDO_META) * 100, 100)
-  const faltan = Math.max(0, FONDO_META - saved)
-  const [showLedger, setShowLedger] = useState(false)
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing]   = useState(false)
   const [amtDraft, setAmtDraft] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy]         = useState(false)
 
   async function submit() {
     const n = parseFloat(amtDraft)
@@ -727,21 +724,13 @@ function FondoCard({ saved, aportadoAmount, movements, onAportar, onQuitar }: {
   return (
     <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="mb-2 flex items-center justify-between">
-        <div>
-          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Fondo Mantenimiento</p>
-          <p className="text-label text-fg-muted">Meta: <Mxn v={FONDO_META} /></p>
-        </div>
-        <div className="text-right">
-          <p className="text-subhead font-black text-ok"><Mxn v={saved} /></p>
-          <p className="text-label text-fg-muted">{pct.toFixed(1)}% · Faltan <Mxn v={faltan} /></p>
-        </div>
+        <button onClick={onOpen} className="text-label font-bold uppercase tracking-widest text-fg-muted transition-colors hover:text-fg">Caja Fuerte →</button>
+        <p className="text-subhead font-black text-ok"><Mxn v={total} /></p>
       </div>
+      <p className="mb-2 text-label text-fg-muted">Total apartado (mantenimiento, obra, reserva…)</p>
 
-      <div className="mb-2 h-2 overflow-hidden rounded-pill bg-surface-2">
-        <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
-      </div>
-
-      <div className="text-secondary">
+      <div className="border-t border-border pt-2 text-secondary">
+        <p className="mb-1 text-label font-medium uppercase tracking-wide text-fg-muted">Aportación mensual · Mantenimiento</p>
         {aportadoAmount == null ? (
           <div className="flex items-center gap-2">
             <span className="text-fg-muted">Sin aportar este mes</span>
@@ -764,27 +753,6 @@ function FondoCard({ saved, aportadoAmount, movements, onAportar, onQuitar }: {
           </div>
         )}
       </div>
-
-      {movements.length > 0 && (
-        <div className="mt-2 border-t border-border pt-2">
-          <button
-            onClick={() => setShowLedger(true)}
-            className="text-label font-medium text-fg-muted transition-colors hover:text-fg"
-          >
-            Ver libreta →
-          </button>
-        </div>
-      )}
-
-      <DrumModal open={showLedger} onClose={() => setShowLedger(false)} ariaLabel="Libreta · Fondo Mantenimiento">
-        <div className="mb-4 flex items-baseline justify-between gap-3">
-          <h3 className="text-subhead font-bold text-fg">Fondo Mantenimiento</h3>
-          <p className="text-heading font-black text-ok"><Mxn v={saved} /></p>
-        </div>
-        {movements.length > 0
-          ? <FundLedger movements={movements} />
-          : <p className="py-6 text-center text-body italic text-fg-muted">Sin movimientos todavía</p>}
-      </DrumModal>
     </div>
   )
 }
@@ -1200,11 +1168,13 @@ export default function UptownContent() {
   const [extraIncome, setExtraIncome] = useState<ExtraItem[]>([])
   const [extraExpenses, setExtraExp]  = useState<ExtraItem[]>([])
   const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
-  const [fondoMovements, setFondoMovements] = useState<FundMovement[]>([])   // Mantenimiento fund ledger (source of truth)
   const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
-  const [pageTab, setPageTab]         = useState<'finanzas' | 'valet' | 'historial'>('finanzas')
+  const [pageTab, setPageTab]         = useState<'finanzas' | 'cajafuerte' | 'valet' | 'historial'>('finanzas')
+
+  // Uptown's Caja Fuerte funds (scope 'uptown': mantenimiento + any obra/reserva/depósito) + handlers.
+  const cajaFuerte = useCajaFuerte('uptown', month)
 
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true); setError(null)
@@ -1217,12 +1187,7 @@ export default function UptownContent() {
       setExtraIncome(data.extra_income)
       setExtraExp(data.extra_expenses)
       setPaidCounts(data.paid_counts ?? {})
-      // Mantenimiento fund ledger (all-time; lives in finance_envelopes, so a separate fetch)
-      try {
-        const funds = await (await fetch('/api/finance/funds')).json()
-        const mto = Array.isArray(funds) ? funds.find((f: { key?: string }) => f.key === 'mantenimiento') : null
-        setFondoMovements(mto?.movements ?? [])
-      } catch { /* leave prior movements */ }
+      // (Caja Fuerte funds load via useCajaFuerte; the monthly aportado derives from them below.)
       // Auto-fill starting balance from previous month when no balance record exists yet
       if (!data.has_balance && m >= '2026-07' && data.prev_saldo != null && data.prev_saldo > 0) {
         const autoBalance = { starting_balance: data.prev_saldo, cuenta_bancaria: 0, efectivo: 0 }
@@ -1265,24 +1230,16 @@ export default function UptownContent() {
 
   // ── Expense handlers ──────────────────────────────────────────────────────
 
-  // Refresh the Mantenimiento fund ledger (single source of truth = the fund movements).
-  async function refreshFondo() {
-    try {
-      const f = await fetch('/api/finance/funds').then(r => r.json())
-      const mto = Array.isArray(f) ? f.find((x: { key?: string }) => x.key === 'mantenimiento') : null
-      setFondoMovements(mto?.movements ?? [])
-    } catch { /* keep prior */ }
-  }
-
-  // Monthly fund contribution — now driven from the Fondo card, not a fixed expense. Same reversible
-  // mechanism: upsert (aportar/editar) or delete (quitar) keyed by source_key='uptown_fondo:<month>'.
+  // Monthly mantenimiento contribution — the month's "Apartado". Same reversible mechanism: upsert
+  // (aportar/editar) or delete (quitar) keyed by source_key='uptown_fondo:<month>'. Refreshes the
+  // shared Caja Fuerte funds so both the panel rollup and the tab reflect it.
   async function aportarFondo(amount: number) {
     await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key: `uptown_fondo:${month}` })
-    await refreshFondo()
+    await cajaFuerte.refresh()
   }
   async function quitarFondo() {
     await fetch(`/api/finance/funds/movement?source_key=${encodeURIComponent('uptown_fondo:' + month)}`, { method: 'DELETE' })
-    await refreshFondo()
+    await cajaFuerte.refresh()
   }
 
   async function toggleExpense(category: string, paid: boolean) {
@@ -1405,8 +1362,11 @@ export default function UptownContent() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   // Fund saldo (flow-aware) + this month's contribution, both from the fund ledger (source of truth).
-  const fondoSaved = fondoMovements.reduce((s, m) => s + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount)), 0)
-  const fondoMovThisMonth = fondoMovements.find(m => m.source_key === `uptown_fondo:${month}`)
+  // Derived from the shared Caja Fuerte funds (scope 'uptown'). Rollup = Σ active funds; the month's
+  // "Apartado" = the mantenimiento fund's source_key'd movement for this month.
+  const cajaTotal = cajaFuerte.funds.filter(f => !f.archived).reduce((s, f) => s + Number(f.saved), 0)
+  const mantFund = cajaFuerte.funds.find(f => f.key === 'mantenimiento')
+  const fondoMovThisMonth = mantFund?.movements.find(m => m.source_key === `uptown_fondo:${month}`)
   const fondoAportado = fondoMovThisMonth ? Number(fondoMovThisMonth.amount) : 0   // transfer set aside this month
 
   return (
@@ -1435,13 +1395,13 @@ export default function UptownContent() {
 
         {/* Tab bar */}
         <div className="mb-5 flex w-fit shrink-0 gap-1 rounded-card border border-border bg-surface-1 p-1 backdrop-blur-xl">
-          {(['finanzas', 'historial', 'valet'] as const).map(t => (
+          {(['finanzas', 'cajafuerte', 'historial', 'valet'] as const).map(t => (
             <button key={t} onClick={() => setPageTab(t)}
               className={['rounded-control px-4 py-1.5 text-body transition-colors',
                 pageTab === t ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg',
               ].join(' ')}
             >
-              {t === 'finanzas' ? 'Finanzas' : t === 'historial' ? 'Historial' : 'Valet'}
+              {t === 'finanzas' ? 'Finanzas' : t === 'cajafuerte' ? 'Caja Fuerte' : t === 'historial' ? 'Historial' : 'Valet'}
             </button>
           ))}
         </div>
@@ -1460,18 +1420,20 @@ export default function UptownContent() {
               fondoAportado={fondoAportado}
               onSave={saveStartingBalance}
             />
-            <FondoCard
-              saved={fondoSaved}
+            <UptownCajaFuerteCard
+              total={cajaTotal}
               aportadoAmount={fondoMovThisMonth ? fondoAportado : null}
-              movements={fondoMovements}
               onAportar={aportarFondo}
               onQuitar={quitarFondo}
+              onOpen={() => setPageTab('cajafuerte')}
             />
           </div>
         )}
 
         <div className="flex-1 min-h-0 overflow-y-auto pb-8">
-        {pageTab === 'valet' ? (
+        {pageTab === 'cajafuerte' ? (
+          <CajaFuerteSection funds={cajaFuerte.funds} {...cajaFuerte.handlers} createPlaceholder="Nuevo fondo (obra, reserva, depósito…)" />
+        ) : pageTab === 'valet' ? (
           <ValetTab month={month} />
         ) : pageTab === 'historial' && !loading && !error ? (
           <UptownHistorialTab

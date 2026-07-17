@@ -32,13 +32,13 @@ export async function GET() {
       .lte('date', days[days.length - 1])
       .order('date', { ascending: false })
       .order('created_at', { ascending: false }),
-    supabase.from('finance_envelopes').select('id, key, archived'),
+    supabase.from('finance_envelopes').select('id, scope, archived'),
     supabase.from('finance_movements').select('envelope_id, amount, flow').not('envelope_id', 'is', null),
   ])
 
-  // "Guardado" = flow-aware sum of every ACTIVE fund's movements, EXCEPT mantenimiento (Uptown's) and
-  // archived funds. Replaces the now-frozen finance_balance.caja_fuerte snapshot column.
-  const excluded = new Set((envRes.data ?? []).filter(e => e.key === 'mantenimiento' || e.archived).map(e => e.id))
+  // "Guardado" = flow-aware sum of every ACTIVE 'personal' fund's movements (Uptown funds and archived
+  // ones are excluded). Replaces the now-frozen finance_balance.caja_fuerte snapshot column.
+  const excluded = new Set((envRes.data ?? []).filter(e => e.scope !== 'personal' || e.archived).map(e => e.id))
   const guardado = ((fundMovsRes.data ?? []) as Array<{ envelope_id: string | null; amount: number; flow: string }>)
     .reduce((s, m) => (m.envelope_id && excluded.has(m.envelope_id)) ? s : s + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount)), 0)
 

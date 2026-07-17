@@ -5,11 +5,8 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
-import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
-import DrumModal from '@/components/DrumModal'
-
-// A fund = a finance_envelopes row with its flow-aware balance + ledger, from /api/finance/funds.
-interface Fund { id: string; key: string | null; label: string; target: number | null; archived: boolean; saved: number; movements: FundMovement[] }
+import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
+import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -713,7 +710,7 @@ function PanelTab({
   const flujo = cobrado - pagado
   // "Guardado" = Σ of every ACTIVE fund in the section (excludes mantenimiento — Uptown's — and
   // archived funds). The card is a read-only rollup; editing happens per-fund inside the Caja Fuerte tab.
-  const guardado = funds.filter(f => f.key !== 'mantenimiento' && !f.archived).reduce((s, f) => s + Number(f.saved), 0)
+  const guardado = funds.filter(f => !f.archived).reduce((s, f) => s + Number(f.saved), 0)
 
   // ── Saldos vivos: última foto de "Cuadrar" ± movimientos creados después, por método ──
   const snapAt = balance?.updated_at ? new Date(balance.updated_at).getTime() : 0
@@ -1036,266 +1033,6 @@ function HistorialTab({
   )
 }
 
-// ─── Caja Fuerte section (funds / apartados) ───────────────────────────────────
-
-// Aportar (out, money set aside → saved up) / Retirar (in → saved down) for any fund. Manual, no
-// source_key. Fresh build for Step 3 (the WIP's FundMovementControl isn't on main yet).
-function FundMovementControl({ onSubmit }: {
-  onSubmit: (flow: 'in' | 'out', desc: string, amount: number) => void
-}) {
-  const [desc, setDesc] = useState('')
-  const [amt,  setAmt]  = useState('')
-  const ready = !!desc.trim() && !!amt
-
-  function submit(flow: 'in' | 'out') {
-    const a = parseFloat(amt)
-    if (!desc.trim() || !a || a <= 0) return
-    onSubmit(flow, desc.trim(), a); setDesc(''); setAmt('')
-  }
-
-  return (
-    <div className="flex gap-2">
-      <input
-        value={desc} onChange={e => setDesc(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit('out')}
-        placeholder="Concepto…"
-        className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
-      />
-      <input
-        type="number" value={amt} onChange={e => setAmt(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit('out')}
-        placeholder="$"
-        className="w-24 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
-      />
-      <button onClick={() => submit('out')} disabled={!ready} title="Aportar al fondo"
-        className="rounded-card bg-ok/20 px-3 py-2 text-body font-medium text-ok hover:bg-ok/30 disabled:opacity-30">Aportar</button>
-      <button onClick={() => submit('in')} disabled={!ready} title="Retirar del fondo"
-        className="rounded-card bg-danger/15 px-3 py-2 text-body font-medium text-danger hover:bg-danger/25 disabled:opacity-30">Retirar</button>
-    </div>
-  )
-}
-
-// ─── FundCard ─────────────────────────────────────────────────────────────────
-// One apartado in the Caja Fuerte section. target=null → colchón/asset (no meta, no bar);
-// target=number → savings goal with progress. saved = flow-aware Σ of its movements (from /funds).
-function FundCard({
-  fund,
-  onAportaRetira,
-  onUpdateTarget,
-  onUpdateLabel,
-  onArchive,
-  onDelete,
-}: {
-  fund: Fund
-  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number) => void
-  onUpdateTarget: (id: string, target: number | null) => void
-  onUpdateLabel: (id: string, label: string) => void
-  onArchive: (id: string) => void
-  onDelete: (id: string) => void
-}) {
-  const saved  = Number(fund.saved)
-  const target = fund.target != null ? Number(fund.target) : null
-  const pct    = target && target > 0 ? Math.min((saved / target) * 100, 100) : 0
-  const [editingMeta, setEditingMeta] = useState(false)
-  const [metaDraft, setMetaDraft]     = useState(target != null ? String(target) : '')
-  const [editingName, setEditingName] = useState(false)
-  const [nameDraft, setNameDraft]     = useState(fund.label)
-  const [modalOpen, setModalOpen]     = useState(false)
-  const isEmergencia = fund.key === 'caja_fuerte'   // foundational fund — not deletable
-
-  useEffect(() => { setMetaDraft(fund.target != null ? String(Number(fund.target)) : '') }, [fund.target])
-  useEffect(() => { setNameDraft(fund.label) }, [fund.label])
-
-  function saveMeta() {
-    const t = metaDraft.trim() === '' ? null : parseFloat(metaDraft)
-    onUpdateTarget(fund.id, t != null && t > 0 ? t : null)
-    setEditingMeta(false)
-  }
-  function saveName() {
-    const n = nameDraft.trim()
-    if (n && n !== fund.label) onUpdateLabel(fund.id, n)
-    setEditingName(false)
-  }
-
-  return (
-    <div className="rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="group min-w-0 flex-1">
-          {editingName ? (
-            <input
-              value={nameDraft} autoFocus onChange={e => setNameDraft(e.target.value)}
-              onBlur={saveName}
-              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setNameDraft(fund.label); setEditingName(false) } }}
-              className="w-full rounded border border-border bg-surface-2 px-2 py-0.5 text-subhead font-bold text-fg outline-none focus:border-accent/50"
-            />
-          ) : (
-            <div className="flex items-center gap-2">
-              <button onClick={() => setEditingName(true)} title="Editar nombre"
-                className="truncate text-subhead font-bold text-fg decoration-dotted underline-offset-4 hover:underline">{fund.label}</button>
-              {!isEmergencia && (
-                <span className="hidden shrink-0 items-center gap-2 text-label group-hover:flex">
-                  <button onClick={() => onArchive(fund.id)} className="text-fg-muted hover:text-fg" title="Archivar (conserva la libreta)">archivar</button>
-                  {fund.movements.length === 0 && (
-                    <button onClick={() => onDelete(fund.id)} className="text-fg-muted/40 hover:text-danger" title="Eliminar (solo fondos vacíos)">eliminar</button>
-                  )}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="shrink-0 text-right">
-          <p className={`text-heading font-black ${saved < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={saved} /></p>
-          {target != null && <p className="text-secondary text-fg-muted">de <Mxn v={target} /></p>}
-        </div>
-      </div>
-
-      {target != null && (
-        <>
-          <div className="mb-1 h-2.5 overflow-hidden rounded-pill bg-surface-2">
-            <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
-          </div>
-          <p className="mb-3 text-right text-label text-fg-muted">
-            {pct.toFixed(1)}% · faltan <Mxn v={Math.max(0, target - saved)} />
-          </p>
-        </>
-      )}
-
-      <div className="flex items-center justify-between gap-2">
-        {editingMeta ? (
-          <div className="flex flex-1 gap-2">
-            <input
-              type="number" value={metaDraft} autoFocus placeholder="Meta (vacío = sin meta)"
-              onChange={e => setMetaDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditingMeta(false) }}
-              className="flex-1 rounded-card border border-border bg-surface-2 px-3 py-1.5 text-secondary text-fg outline-none focus:border-accent/50"
-            />
-            <button onClick={saveMeta} className="rounded-card bg-accent/20 px-3 py-1.5 text-label font-medium text-accent hover:bg-accent/30">OK</button>
-            <button onClick={() => setEditingMeta(false)} className="text-label text-fg-muted hover:text-fg">✕</button>
-          </div>
-        ) : (
-          <button onClick={() => setEditingMeta(true)} className="text-secondary text-fg-muted underline-offset-2 hover:text-fg hover:underline">
-            {target != null ? <>Cambiar meta (<Mxn v={target} />)</> : 'Poner meta'}
-          </button>
-        )}
-        {!editingMeta && (
-          <button onClick={() => setModalOpen(true)}
-            className="shrink-0 rounded-card border border-border px-3 py-1.5 text-secondary font-medium text-fg-muted transition-colors hover:text-fg">
-            Ver libreta →
-          </button>
-        )}
-      </div>
-
-      <DrumModal open={modalOpen} onClose={() => setModalOpen(false)} ariaLabel={`Libreta · ${fund.label}`}>
-        <div className="mb-4 flex items-baseline justify-between gap-3">
-          <h3 className="text-subhead font-bold text-fg">{fund.label}</h3>
-          <p className={`text-heading font-black ${saved < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={saved} /></p>
-        </div>
-        <div className="mb-4">
-          <FundMovementControl onSubmit={(flow, desc, amount) => onAportaRetira(fund.id, flow, desc, amount)} />
-        </div>
-        {fund.movements.length > 0
-          ? <FundLedger movements={fund.movements} />
-          : <p className="py-6 text-center text-body italic text-fg-muted">Sin movimientos todavía</p>}
-      </DrumModal>
-    </div>
-  )
-}
-
-// ─── CajaFuerteTab ────────────────────────────────────────────────────────────
-// The section where every apartado/asset lives. Data = /funds minus mantenimiento (Uptown's).
-function CajaFuerteTab({
-  funds,
-  onAportaRetira,
-  onUpdateTarget,
-  onUpdateLabel,
-  onArchive,
-  onRestore,
-  onDelete,
-  onCreate,
-}: {
-  funds: Fund[]
-  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number) => void
-  onUpdateTarget: (id: string, target: number | null) => void
-  onUpdateLabel: (id: string, label: string) => void
-  onArchive: (id: string) => void
-  onRestore: (id: string) => void
-  onDelete: (id: string) => void
-  onCreate: (label: string, target: number | null) => void
-}) {
-  const [name, setName] = useState('')
-  const [meta, setMeta] = useState('')
-  const [showArchived, setShowArchived] = useState(false)
-  const inSection = funds.filter(f => f.key !== 'mantenimiento')
-  const section   = inSection.filter(f => !f.archived)   // active apartados
-  const archived  = inSection.filter(f => f.archived)    // soft-deleted, ledger preserved
-  const total     = section.reduce((s, f) => s + Number(f.saved), 0)
-
-  function create() {
-    if (!name.trim()) return
-    const t = meta.trim() === '' ? null : parseFloat(meta)
-    onCreate(name.trim(), t != null && t > 0 ? t : null)
-    setName(''); setMeta('')
-  }
-
-  return (
-    <div className="space-y-5">
-      {/* Total guardado + create apartado */}
-      <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Total guardado</p>
-          <p className={`text-subhead font-black tabular-nums ${total < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={total} /></p>
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
-            placeholder="Nuevo apartado (retiro, joya, obra…)"
-            className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
-          />
-          <input
-            type="number" value={meta} onChange={e => setMeta(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
-            placeholder="Meta (opcional)"
-            className="w-36 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
-          />
-          <button onClick={create} disabled={!name.trim()}
-            className="rounded-card bg-accent/20 px-4 py-2 text-body font-medium text-accent hover:bg-accent/30 disabled:opacity-30">Crear</button>
-        </div>
-      </div>
-
-      {section.length === 0 ? (
-        <p className="py-10 text-center text-body italic text-fg-muted">Sin apartados todavía</p>
-      ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
-          {section.map(f => (
-            <FundCard key={f.id} fund={f} onAportaRetira={onAportaRetira} onUpdateTarget={onUpdateTarget} onUpdateLabel={onUpdateLabel} onArchive={onArchive} onDelete={onDelete} />
-          ))}
-        </div>
-      )}
-
-      {/* Archived apartados — soft-deleted, ledger preserved, restorable (mirrors HabitTracker) */}
-      {archived.length > 0 && (
-        <div className="rounded-card border border-border bg-surface-1 dashboard-card">
-          <button
-            onClick={() => setShowArchived(s => !s)}
-            className="flex w-full items-center justify-between px-4 py-3 text-secondary font-semibold uppercase tracking-wider text-fg-muted transition-colors hover:text-fg"
-          >
-            <span>Archivados ({archived.length})</span>
-            <span aria-hidden className="text-fg-muted/60">{showArchived ? '▲' : '▼'}</span>
-          </button>
-          {showArchived && (
-            <div className="divide-y divide-border border-t border-border">
-              {archived.map(f => (
-                <div key={f.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="min-w-0 flex-1 truncate text-body text-fg-muted">{f.label}</span>
-                  <span className="shrink-0 text-secondary tabular-nums text-fg-muted/70"><Mxn v={Number(f.saved)} /></span>
-                  <button onClick={() => onRestore(f.id)} className="shrink-0 text-label font-medium text-accent hover:underline">Restaurar</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── FinancePage ──────────────────────────────────────────────────────────────
 
 const TABS: Tab[] = ['Panel', 'Historial', 'Caja Fuerte']
@@ -1308,7 +1045,6 @@ export default function FinancePage() {
 
   const [movements,    setMovements]    = useState<Movement[]>([])
   const [commitments,  setCommitments]  = useState<Commitment[]>([])
-  const [funds,        setFunds]        = useState<Fund[]>([])
   const [balance,      setBalance]      = useState<Balance | null>(null)
   const [incomeItems,  setIncomeItems]  = useState<IncomeItem[]>([])
   const [monthChecks,  setMonthChecks]  = useState<MonthChecks>(EMPTY_CHECKS)
@@ -1347,20 +1083,23 @@ export default function FinancePage() {
     }
   }, [])
 
+  // Caja Fuerte funds (scope 'personal') + all their handlers, via the shared hook. After any fund
+  // mutation it also reloads this month's movements (the fondo aportación shows in the Historial and
+  // shifts the wallet deltas).
+  const cajaFuerte = useCajaFuerte('personal', month, () => { void loadMovements(month) })
+
   useEffect(() => {
     async function init() {
       setLoading(true)
       setError(null)
       try {
-        const [comms, bal, incItems, nomina, fundList] = await Promise.all([
+        const [comms, bal, incItems, nomina] = await Promise.all([
           apiFetch<Commitment[]>('/api/finance/commitments'),
           apiFetch<Balance | null>('/api/finance/balance'),
           apiFetch<IncomeItem[]>('/api/finance/income'),
           fetch(`/api/uptown/nomina?month=${currMonth()}`).then(r => r.ok ? r.json() as Promise<NominaMirror[]> : []).catch(() => []),
-          apiFetch<Fund[]>('/api/finance/funds?archived=1'),
         ])
         setCommitments(comms)
-        setFunds(fundList)
         setBalance(bal)
         setIncomeItems(incItems)
         setNominaMirror(nomina ?? [])
@@ -1493,45 +1232,6 @@ export default function FinancePage() {
     }
   }
 
-  // ── Caja Fuerte section: funds (apartados) ─────────────────────────────────
-  async function refreshFunds() {
-    try { setFunds(await apiFetch<Fund[]>('/api/finance/funds?archived=1')) } catch { /* keep prior */ }
-  }
-  // Aportar (flow 'out' → saved up) / Retirar (flow 'in' → saved down). Manual, no source_key,
-  // written by envelope_id straight to finance_movements (category 'fondo'). Negatives allowed.
-  async function aportaRetiraFund(envelopeId: string, flow: 'in' | 'out', desc: string, amount: number) {
-    await apiPost('/api/finance/movements', {
-      month, date: todayStr(), description: desc, amount, flow, category: 'fondo',
-      commitment_id: null, envelope_id: envelopeId, metodo: null,
-    })
-    await Promise.all([refreshFunds(), loadMovements(month)])
-  }
-  async function createApartado(label: string, target: number | null) {
-    await apiPost('/api/finance/envelopes', { label, target })
-    await refreshFunds()
-  }
-  async function updateApartadoTarget(id: string, target: number | null) {
-    await apiPatch(`/api/finance/envelopes/${id}`, { target })
-    await refreshFunds()
-  }
-  async function updateApartadoLabel(id: string, label: string) {
-    await apiPatch(`/api/finance/envelopes/${id}`, { label })
-    await refreshFunds()
-  }
-  async function archiveApartado(id: string) {
-    await apiPatch(`/api/finance/envelopes/${id}`, { archived: true })
-    await refreshFunds()
-  }
-  async function restoreApartado(id: string) {
-    await apiPatch(`/api/finance/envelopes/${id}`, { archived: false })
-    await refreshFunds()
-  }
-  // Hard delete — the endpoint refuses it for funds with movements (archive those instead).
-  async function deleteApartado(id: string) {
-    await apiDel(`/api/finance/envelopes/${id}`)
-    await refreshFunds()
-  }
-
   // ── General mutations ─────────────────────────────────────────────────────
 
   async function addMovement(partial: Omit<Movement, 'id' | 'month' | 'created_at'>) {
@@ -1584,7 +1284,7 @@ export default function FinancePage() {
     )
     setBalance(bal)
     await loadMovements(month)
-    try { setFunds(await apiFetch<Fund[]>('/api/finance/funds?archived=1')) } catch { /* keep prior */ }
+    void cajaFuerte.refresh()
   }
 
   async function addIncomeItem(nombre: string, monto: number, metodo: string) {
@@ -1676,7 +1376,7 @@ export default function FinancePage() {
                 movements={movements}
                 monthChecks={monthChecks}
                 balance={balance}
-                funds={funds}
+                funds={cajaFuerte.funds}
                 month={month}
                 nominaMirror={nominaMirror}
                 onToggleIncome={toggleIncome}
@@ -1701,16 +1401,7 @@ export default function FinancePage() {
               <HistorialTab movements={movements} onDelete={deleteMovement} />
             )}
             {tab === 'Caja Fuerte' && (
-              <CajaFuerteTab
-                funds={funds}
-                onAportaRetira={aportaRetiraFund}
-                onUpdateTarget={updateApartadoTarget}
-                onUpdateLabel={updateApartadoLabel}
-                onArchive={archiveApartado}
-                onRestore={restoreApartado}
-                onDelete={deleteApartado}
-                onCreate={createApartado}
-              />
+              <CajaFuerteSection funds={cajaFuerte.funds} {...cajaFuerte.handlers} />
             )}
           </>
         )}

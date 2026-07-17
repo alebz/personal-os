@@ -22,12 +22,15 @@ type Move = {
 // regardless of category. This covers 'fondo' movements (Caja Fuerte, Mantenimiento) AND fixes the
 // old vacaciones bug that summed amount ignoring flow. Movements come ordered chronologically so the
 // ledger UI can accumulate a running balance (entrada = flow 'out', salida = flow 'in').
-// Archived funds are hidden by default (soft-delete, mirrors habits/journal). Pass ?archived=1 to
-// include them — the Caja Fuerte section does, to render its "Archivados" list.
+// ?scope=personal|uptown filters funds to that section (each fund declares its scope — no by-key
+// blacklist). Archived funds are hidden by default (soft-delete); pass ?archived=1 to include them
+// (the Caja Fuerte section does, to render its "Archivados" list).
 export async function GET(req: NextRequest) {
   const includeArchived = req.nextUrl.searchParams.get('archived') === '1'
+  const scope = req.nextUrl.searchParams.get('scope')
   const supabase = createServerClient()
   let fundsQuery = supabase.from('finance_envelopes').select('*').order('sort_order').order('created_at')
+  if (scope) fundsQuery = fundsQuery.eq('scope', scope)
   if (!includeArchived) fundsQuery = fundsQuery.eq('archived', false)
   const [{ data: funds, error: e1 }, { data: moves, error: e2 }] = await Promise.all([
     fundsQuery,
