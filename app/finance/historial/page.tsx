@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import Mxn from '@/components/Mxn'
-import { CAT_LABEL, MethodBadge, type Movement } from '@/components/sections/FinanzasContent'
+import { CAT_LABEL, CAT_STYLE, MethodBadge, type Movement } from '@/components/sections/FinanzasContent'
 
 // Dedicated full-history view. The Finanzas drum face only shows the current month (the "living
 // present"); the complete ledger graduates here — a normal page that scrolls naturally, grouped by
@@ -86,7 +86,7 @@ export default function FinanceHistorialPage() {
                       <span className="w-8 shrink-0 text-secondary font-medium text-fg-muted">{m.date.slice(8)}</span>
                       <span className="min-w-0 flex-1 truncate text-body text-fg">{m.description}</span>
                       {m.metodo && <MethodBadge metodo={m.metodo} />}
-                      <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-muted">
+                      <span className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${CAT_STYLE[m.category]}`}>
                         {CAT_LABEL[m.category]}
                       </span>
                       <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>

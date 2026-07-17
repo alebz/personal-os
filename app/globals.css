@@ -188,20 +188,25 @@ input::placeholder, textarea::placeholder {
 
 
   /* ---- Layer 1: color primitives ---- */
-  /* Neutral / ink ramp */
-  --color-ink-0: oklch(0.09 0.006 275);
-  --color-ink-1: oklch(0.155 0.008 275);
-  --color-ink-2: oklch(0.32 0.01 275);
-  --color-ink-3: oklch(0.62 0.012 275);
-  --color-ink-4: oklch(0.955 0.004 275);
+  /* Neutral / ink ramp — hue 75 = warm-black (terminal), not clinical cool-gray */
+  --color-ink-0: oklch(0.10 0.008 75);
+  --color-ink-1: oklch(0.165 0.010 75);
+  --color-ink-2: oklch(0.33 0.012 75);
+  --color-ink-3: oklch(0.63 0.013 75);
+  --color-ink-4: oklch(0.955 0.005 75);
 
-  /* Accent */
-  --color-accent: oklch(0.7 0.16 255);
+  /* Accent — Dracula purple (lavender); re-tints every accent usage OS-wide */
+  --color-accent: oklch(0.742 0.149 302);
 
-  /* Semantic hues */
-  --color-ok: oklch(0.72 0.17 152);
-  --color-warn: oklch(0.8 0.16 85);
-  --color-danger: oklch(0.64 0.21 25);
+  /* Semantic hues — Dracula ANSI. Money keeps green=in / red=out; warn = Dracula orange. */
+  --color-ok: oklch(0.871 0.220 148);     /* Dracula green  #50fa7b — neon */
+  --color-warn: oklch(0.834 0.124 67);    /* Dracula orange #ffb86c */
+  --color-danger: oklch(0.682 0.206 24);  /* Dracula red    #ff5555 */
+
+  /* Classifying colors — categories/badges/chips (never money direction) */
+  --color-cyan: oklch(0.883 0.093 213);   /* Dracula cyan   #8be9fd */
+  --color-pink: oklch(0.755 0.183 347);   /* Dracula pink   #ff79c6 */
+  --color-yellow: oklch(0.955 0.134 113); /* Dracula yellow #f1fa8c */
 
   /* ---- Layer 2: SEMANTIC roles — components use ONLY these ---- */
   /* Radius → rounded-card / rounded-control / rounded-pill / rounded-sharp */

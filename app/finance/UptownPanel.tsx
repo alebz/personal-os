@@ -181,7 +181,7 @@ function CheckDot({ checked }: { checked: boolean }) {
     <div className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border transition-colors',
       checked ? 'border-ok bg-ok' : 'border-border-strong'].join(' ')}>
       {checked && (
-        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 stroke-white" strokeWidth={2}>
+        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-ink-0 stroke-current" strokeWidth={2}>
           <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}

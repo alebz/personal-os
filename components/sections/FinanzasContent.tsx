@@ -152,6 +152,18 @@ export const CAT_LABEL: Record<Category, string> = {
   ajuste: 'Ajuste',
 }
 
+// Badge color per type — classifying, not judging (the amount already carries green=in/red=out).
+// Literal class strings so Tailwind's scanner emits them. Ajuste stays neutral gray: it's meta,
+// not a spending category, and its neutrality is what distinguishes it.
+export const CAT_STYLE: Record<Category, string> = {
+  nomina:      'bg-cyan/15 text-cyan',
+  freelance:   'bg-accent/15 text-accent',   // Dracula lavender
+  gasto_fijo:  'bg-pink/15 text-pink',
+  gasto_extra: 'bg-warn/15 text-warn',        // Dracula orange
+  vacaciones:  'bg-yellow/15 text-yellow',
+  ajuste:      'bg-surface-2 text-fg-muted',  // meta — intentionally neutral
+}
+
 // ─── Method badge / select ────────────────────────────────────────────────────
 
 // Solo dos métodos: efectivo 💵 (cash) y tarjeta 💳 (digital — SPEI/cargo cuentan como digital).
@@ -205,7 +217,7 @@ function CheckBox({ checked }: { checked: boolean }) {
       ].join(' ')}
     >
       {checked && (
-        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5" stroke="white" strokeWidth={1.8}>
+        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-ink-0" stroke="currentColor" strokeWidth={1.8}>
           <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
@@ -1004,7 +1016,7 @@ function HistorialTab({
               <span className="w-8 shrink-0 text-secondary font-medium text-fg-muted">{m.date.slice(8)}</span>
               <span className="min-w-0 flex-1 truncate text-body text-fg">{m.description}</span>
               {m.metodo && <MethodBadge metodo={m.metodo} />}
-              <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-muted">
+              <span className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${CAT_STYLE[m.category]}`}>
                 {CAT_LABEL[m.category]}
               </span>
               <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>

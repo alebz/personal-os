@@ -166,7 +166,7 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
       aria-label={paid ? 'Marcar pendiente' : 'Marcar pagado'}
     >
       {paid && (
-        <svg viewBox="0 0 10 8" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={2}>
+        <svg viewBox="0 0 10 8" fill="none" className="h-3 w-3 text-ink-0" stroke="currentColor" strokeWidth={2}>
           <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
@@ -457,7 +457,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
               <div className="flex gap-2">
                 <button
                   onClick={async () => { await onDelete(row.category); setConfirmDel(null) }}
-                  className="rounded bg-danger/80 px-2 py-0.5 text-label font-semibold text-white hover:bg-danger"
+                  className="rounded bg-danger/80 px-2 py-0.5 text-label font-semibold text-ink-0 hover:bg-danger"
                 >Sí</button>
                 <button
                   onClick={() => setConfirmDel(null)}
