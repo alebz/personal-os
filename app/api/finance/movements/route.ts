@@ -4,24 +4,32 @@ import { createServerClient } from '@/lib/supabase'
 
 // GET /api/finance/movements?month=YYYY-MM
 // GET /api/finance/movements?category=vacaciones  (all-time, for envelope history)
+// PERSONAL scope only: movements linked to an 'uptown'-scoped fund (mantenimiento, obra, reserva…)
+// are Uptown's history, not Alex's — excluded here so they never surface in the Finanzas Historial.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
   const category = searchParams.get('category')
 
   const supabase = createServerClient()
+
   let q = supabase
     .from('finance_movements')
     .select('*')
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
-
   if (month) q = q.eq('month', month)
   if (category) q = q.eq('category', category)
 
-  const { data, error } = await q
+  const [{ data: uptownEnvs }, { data, error }] = await Promise.all([
+    supabase.from('finance_envelopes').select('id').eq('scope', 'uptown'),
+    q,
+  ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  const uptownIds = new Set((uptownEnvs ?? []).map((e: { id: string }) => e.id))
+  const personal = (data ?? []).filter((m: { envelope_id: string | null }) => !m.envelope_id || !uptownIds.has(m.envelope_id))
+  return NextResponse.json(personal)
 }
 
 // POST /api/finance/movements
