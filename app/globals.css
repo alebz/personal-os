@@ -113,6 +113,7 @@ input::placeholder, textarea::placeholder {
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
   mix-blend-mode: normal !important;
+  box-shadow: none !important;   /* terminal: nothing levitates. Kills the soft shadow-xl on all cards + modal. */
 }
 
 /* ── Modo Discreto ───────────────────────────────────────────────────────────── */
@@ -210,9 +211,9 @@ input::placeholder, textarea::placeholder {
 
   /* ---- Layer 2: SEMANTIC roles — components use ONLY these ---- */
   /* Radius → rounded-card / rounded-control / rounded-pill / rounded-sharp */
-  --radius-card:    var(--r-xl);    /* 16px — arcade's card radius (preserves the 47 rounded-2xl cards); themes remap */
-  --radius-control: var(--r-md);    /* 8px */
-  --radius-pill:    var(--r-full);
+  --radius-card:    var(--r-md);    /* 8px — softened corner (not iOS-round 16, not brutalist 0) */
+  --radius-control: var(--r-sm);    /* 2px — inputs/buttons: a whisper, not iOS-round (was 8px) */
+  --radius-pill:    var(--r-sm);    /* 2px — tags/bars go square (a terminal has no round pills) */
   --radius-sharp:   var(--r-sm);
 
   /* Font size → text-label / text-secondary / text-body / text-md / text-subhead /
@@ -238,8 +239,8 @@ input::placeholder, textarea::placeholder {
   --color-fg:            var(--color-ink-4);   /* primary text   (was text-ink-4) */
   --color-fg-muted:      var(--color-ink-3);   /* secondary text (was text-ink-3) */
   --color-fg-faint:      var(--color-ink-2);   /* faint text     (was text-ink-2) */
-  --color-border:        color-mix(in oklch, var(--color-ink-4) 12%, transparent); /* hairline (was border-ink-4/5–15) */
-  --color-border-strong: color-mix(in oklch, var(--color-ink-4) 30%, transparent); /* emphasis border/ring (was border-ink-4/20–60, border-ink-3/40) */
+  --color-border:        color-mix(in oklch, var(--color-ink-4) 32%, transparent); /* MARKED hairline — measures 6:1, a line that exists (was 12% = 2.9:1, invisible) */
+  --color-border-strong: color-mix(in oklch, var(--color-ink-4) 55%, transparent); /* emphasis border/ring (was 30%) */
 }
 
 :root {
