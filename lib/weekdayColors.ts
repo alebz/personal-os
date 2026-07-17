@@ -6,6 +6,16 @@ export function dayColor(d: Date): string {
   return WEEKDAY_RAINBOW[(d.getDay() + 6) % 7]   // Mon=0 … Sun=6
 }
 
+// Cerebro "pensando" stroke — the same rainbow, minus the white (it vanishes on the dark card),
+// repeated ×4 into tight hard-stop blocks (finer = the conic-on-rectangle size variation reads as
+// texture, not chunky corner-pausing). `from var(--rain-angle)` is animated by CSS (globals).
+export const RAIN_STROKE_GRADIENT: string = (() => {
+  const blocks = [0, 1, 2, 3].flatMap(() => WEEKDAY_RAINBOW.slice(0, 6))
+  const seg = 360 / blocks.length
+  const stops = blocks.map((c, i) => `${c} ${(seg * i).toFixed(2)}deg ${(seg * (i + 1)).toFixed(2)}deg`)
+  return `conic-gradient(from var(--rain-angle), ${stops.join(', ')})`
+})()
+
 function mixHex(a: string, b: string, t: number): string {
   const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16)
   const c = [0, 1, 2].map(i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t))

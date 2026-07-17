@@ -2,6 +2,7 @@
 
 import { ResultCard, type MemoryChunk } from '@/components/sections/CerebroContent'
 import { kindLabel } from '@/lib/memoryKinds'
+import { useThinkingStroke } from '@/components/useThinkingStroke'
 import type { QueryRoute } from '@/lib/router/classifyQuery'
 
 const RESULT_FILTERS: { id: string | null; label: string }[] = [
@@ -32,6 +33,7 @@ export default function CerebroResults({
   err: string | null
 }) {
   const showSynth = route === 'synthesis'
+  const stroke = useThinkingStroke(asking)   // rainbow "pensando" border: fade-in, slow fade-out
   return (
     <div className="w-full space-y-4">
       {/* Refine bar — iterate the query without closing the modal */}
@@ -70,7 +72,10 @@ export default function CerebroResults({
 
       {/* Synthesis ARRIBA — only for synthesis-type queries */}
       {showSynth && (
-        <div className="rounded-card border border-accent/15 bg-accent/[0.04] px-5 py-4">
+        <div
+          className={`rounded-card border border-accent/15 bg-accent/[0.04] px-5 py-4 ${stroke.className}`}
+          style={stroke.style}
+        >
           <p className="mb-2 text-secondary font-medium uppercase tracking-wide text-accent/80">Cerebro responde</p>
           {asking && !answer ? (
             <p className="flex items-center gap-2 text-body italic text-fg-muted">

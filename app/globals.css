@@ -31,6 +31,50 @@
 @keyframes sparkle2{0%{transform:translate(0,0) scale(.9);opacity:0;}20%{opacity:.6;}55%{transform:translate(10px,200px) scale(1);opacity:.5;}90%{opacity:.22;}100%{transform:translate(-6px,410px) scale(.7);opacity:0;}}
 @keyframes sparkle3{0%{transform:translate(0,0) scale(1.1);opacity:0;}18%{opacity:.55;}48%{transform:translate(-12px,160px) scale(.95);opacity:.45;}82%{opacity:.2;}100%{transform:translate(8px,370px) scale(.75);opacity:0;}}
 @keyframes sparkle4{0%{transform:translate(0,0);opacity:0;}22%{opacity:.5;}60%{transform:translate(6px,220px);opacity:.4;}100%{transform:translate(-4px,430px);opacity:0;}}
+
+/* ── Cerebro "pensando" rainbow stroke ─────────────────────────────────────────
+   A hard-stop WEEKDAY_RAINBOW conic gradient sweeps the card border while Cerebro
+   streams a synthesis. Hard stops (each colour ends where the next begins — no
+   interpolation) = digital, NES colour-bar, same grammar as the tambor nav-dots.
+   The gradient string (with the animated `from var(--rain-angle)`) is set inline
+   from the WEEKDAY_RAINBOW array via --rain-gradient, so the palette stays single-
+   sourced. Present ONLY while .cerebro-thinking is on (asking=true) → zero idle
+   animation. Two motions: --slide (blocks glide around) / --jump (marquee steps). */
+/* inherits:true → animating --rain-angle on the element cascades to BOTH pseudos, so the
+   glow layer and the crisp stroke stay perfectly in sync off one animation. */
+@property --rain-angle { syntax: '<angle>'; initial-value: 0deg; inherits: true; }
+
+.cerebro-thinking { position: relative; }
+/* Shared ring geometry: a gradient band, centre masked out (gradient-border trick).
+   Base opacity 0 + a SLOW transition = the fade-OUT when Cerebro stops streaming. */
+.cerebro-thinking::before,
+.cerebro-thinking::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--rain-gradient);  /* conic-gradient(from var(--rain-angle), <hard stops>) — set inline */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s ease;     /* fade-OUT (slow) */
+}
+/* ::before = wide soft coloured bloom — mirrors the tambor nav-dots' glow (each hue haloes itself) */
+.cerebro-thinking::before { padding: 3px; filter: blur(8px); }
+/* ::after = the crisp hard-stop stroke, painted on top */
+
+/* lit (added one frame after mount) → fade-IN, quicker than the fade-out */
+.cerebro-thinking--on::before { opacity: .9; transition-duration: .5s; }
+.cerebro-thinking--on::after  { opacity: 1;  transition-duration: .5s; }
+
+@keyframes rain-slide { to { --rain-angle: 360deg; } }
+@media (prefers-reduced-motion: no-preference) {
+  .cerebro-thinking--slide { animation: rain-slide 10s linear infinite; }
+}
 @keyframes glassShimmer{0%{transform:translateX(-140%) skewX(-14deg);opacity:0;}12%{opacity:1;}88%{opacity:.85;}100%{transform:translateX(280%) skewX(-14deg);opacity:0;}}
 @keyframes glassBreath{0%,100%{opacity:.14;}50%{opacity:.22;}}
 @keyframes glassGlow{0%,100%{opacity:.55;}50%{opacity:.72;}}
