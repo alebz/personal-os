@@ -51,8 +51,8 @@ export function FundLedger({ movements, target }: {
             <span className="text-fg-muted">Meta</span>
             <span className="tabular-nums text-fg"><Mxn v={saved} /> / <Mxn v={target} /></span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-pill bg-surface-2">
-            <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
+          <div className="h-1.5 overflow-hidden rounded-round bg-surface-2">
+            <div className="h-full rounded-round bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}

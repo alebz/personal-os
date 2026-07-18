@@ -156,12 +156,12 @@ export const CAT_LABEL: Record<Category, string> = {
 // Literal class strings so Tailwind's scanner emits them. Ajuste stays neutral gray: it's meta,
 // not a spending category, and its neutrality is what distinguishes it.
 export const CAT_STYLE: Record<Category, string> = {
-  nomina:      'bg-cyan/15 text-cyan',
-  freelance:   'bg-accent/15 text-accent',   // Dracula lavender
-  gasto_fijo:  'bg-pink/15 text-pink',
-  gasto_extra: 'bg-warn/15 text-warn',        // Dracula orange
-  vacaciones:  'bg-yellow/15 text-yellow',
-  ajuste:      'bg-surface-2 text-fg-muted',  // meta — intentionally neutral
+  nomina:      'bg-cat-nomina/15 text-cat-nomina',
+  freelance:   'bg-cat-freelance/15 text-cat-freelance',
+  gasto_fijo:  'bg-cat-fijo/15 text-cat-fijo',
+  gasto_extra: 'bg-cat-extra/15 text-cat-extra',
+  vacaciones:  'bg-cat-vacaciones/15 text-cat-vacaciones',
+  ajuste:      'bg-surface-2 text-fg-muted',  // meta — intentionally neutral, no cat-token
 }
 
 // ─── Method badge / select ────────────────────────────────────────────────────
@@ -394,7 +394,7 @@ function GastoRow({
         {commitment.name}
       </span>
       {numero != null && commitment.meses != null && (
-        <span className="shrink-0 rounded-pill bg-surface-2 px-1.5 py-0.5 text-label tabular-nums text-fg-muted" title="Pago actual de total">
+        <span className="shrink-0 rounded-chip bg-surface-2 px-1.5 py-0.5 text-label tabular-nums text-fg-muted" title="Pago actual de total">
           {numero} de {commitment.meses}
         </span>
       )}
@@ -1016,7 +1016,7 @@ function HistorialTab({
               <span className="w-8 shrink-0 text-secondary font-medium text-fg-muted">{m.date.slice(8)}</span>
               <span className="min-w-0 flex-1 truncate text-body text-fg">{m.description}</span>
               {m.metodo && <MethodBadge metodo={m.metodo} />}
-              <span className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${CAT_STYLE[m.category]}`}>
+              <span className={`shrink-0 rounded-chip px-2 py-0.5 text-label font-medium ${CAT_STYLE[m.category]}`}>
                 {CAT_LABEL[m.category]}
               </span>
               <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
@@ -1333,7 +1333,7 @@ export default function FinancePage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setMonth(m => shiftMonth(m, -1))}
-                className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
+                className="flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
               >
                 ‹
               </button>
@@ -1342,7 +1342,7 @@ export default function FinancePage() {
               </span>
               <button
                 onClick={() => setMonth(m => shiftMonth(m, 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
+                className="flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
               >
                 ›
               </button>

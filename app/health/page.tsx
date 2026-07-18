@@ -201,7 +201,7 @@ export default function HealthPage() {
                         >
                           {(i % 5 === 0 || d === today) && (
                             <span className={`text-label tabular-nums leading-none ${
-                              d === today ? 'font-bold text-accent' : 'text-fg-faint/60'
+                              d === today ? 'font-bold text-accent' : 'text-fg-faint'
                             }`}>
                               {Number(dayLabels[i])}
                             </span>
@@ -241,7 +241,7 @@ export default function HealthPage() {
                               <div
                                 key={d}
                                 title={`${d} · ${completed ? '✓' : '✗'}`}
-                                className={`h-3 w-3 shrink-0 rounded-sharp transition-colors ${cls} ${
+                                className={`h-3 w-3 shrink-0 rounded-control transition-colors ${cls} ${
                                   monthBreaks.has(i) ? 'ml-1.5' : ''
                                 }`}
                               />
@@ -255,15 +255,15 @@ export default function HealthPage() {
                   {/* Legend */}
                   <div className="mt-4 flex items-center gap-5 pl-24">
                     <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded-sharp bg-ok" />
+                      <div className="h-3 w-3 rounded-control bg-ok" />
                       <span className="text-label text-fg-muted">Completado</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded-sharp bg-surface-2" />
+                      <div className="h-3 w-3 rounded-control bg-surface-2" />
                       <span className="text-label text-fg-muted">Sin completar</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded-sharp bg-surface-2 ring-1 ring-accent/40" />
+                      <div className="h-3 w-3 rounded-control bg-surface-2 ring-1 ring-accent/40" />
                       <span className="text-label text-fg-muted">Hoy</span>
                     </div>
                   </div>

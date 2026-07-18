@@ -92,8 +92,8 @@ function FundCard({
 
       {target != null && (
         <>
-          <div className="mb-1 h-2.5 overflow-hidden rounded-pill bg-surface-2">
-            <div className="h-full rounded-pill bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
+          <div className="mb-1 h-2.5 overflow-hidden rounded-round bg-surface-2">
+            <div className="h-full rounded-round bg-ok transition-all duration-500" style={{ width: `${pct}%` }} />
           </div>
           <p className="mb-3 text-right text-label text-fg-muted">
             {pct.toFixed(1)}% · faltan <Mxn v={Math.max(0, target - saved)} />

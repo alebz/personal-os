@@ -86,7 +86,7 @@ export default function FinanceHistorialPage() {
                       <span className="w-8 shrink-0 text-secondary font-medium text-fg-muted">{m.date.slice(8)}</span>
                       <span className="min-w-0 flex-1 truncate text-body text-fg">{m.description}</span>
                       {m.metodo && <MethodBadge metodo={m.metodo} />}
-                      <span className={`shrink-0 rounded-pill px-2 py-0.5 text-label font-medium ${CAT_STYLE[m.category]}`}>
+                      <span className={`shrink-0 rounded-chip px-2 py-0.5 text-label font-medium ${CAT_STYLE[m.category]}`}>
                         {CAT_LABEL[m.category]}
                       </span>
                       <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>

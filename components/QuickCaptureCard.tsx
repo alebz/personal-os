@@ -115,7 +115,7 @@ export default function QuickCaptureCard() {
           onChange={(e) => setValue(e.target.value)}
           placeholder="Tarea, nota, contacto…"
           disabled={submitting}
-          className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg placeholder:text-fg-faint/60 transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 disabled:opacity-40"
+          className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg placeholder:text-fg-faint transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 disabled:opacity-40"
         />
         <button
           type="submit"

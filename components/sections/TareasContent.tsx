@@ -115,10 +115,10 @@ function DayTag({ day }: { day: Date }) {
   const c = dayColor(day)
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-0.5 text-label font-medium"
+      className="inline-flex shrink-0 items-center gap-1 rounded-chip px-2 py-0.5 text-label font-medium"
       style={{ color: c, background: c + '18' }}
     >
-      <span className="h-1.5 w-1.5 rounded-pill" style={{ background: c }} />
+      <span className="h-1.5 w-1.5 rounded-round" style={{ background: c }} />
       {DOW_SHORT[day.getDay()]} {day.getDate()}
     </span>
   )
@@ -175,7 +175,7 @@ function TaskCard({
               {day && <DayTag day={day} />}
               {task.entity_name && <span className="text-secondary text-fg-muted">{task.entity_name}</span>}
               {task.tags?.map((tag) => (
-                <span key={tag} className="rounded-pill border border-border px-2 py-0.5 text-label text-fg-muted">{tag}</span>
+                <span key={tag} className="rounded-chip border border-border px-2 py-0.5 text-label text-fg-muted">{tag}</span>
               ))}
             </div>
           )}
@@ -359,7 +359,7 @@ function ListaSection({
       </div>
 
       <div className="flex flex-col">
-        {open.length === 0 && done.length === 0 && <p className="px-3 py-2.5 text-secondary italic text-fg-faint/60">Sin tareas</p>}
+        {open.length === 0 && done.length === 0 && <p className="px-3 py-2.5 text-secondary italic text-fg-faint">Sin tareas</p>}
         {visible.map((task) => <TaskRow key={task.id} task={task} onToggle={onToggle} onClick={onClickTask} />)}
         {open.length > COLUMN_TOP_N && (
           <button onClick={() => setShowAll((s) => !s)} className="mt-1 self-start px-3 text-secondary text-fg-muted transition-colors hover:text-fg">
@@ -465,7 +465,7 @@ function EntityManager({
 
       <button
         onClick={() => onFilter(null)}
-        className={`rounded-pill border px-2.5 py-0.5 text-secondary transition-colors ${
+        className={`rounded-control border px-2.5 py-0.5 text-secondary transition-colors ${
           activeFilter === null ? 'border-accent/30 bg-accent/10 text-accent' : 'border-border text-fg-muted hover:text-fg'
         }`}
       >
@@ -484,15 +484,15 @@ function EntityManager({
               if (ev.key === 'Enter') handleRename(e.id)
               if (ev.key === 'Escape') setEditingId(null)
             }}
-            className="rounded-pill border border-accent/30 bg-surface-1 px-3 py-0.5 text-secondary text-fg outline-none focus:ring-1 focus:ring-accent/30"
+            className="rounded-control border border-accent/30 bg-surface-1 px-3 py-0.5 text-secondary text-fg outline-none focus:ring-1 focus:ring-accent/30"
             style={{ width: Math.max(80, editingName.length * 8 + 28) }}
           />
         ) : (
-          <div key={e.id} className={`group flex items-center gap-0.5 rounded-pill border py-0.5 pl-2.5 pr-1 ${activeFilter === e.name ? 'border-accent/30 bg-accent/10' : 'border-border bg-surface-1'}`}>
+          <div key={e.id} className={`group flex items-center gap-0.5 rounded-control border py-0.5 pl-2.5 pr-1 ${activeFilter === e.name ? 'border-accent/30 bg-accent/10' : 'border-border bg-surface-1'}`}>
             <button onClick={() => onFilter(activeFilter === e.name ? null : e.name)} className={`text-secondary transition-colors ${activeFilter === e.name ? 'font-medium text-accent' : 'text-fg-muted hover:text-fg'}`}>{e.name}</button>
             <button
               onClick={() => { setEditingId(e.id); setEditingName(e.name) }}
-              className="rounded-pill p-0.5 text-fg-faint opacity-0 transition-all group-hover:opacity-100 hover:text-fg"
+              className="rounded-control p-0.5 text-fg-faint opacity-0 transition-all group-hover:opacity-100 hover:text-fg"
               aria-label={`Renombrar ${e.name}`}
             >
               <svg viewBox="0 0 14 14" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={1.5}>
@@ -501,7 +501,7 @@ function EntityManager({
             </button>
             <button
               onClick={() => handleDelete(e.id)}
-              className={`rounded-pill p-0.5 transition-all ${
+              className={`rounded-control p-0.5 transition-all ${
                 pendingDeleteId === e.id
                   ? 'text-danger opacity-100'
                   : 'text-fg-faint opacity-0 group-hover:opacity-100 hover:text-danger'
@@ -528,12 +528,12 @@ function EntityManager({
             if (ev.key === 'Escape') { setAdding(false); setNewName('') }
           }}
           placeholder="Nombre…"
-          className="rounded-pill border border-dashed border-accent/40 bg-transparent px-3 py-0.5 text-secondary text-fg-muted outline-none placeholder:text-fg-faint/50 focus:border-accent/60"
+          className="rounded-control border border-dashed border-accent/40 bg-transparent px-3 py-0.5 text-secondary text-fg-muted outline-none placeholder:text-fg-faint focus:border-accent/60"
         />
       ) : (
         <button
           onClick={() => { setAdding(true); setNewName('') }}
-          className="flex items-center gap-1 rounded-pill border border-dashed border-border-strong px-2.5 py-0.5 text-secondary text-fg-faint transition-colors hover:border-border-strong hover:text-fg-muted"
+          className="flex items-center gap-1 rounded-control border border-dashed border-border-strong px-2.5 py-0.5 text-secondary text-fg-faint transition-colors hover:border-border-strong hover:text-fg-muted"
         >
           <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth={1.8}>
             <path d="M6 2v8M2 6h8" strokeLinecap="round" />
@@ -920,12 +920,12 @@ export default function TareasContent() {
               Nueva tarea
             </button>
 
-          <nav className="flex items-center gap-1 rounded-pill border border-border bg-surface-1 p-1 backdrop-blur-xl">
+          <nav className="flex items-center gap-1 rounded-card border border-border bg-surface-1 p-1 backdrop-blur-xl">
             {VIEWS.map((v) => (
               <button
                 key={v.id}
                 onClick={() => setView(v.id)}
-                className={`rounded-pill px-4 py-1.5 text-body transition-colors ${
+                className={`rounded-control px-4 py-1.5 text-body transition-colors ${
                   view === v.id ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'
                 }`}
               >
@@ -938,7 +938,7 @@ export default function TareasContent() {
 
         {!loading && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-          <nav className="flex items-center gap-1 rounded-pill border border-border bg-surface-1 p-1 backdrop-blur-xl">
+          <nav className="flex items-center gap-1 rounded-card border border-border bg-surface-1 p-1 backdrop-blur-xl">
             {([
               { on: true,  label: 'Accionable' },
               { on: false, label: 'Ver todo' },
@@ -946,7 +946,7 @@ export default function TareasContent() {
               <button
                 key={o.label}
                 onClick={() => setActionableOnly(o.on)}
-                className={`rounded-pill px-3.5 py-1 text-secondary transition-colors ${
+                className={`rounded-control px-3.5 py-1 text-secondary transition-colors ${
                   actionableOnly === o.on ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'
                 }`}
               >
@@ -958,8 +958,8 @@ export default function TareasContent() {
           <div ref={filterRef} className="relative w-fit">
             <button
               onClick={() => setFilterOpen((o) => !o)}
-              className={`flex items-center gap-1.5 rounded-pill border px-3 py-1 text-secondary transition-colors ${
-                entityFilter ? 'border-accent/30 bg-accent/10 text-accent' : 'border-border text-fg-muted hover:text-fg'
+              className={`flex items-center gap-1.5 rounded-control px-3 py-1.5 text-secondary transition-colors ${
+                entityFilter ? 'border border-accent/30 bg-accent/10 text-accent' : 'text-fg-muted hover:bg-surface-hover hover:text-fg'
               }`}
             >
               <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M1 3h12M3 7h8M5 11h4" strokeLinecap="round" /></svg>
@@ -994,7 +994,7 @@ export default function TareasContent() {
         )}
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <div className="h-6 w-6 animate-spin rounded-pill border-2 border-border border-t-accent" />
+            <div className="h-6 w-6 animate-spin rounded-round border-2 border-border border-t-accent" />
           </div>
         ) : (
           <>

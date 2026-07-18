@@ -123,7 +123,7 @@ function HabitModal({
               placeholder="Nombre del hábito"
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
-              className="h-11 flex-1 rounded-card border border-border bg-surface-base/40 px-3 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/40"
+              className="h-11 flex-1 rounded-card border border-border bg-surface-base/40 px-3 text-body text-fg placeholder:text-fg-faint outline-none focus:border-accent/40"
             />
           </div>
 
@@ -142,7 +142,7 @@ function HabitModal({
               onChange={e => setCategory(e.target.value)}
               list="habit-categories"
               placeholder="Salud, Fitness, Detox…"
-              className="w-full rounded-card border border-border bg-surface-base/40 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/40"
+              className="w-full rounded-card border border-border bg-surface-base/40 px-3 py-2 text-body text-fg placeholder:text-fg-faint outline-none focus:border-accent/40"
             />
             <datalist id="habit-categories">{CATEGORIES.map(c => <option key={c} value={c} />)}</datalist>
           </div>
@@ -155,7 +155,7 @@ function HabitModal({
                 <button
                   key={c}
                   onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-pill transition-transform ${color === c ? 'scale-110 ring-2 ring-border-strong ring-offset-2 ring-offset-ink-1' : ''}`}
+                  className={`h-7 w-7 rounded-round transition-transform ${color === c ? 'scale-110 ring-2 ring-border-strong ring-offset-2 ring-offset-ink-1' : ''}`}
                   style={{ backgroundColor: c }}
                   aria-label={c}
                 />
@@ -215,7 +215,7 @@ function HabitRow({
             <span
               key={d}
               title={d}
-              className={`h-4 w-2 rounded-sharp bg-surface-active ${d === today ? 'ring-1 ring-border-strong' : ''}`}
+              className={`h-4 w-2 rounded-control bg-surface-active ${d === today ? 'ring-1 ring-border-strong' : ''}`}
               style={filled ? { backgroundColor: habit.color } : undefined}
             />
           )
@@ -226,10 +226,10 @@ function HabitRow({
       <button
         onClick={() => onToggle(habit)}
         aria-label={doneToday ? 'Marcar no hecho' : 'Marcar hecho'}
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-card border transition-colors ${doneToday ? 'border-transparent text-white' : 'border-border-strong text-transparent hover:border-border-strong'}`}
+        className={`grid h-7 w-7 shrink-0 place-items-center rounded-round border transition-colors ${doneToday ? 'border-transparent text-white' : 'border-border-strong text-transparent hover:border-border-strong'}`}
         style={doneToday ? { backgroundColor: habit.color } : undefined}
       >
-        <svg viewBox="0 0 12 10" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M1 5l3.5 3.5L11 1" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <svg viewBox="0 0 12 10" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={2}><path d="M1 5l3.5 3.5L11 1" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
     </div>
   )
@@ -352,7 +352,7 @@ function HabitDetail({
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-10"><span className="inline-block h-5 w-5 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" /></div>
+            <div className="flex justify-center py-10"><span className="inline-block h-5 w-5 animate-spin rounded-round border-2 border-accent/30 border-t-accent" /></div>
           ) : (
             <div className="overflow-x-auto pb-1">
               <div className="inline-flex flex-col gap-1">
@@ -372,7 +372,7 @@ function HabitDetail({
                         <span
                           key={r}
                           title={c ? (done.has(c) ? `${c} ✓` : c) : ''}
-                          className="h-[11px] w-[11px] rounded-sharp"
+                          className="h-[11px] w-[11px] rounded-control"
                           style={{ backgroundColor: c ? (done.has(c) ? habit.color : 'rgb(255 255 255 / 0.06)') : 'transparent' }}
                         />
                       ))}
@@ -446,17 +446,17 @@ function MonthlyHeatmap() {
           <span className="text-body font-light text-fg-muted">{year}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={prev} aria-label="Mes anterior" className="flex h-8 w-8 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
+          <button onClick={prev} aria-label="Mes anterior" className="flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button onClick={next} disabled={beyond} aria-label="Mes siguiente" className="flex h-8 w-8 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-30">
+          <button onClick={next} disabled={beyond} aria-label="Mes siguiente" className="flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-30">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><span className="inline-block h-5 w-5 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" /></div>
+        <div className="flex justify-center py-16"><span className="inline-block h-5 w-5 animate-spin rounded-round border-2 border-accent/30 border-t-accent" /></div>
       ) : active.length === 0 ? (
         <p className="py-16 text-center text-body text-fg-muted">Sin hábitos activos.</p>
       ) : (
@@ -489,7 +489,7 @@ function MonthlyHeatmap() {
                           <span
                             key={h.id}
                             title={done ? `${h.name} ✓` : h.name}
-                            className="h-1.5 w-1.5 rounded-pill transition-colors"
+                            className="h-1.5 w-1.5 rounded-round transition-colors"
                             style={{ background: done ? h.color : 'rgb(255 255 255 / 0.08)' }}
                           />
                         )
@@ -504,8 +504,8 @@ function MonthlyHeatmap() {
           {/* Legend + per-habit totals */}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {active.map(h => (
-              <div key={h.id} className="flex items-center gap-1.5 rounded-pill border border-border bg-surface-1 px-2.5 py-1">
-                <span className="h-2 w-2 rounded-pill" style={{ background: h.color }} />
+              <div key={h.id} className="flex items-center gap-1.5 rounded-chip border border-border bg-surface-1 px-2.5 py-1">
+                <span className="h-2 w-2 rounded-round" style={{ background: h.color }} />
                 <span className="text-body leading-none">{h.icon}</span>
                 <span className="text-secondary text-fg-muted">{h.name}</span>
                 <span className="text-secondary font-bold tabular-nums" style={{ color: h.color }}>{h.dates.length}</span>
@@ -614,7 +614,7 @@ export default function HabitTrackerContent() {
         {view === 'month' ? <MonthlyHeatmap /> : (<div className="space-y-2">
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="inline-block h-5 w-5 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" />
+            <span className="inline-block h-5 w-5 animate-spin rounded-round border-2 border-accent/30 border-t-accent" />
           </div>
         ) : active.length === 0 ? (
           <div className="py-20 text-center">

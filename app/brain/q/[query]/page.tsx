@@ -62,7 +62,7 @@ export default function BrainQueryPage() {
           <div className="mb-5 flex flex-wrap gap-1.5">
             <button
               onClick={() => setKindFilter(null)}
-              className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === null ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
+              className={`rounded-control border px-3 py-1 text-secondary transition-colors ${kindFilter === null ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
             >
               Todo
             </button>
@@ -70,7 +70,7 @@ export default function BrainQueryPage() {
               <button
                 key={k}
                 onClick={() => setKindFilter(k)}
-                className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === k ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
+                className={`rounded-control border px-3 py-1 text-secondary transition-colors ${kindFilter === k ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
               >
                 {kindLabel(k)}
               </button>
@@ -80,7 +80,7 @@ export default function BrainQueryPage() {
 
         {loading ? (
           <div className="flex items-center gap-3 py-10 text-body text-fg-muted">
-            <span className="inline-block h-4 w-4 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" />
+            <span className="inline-block h-4 w-4 animate-spin rounded-round border-2 border-accent/30 border-t-accent" />
             Buscando en tu memoria…
           </div>
         ) : err ? (

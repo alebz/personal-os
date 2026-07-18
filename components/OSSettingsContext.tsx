@@ -59,7 +59,7 @@ function loadState(): OSSettingsState {
 
 export const FONT_FAMILIES: Record<Font, string> = {
   system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  mono:   "var(--font-jetbrains-mono), 'JetBrains Mono', 'Fira Code', ui-monospace, monospace",
+  mono:   "'SF Mono', ui-monospace, Menlo, monospace",
 }
 
 function applyFont(font: Font) {

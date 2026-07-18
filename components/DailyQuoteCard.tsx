@@ -68,7 +68,7 @@ function useTypewriter(text: string | null, speed = 18, skip = false): string {
 function TypeBadge({ symbol, label, color, sublabel }: { symbol: string; label: string; color: string; sublabel?: string }) {
   return (
     <div
-      className="flex items-center gap-1.5 rounded-pill border px-2.5 py-1"
+      className="flex items-center gap-1.5 rounded-chip border px-2.5 py-1"
       style={{ borderColor: `color-mix(in oklch, ${color} 40%, transparent)`, backgroundColor: `color-mix(in oklch, ${color} 12%, transparent)` }}
     >
       <span className="text-secondary" style={{ color }}>{symbol}</span>
@@ -240,7 +240,7 @@ export default function DailyQuoteCard() {
           <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center gap-2.5">
-                <div className="h-3 w-3 animate-spin rounded-pill border-2 border-border border-t-accent/60" />
+                <div className="h-3 w-3 animate-spin rounded-round border-2 border-border border-t-accent/60" />
                 <span className="text-secondary text-fg-muted/60">consultando…</span>
               </div>
             ) : message ? (
@@ -258,7 +258,7 @@ export default function DailyQuoteCard() {
 
           {/* Flip hint */}
           {message && !loading && (
-            <p className="mt-4 select-none text-center text-label text-fg-faint/30">
+            <p className="mt-4 select-none text-center text-label text-fg-faint">
               tocar para expandir la lectura ▾
             </p>
           )}
@@ -287,7 +287,7 @@ export default function DailyQuoteCard() {
           <div className="mt-4 flex-1 overflow-y-auto">
             {expanding ? (
               <div className="flex items-center gap-2.5">
-                <div className="h-3 w-3 animate-spin rounded-pill border-2 border-border border-t-accent/60" />
+                <div className="h-3 w-3 animate-spin rounded-round border-2 border-border border-t-accent/60" />
                 <span className="text-secondary text-fg-muted/60">profundizando…</span>
               </div>
             ) : interp ? (

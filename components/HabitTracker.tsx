@@ -89,9 +89,9 @@ export default function HabitTracker() {
           </ul>
 
           <div className="mt-4">
-            <div className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-active">
+            <div className="h-1.5 w-full overflow-hidden rounded-round bg-surface-active">
               <div
-                className="h-full rounded-pill bg-accent transition-all duration-500"
+                className="h-full rounded-round bg-accent transition-all duration-500"
                 style={{ width: habits.length > 0 ? `${(count / habits.length) * 100}%` : '0%' }}
               />
             </div>

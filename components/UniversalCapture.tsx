@@ -114,7 +114,7 @@ export default function UniversalCapture() {
             key={m.id}
             type="button"
             onClick={() => pick(m.id)}
-            className={`rounded-pill border px-4 py-1.5 text-body transition-colors ${
+            className={`rounded-control border px-4 py-1.5 text-body transition-colors ${
               mode === m.id
                 ? 'border-accent/40 bg-[oklch(0.24_0.055_255)] font-medium text-accent'
                 : 'border-border bg-surface-1 text-fg-muted hover:bg-surface-1 hover:text-fg'
@@ -144,7 +144,7 @@ export default function UniversalCapture() {
               key={m.value}
               type="button"
               onClick={() => setMood(mood === m.value ? '' : m.value)}
-              className={`flex items-center gap-1 rounded-pill border px-2.5 py-1 text-secondary font-medium transition-colors ${
+              className={`flex items-center gap-1 rounded-control border px-2.5 py-1 text-secondary font-medium transition-colors ${
                 mood === m.value
                   ? 'border-accent/25 bg-accent/10 text-accent'
                   : 'border-border text-fg-muted hover:text-fg'

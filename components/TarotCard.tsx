@@ -512,7 +512,7 @@ export default function TarotCard() {
     return (
       <div className="relative w-full" style={{ paddingBottom: '150%', position: 'relative', zIndex: 10000 }}>
         <div className="absolute inset-0 flex items-center justify-center bg-surface-1" style={{ clipPath: CARD_CLIP }}>
-          <div className="h-3 w-3 animate-spin rounded-pill border-2 border-border border-t-accent/60" />
+          <div className="h-3 w-3 animate-spin rounded-round border-2 border-border border-t-accent/60" />
         </div>
       </div>
     )
@@ -595,7 +595,7 @@ export default function TarotCard() {
             {/* Nueva button — top right */}
             <button
               onClick={drawNew}
-              className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 rounded-pill px-2.5 py-1 text-label font-semibold text-white/70 backdrop-blur-sm transition-colors hover:text-white/95"
+              className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 rounded-control px-2.5 py-1 text-label font-semibold text-white/70 backdrop-blur-sm transition-colors hover:text-white/95"
               style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.12)' }}
             >
               ↺ nueva

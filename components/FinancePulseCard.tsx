@@ -60,7 +60,7 @@ function Sparkline({ points }: { points: DayPoint[] }) {
           key={i}
           x1={x(i)}   y1={y(points[i].balance)}
           x2={x(i+1)} y2={y(p.balance)}
-          stroke={p.balance >= points[i].balance ? '#4ade80' : '#f87171'}
+          stroke={p.balance >= points[i].balance ? 'var(--color-ok)' : 'var(--color-danger)'}
           strokeWidth="1.5"
           strokeLinecap="round"
         />
@@ -72,8 +72,8 @@ function Sparkline({ points }: { points: DayPoint[] }) {
         r="2"
         fill={
           points[points.length - 1].balance >= points[points.length - 2].balance
-            ? '#4ade80'
-            : '#f87171'
+            ? 'var(--color-ok)'
+            : 'var(--color-danger)'
         }
       />
     </svg>
@@ -157,7 +157,7 @@ export default function FinancePulseCard() {
           FINANCE PULSE
         </h2>
         {loading && (
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-pill bg-surface-2" />
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-round bg-surface-2" />
         )}
       </div>
 

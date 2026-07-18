@@ -254,7 +254,7 @@ function CategoryManagerModal({
               key={cat.id}
               className="group flex items-center gap-3 rounded-card px-3 py-2 transition-colors hover:bg-surface-2"
             >
-              <span className={`shrink-0 rounded-pill border px-2 py-0.5 text-label font-medium ${catCls(cat.name)}`}>
+              <span className={`shrink-0 rounded-chip border px-2 py-0.5 text-label font-medium ${catCls(cat.name)}`}>
                 {catEmoji(cat.name)} {cat.name}
               </span>
               <span className="flex-1 truncate text-body text-fg">{cat.name}</span>
@@ -307,13 +307,13 @@ function ContactRow({ contact, onClick }: { contact: Contact; onClick: () => voi
       onClick={onClick}
       className="group flex w-full items-center gap-4 border-t border-border px-5 py-3.5 text-left transition-colors hover:bg-surface-2 first:border-t-0"
     >
-      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-pill border text-secondary font-bold ${catCls(contact.category)}`}>
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-round border text-secondary font-bold ${catCls(contact.category)}`}>
         {ini}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-body font-medium text-fg">{contact.name}</span>
-          <span className={`shrink-0 rounded-pill border px-1.5 py-0.5 text-label font-medium ${catCls(contact.category)}`}>
+          <span className={`shrink-0 rounded-chip border px-1.5 py-0.5 text-label font-medium ${catCls(contact.category)}`}>
             {catEmoji(contact.category)} {contact.category}
           </span>
         </div>
@@ -687,7 +687,7 @@ export default function ContactosContent() {
             <div ref={filterRef} className="relative">
               <button
                 onClick={() => setFilterOpen(o => !o)}
-                className={`flex items-center gap-1.5 rounded-pill border px-3 py-1 text-secondary transition-colors ${
+                className={`flex items-center gap-1.5 rounded-control border px-3 py-1 text-secondary transition-colors ${
                   catFilter
                     ? catCls(catFilter)
                     : 'border-border text-fg-muted hover:text-fg'
@@ -731,7 +731,7 @@ export default function ContactosContent() {
                 <button
                   key={s}
                   onClick={() => setSort(s)}
-                  className={`rounded-pill border px-2.5 py-0.5 text-label font-medium transition-colors ${
+                  className={`rounded-control border px-2.5 py-0.5 text-label font-medium transition-colors ${
                     sort === s
                       ? 'border-accent/30 bg-accent/10 text-accent'
                       : 'border-border text-fg-muted hover:text-fg'

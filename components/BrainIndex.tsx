@@ -42,7 +42,7 @@ function CompactRow({ chunk }: { chunk: MemoryChunk }) {
         {kindLabel(chunk.metadata?.kind as string | undefined)}
       </span>
       <span className="min-w-0 flex-1 truncate text-body text-fg">{chunk.content}</span>
-      <span className="shrink-0 text-secondary tabular-nums text-fg-faint/60">{fmtDate(chunk.created_at)}</span>
+      <span className="shrink-0 text-secondary tabular-nums text-fg-faint">{fmtDate(chunk.created_at)}</span>
     </div>
   )
 }
@@ -124,7 +124,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
           onChange={e => setSearch(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
           placeholder="Buscar en tu memoria…"
-          className="min-w-0 flex-1 bg-transparent text-body text-fg placeholder:text-fg-faint/60 outline-none"
+          className="min-w-0 flex-1 bg-transparent text-body text-fg placeholder:text-fg-faint outline-none"
         />
         {search.trim() && (
           <button onClick={runSearch} className="shrink-0 text-secondary text-fg-muted transition-colors hover:text-accent">Buscar →</button>
@@ -133,12 +133,12 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
 
       {/* View switch */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <nav className="flex items-center gap-1 rounded-pill border border-border bg-surface-1 p-1 backdrop-blur-xl">
+        <nav className="flex items-center gap-1 rounded-control border border-border bg-surface-1 p-1 backdrop-blur-xl">
           {VIEWS.map(v => (
             <button
               key={v.id}
               onClick={() => changeView(v.id)}
-              className={`rounded-pill px-3.5 py-1 text-secondary transition-colors ${view === v.id ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'}`}
+              className={`rounded-control px-3.5 py-1 text-secondary transition-colors ${view === v.id ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'}`}
             >
               {v.label}
             </button>
@@ -151,7 +151,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
         <div className="mt-3 flex flex-wrap gap-1.5">
           <button
             onClick={() => setKindFilter(null)}
-            className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === null ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
+            className={`rounded-control border px-3 py-1 text-secondary transition-colors ${kindFilter === null ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
           >
             Todo
           </button>
@@ -159,7 +159,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
             <button
               key={k}
               onClick={() => setKindFilter(kindFilter === k ? null : k)}
-              className={`rounded-pill border px-3 py-1 text-secondary transition-colors ${kindFilter === k ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
+              className={`rounded-control border px-3 py-1 text-secondary transition-colors ${kindFilter === k ? 'border-border-strong bg-surface-active text-fg' : 'border-border text-fg-muted hover:text-fg'}`}
             >
               {kindLabel(k)}
             </button>
@@ -190,7 +190,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
               return (
                 <section key={day}>
                   <div className="mb-2 flex items-center gap-2 border-b border-border pb-1.5">
-                    <span className="h-2 w-2 rounded-pill" style={{ background: c }} />
+                    <span className="h-2 w-2 rounded-round" style={{ background: c }} />
                     <h2 className="text-secondary font-semibold uppercase tracking-wider" style={{ color: c }}>
                       {fmtDayKey(day)}
                     </h2>

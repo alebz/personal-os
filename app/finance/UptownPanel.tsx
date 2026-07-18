@@ -178,7 +178,7 @@ function AmountInput({ value, onSave, dim }: { value: number; onSave: (n: number
 
 function CheckDot({ checked }: { checked: boolean }) {
   return (
-    <div className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border transition-colors',
+    <div className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-control border transition-colors',
       checked ? 'border-ok bg-ok' : 'border-border-strong'].join(' ')}>
       {checked && (
         <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-ink-0 stroke-current" strokeWidth={2}>
@@ -460,7 +460,7 @@ function NominaPanel({ nomina, onToggleSemana, onSetMonto }: {
           >
             <p className="text-label font-semibold text-fg-muted">Sem {i + 1}</p>
             <AmountInput value={monto} onSave={n => onSetMonto(i, n)} dim={nomina.pagadas[i]} />
-            <div className={['h-1.5 w-1.5 rounded-pill', nomina.pagadas[i] ? 'bg-ok' : 'bg-surface-2'].join(' ')} />
+            <div className={['h-1.5 w-1.5 rounded-round', nomina.pagadas[i] ? 'bg-ok' : 'bg-surface-2'].join(' ')} />
           </div>
         ))}
       </div>
@@ -478,8 +478,8 @@ function FondoPanel({ fondoAcum, fondoMeta = 50000 }: { fondoAcum: number; fondo
         <p className="text-label font-semibold uppercase tracking-widest text-warn/70">Fondo mantenimiento</p>
         <p className="text-body font-bold tabular-nums text-warn">{fmt(fondoAcum)}</p>
       </div>
-      <div className="h-2 overflow-hidden rounded-pill bg-surface-2">
-        <div className="h-full rounded-pill bg-warn transition-all duration-700" style={{ width: `${pct}%` }} />
+      <div className="h-2 overflow-hidden rounded-round bg-surface-2">
+        <div className="h-full rounded-round bg-warn transition-all duration-700" style={{ width: `${pct}%` }} />
       </div>
       <p className="mt-1 text-right text-label text-fg-faint">{pct.toFixed(0)}% · meta {fmt(fondoMeta)}</p>
     </div>
@@ -717,7 +717,7 @@ export default function UptownPanel({ month }: { month: string }) {
             />
             <ul>
               {ms.extrasIngresos.length === 0 && (
-                <li className="px-3 py-2 text-secondary italic text-fg-faint/40">Sin ingresos extra</li>
+                <li className="px-3 py-2 text-secondary italic text-fg-faint">Sin ingresos extra</li>
               )}
               {ms.extrasIngresos.map(ei => (
                 <ExtraIngresoRow key={ei.id} ei={ei}
@@ -762,7 +762,7 @@ export default function UptownPanel({ month }: { month: string }) {
             />
             <ul>
               {ms.extras.length === 0 && (
-                <li className="px-3 py-2 text-secondary italic text-fg-faint/40">Sin gastos extra</li>
+                <li className="px-3 py-2 text-secondary italic text-fg-faint">Sin gastos extra</li>
               )}
               {ms.extras.map(eg => (
                 <ExtraGastoRow key={eg.id} eg={eg}

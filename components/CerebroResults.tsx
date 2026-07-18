@@ -47,7 +47,7 @@ export default function CerebroResults({
           onChange={e => onQueryChange(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onRefine() } }}
           placeholder="Afina tu consulta…"
-          className="w-full bg-transparent py-1 pl-7 pr-2 text-body text-fg placeholder:text-fg-faint/60 outline-none"
+          className="w-full bg-transparent py-1 pl-7 pr-2 text-body text-fg placeholder:text-fg-faint outline-none"
         />
       </div>
 
@@ -63,7 +63,7 @@ export default function CerebroResults({
             {f.label}
           </button>
         ))}
-        <span className="ml-auto text-secondary text-fg-faint/50">Enter para afinar</span>
+        <span className="ml-auto text-secondary text-fg-faint">Enter para afinar</span>
       </div>
 
       {err && (
@@ -79,7 +79,7 @@ export default function CerebroResults({
           <p className="mb-2 text-secondary font-medium uppercase tracking-wide text-accent/80">Cerebro responde</p>
           {asking && !answer ? (
             <p className="flex items-center gap-2 text-body italic text-fg-muted">
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" />
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-round border-2 border-accent/30 border-t-accent" />
               Cerebro está pensando…
             </p>
           ) : (
@@ -99,7 +99,7 @@ export default function CerebroResults({
       {/* Fragment list ABAJO — full list (no cap; the modal scrolls) */}
       {searching ? (
         <div className="flex items-center gap-3 py-6 text-body text-fg-muted">
-          <span className="inline-block h-4 w-4 animate-spin rounded-pill border-2 border-accent/30 border-t-accent" />
+          <span className="inline-block h-4 w-4 animate-spin rounded-round border-2 border-accent/30 border-t-accent" />
           Buscando en tu memoria…
         </div>
       ) : results.length > 0 ? (

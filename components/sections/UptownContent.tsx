@@ -844,7 +844,7 @@ function UptownHistorialTab({ rents, expenses, nomina, extraIncome, extraExpense
               <span className={`shrink-0 rounded px-1.5 py-0.5 text-label font-bold ${UPTOWN_METHOD_STYLE[m.method] ?? 'bg-surface-2 text-fg-muted'}`}>
                 {UPTOWN_METHOD_LABEL[m.method] ?? m.method}
               </span>
-              <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-label text-fg-muted">
+              <span className="shrink-0 rounded-chip bg-surface-2 px-2 py-0.5 text-label text-fg-muted">
                 {m.category}
               </span>
               <span className={`shrink-0 text-body font-medium tabular-nums ${m.flow === 'in' ? 'text-ok' : 'text-danger'}`}>
@@ -1044,8 +1044,8 @@ function ValetTab({ month }: { month: string }) {
               <span className="text-fg-muted">Cobrado</span>
               <span className="font-medium tabular-nums text-fg"><Mxn v={cobrado} /> / <Mxn v={esperado} /></span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-pill bg-surface-2">
-              <div className="h-full rounded-pill bg-ok transition-all duration-500"
+            <div className="h-1.5 overflow-hidden rounded-round bg-surface-2">
+              <div className="h-full rounded-round bg-ok transition-all duration-500"
                 style={{ width: `${esperado ? Math.min(cobrado / esperado * 100, 100) : 0}%` }} />
             </div>
           </div>
@@ -1054,8 +1054,8 @@ function ValetTab({ month }: { month: string }) {
               <span className="text-fg-muted">Proveedor pagado</span>
               <span className="font-medium tabular-nums text-fg"><Mxn v={proveedorPagado} /> / <Mxn v={proveedorTotal} /></span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-pill bg-surface-2">
-              <div className="h-full rounded-pill bg-accent transition-all duration-500"
+            <div className="h-1.5 overflow-hidden rounded-round bg-surface-2">
+              <div className="h-full rounded-round bg-accent transition-all duration-500"
                 style={{ width: `${proveedorTotal ? Math.min(proveedorPagado / proveedorTotal * 100, 100) : 0}%` }} />
             </div>
           </div>
@@ -1381,14 +1381,14 @@ export default function UptownContent() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMonth(m => shiftMonth(m, -1))}
-              className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
+              className="flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
             >‹</button>
             <span className="min-w-[148px] text-center text-body font-semibold capitalize text-fg">
               {monthLabel(month)}
             </span>
             <button
               onClick={() => setMonth(m => shiftMonth(m, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-control border border-border bg-surface-1 text-fg-muted backdrop-blur-xl hover:text-fg"
+              className="flex h-8 w-8 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
             >›</button>
           </div>
         </div>

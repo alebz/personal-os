@@ -176,7 +176,7 @@ function MealRow({
             <div className="relative">
               <MacroInput label="kcal" value={edit.kcal} onChange={handleKcal} />
               {redistributing && (
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-pill bg-accent/70" />
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-round bg-accent/70" />
               )}
             </div>
           </div>
@@ -346,7 +346,7 @@ export default function NutritionCard() {
             </span>
           </div>
           {macroCal > 0 && (
-            <div className="flex h-1.5 overflow-hidden rounded-pill bg-surface-active">
+            <div className="flex h-1.5 overflow-hidden rounded-round bg-surface-active">
               <div style={{ width: `${pPct}%` }}  className="bg-ok transition-all duration-300" />
               <div style={{ width: `${cPct}%` }}  className="bg-accent transition-all duration-300" />
               <div style={{ width: `${fPct}%` }}  className="bg-warn transition-all duration-300" />
@@ -354,9 +354,9 @@ export default function NutritionCard() {
           )}
           {macroCal > 0 && (
             <div className="mt-1 flex gap-3 text-label text-fg-muted/60">
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-pill bg-ok inline-block" />Prot.</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-pill bg-accent inline-block" />Carb.</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-pill bg-warn inline-block" />Gras.</span>
+              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-round bg-ok inline-block" />Prot.</span>
+              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-round bg-accent inline-block" />Carb.</span>
+              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-round bg-warn inline-block" />Gras.</span>
             </div>
           )}
         </div>

@@ -50,7 +50,7 @@ export default function DrumModal({
         <button
           onClick={onClose}
           aria-label="Cerrar"
-          className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+          className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
         >
           <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
             <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />

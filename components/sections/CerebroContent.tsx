@@ -63,7 +63,7 @@ export function ResultCard({ chunk }: { chunk: MemoryChunk }) {
       <div className="mb-1.5 flex items-center gap-2 text-secondary text-fg-muted">
         <span className="font-medium uppercase tracking-wide">{kindLabel(chunk.metadata?.kind as string | undefined)}</span>
         {chunk.created_at && <><span className="text-fg-muted/40">·</span><span>{fmtDate(chunk.created_at)}</span></>}
-        {pct != null && <span className="ml-auto tabular-nums text-fg-faint/50">{pct}%</span>}
+        {pct != null && <span className="ml-auto tabular-nums text-fg-faint">{pct}%</span>}
       </div>
       <p className="whitespace-pre-wrap text-body leading-relaxed text-fg">{body}</p>
       {long && (
@@ -286,9 +286,9 @@ export default function CerebroContent() {
       <div className="rounded-card border border-border bg-surface-1 p-6 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
 
         {/* Intent toggle */}
-        <div className="relative mb-5 flex rounded-pill border border-border bg-surface-base/40 p-1">
+        <div className="relative mb-5 flex rounded-control border border-border bg-surface-base/40 p-1">
           <div
-            className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-pill bg-surface-active transition-transform duration-200 ease-out"
+            className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-control bg-surface-active transition-transform duration-200 ease-out"
             style={{ transform: intent === 'consultar' ? 'translateX(100%)' : 'translateX(0)' }}
           />
           {(['capturar', 'consultar'] as const).map(i => (
@@ -296,7 +296,7 @@ export default function CerebroContent() {
               key={i}
               type="button"
               onClick={() => { if (i === 'capturar') clearSearch(); setIntent(i) }}
-              className={`relative z-10 flex-1 rounded-pill py-1.5 text-body font-medium capitalize transition-colors ${intent === i ? 'text-fg' : 'text-fg-muted hover:text-fg'}`}
+              className={`relative z-10 flex-1 rounded-control py-1.5 text-body font-medium capitalize transition-colors ${intent === i ? 'text-fg' : 'text-fg-muted hover:text-fg'}`}
             >
               {i}
             </button>
@@ -326,7 +326,7 @@ export default function CerebroContent() {
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submitCapture() } }}
               placeholder={capMeta.placeholder}
               disabled={saving}
-              className="w-full resize-none overflow-hidden bg-transparent text-body leading-relaxed text-fg placeholder:text-fg-faint/60 outline-none disabled:opacity-40"
+              className="w-full resize-none overflow-hidden bg-transparent text-body leading-relaxed text-fg placeholder:text-fg-faint outline-none disabled:opacity-40"
               style={{ minHeight: capMode === 'tarea' ? '32px' : '76px' }}
             />
 
@@ -337,7 +337,7 @@ export default function CerebroContent() {
                     key={m.value}
                     type="button"
                     onClick={() => setMood(mood === m.value ? '' : m.value)}
-                    className={`flex items-center gap-1 rounded-pill border px-2.5 py-1 text-secondary font-medium transition-colors ${mood === m.value ? 'border-accent/25 bg-accent/10 text-accent' : 'border-border text-fg-muted hover:text-fg'}`}
+                    className={`flex items-center gap-1 rounded-control border px-2.5 py-1 text-secondary font-medium transition-colors ${mood === m.value ? 'border-accent/25 bg-accent/10 text-accent' : 'border-border text-fg-muted hover:text-fg'}`}
                   >
                     <span>{m.emoji}</span><span>{m.label}</span>
                   </button>
@@ -372,14 +372,14 @@ export default function CerebroContent() {
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void runConsult(query) } }}
                 placeholder="Busca en tu memoria…"
-                className="w-full bg-transparent py-1 pl-7 pr-8 text-body text-fg placeholder:text-fg-faint/60 outline-none"
+                className="w-full bg-transparent py-1 pl-7 pr-8 text-body text-fg placeholder:text-fg-faint outline-none"
               />
               {(query || searched) && (
                 <button
                   type="button"
                   onClick={clearSearch}
                   aria-label="Limpiar búsqueda"
-                  className="absolute right-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+                  className="absolute right-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
                 >
                   <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={1.8}><path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" /></svg>
                 </button>
@@ -389,7 +389,7 @@ export default function CerebroContent() {
             {/* Hint row — quick entry only; results (with kind filters) open in the modal */}
             <div className="mt-3 flex items-center border-t border-border pt-3">
               {query.trim() ? (
-                <span className="ml-auto text-secondary text-fg-faint/50">Enter para consultar</span>
+                <span className="ml-auto text-secondary text-fg-faint">Enter para consultar</span>
               ) : (
                 <button
                   type="button"

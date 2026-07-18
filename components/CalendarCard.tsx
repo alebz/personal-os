@@ -229,15 +229,15 @@ export default function CalendarCard() {
           {showTodayBtn && (
             <button
               onClick={goToday}
-              className="rounded-pill border border-border px-3 py-1.5 text-secondary font-medium text-fg-muted transition-colors hover:border-accent/40 hover:text-accent"
+              className="rounded-control border border-border px-3 py-1.5 text-secondary font-medium text-fg-muted transition-colors hover:border-accent/40 hover:text-accent"
             >
               Hoy
             </button>
           )}
-          <button onClick={prevMonth} aria-label="Mes anterior" className="flex h-9 w-9 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
+          <button onClick={prevMonth} aria-label="Mes anterior" className="flex h-9 w-9 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button onClick={nextMonth} aria-label="Mes siguiente" className="flex h-9 w-9 items-center justify-center rounded-pill text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
+          <button onClick={nextMonth} aria-label="Mes siguiente" className="flex h-9 w-9 items-center justify-center rounded-control text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
             <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={2}><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
@@ -277,7 +277,7 @@ export default function CalendarCard() {
                   } ${!isCurrentMonth ? 'opacity-35' : ''}`}
                 >
                   <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-pill text-body tabular-nums transition-colors ${
+                    className={`flex h-7 w-7 items-center justify-center rounded-round text-body tabular-nums transition-colors ${
                       bday ? 'font-bold' :
                       isToday ? 'bg-accent font-semibold text-white' :
                       isSelected ? 'font-semibold text-accent' :
@@ -292,7 +292,7 @@ export default function CalendarCard() {
                   {cellEvents.length > 0 && (
                     <div className="flex items-center gap-[3px]">
                       {cellEvents.slice(0, 4).map(ev => (
-                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-pill" style={{ background: dayColor(date) }} />
+                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-round" style={{ background: dayColor(date) }} />
                       ))}
                       {cellEvents.length > 4 && <span className="text-label leading-none text-fg-muted">+{cellEvents.length - 4}</span>}
                     </div>
@@ -338,7 +338,7 @@ export default function CalendarCard() {
                 <ul className="max-h-[9.5rem] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
                   {dayEvents.map(ev => (
                     <li key={ev.uid} className={`group flex items-stretch gap-3 rounded-card px-3 py-2.5 transition-colors ${editingUid === ev.uid ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-surface-base/40'}`}>
-                      <span className="w-1 shrink-0 rounded-pill" style={{ background: selColor }} />
+                      <span className="w-1 shrink-0 rounded-round" style={{ background: selColor }} />
                       <div className="min-w-0 flex-1">
                         <p className="text-body font-medium leading-snug text-fg">{ev.title}</p>
                         <p className="mt-0.5 text-secondary text-fg-muted">{ev.allDay ? 'Todo el día' : formatTime(ev.start)}</p>

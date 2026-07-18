@@ -164,7 +164,7 @@ export default function FloatingCapture() {
         <button
           onClick={() => setOpen(o => !o)}
           title="Captura rápida (⌘K)"
-          className={`flex items-center gap-2 rounded-pill border px-4 py-2 text-body font-medium shadow-xl backdrop-blur-xl transition-colors ${
+          className={`flex items-center gap-2 rounded-control border px-4 py-2 text-body font-medium shadow-xl backdrop-blur-xl transition-colors ${
             open
               ? 'border-accent/30 bg-accent/15 text-accent'
               : 'border-border bg-surface-base/80 text-fg-muted hover:border-border-strong hover:text-fg'

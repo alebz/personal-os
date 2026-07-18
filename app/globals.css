@@ -8,6 +8,19 @@
   font-display: block;
 }
 
+/* ── SF Mono (self-hosted from /public/SF-Mono) — the Mono toggle's typeface ─────
+   Alex's Terminal font; replaces JetBrains Mono. Six upright weights cover the UI's
+   real usage (font-light 300 · normal 400 · medium 500 · semibold 600 · bold 700 ·
+   black→heavy 800; font-black/900 falls back to Heavy) + RegularItalic for the
+   italic empty-states. Italic at other weights is browser-synthesised (rare). */
+@font-face { font-family: 'SF Mono'; src: url('/SF-Mono/SF-Mono-Light.otf')        format('opentype'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Mono'; src: url('/SF-Mono/SF-Mono-Regular.otf')      format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Mono'; src: url('/SF-Mono/SF-Mono-Medium.otf')       format('opentype'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Mono'; src: url('/SF-Mono/SF-Mono-Semibold.otf')     format('opentype'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Mono'; src: url('/SF-Mono/SF-Mono-Bold.otf')         format('opentype'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Mono'; src: url('/SF-Mono/SF-Mono-Heavy.otf')        format('opentype'); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Mono'; src: url('/SF-Mono/SF-Mono-RegularItalic.otf') format('opentype'); font-weight: 400; font-style: italic; font-display: swap; }
+
 /* ── Lolo companion animations ──────────────────────────────────────────────── */
 
 @keyframes adanBreathe{0%{transform:scaleX(1) scaleY(1);}30%{transform:scaleX(1.019) scaleY(1.013);}55%{transform:scaleX(1.024) scaleY(1.016);}80%{transform:scaleX(0.997) scaleY(0.996);}100%{transform:scaleX(1) scaleY(1);}}
@@ -99,15 +112,15 @@
 @keyframes laser-flicker{0%{opacity:1}33%{opacity:.6}66%{opacity:.85}100%{opacity:.5}}
 @keyframes hit-spark{0%{transform:scale(.35);opacity:1}45%{opacity:.95}100%{transform:scale(1.7);opacity:0}}
 
-input::placeholder { color: #555555; opacity: 1; }
+input::placeholder { color: var(--color-fg-faint); opacity: 1; }   /* was #555555 (2.76:1) — hardcode ilegible → token legible + temable */
 
 input, textarea {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-family: var(--os-font) !important;   /* follow the Mono toggle — form controls don't inherit font-family, so inputs/placeholders were stuck on system sans regardless of the toggle */
   font-size: 14px !important;
 }
 
 input::placeholder, textarea::placeholder {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-family: var(--os-font) !important;   /* follow the Mono toggle — form controls don't inherit font-family, so inputs/placeholders were stuck on system sans regardless of the toggle */
   font-size: 14px !important;
 }
 
@@ -153,7 +166,7 @@ input::placeholder, textarea::placeholder {
 .dashboard-card {
   position: relative;
   z-index: 2;
-  background-color: rgba(13, 13, 18, 0.60) !important;
+  background-color: var(--color-surface-1) !important;   /* token warm-black — was rgba(13,13,18,.6): un frío hardcoded de la paleta vieja que ignoraba el token (bug del café: card ≠ submenú). Ahora TODA card = misma superficie que cualquier bg-surface-1. */
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
   mix-blend-mode: normal !important;
@@ -204,6 +217,34 @@ input::placeholder, textarea::placeholder {
 
    --r-/--op-/--t- use non-utility namespaces, so they generate no classes; only
    the Layer-2 color/radius/text roles do. oklch(L C H). */
+
+/* ╔══════════════════════════════════════════════════════════════════════════╗
+   ║ TOKEN CONTRACT — read before adding, renaming, or theming any token.       ║
+   ║                                                                            ║
+   ║ THREE TIERS:                                                               ║
+   ║   TIER 0 · PRIMITIVES   --r-* --op-* --t-* --color-ink-* + raw hues.        ║
+   ║            Raw scales, named by MAGNITUD/VALOR. Components NEVER use them.   ║
+   ║            A theme MAY redefine a primitive (swap the whole ramp).          ║
+   ║   TIER 1 · SEMANTIC (TEMABLE)  --radius-card/control/chip, --color-surface/ ║
+   ║            fg/border/accent, --text-*, --color-cat-*. Roles named by        ║
+   ║            MEANING. Every [data-theme] MAY remap these. = decisiones que    ║
+   ║            un tema tiene derecho a tomar.                                   ║
+   ║   TIER 2 · INVARIANTS   --radius-round (…). Object physics, named by        ║
+   ║            NATURE. Live here but NEVER appear inside a [data-theme] block.   ║
+   ║                                                                            ║
+   ║ THREE LAWS:                                                                 ║
+   ║   Ley 1 — UN TOKEN, UN SIGNIFICADO. Si cambiar su valor arreglaría un uso   ║
+   ║           pero rompería otro, son dos tokens. (Así murió --radius-pill:     ║
+   ║           era dot + chip a la vez.)                                         ║
+   ║   Ley 2 — NOMBRA POR ROL, NUNCA POR VALOR. Un nombre-de-valor miente cuando ║
+   ║           cambia el tema. (Por eso no hay --radius-sharp ni text-cyan suelto;║
+   ║           el color vive como primitiva, el rol como --color-cat-*.)         ║
+   ║   Ley 3 — INVARIANTES FUERA DEL ALCANCE DEL TEMA. Ni el cozy pink lion      ║
+   ║           querría un marker de día cuadrado. Un invariante en [data-theme]  ║
+   ║           es un BUG (grep-guard en CI lo caza).                             ║
+   ║                                                                            ║
+   ║ Cada token abajo declara: REPRESENTA · TEMABLE|INVARIANTE · cuándo usarlo.  ║
+   ╚══════════════════════════════════════════════════════════════════════════╝ */
 @theme static {
   /* ---- Layer 1: non-color primitives (raw scales) ---- */
   /* Radius */
@@ -243,22 +284,30 @@ input::placeholder, textarea::placeholder {
   /* Accent — Dracula purple (lavender); re-tints every accent usage OS-wide */
   --color-accent: oklch(0.742 0.149 302);
 
-  /* Semantic hues — Dracula ANSI. Money keeps green=in / red=out; warn = Dracula orange. */
+  /* Semantic hues — Dracula ANSI. TEMABLE(tono) / INVARIANTE(significado): ok=positivo/
+     incremento/entra, danger=negativo/decremento/sale, warn=precaución. Un tema elige el
+     tono pero DEBE preservar la lectura (jamás mapear ok→rojo). Money: green=in / red=out. */
   --color-ok: oklch(0.871 0.220 148);     /* Dracula green  #50fa7b — neon */
   --color-warn: oklch(0.834 0.124 67);    /* Dracula orange #ffb86c */
   --color-danger: oklch(0.682 0.206 24);  /* Dracula red    #ff5555 */
 
-  /* Classifying colors — categories/badges/chips (never money direction) */
+  /* Raw palette hues (Dracula ANSI) — PRIMITIVES only. Components never touch these;
+     they consume the keyed --color-cat-* roles below, so a non-Dracula theme can
+     recolor a category without the token name lying (Ley 2: nombra por rol, no por valor). */
   --color-cyan: oklch(0.883 0.093 213);   /* Dracula cyan   #8be9fd */
   --color-pink: oklch(0.755 0.183 347);   /* Dracula pink   #ff79c6 */
   --color-yellow: oklch(0.955 0.134 113); /* Dracula yellow #f1fa8c */
 
-  /* ---- Layer 2: SEMANTIC roles — components use ONLY these ---- */
-  /* Radius → rounded-card / rounded-control / rounded-pill / rounded-sharp */
-  --radius-card:    var(--r-md);    /* 8px — softened corner (not iOS-round 16, not brutalist 0) */
-  --radius-control: var(--r-sm);    /* 2px — inputs/buttons: a whisper, not iOS-round (was 8px) */
-  --radius-pill:    var(--r-sm);    /* 2px — tags/bars go square (a terminal has no round pills) */
-  --radius-sharp:   var(--r-sm);
+  /* ═══ TIER 2 · INVARIANTS — object physics. Named by NATURE. NEVER in [data-theme]. ═══
+     A dot is round because of WHAT IT IS, not how a theme dresses it. A theme decides
+     card corners; it does NOT get to square a spinner. (Ley 3.) */
+  --radius-round:   var(--r-full);  /* INVARIANTE · círculos por naturaleza: dot, avatar, spinner, marker de día, check-dot. NUNCA remapear en un tema. */
+
+  /* ═══ TIER 1 · SEMANTIC roles (TEMABLE) — components use ONLY these ═══
+     Radius → rounded-card / rounded-control / rounded-chip. Named by ROLE, not look. */
+  --radius-card:    var(--r-md);    /* TEMABLE · contenedor que agrupa contenido (card, panel, modal). 8px en arcade. */
+  --radius-control: var(--r-sm);    /* TEMABLE · control operable: input, botón, switch segmentado, checkbox. 2px en arcade. */
+  --radius-chip:    var(--r-sm);    /* TEMABLE · etiqueta/badge/tag (no operable, clasifica). 2px terminal-square en arcade; un tema cozy podría redondear. */
 
   /* Font size → text-label / text-secondary / text-body / text-md / text-subhead /
      text-heading / text-display. (--text-subhead, not --text-lg: would clash with
@@ -282,9 +331,18 @@ input::placeholder, textarea::placeholder {
   --color-surface-active: color-mix(in oklch, var(--color-ink-4) 10%, transparent);  /* active/selected fill (was static bg-ink-4/5–10) */
   --color-fg:            var(--color-ink-4);   /* primary text   (was text-ink-4) */
   --color-fg-muted:      var(--color-ink-3);   /* secondary text (was text-ink-3) */
-  --color-fg-faint:      var(--color-ink-2);   /* faint text     (was text-ink-2) */
+  --color-fg-faint:      oklch(0.55 0.012 75);  /* faint/hint text — DECOUPLED de ink-2 (que sigue siendo la primitiva de surface-2). ink-2@L0.33 medía 1.68:1 (ilegible sobre el fondo); 0.55 = 4.24:1 vs base / 3.97 vs card, y queda por debajo de fg-muted (5.88). REGLA: es el piso de legibilidad — NUNCA usar con /alpha. */
   --color-border:        color-mix(in oklch, var(--color-ink-4) 32%, transparent); /* MARKED hairline — measures 6:1, a line that exists (was 12% = 2.9:1, invisible) */
   --color-border-strong: color-mix(in oklch, var(--color-ink-4) 55%, transparent); /* emphasis border/ring (was 30%) */
+
+  /* Category classifiers → bg-cat-* / text-cat-* — TEMABLE, keyed by DOMAIN not color.
+     Meaning is fixed (this badge = Nómina); the theme picks the tone. Never money direction
+     (the amount already carries green=in/red=out). A theme remaps the whole set here. */
+  --color-cat-nomina:     var(--color-cyan);     /* Nómina    */
+  --color-cat-freelance:  var(--color-accent);   /* Freelance (lavender) */
+  --color-cat-fijo:       var(--color-pink);     /* Gasto fijo */
+  --color-cat-extra:      var(--color-warn);     /* Gasto extra (orange) */
+  --color-cat-vacaciones: var(--color-yellow);   /* Vacaciones */
 }
 
 :root {
@@ -293,27 +351,36 @@ input::placeholder, textarea::placeholder {
 }
 
 /* ── Themes · VISUAL LAYER ─────────────────────────────────────────────────────
-   A theme's *visual* half = a [data-theme] block that remaps Layer-2 semantics
-   (and/or overrides a Layer-1 primitive). It never touches a component. Apply
-   with <html data-theme="…">. Default (no attribute) = "arcade dark" (the @theme
-   mapping above). These skeletons are ILLUSTRATIVE — 2–3 sample values to prove
-   the structure holds under a real theme swap; not finished themes. The theme's
+   A theme's *visual* half = a [data-theme] block that remaps TIER 1 semantics
+   (and/or overrides a TIER 0 primitive). It NEVER touches a component and NEVER
+   remaps a TIER 2 invariant (--radius-round et al) — Ley 3. Apply with
+   <html data-theme="…">. "arcade" is the base (the @theme mapping above); the
+   default (no attribute) resolves to it. These skeletons are ILLUSTRATIVE — a few
+   sample values to prove the structure holds under a real theme swap. The theme's
    *other* half (capabilities/config: ships, rainbow-trail, dynamic Settings) will
    be declared in a TS theme object keyed to the same name — not built here. */
 
-/* "cozy pink lion" — soft corners, warm pink accent */
+/* "arcade dark" — the BASE theme. Its values live in @theme static above (so the
+   token classes emit + the no-attribute default resolves here). This anchor makes
+   data-theme="arcade" explicit and gives a home to any future arcade-only override.
+   NOTE: no invariant appears in any theme block — a squared spinner is never a look. */
+:root[data-theme="arcade"] { /* = @theme base; intentionally empty */ }
+
+/* "cozy pink lion" — soft corners, warm pink accent. A theme MAY round chips
+   (chip is TIER 1); it may NOT round-or-square a dot (that's TIER 2, absent here). */
 :root[data-theme="cozy"] {
-  --radius-card:    var(--r-2xl);  /* 24px — rounder than arcade's 16 */
+  --radius-card:    var(--r-2xl);  /* 24px — rounder than arcade's 8 */
   --radius-control: var(--r-lg);   /* 12px — softer controls */
+  --radius-chip:    var(--r-full); /* cozy rounds its tags into real pills (arcade keeps them square) */
   --color-accent:   oklch(0.78 0.13 350);   /* pink → re-tints every accent usage */
-  /* a full theme would also remap surfaces/fg + declare its capabilities in TS */
+  /* a full theme would also remap surfaces/fg + --color-cat-* + declare capabilities in TS */
 }
 
 /* "ultraminimal console" — square corners, monochrome */
 :root[data-theme="console"] {
   --radius-card:    var(--r-none);
   --radius-control: var(--r-none);
-  --radius-pill:    var(--r-sm);
+  --radius-chip:    var(--r-none);          /* everything square (was --radius-pill) */
   --color-accent:   var(--color-ink-4);     /* accent = foreground (monochrome) */
 }
 
