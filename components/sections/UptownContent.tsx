@@ -54,7 +54,7 @@ interface BalanceState { starting_balance: number; cuenta_bancaria: number; efec
 
 type ValetStatus = 'pending' | 'paid'
 interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; provider_amounts: number[]; price_per_point: number }
-interface ValetPayment { week_num: number; tenant_id: string; status: ValetStatus }
+interface ValetPayment { week_date: string; tenant_id: string; status: ValetStatus }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -982,16 +982,14 @@ function ValetTab({ month }: { month: string }) {
     await post('/api/uptown/valet/config', { month, ...next })
   }
 
-  async function toggleTenant(weekNum: number, tenantId: string, paid: boolean) {
+  async function toggleTenant(weekDate: string, tenantId: string, paid: boolean) {
     const status: ValetStatus = paid ? 'paid' : 'pending'
     setPayments(prev => {
-      const key = `${weekNum}:${tenantId}`
-      return [...prev.filter(p => `${p.week_num}:${p.tenant_id}` !== key),
-              { week_num: weekNum, tenant_id: tenantId, status }]
+      const key = `${weekDate}:${tenantId}`
+      return [...prev.filter(p => `${p.week_date}:${p.tenant_id}` !== key),
+              { week_date: weekDate, tenant_id: tenantId, status }]
     })
-    await post('/api/uptown/valet/payment', {
-      month, week_num: weekNum, tenant_id: tenantId, status,
-    })
+    await post('/api/uptown/valet/payment', { week_date: weekDate, tenant_id: tenantId, status })
   }
 
   function toggleProvider(idx: number, paid: boolean) {
@@ -1015,9 +1013,21 @@ function ValetTab({ month }: { month: string }) {
     return `Sáb ${d.getDate()}`
   }
 
+  // Absolute Saturday (ISO) for week w — SAME formula the 0046 backfill used, so it matches the
+  // stored week_date exactly and the grid shows every existing mark. week1_date is always present
+  // (defaulted to firstSaturdayOfMonth on load), mirroring the migration's COALESCE.
+  function weekDateOf(w: number): string {
+    const base = config.week1_date ?? firstSaturdayOfMonth(month)
+    const d = new Date(base + 'T12:00:00')
+    d.setDate(d.getDate() + (w - 1) * 7)
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
+  }
+
   const numWeeks        = saturdaysInMonth(month).length
   const ppt             = config.price_per_point
-  const cobrado         = payments.filter(p => p.status !== 'pending').reduce((s, p) => s + Math.round((VALET_TENANTS.find(t => t.id === p.tenant_id)?.pts ?? 0) * ppt), 0)
+  // payments is now global (continuous grid); scope the month's reconciliation to THIS month's weeks.
+  const monthWeekDates  = new Set(Array.from({ length: numWeeks }, (_, i) => weekDateOf(i + 1)))
+  const cobrado         = payments.filter(p => p.status !== 'pending' && monthWeekDates.has(p.week_date)).reduce((s, p) => s + Math.round((VALET_TENANTS.find(t => t.id === p.tenant_id)?.pts ?? 0) * ppt), 0)
   const esperado        = numWeeks * VALET_TOTAL_PTS * ppt
   const weekProvAmt     = (idx: number) => (config.provider_amounts as number[])[idx] ?? VALET_PROVIDER_WEEK
   const proveedorPagado = Array.from({ length: numWeeks }, (_, i) => (config.provider_paid as boolean[])[i] ? weekProvAmt(i) : 0).reduce((s, v) => s + v, 0)
@@ -1143,11 +1153,11 @@ function ValetTab({ month }: { month: string }) {
           key={w}
           weekNum={w}
           weekLabel={weekLabel(w)}
-          payments={payments.filter(p => p.week_num === w)}
+          payments={payments.filter(p => p.week_date === weekDateOf(w))}
           providerPaid={(config.provider_paid as boolean[])[w - 1] ?? false}
           providerAmount={weekProvAmt(w - 1)}
           pricePerPoint={ppt}
-          onTenantToggle={(tid, paid) => void toggleTenant(w, tid, paid)}
+          onTenantToggle={(tid, paid) => void toggleTenant(weekDateOf(w), tid, paid)}
           onProviderToggle={paid => toggleProvider(w - 1, paid)}
           onProviderAmount={amount => setProviderAmount(w - 1, amount)}
         />

@@ -16,10 +16,11 @@ export async function GET(req: NextRequest) {
       .select('num_weeks,week1_date,nu_balance,provider_paid,price_per_point')
       .eq('month', month)
       .maybeSingle(),
+    // ALL payments, keyed by absolute week_date — the grid is continuous (not month-scoped), so
+    // it filters to the visible weeks client-side and advances survive the month change.
     supabase
       .from('uptown_valet_payments')
-      .select('week_num,tenant_id,status')
-      .eq('month', month),
+      .select('week_date,tenant_id,status'),
   ])
 
   if (configRes.error)   return NextResponse.json({ error: configRes.error.message },   { status: 500 })
