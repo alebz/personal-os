@@ -52,7 +52,7 @@ interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 
 interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
 interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
 
-type ValetStatus = 'pending' | 'paid' | 'advance'
+type ValetStatus = 'pending' | 'paid'
 interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; provider_amounts: number[]; price_per_point: number }
 interface ValetPayment { week_num: number; tenant_id: string; status: ValetStatus }
 
@@ -884,8 +884,7 @@ function ValetWeekCard({
   }
 
   function isPaid(tid: string): boolean {
-    const s = payments.find(p => p.tenant_id === tid)?.status
-    return s === 'paid' || s === 'advance'
+    return payments.find(p => p.tenant_id === tid)?.status === 'paid'
   }
   const tenantAmt = (pts: number) => Math.round(pts * pricePerPoint)
   const totalWeek = VALET_TOTAL_PTS * pricePerPoint
