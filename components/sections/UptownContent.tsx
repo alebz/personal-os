@@ -1294,12 +1294,14 @@ export default function UptownContent() {
     setNomina(prev => prev.map(n => n.week_num === week_num ? { ...n, paid } : n))
     const row = nomina.find(n => n.week_num === week_num)
     await post('/api/uptown/nomina', { month, week_num, paid, amount: row?.amount ?? 0 })
+    window.dispatchEvent(new CustomEvent('finance:refresh'))   // live-refresh Finanzas Alex (nómina → Efectivo + check)
   }
 
   async function setNominaAmount(week_num: number, amount: number) {
     setNomina(prev => prev.map(n => n.week_num === week_num ? { ...n, amount } : n))
     const row = nomina.find(n => n.week_num === week_num)
     await post('/api/uptown/nomina', { month, week_num, amount, paid: row?.paid ?? false })
+    window.dispatchEvent(new CustomEvent('finance:refresh'))
   }
 
   // ── Extra income handlers ─────────────────────────────────────────────────
@@ -1330,6 +1332,7 @@ export default function UptownContent() {
     setNomina(prev => prev.map(n => n.week_num === week_num ? { ...n, method } : n))
     const row = nomina.find(n => n.week_num === week_num)
     await post('/api/uptown/nomina', { month, week_num, method, amount: row?.amount ?? 0, paid: row?.paid ?? false })
+    window.dispatchEvent(new CustomEvent('finance:refresh'))
   }
 
   async function setExtraIncomeMethod(id: string, method: 'cash' | 'card') {

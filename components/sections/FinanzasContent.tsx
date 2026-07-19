@@ -1095,6 +1095,13 @@ export default function FinancePage() {
     }
   }, [])
 
+  const loadNomina = useCallback(async () => {
+    const nomina = await fetch(`/api/uptown/nomina?month=${currMonth()}`)
+      .then(r => r.ok ? r.json() as Promise<NominaMirror[]> : [])
+      .catch(() => [])
+    setNominaMirror(nomina ?? [])
+  }, [])
+
   // Caja Fuerte funds (scope 'personal') + all their handlers, via the shared hook. After any fund
   // mutation it also reloads this month's movements (the fondo aportación shows in the Historial and
   // shifts the wallet deltas).
@@ -1128,6 +1135,19 @@ export default function FinancePage() {
     void loadMovements(month)
     void loadMonthChecks(month)
   }, [month, loadMovements, loadMonthChecks])
+
+  // Live cross-section sync: the drum keeps every section mounted, so marking nómina (or any
+  // Uptown↔Alex write) elsewhere leaves this stale until reload. Uptown fires 'finance:refresh'
+  // after such a write; we refetch movements (→ Efectivo delta) + the nómina mirror (→ check).
+  // Same pattern as 'capture:task' used across the OS.
+  useEffect(() => {
+    function onRefresh() {
+      void loadMovements(month)
+      void loadNomina()
+    }
+    window.addEventListener('finance:refresh', onRefresh)
+    return () => window.removeEventListener('finance:refresh', onRefresh)
+  }, [month, loadMovements, loadNomina])
 
   // ── MonthChecks persistence ───────────────────────────────────────────────
 

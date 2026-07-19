@@ -18,6 +18,15 @@ function saturdaysInMonth(month: string): { num: number; label: string }[] {
   return result
 }
 
+// The calendar date (YYYY-MM-DD) of the week_num-th Saturday — the synced movement's date.
+function saturdayDate(month: string, week_num: number): string {
+  const [y, mo] = month.split('-').map(Number)
+  const d = new Date(y, mo - 1, 1)
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1)
+  d.setDate(d.getDate() + (week_num - 1) * 7)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
@@ -77,5 +86,34 @@ export async function POST(req: NextRequest) {
     .upsert(record, { onConflict: 'month,week_num' })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Sync a linked wallet income into Finanzas Alex so paid nómina actually raises his balance.
+  // The nómina is Uptown paying Alex: from his side it's income landing in a wallet by method
+  // (cash→efectivo, card→tarjeta). Idempotent via source_key (delete-then-insert = always exactly
+  // one, in sync with the current amount/method). envelope_id stays null so it's PERSONAL — it
+  // shows in his Historial and feeds accountDelta (Efectivo), and the Uptown scope filter never
+  // touches it. cobrado still comes from the read-only mirror (mirrorPaid), so nothing double-counts.
+  // Wrapped so a failure here (e.g. migration 0044 not applied yet) never blocks marking nómina.
+  try {
+    const sourceKey = `uptown_nomina:${month}:${week_num}`
+    await supabase.from('finance_movements').delete().eq('source_key', sourceKey)
+    if (record.paid && Number(record.amount) > 0) {
+      await supabase.from('finance_movements').insert({
+        source_key:   sourceKey,
+        month,
+        date:         saturdayDate(month, week_num),
+        description:  `Nómina · Semana ${week_num}`,
+        amount:       record.amount,
+        flow:         'in',
+        category:     'nomina',
+        metodo:       record.method === 'cash' ? 'efectivo' : 'tarjeta',
+        envelope_id:  null,
+        commitment_id: null,
+      })
+    }
+  } catch (e) {
+    console.error('[nomina] wallet-movement sync failed (nómina still saved):', e)
+  }
+
   return NextResponse.json({ ok: true })
 }
