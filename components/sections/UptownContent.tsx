@@ -6,6 +6,7 @@ import { MethodCell } from '@/components/finance/MethodCell'
 import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { FundLedger } from '@/components/finance/FundLedger'
+import DrumModal from '@/components/DrumModal'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ interface ExtraItem  { id: string; description: string; amount: number; method: 
 interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
 
 type ValetStatus = 'pending' | 'paid'
-interface ValetConfig  { num_weeks: number; week1_date: string | null; nu_balance: number; provider_paid: boolean[]; provider_amounts: number[]; price_per_point: number }
+interface ValetConfig  { num_weeks: number; week1_date: string | null; price_per_point: number }
 interface ValetPayment { week_date: string; tenant_id: string; status: ValetStatus }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -947,12 +948,14 @@ function ValetWeekCard({
 // ─── ValetTab ─────────────────────────────────────────────────────────────────
 
 function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: Fund; onLedgerChange: () => void }) {
-  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, nu_balance: 0, provider_paid: [], provider_amounts: [], price_per_point: 176 })
+  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, price_per_point: 176 })
   const [payments, setPayments] = useState<ValetPayment[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
-  const [nuDraft,  setNuDraft]  = useState('0')
+  const [bankDraft, setBankDraft] = useState('')
+  const [ledgerOpen, setLedgerOpen] = useState(false)
   const [pptDraft, setPptDraft] = useState('176')
+  const saved = Number(nuFund?.saved ?? 0)   // saldo corrido real de la libreta Nu
 
   useEffect(() => {
     setLoading(true); setError(null)
@@ -963,13 +966,9 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
         const cfg: ValetConfig = {
           num_weeks:        data.config?.num_weeks ?? 4,
           week1_date:       data.config?.week1_date ?? firstSaturdayOfMonth(month),
-          nu_balance:       Number(data.config?.nu_balance ?? 0),
-          provider_paid:    Array.isArray(data.config?.provider_paid)    ? data.config!.provider_paid    : [],
-          provider_amounts: Array.isArray(data.config?.provider_amounts) ? data.config!.provider_amounts : [],
           price_per_point:  Number(data.config?.price_per_point ?? 176),
         }
         setConfig(cfg)
-        setNuDraft(String(cfg.nu_balance))
         setPptDraft(String(cfg.price_per_point))
         setPayments(data.payments ?? [])
       })
@@ -981,7 +980,22 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
     const next = { ...config, ...fields }
     setConfig(next)
     await post('/api/uptown/valet/config', { month, ...next })
-    if (fields.provider_paid !== undefined) onLedgerChange()   // provider sync touched the Nu ledger
+  }
+
+  // Único punto de edición del saldo: si el banco difiere de la libreta, registra un ajuste NOMBRADO
+  // (aportación/retiro sobre el fondo valet_nu). Nunca se edita nu_balance a mano.
+  async function registrarAjuste() {
+    const bank = parseFloat(bankDraft)
+    if (isNaN(bank)) return
+    const delta = Math.round((bank - saved) * 100) / 100
+    if (Math.abs(delta) < 0.01) { setBankDraft(''); return }
+    await post('/api/finance/funds/movement', {
+      key: 'valet_nu',
+      flow: delta > 0 ? 'out' : 'in',   // out = aportación (sube el fondo), in = retiro (baja)
+      amount: Math.abs(delta), description: 'Ajuste de conciliación', month,
+    })
+    setBankDraft('')
+    onLedgerChange()
   }
 
   async function toggleTenant(weekDate: string, tenantId: string, paid: boolean) {
@@ -995,18 +1009,30 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
     onLedgerChange()   // cobro created/removed in the Nu ledger → refresh it
   }
 
-  function toggleProvider(idx: number, paid: boolean) {
-    const arr = [...(config.provider_paid as boolean[])]
-    while (arr.length <= idx) arr.push(false)
-    arr[idx] = paid
-    void saveConfig({ provider_paid: arr })
+  // Provider state IS the ledger: a valet_prov:<week_date> movement exists ⇔ that week's provider is
+  // paid (same source_key toggle pattern as the mantenimiento fondo — no dual source).
+  const provMovOf = (weekDate: string) => nuFund?.movements.find(m => m.source_key === `valet_prov:${weekDate}`)
+
+  async function toggleProvider(weekDate: string, paid: boolean) {
+    if (paid) {
+      await post('/api/finance/funds/movement', {
+        key: 'valet_nu', flow: 'in', amount: Number(provMovOf(weekDate)?.amount ?? VALET_PROVIDER_WEEK),
+        description: `Pago proveedor · ${weekDate}`, month: weekDate.slice(0, 7), date: weekDate,
+        source_key: `valet_prov:${weekDate}`,
+      })
+    } else {
+      await fetch(`/api/finance/funds/movement?source_key=${encodeURIComponent(`valet_prov:${weekDate}`)}`, { method: 'DELETE' })
+    }
+    onLedgerChange()
   }
 
-  function setProviderAmount(idx: number, amount: number) {
-    const arr = [...(config.provider_amounts as number[])]
-    while (arr.length <= idx) arr.push(VALET_PROVIDER_WEEK)
-    arr[idx] = amount
-    void saveConfig({ provider_amounts: arr })
+  async function setProviderAmount(weekDate: string, amount: number) {
+    if (!provMovOf(weekDate)) return   // amount only applies to a paid week (a movement to re-amount)
+    await post('/api/finance/funds/movement', {
+      key: 'valet_nu', flow: 'in', amount, description: `Pago proveedor · ${weekDate}`,
+      month: weekDate.slice(0, 7), date: weekDate, source_key: `valet_prov:${weekDate}`,
+    })
+    onLedgerChange()
   }
 
   function weekLabel(w: number): string {
@@ -1032,9 +1058,10 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
   const monthWeekDates  = new Set(Array.from({ length: numWeeks }, (_, i) => weekDateOf(i + 1)))
   const cobrado         = payments.filter(p => p.status !== 'pending' && monthWeekDates.has(p.week_date)).reduce((s, p) => s + Math.round((VALET_TENANTS.find(t => t.id === p.tenant_id)?.pts ?? 0) * ppt), 0)
   const esperado        = numWeeks * VALET_TOTAL_PTS * ppt
-  const weekProvAmt     = (idx: number) => (config.provider_amounts as number[])[idx] ?? VALET_PROVIDER_WEEK
-  const proveedorPagado = Array.from({ length: numWeeks }, (_, i) => (config.provider_paid as boolean[])[i] ? weekProvAmt(i) : 0).reduce((s, v) => s + v, 0)
-  const proveedorTotal  = Array.from({ length: numWeeks }, (_, i) => weekProvAmt(i)).reduce((s, v) => s + v, 0)
+  const provPaidOf      = (w: number) => !!provMovOf(weekDateOf(w))
+  const provAmtOf       = (w: number) => Number(provMovOf(weekDateOf(w))?.amount ?? VALET_PROVIDER_WEEK)
+  const proveedorPagado = Array.from({ length: numWeeks }, (_, i) => provPaidOf(i + 1) ? provAmtOf(i + 1) : 0).reduce((s, v) => s + v, 0)
+  const proveedorTotal  = Array.from({ length: numWeeks }, (_, i) => provAmtOf(i + 1)).reduce((s, v) => s + v, 0)
 
   if (loading) return (
     <div className="flex items-center justify-center py-32">
@@ -1071,38 +1098,8 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
                 style={{ width: `${proveedorTotal ? Math.min(proveedorPagado / proveedorTotal * 100, 100) : 0}%` }} />
             </div>
           </div>
-          {(() => {
-            const nuEsperado = cobrado - proveedorPagado
-            const diferencia = config.nu_balance - nuEsperado   // saldoReal − esperado: sobrante +, faltante −
-            return (
-              <div className="space-y-1.5 rounded-control border border-border bg-surface-2 px-3 py-2.5">
-                <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Cuenta NU · real vs esperado</p>
-                <div className="flex items-center justify-between text-secondary">
-                  <span className="text-fg-muted">Saldo real</span>
-                  <input
-                    type="number"
-                    value={nuDraft}
-                    onChange={e => setNuDraft(e.target.value)}
-                    onBlur={() => {
-                      const val = parseFloat(nuDraft) || 0
-                      if (val !== config.nu_balance) void saveConfig({ nu_balance: val })
-                      else setNuDraft(String(config.nu_balance))
-                    }}
-                    onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-right tabular-nums font-bold text-fg outline-none hover:border-border focus:border-accent/50 focus:bg-surface-2"
-                  />
-                </div>
-                <div className="flex items-center justify-between text-secondary">
-                  <span className="text-fg-muted">Saldo esperado</span>
-                  <span className="tabular-nums text-fg"><Mxn v={nuEsperado} /></span>
-                </div>
-                <div className={`flex items-center justify-between border-t border-border pt-1 text-secondary font-bold ${diferencia < 0 ? 'text-danger' : 'text-ok'}`}>
-                  <span>Diferencia</span>
-                  <span className="tabular-nums"><Mxn v={diferencia} /></span>
-                </div>
-              </div>
-            )
-          })()}
+          {/* La conciliación real (libreta vs banco) vive en la libreta abajo — el "saldo esperado"
+              ficticio (cobrado − proveedor) se eliminó: nunca cuadraba con pagos desfasados. */}
         </div>
         {/* Configuración */}
         <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-border pt-3">
@@ -1122,19 +1119,6 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-secondary text-fg-muted">Saldo NU:</span>
-          <input type="number" value={nuDraft}
-            onChange={e => setNuDraft(e.target.value)}
-            onBlur={() => {
-              const val = parseFloat(nuDraft) || 0
-              if (val !== config.nu_balance) void saveConfig({ nu_balance: val })
-              else setNuDraft(String(config.nu_balance))
-            }}
-            onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-            className="w-28 rounded border border-border bg-surface-2 px-2 py-0.5 text-right text-secondary tabular-nums text-fg outline-none focus:border-accent/50" />
-        </div>
-
-        <div className="flex items-center gap-1.5">
           <span className="text-secondary text-fg-muted">Monto/pt:</span>
           <input type="number" value={pptDraft}
             onChange={e => setPptDraft(e.target.value)}
@@ -1149,14 +1133,52 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
       </div>
       </div>
 
-      {/* Libreta de la Cuenta Nu — el dinero real: fecha · concepto · entrada · salida · saldo corrido */}
+      {/* Cuenta Nu — card compacta (saldo + abrir); la libreta + conciliación viven en un DrumModal,
+          como Caja Fuerte / mantenimiento (50+ movimientos no pueden vivir desplegados). */}
       {nuFund && (
         <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Libreta · Cuenta Nu</p>
-            <p className="text-heading font-black tabular-nums text-fg"><Mxn v={Number(nuFund.saved)} /></p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Cuenta Nu</p>
+              <p className="mt-1 text-heading font-black tabular-nums text-fg"><Mxn v={saved} /></p>
+            </div>
+            <button onClick={() => setLedgerOpen(true)}
+              className="shrink-0 rounded-card border border-border px-3 py-1.5 text-secondary font-medium text-fg-muted transition-colors hover:text-fg">
+              Ver libreta →
+            </button>
           </div>
-          <FundLedger movements={nuFund.movements} />
+
+          <DrumModal open={ledgerOpen} onClose={() => setLedgerOpen(false)} ariaLabel="Libreta · Cuenta Nu">
+            <div className="mb-4 flex items-baseline justify-between gap-3">
+              <h3 className="text-subhead font-bold text-fg">Cuenta Nu</h3>
+              <p className="text-heading font-black tabular-nums text-fg"><Mxn v={saved} /></p>
+            </div>
+            {/* Conciliar: libreta vs banco → Cuadrar registra un ajuste nombrado (único punto de edición) */}
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-control border border-border bg-surface-2 px-3 py-2.5 text-secondary">
+              <span className="text-fg-muted">¿Qué dice Nu?</span>
+              <input type="number" placeholder="$ banco" value={bankDraft}
+                onChange={e => setBankDraft(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && void registrarAjuste()}
+                className="w-28 rounded border border-border bg-surface-1 px-2 py-0.5 text-right tabular-nums text-fg outline-none focus:border-accent/50" />
+              {(() => {
+                const bank = parseFloat(bankDraft)
+                if (isNaN(bank) || Math.abs(bank - saved) < 0.01) return null
+                const diff = Math.round((bank - saved) * 100) / 100
+                return (
+                  <>
+                    <span className={`font-bold ${diff < 0 ? 'text-danger' : 'text-ok'}`}>dif <Mxn v={diff} /></span>
+                    <button onClick={() => void registrarAjuste()}
+                      className="rounded-control bg-accent/15 px-2.5 py-1 font-medium text-accent transition-colors hover:bg-accent/25">
+                      Cuadrar
+                    </button>
+                  </>
+                )
+              })()}
+            </div>
+            {nuFund.movements.length > 0
+              ? <FundLedger movements={nuFund.movements} />
+              : <p className="py-6 text-center text-body italic text-fg-muted">Sin movimientos todavía</p>}
+          </DrumModal>
         </div>
       )}
 
@@ -1168,12 +1190,12 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
           weekNum={w}
           weekLabel={weekLabel(w)}
           payments={payments.filter(p => p.week_date === weekDateOf(w))}
-          providerPaid={(config.provider_paid as boolean[])[w - 1] ?? false}
-          providerAmount={weekProvAmt(w - 1)}
+          providerPaid={provPaidOf(w)}
+          providerAmount={provAmtOf(w)}
           pricePerPoint={ppt}
           onTenantToggle={(tid, paid) => void toggleTenant(weekDateOf(w), tid, paid)}
-          onProviderToggle={paid => toggleProvider(w - 1, paid)}
-          onProviderAmount={amount => setProviderAmount(w - 1, amount)}
+          onProviderToggle={paid => void toggleProvider(weekDateOf(w), paid)}
+          onProviderAmount={amount => void setProviderAmount(weekDateOf(w), amount)}
         />
       ))}
       </div>
