@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
-import { CajaFuerteSection } from '@/components/finance/CajaFuerteSection'
+import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
+import { FundLedger } from '@/components/finance/FundLedger'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -945,7 +946,7 @@ function ValetWeekCard({
 
 // ─── ValetTab ─────────────────────────────────────────────────────────────────
 
-function ValetTab({ month }: { month: string }) {
+function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: Fund; onLedgerChange: () => void }) {
   const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, nu_balance: 0, provider_paid: [], provider_amounts: [], price_per_point: 176 })
   const [payments, setPayments] = useState<ValetPayment[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -980,6 +981,7 @@ function ValetTab({ month }: { month: string }) {
     const next = { ...config, ...fields }
     setConfig(next)
     await post('/api/uptown/valet/config', { month, ...next })
+    if (fields.provider_paid !== undefined) onLedgerChange()   // provider sync touched the Nu ledger
   }
 
   async function toggleTenant(weekDate: string, tenantId: string, paid: boolean) {
@@ -990,6 +992,7 @@ function ValetTab({ month }: { month: string }) {
               { week_date: weekDate, tenant_id: tenantId, status }]
     })
     await post('/api/uptown/valet/payment', { week_date: weekDate, tenant_id: tenantId, status })
+    onLedgerChange()   // cobro created/removed in the Nu ledger → refresh it
   }
 
   function toggleProvider(idx: number, paid: boolean) {
@@ -1145,6 +1148,17 @@ function ValetTab({ month }: { month: string }) {
         </div>
       </div>
       </div>
+
+      {/* Libreta de la Cuenta Nu — el dinero real: fecha · concepto · entrada · salida · saldo corrido */}
+      {nuFund && (
+        <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Libreta · Cuenta Nu</p>
+            <p className="text-heading font-black tabular-nums text-fg"><Mxn v={Number(nuFund.saved)} /></p>
+          </div>
+          <FundLedger movements={nuFund.movements} />
+        </div>
+      )}
 
       {/* Semanas */}
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -1376,7 +1390,11 @@ export default function UptownContent() {
   // Fund saldo (flow-aware) + this month's contribution, both from the fund ledger (source of truth).
   // Derived from the shared Caja Fuerte funds (scope 'uptown'). Rollup = Σ active funds; the month's
   // "Apartado" = the mantenimiento fund's source_key'd movement for this month.
-  const cajaTotal = cajaFuerte.funds.filter(f => !f.archived).reduce((s, f) => s + Number(f.saved), 0)
+  // valet_nu is the Valet's operating account (its ledger lives in the Valet tab), NOT a Caja Fuerte
+  // apartado — split it out so it never shows as a fund card nor inflates the Caja Fuerte rollup.
+  const nuFund    = cajaFuerte.funds.find(f => f.key === 'valet_nu')
+  const apartados = cajaFuerte.funds.filter(f => f.key !== 'valet_nu')
+  const cajaTotal = apartados.filter(f => !f.archived).reduce((s, f) => s + Number(f.saved), 0)
   const mantFund = cajaFuerte.funds.find(f => f.key === 'mantenimiento')
   const fondoMovThisMonth = mantFund?.movements.find(m => m.source_key === `uptown_fondo:${month}`)
   const fondoAportado = fondoMovThisMonth ? Number(fondoMovThisMonth.amount) : 0   // transfer set aside this month
@@ -1444,9 +1462,9 @@ export default function UptownContent() {
 
         <div className="flex-1 min-h-0 overflow-y-auto pb-8">
         {pageTab === 'cajafuerte' ? (
-          <CajaFuerteSection funds={cajaFuerte.funds} {...cajaFuerte.handlers} createPlaceholder="Nuevo fondo (obra, reserva, depósito…)" />
+          <CajaFuerteSection funds={apartados} {...cajaFuerte.handlers} createPlaceholder="Nuevo fondo (obra, reserva, depósito…)" />
         ) : pageTab === 'valet' ? (
-          <ValetTab month={month} />
+          <ValetTab month={month} nuFund={nuFund} onLedgerChange={cajaFuerte.refresh} />
         ) : pageTab === 'historial' && !loading && !error ? (
           <UptownHistorialTab
             rents={rents} expenses={expenses} nomina={nomina}
