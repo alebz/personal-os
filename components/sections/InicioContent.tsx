@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import CalendarCard from '@/components/CalendarCard'
 import Clock from '@/components/Clock'
-import { dayColorFlow } from '@/lib/weekdayColors'
+import { dayColorFlow, crtDayColor } from '@/lib/weekdayColors'
+import { useOSSettings } from '@/components/OSSettingsContext'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ import { dayColorFlow } from '@/lib/weekdayColors'
 
 function Hero() {
   const [quote, setQuote] = useState<string | null>(null)
+  const { crt } = useOSSettings()   // color del reloj reactivo: fósforo en mono, día en multi
 
   useEffect(() => {
     fetch('/api/daily-quote')
@@ -22,7 +24,7 @@ function Hero() {
   return (
     <div className="relative flex shrink-0 flex-col items-center justify-center gap-8 py-14">
       <div className="py-4">
-        <Clock scale={1.8} colorFn={dayColorFlow} />
+        <Clock scale={1.8} colorFn={(d: Date) => crtDayColor(dayColorFlow(d), crt)} />
       </div>
 
       {quote && (

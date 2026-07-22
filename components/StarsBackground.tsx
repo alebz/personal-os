@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { useOSSettings } from './OSSettingsContext'
-import type { Fleet } from './OSSettingsContext'
+
+// Tipo local de flota (antes venía de OSSettingsContext; el selector de flota se retiró de Ajustes
+// pero la simulación de naves lo sigue usando internamente — se mantiene local, intacto).
+type Fleet = 'all' | 'mainship' | 'nairan' | 'klaed' | 'nautolan'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -931,7 +934,6 @@ function pickEvent(night: boolean): string {
     { type: 'shooting-star', w: 28 },
     { type: 'airplane',      w: 24 },
     { type: 'satellite',     w: 18 },
-    { type: 'comet',         w: night ? 14 : 8 },
   ]
   const total = pool.reduce((s, e) => s + e.w, 0)
   let r = Math.random() * total
@@ -946,73 +948,6 @@ function edgePos(edge: number): [number, number] {
     case 2: return [Math.random() * 110 - 5, 105]
     default: return [-5, Math.random() * 110 - 5]
   }
-}
-
-// ─── Planet system ───────────────────────────────────────────────────────────
-
-const PLANETS = [
-  { id: 'teal',   src: '/celestial bodies/planet.png',        size: 160, speed: '4s'   },
-  { id: 'orange', src: '/celestial bodies/planet_orange.png', size: 100, speed: '3.5s' },
-  { id: 'blue',   src: '/celestial bodies/planet_blue.png',   size: 100, speed: '5s'   },
-  { id: 'green',  src: '/celestial bodies/planet_green.png',  size: 100, speed: '4.5s' },
-  { id: 'saturn', src: '/celestial bodies/saturn.png',        size: 160, speed: '6s'   },
-]
-
-function pickPlanetIdx(exclude: number): number {
-  if (PLANETS.length === 1) return 0
-  let i: number
-  do { i = Math.floor(Math.random() * PLANETS.length) } while (i === exclude)
-  return i
-}
-
-function OrbitingPlanet() {
-  const [idx, setIdx]           = useState(() => Math.floor(Math.random() * PLANETS.length))
-  const [visible, setVisible]   = useState(false)
-  const [cycleKey, setCycleKey] = useState(0)
-  const startX   = useRef(5  + Math.random() * 30)
-  const startY   = useRef(10 + Math.random() * 60)
-  const orbitDur = useRef(120 + Math.random() * 60)
-
-  useEffect(() => {
-    const dur = orbitDur.current
-    const t1 = setTimeout(() => setVisible(true), 50)
-    const t2 = setTimeout(() => setVisible(false), (dur - 2) * 1000)
-    const t3 = setTimeout(() => {
-      setIdx(prev => {
-        startX.current   = 5  + Math.random() * 30
-        startY.current   = 10 + Math.random() * 60
-        orbitDur.current = 120 + Math.random() * 60
-        return pickPlanetIdx(prev)
-      })
-      setCycleKey(k => k + 1)
-    }, dur * 1000)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-  }, [cycleKey])
-
-  const planet = PLANETS[idx]
-  return (
-    <div
-      key={cycleKey}
-      aria-hidden="true"
-      style={{
-        position:            'fixed',
-        left:                `${startX.current}vw`,
-        top:                 `${startY.current}vh`,
-        width:               planet.size,
-        height:              planet.size,
-        backgroundImage:     `url(${planet.src})`,
-        backgroundSize:      '5000% 100%',
-        backgroundRepeat:    'no-repeat',
-        backgroundPositionY: '0%',
-        imageRendering:      'pixelated',
-        animation:           `planetOrbit ${orbitDur.current}s linear infinite, planetSpin ${planet.speed} steps(50) infinite`,
-        opacity:             visible ? 1 : 0,
-        transition:          'opacity 2s ease',
-        pointerEvents:       'none',
-        zIndex:              1,
-      }}
-    />
-  )
 }
 
 // ─── Asteroids (simulated hazards: explode on contact / when shot) ─────────────
@@ -1030,52 +965,6 @@ const ASTEROID_FADE_OUT = 2600  // ms slow fade-out before removal when drifting
 const ASTEROID_HARD_CAP = 64  // never exceed (ambient + a heavy multi-row belt wave)
 const ASTEROID_DMG     = 3    // serious blast damage to nearby ships
 const ASTEROID_BLAST   = 78   // px — radius of the damaging shockwave
-
-// ─── SVG: Comet ───────────────────────────────────────────────────────────────
-
-const COMET_SPARKS: [number, number, string, string, string][] = [
-  [3,  4, '0.44s', '0.00s', '#fff8a0'],
-  [7,  3, '0.38s', '0.20s', '#ffe880'],
-  [10, 4, '0.52s', '0.38s', '#ffffff'],
-  [5,  4, '0.41s', '0.55s', '#fff080'],
-  [14, 4, '0.35s', '0.14s', '#fffff0'],
-  [8,  4, '0.48s', '0.68s', '#ffe060'],
-  [19, 3, '0.40s', '0.30s', '#fff8d0'],
-]
-
-function CometSVG() {
-  const COLORS = [
-    '#1c1a08', '#1c1a08', '#1c1a08', '#1c1a08',
-    '#2e2c10', '#2e2c10', '#2e2c10', '#2e2c10',
-    '#4a4620', '#4a4620', '#4a4620', '#4a4620',
-    '#6b6630', '#6b6630', '#6b6630', '#6b6630',
-    '#948c50', '#948c50', '#948c50', '#948c50',
-    '#bdb870', '#bdb870', '#bdb870',
-    '#dddcb0', '#dddcb0', '#dddcb0',
-    '#f0f0d0', '#fffff0',
-  ]
-  return (
-    <svg width="28" height="9" viewBox="0 0 28 9"
-      style={{ display: 'block', imageRendering: 'pixelated' }}
-      shapeRendering="crispEdges"
-    >
-      {COLORS.map((color, x) => {
-        const halfH = Math.max(1, Math.round((x / 27) * 4))
-        return <rect key={x} x={x} y={4 - halfH} width={1} height={halfH * 2} fill={color} shapeRendering="crispEdges" />
-      })}
-      <rect x={27} y={4} width={1} height={1} fill="white" shapeRendering="crispEdges" />
-      {COMET_SPARKS.map(([x, y, dur, del, c]) => (
-        <rect
-          key={`s${x}${y}`}
-          x={x} y={y} width={1} height={1}
-          fill={c}
-          shapeRendering="crispEdges"
-          style={{ animation: `comet-spark ${dur} ease-in-out ${del} infinite` }}
-        />
-      ))}
-    </svg>
-  )
-}
 
 // ─── Pixel-art projectiles (procedural, no external assets) ────────────────────
 
@@ -1486,9 +1375,6 @@ function wrapFieldX(fieldX: number): number {
 }
 
 function SpaceSim() {
-  const { shipFleet } = useOSSettings()
-  const fleetRef = useRef<Fleet>(shipFleet)
-  useEffect(() => { fleetRef.current = shipFleet }, [shipFleet])
 
   const agents   = useRef(new Map<string, ShipAgent>())
   const projs    = useRef(new Map<string, ProjData>())
@@ -1570,12 +1456,8 @@ function SpaceSim() {
     }
 
     function pickType(): AgentFleetType {
-      const fl = fleetRef.current
-      if (fl === 'mainship') return 'mainship'
-      if (fl === 'nairan')   return 'nairan'
-      if (fl === 'klaed')    return 'klaed'
-      if (fl === 'nautolan') return 'nautolan'
-      // 'all': three enemy factions equally likely; mainship rare solo
+      // Tres facciones enemigas por igual; mainship raro en solo. El selector de flota se retiró
+      // (siempre 'all'): así el torneo siempre tiene contendientes y las batallas no cambian.
       const r = Math.random()
       if (r < 0.05)  return 'mainship'
       if (r < 0.37)  return 'nairan'
@@ -3650,12 +3532,11 @@ function SpaceSim() {
 type StarEvt   = { x: number; y: number; angle: number; key: string }
 type PlaneEvt  = { x0: number; y0: number; x1: number; y1: number; angle: number; duration: number; key: string }
 type SatEvt    = { y: number; rtl: boolean; key: string }
-type CometEvt  = { x0: number; y0: number; x1: number; y1: number; angle: number; duration: number; key: string }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function StarsBackground() {
-  const { showStars, showComets, showPlanets, showPlanes, showShips } = useOSSettings()
+  const { showStars, showPlanes, showShips } = useOSSettings()
   const [stars, setStars] = useState<StarData[]>([])
   // Client-only gate: the background (random planet positions, localStorage-seeded
   // score, the whole sim) never renders on the server, so there's no hydration mismatch.
@@ -3664,7 +3545,6 @@ export function StarsBackground() {
   const [starEvent,   setStarEvent]   = useState<StarEvt   | null>(null)
   const [planeEvent,  setPlaneEvent]  = useState<PlaneEvt  | null>(null)
   const [satEvent,   setSatEvent]   = useState<SatEvt  | null>(null)
-  const [cometEvent, setCometEvent] = useState<CometEvt | null>(null)
 
   const mountedRef    = useRef(true)
   const schedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -3709,27 +3589,12 @@ export function StarsBackground() {
       return 0
     }
 
-    function fireComet(): number {
-      const se = Math.floor(Math.random() * 4)
-      let ee   = Math.floor(Math.random() * 3)
-      if (ee >= se) ee++
-      const [x0, y0] = edgePos(se)
-      const [x1, y1] = edgePos(ee)
-      const angle    = Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI
-      const dist     = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
-      const duration = Math.max(60, Math.min(90, dist / 1.4))
-      setCometEvent({ x0, y0, x1, y1, angle, duration, key: `comet-${Date.now()}` })
-      setClear('comet', () => setCometEvent(null), duration * 1000 + 2000)
-      return 0
-    }
-
     function fireEvent(type: string): number {
       if (!mountedRef.current) return 0
       switch (type) {
         case 'shooting-star': return fireStar()
         case 'satellite':     return fireSat()
         case 'airplane':      return firePlane()
-        case 'comet':         return fireComet()
         default:              return 0
       }
     }
@@ -3771,14 +3636,6 @@ export function StarsBackground() {
         @keyframes shieldCycle40 { from { background-position: 0% 0%; } to { background-position: 102.56% 0%; } }
         @keyframes shieldFlash  { 0%, 20%   { opacity: 1; } 21%, 100% { opacity: 0; } }
         @keyframes shieldPanic  { 0%, 40%   { opacity: 1; } 41%, 100% { opacity: 0; } }
-        @keyframes planetSpin   { from { background-position-x: 0%; } to { background-position-x: 100%; } }
-        @keyframes planetOrbit  {
-          0%   { transform: translate(0vw,  0vh);  }
-          25%  { transform: translate(30vw, -8vh); }
-          50%  { transform: translate(60vw,  0vh); }
-          75%  { transform: translate(30vw,  8vh); }
-          100% { transform: translate(0vw,  0vh);  }
-        }
         @keyframes destructTo108_33 { from { background-position: 0% 0%; } to { background-position: 108.33% 0%; } }
         @keyframes destructTo114_29 { from { background-position: 0% 0%; } to { background-position: 114.29% 0%; } }
         @keyframes destructTo112_50 { from { background-position: 0% 0%; } to { background-position: 112.50% 0%; } }
@@ -3855,24 +3712,7 @@ export function StarsBackground() {
           </div>
         )}
 
-        {showComets && cometEvent && (
-          <div
-            key={cometEvent.key}
-            style={{
-              position: 'absolute', top: 0, left: 0,
-              animation: `comet-travel ${cometEvent.duration}s ease-in-out 1 forwards`,
-              ['--cx0' as string]: `${cometEvent.x0}vw`, ['--cy0' as string]: `${cometEvent.y0}vh`,
-              ['--cx1' as string]: `${cometEvent.x1}vw`, ['--cy1' as string]: `${cometEvent.y1}vh`,
-            } as React.CSSProperties}
-          >
-            <div style={{ transform: `rotate(${cometEvent.angle}deg)`, transformOrigin: '27px 4px' }}>
-              <CometSVG />
-            </div>
-          </div>
-        )}
       </div>
-
-      {showPlanets && <OrbitingPlanet />}
 
       {showShips && (
         <div

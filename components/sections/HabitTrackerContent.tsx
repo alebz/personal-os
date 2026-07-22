@@ -172,7 +172,7 @@ function HabitModal({
           ) : <span />}
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="rounded-control px-3 py-1.5 text-body text-fg-muted hover:text-fg">Cancelar</button>
-            <button onClick={save} disabled={busy || !name.trim()} className="rounded-control bg-accent/15 px-4 py-1.5 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40">
+            <button onClick={save} disabled={busy || !name.trim()} className="btn-primary rounded-control px-4 py-1.5 text-body">
               {busy ? '…' : 'Guardar'}
             </button>
           </div>

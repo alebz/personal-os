@@ -281,15 +281,16 @@ input::placeholder, textarea::placeholder {
   --color-ink-3: oklch(0.63 0.013 75);
   --color-ink-4: oklch(0.955 0.005 75);
 
-  /* Accent — Dracula purple (lavender); re-tints every accent usage OS-wide */
-  --color-accent: oklch(0.742 0.149 302);
+  /* Accent — ARCADE-NEÓN cian eléctrico (antes Dracula purple; se sentía corporativo).
+     Re-tints every accent usage OS-wide. */
+  --color-accent: oklch(0.82 0.15 200);
 
-  /* Semantic hues — Dracula ANSI. TEMABLE(tono) / INVARIANTE(significado): ok=positivo/
-     incremento/entra, danger=negativo/decremento/sale, warn=precaución. Un tema elige el
-     tono pero DEBE preservar la lectura (jamás mapear ok→rojo). Money: green=in / red=out. */
-  --color-ok: oklch(0.871 0.220 148);     /* Dracula green  #50fa7b — neon */
-  --color-warn: oklch(0.834 0.124 67);    /* Dracula orange #ffb86c */
-  --color-danger: oklch(0.682 0.206 24);  /* Dracula red    #ff5555 */
+  /* Semantic hues — ARCADE-NEÓN (neón sobre negro). TEMABLE(tono) / INVARIANTE(significado):
+     ok=positivo/incremento/entra, danger=negativo/decremento/sale, warn=precaución. Un tema
+     elige el tono pero DEBE preservar la lectura (jamás mapear ok→rojo). Money: green=in / red=out. */
+  --color-ok: oklch(0.87 0.27 150);       /* verde fósforo eléctrico */
+  --color-warn: oklch(0.85 0.17 85);      /* oro de arcade (moneda) */
+  --color-danger: oklch(0.66 0.25 22);    /* rojo/coral neón */
 
   /* Raw palette hues (Dracula ANSI) — PRIMITIVES only. Components never touch these;
      they consume the keyed --color-cat-* roles below, so a non-Dracula theme can
@@ -339,7 +340,7 @@ input::placeholder, textarea::placeholder {
      Meaning is fixed (this badge = Nómina); the theme picks the tone. Never money direction
      (the amount already carries green=in/red=out). A theme remaps the whole set here. */
   --color-cat-nomina:     var(--color-cyan);     /* Nómina    */
-  --color-cat-freelance:  var(--color-accent);   /* Freelance (lavender) */
+  --color-cat-freelance:  var(--color-pink);     /* Freelance (rosa) — desacoplado del accent (ahora cian) para no chocar con nómina */
   --color-cat-fijo:       var(--color-pink);     /* Gasto fijo */
   --color-cat-extra:      var(--color-warn);     /* Gasto extra (orange) */
   --color-cat-vacaciones: var(--color-yellow);   /* Vacaciones */
@@ -383,6 +384,102 @@ input::placeholder, textarea::placeholder {
   --radius-chip:    var(--r-none);          /* everything square (was --radius-pill) */
   --color-accent:   var(--color-ink-4);     /* accent = foreground (monochrome) */
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   CRT · efecto de pantalla del tema arcade (capa de personalización)
+   Gate: [data-crt="on"|"off"] en <html>. Modo de color: [data-crt-color="mono"|"multi"].
+   Variables (--crt-*) las setea OSSettingsContext.applyCrt; los parámetros del filtro SVG
+   (blur/aberración/fisheye/deform) los aplica <CRTOverlay> por ref. El contenido se envuelve
+   en .crt-screen (div zIndex:1 del layout).
+   ═══════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --crt-text:      #EA4335;
+  --crt-scan-a:    0.11;
+  --crt-dots-o:    0.2;
+  --crt-vig-a:     0;
+  --crt-bloom-o:   0;
+  --crt-glow-a:    0.1;
+  --crt-glow-blur: 1.1px;
+  --crt-aberr:     0.6;   /* aberración cromática en texto (px de separación rojo/cian) */
+}
+
+/* Warp del contenido: blur + aberración + fisheye + banda de deformación.
+   DESACTIVADO: aplicar filter a .crt-screen reparenta los position:fixed descendientes
+   (el OSDrum de la home) y los colapsa a negro. Probado: min-height:100vh NO lo salva.
+   El fix real requiere portalear el OSDrum fuera de .crt-screen (o post-proceso WebGL) —
+   tarea dedicada. El <filter> y sus params quedan listos para cuando se resuelva.
+   [data-crt="on"] .crt-screen { filter: url(#crtFx); } */
+
+/* Glow de fósforo + aberración cromática por letra (hereda a todo el texto del contenido).
+   La aberración va como text-shadow (offsets rojo/cian) — NO usa filtro, así que no rompe el tambor. */
+[data-crt="on"] .crt-screen {
+  text-shadow:
+    calc(-1px * var(--crt-aberr)) 0 0 rgba(255, 45, 85, 0.55),
+    calc(1px * var(--crt-aberr))  0 0 rgba(0, 232, 255, 0.55),
+    0 0 var(--crt-glow-blur) rgba(255,255,255,var(--crt-glow-a));
+}
+
+/* MODO MONO: remapea los tokens de color a fósforo dentro del contenido. Aprovecha el
+   sistema de tokens (Tier 1) para que TODO el árbol de componentes se vuelva monocromo
+   sin carpet-bombing de !important. Multicolor no remapea → paleta arcade normal. */
+[data-crt="on"][data-crt-color="mono"] .crt-screen {
+  color:                 var(--crt-text);
+  --color-fg:            var(--crt-text);
+  --color-fg-muted:      color-mix(in oklch, var(--crt-text) 72%, transparent);
+  --color-fg-faint:      color-mix(in oklch, var(--crt-text) 50%, transparent);
+  --color-border:        color-mix(in oklch, var(--crt-text) 40%, transparent);
+  --color-border-strong: color-mix(in oklch, var(--crt-text) 60%, transparent);
+  --color-ok:            var(--crt-text);
+  --color-danger:        var(--crt-text);
+  --color-warn:          var(--crt-text);
+  --color-accent:        var(--crt-text);
+  --color-cat-nomina:    var(--crt-text);
+  --color-cat-freelance: var(--crt-text);
+  --color-cat-fijo:      var(--crt-text);
+  --color-cat-extra:     var(--crt-text);
+  --color-cat-vacaciones:var(--crt-text);
+  /* Superficies interactivas/seleccionadas → tinte de fósforo (antes gris-neutro basado en ink).
+     surface-1 (card) y surface-base (fondo app) NO se tiñen: quedan oscuras como contenedor. */
+  --color-surface-hover:  color-mix(in oklch, var(--crt-text) 9%,  transparent);
+  --color-surface-active: color-mix(in oklch, var(--crt-text) 17%, transparent);
+  --color-surface-2:      color-mix(in oklch, var(--crt-text) 13%, transparent);
+}
+
+/* Capas de overlay fijas — sobre el contenido, DEBAJO de modales (z 10050) y ajustes (10001) */
+.crt-bloom, .crt-dots, .crt-scan, .crt-vig { position: fixed; inset: 0; pointer-events: none; }
+[data-crt="off"] .crt-bloom,
+[data-crt="off"] .crt-dots,
+[data-crt="off"] .crt-scan,
+[data-crt="off"] .crt-vig { display: none; }
+.crt-bloom { z-index: 9990; backdrop-filter: blur(3px) brightness(1.32) saturate(0); -webkit-backdrop-filter: blur(3px) brightness(1.32) saturate(0); mix-blend-mode: screen; opacity: var(--crt-bloom-o); }
+.crt-dots  { z-index: 9991; background: repeating-linear-gradient(90deg, rgba(255,40,40,.05) 0, rgba(40,255,80,.05) 1px, rgba(60,80,255,.05) 2px, transparent 3px); mix-blend-mode: screen; opacity: var(--crt-dots-o); }
+.crt-scan  { z-index: 9992; background: repeating-linear-gradient(0deg, rgba(0,0,0,var(--crt-scan-a)) 0, rgba(0,0,0,var(--crt-scan-a)) 1px, transparent 1.5px, transparent 3px); mix-blend-mode: multiply; animation: crt-flicker 7s linear infinite; }
+.crt-vig   { z-index: 9993; border-radius: 34px; background: radial-gradient(128% 116% at 50% 47%, transparent 52%, rgba(0,0,0,var(--crt-vig-a)) 100%); box-shadow: inset 0 0 150px 30px rgba(0,0,0,calc(var(--crt-vig-a) + .06)); }
+@keyframes crt-flicker { 0%,100%{opacity:.6} 46%{opacity:.58} 47%{opacity:.68} 48%{opacity:.57} 92%{opacity:.6} 93%{opacity:.65} }
+
+/* Íconos pixel (currentColor). En multicolor el corazón/anillo va en rojo. */
+.crt-ico { display: inline-block; fill: currentColor; shape-rendering: crispEdges; vertical-align: -0.2em; }
+.crt-ico-card { width: 1.2em; height: 1.8em; }
+.crt-ico-chip { width: 1.2em; height: 1.2em; }
+.crt-ico-color { color: #EA4335; }  /* acento del corazón/anillo en las variantes a color */
+
+/* ── Botón primario (canónico) ───────────────────────────────────────────────
+   El primario del OS = borde de acento + relleno tenue + texto de acento (el look de
+   "Nueva tarea" que se ve vivo). Usa --color-accent → mono=fósforo, multi=cian. Clase
+   reusable: TODOS los Guardar/Crear/Confirmar deben usarla para ser consistentes. */
+.btn-primary {
+  background:   color-mix(in oklch, var(--color-accent) 12%, transparent);
+  color:        var(--color-accent);
+  font-weight:  500;
+  border:       1px solid color-mix(in oklch, var(--color-accent) 30%, transparent);
+  transition:   background 140ms ease, border-color 140ms ease, transform 80ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background:   color-mix(in oklch, var(--color-accent) 22%, transparent);
+  border-color: color-mix(in oklch, var(--color-accent) 55%, transparent);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(1px); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 html {
   background-color: var(--color-ink-0);

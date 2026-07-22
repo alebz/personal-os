@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
+import { PixelIcon } from '@/components/PixelIcon'
 import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { FundLedger } from '@/components/finance/FundLedger'
@@ -240,10 +241,10 @@ function MethodToggle({ method, onChange }: { method: 'cash' | 'card'; onChange:
     <MethodCell>
       <button
         onClick={() => onChange(method === 'cash' ? 'card' : 'cash')}
-        className="text-md leading-none opacity-60 hover:opacity-100 transition-opacity"
+        className="leading-none opacity-60 hover:opacity-100 transition-opacity"
         title={method === 'cash' ? 'Efectivo — click para cambiar a tarjeta' : 'Tarjeta — click para cambiar a efectivo'}
       >
-        {method === 'cash' ? '💵' : '💳'}
+        <PixelIcon kind={method === 'cash' ? 'cash' : 'card'} />
       </button>
     </MethodCell>
   )
@@ -531,8 +532,8 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
               onChange={e => setAddMethod(e.target.value as 'cash' | 'card')}
               className="flex-1 rounded border border-border bg-surface-2 px-2 py-1 text-body text-fg outline-none focus:border-accent/40"
             >
-              <option value="cash">💵 Efectivo</option>
-              <option value="card">💳 Tarjeta</option>
+              <option value="cash">Efectivo</option>
+              <option value="card">Tarjeta</option>
             </select>
           </div>
           <div className="flex gap-2">
@@ -543,7 +544,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
             <button
               disabled={adding || !addName.trim()}
               onClick={() => void handleAdd()}
-              className="flex-1 rounded bg-accent/80 py-1 text-secondary font-semibold text-white hover:bg-accent disabled:opacity-40"
+              className="btn-primary flex-1 rounded py-1 text-secondary"
             >{adding ? '…' : 'Agregar'}</button>
           </div>
         </div>

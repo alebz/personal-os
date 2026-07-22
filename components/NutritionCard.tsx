@@ -184,7 +184,7 @@ function MealRow({
           <div className="flex justify-end">
             <button
               onClick={() => onSave({ ...meal, ...edit })}
-              className="rounded-control bg-accent/15 px-3 py-1 text-secondary font-medium text-accent transition-colors hover:bg-accent/25"
+              className="btn-primary rounded-control px-3 py-1 text-secondary"
             >
               Guardar
             </button>

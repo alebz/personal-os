@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { dayColor } from '@/lib/weekdayColors'
+import { dayColor, crtDayColor } from '@/lib/weekdayColors'
+import { useOSSettings } from '@/components/OSSettingsContext'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,8 @@ function isActionable(task: Task): boolean {
 }
 
 function DayTag({ day }: { day: Date }) {
-  const c = dayColor(day)
+  const { crt } = useOSSettings()
+  const c = crtDayColor(dayColor(day), crt)
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1 rounded-chip px-2 py-0.5 text-label font-medium"
@@ -912,7 +914,7 @@ export default function TareasContent() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => { setCreating(true); setDrawerTask(null) }}
-              className="flex items-center gap-1.5 rounded-card border border-accent/20 bg-accent/10 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/20"
+              className="btn-primary flex items-center gap-1.5 rounded-card px-4 py-2 text-body"
             >
               <svg viewBox="0 0 12 12" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={2}>
                 <path d="M6 2v8M2 6h8" strokeLinecap="round" />

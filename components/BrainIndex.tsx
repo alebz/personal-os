@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ResultCard, fmtDate, type MemoryChunk } from '@/components/sections/CerebroContent'
 import { canonicalKind, kindLabel, CANONICAL_KINDS } from '@/lib/memoryKinds'
-import { dayColor } from '@/lib/weekdayColors'
+import { dayColor, crtDayColor } from '@/lib/weekdayColors'
+import { useOSSettings } from '@/components/OSSettingsContext'
 
 // The full "ver todo" index of Cerebro's memory — three views (grid/list/timeline), a canonical
 // type filter, and a search box that redirects to /brain/q. Layout-neutral (no page margins): the
@@ -50,6 +51,7 @@ function CompactRow({ chunk }: { chunk: MemoryChunk }) {
 // onNavigate fires just before routing away (search → /brain/q), so a host modal can close itself.
 export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter()
+  const { crt } = useOSSettings()   // color de heatmap reactivo (fósforo en mono)
   const [items, setItems] = useState<MemoryChunk[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -186,7 +188,7 @@ export default function BrainIndex({ onNavigate }: { onNavigate?: () => void }) 
         ) : (
           <div className="flex flex-col gap-6">
             {timeline.map(([day, rows]) => {
-              const c = dayColor(new Date(day + 'T12:00:00'))
+              const c = crtDayColor(dayColor(new Date(day + 'T12:00:00')), crt)
               return (
                 <section key={day}>
                   <div className="mb-2 flex items-center gap-2 border-b border-border pb-1.5">

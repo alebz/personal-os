@@ -353,7 +353,7 @@ export default function CerebroContent() {
                 type="button"
                 onClick={() => void submitCapture()}
                 disabled={saving || !capText.trim()}
-                className="shrink-0 rounded-card bg-accent/15 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn-primary shrink-0 rounded-card px-4 py-2 text-body"
               >
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>

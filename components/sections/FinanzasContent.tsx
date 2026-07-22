@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
+import { PixelIcon } from '@/components/PixelIcon'
 import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 
@@ -181,8 +182,8 @@ export function MethodBadge({ metodo }: { metodo?: string | null }) {
   const m = normMethod(metodo)
   return (
     <MethodCell>
-      <span className="text-body leading-none" title={METHOD_META[m].label}>
-        {METHOD_META[m].emoji}
+      <span className="leading-none" title={METHOD_META[m].label}>
+        <PixelIcon kind={m === 'efectivo' ? 'cash' : 'card'} />
       </span>
     </MethodCell>
   )
@@ -202,8 +203,8 @@ function MethodSelect({
       onClick={e => e.stopPropagation()}
       className="shrink-0 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-secondary text-fg outline-none"
     >
-      <option value="efectivo">💵 Efectivo</option>
-      <option value="tarjeta">💳 Tarjeta</option>
+      <option value="efectivo">Efectivo</option>
+      <option value="tarjeta">Tarjeta</option>
     </select>
   )
 }
@@ -485,8 +486,8 @@ function AddExtraForm({
         onChange={e => setMetodo(e.target.value)}
         className="rounded-control border border-border bg-surface-2 px-2 py-1.5 text-secondary text-fg outline-none"
       >
-        <option value="efectivo">💵 Efectivo</option>
-        <option value="tarjeta">💳 Tarjeta</option>
+        <option value="efectivo">Efectivo</option>
+        <option value="tarjeta">Tarjeta</option>
       </select>
       <button
         onClick={submit}
@@ -552,15 +553,15 @@ function EditModal({
             onChange={e => setMetodo(normMethod(e.target.value))}
             className="rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none"
           >
-            <option value="efectivo">💵 Efectivo</option>
-            <option value="tarjeta">💳 Tarjeta</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
           </select>
         </div>
         <div className="flex gap-2 pt-1">
           <button
             onClick={save}
             disabled={saving || !desc.trim() || !monto}
-            className="flex-1 rounded-card bg-accent/20 py-2 text-body font-medium text-accent hover:bg-accent/30 disabled:opacity-30"
+            className="btn-primary flex-1 rounded-card py-2 text-body"
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
@@ -618,8 +619,8 @@ function AddCommitmentForm({
         value={metodo} onChange={e => setMetodo(e.target.value)}
         className="rounded-control border border-border bg-surface-2 px-2 py-1.5 text-secondary text-fg outline-none"
       >
-        <option value="efectivo">💵 Efectivo</option>
-        <option value="tarjeta">💳 Tarjeta</option>
+        <option value="efectivo">Efectivo</option>
+        <option value="tarjeta">Tarjeta</option>
       </select>
       <button
         onClick={submit} disabled={!name.trim() || !monto}
