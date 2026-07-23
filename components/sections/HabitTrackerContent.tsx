@@ -98,7 +98,7 @@ function HabitModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="crt-screen fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-card border border-border bg-surface-1 shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
@@ -309,7 +309,7 @@ function HabitDetail({
   const thisYear  = new Date().getFullYear()
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-8">
+    <div className="crt-screen fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-8">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative my-auto w-full max-w-3xl rounded-card border border-border bg-surface-1 shadow-2xl">
         {/* Header */}
