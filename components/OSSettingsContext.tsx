@@ -40,21 +40,21 @@ interface OSSettingsCtx extends OSSettingsState {
   closeSettings:  () => void
 }
 
-// Valores por defecto del CRT — horneados con el usuario (2026-07-22).
+// Valores por defecto del CRT — calibrados con el usuario (2026-07-23).
 export const CRT_DEFAULTS: CrtState = {
   on:          true,
   color:       'multi',
   phosphor:    '#EA4335',
   blur:        0.2,
-  aberr:       0.6,
-  fisheye:     4,
-  bloom:       0,
-  glow:        0.1,
-  scan:        0.11,
-  dots:        0.2,
-  vig:         0,
-  deform:      2.5,
-  deformSpeed: 17,
+  aberr:       0.5,
+  fisheye:     0,     // 0 = clicks al pixel (fisheye deforma píxeles, no el hit-testing). Súbelo para el modo vibe.
+  bloom:       0.02,
+  glow:        0.05,
+  scan:        0.12,
+  dots:        0.38,
+  vig:         0.06,
+  deform:      0,     // idem barra deformadora — 0 por defecto para no romper clicks
+  deformSpeed: 7,
 }
 
 // Los 7 colores del rainbow del OS (WEEKDAY_RAINBOW) — paleta del fósforo en modo mono.

@@ -48,8 +48,14 @@ export default function CRTOverlay() {
     const setBand = (u: string) => { bandImgRef.current?.setAttribute('href', u); bandImgRef.current?.setAttributeNS('http://www.w3.org/1999/xlink', 'href', u) }
     // fisheye: vector radial que crece con r²
     buildMap('fish', 512, (nx, ny) => { const r2 = nx * nx + ny * ny; return [nx * r2 * 170, ny * r2 * 170] }, setFish)
-    // banda: onda senoidal vertical continua (2 ciclos = 1 por pantalla) → barrido sin corte
-    buildMap('band', 256, (_nx, _ny, _x, y) => [100 * Math.sin(2 * Math.PI * 2 * (y / 256)), 0], setBand)
+    // banda: UN lóbulo localizado (raised-cosine, ~10% de alto) — NO una onda global. El resto
+    // del mapa queda en 128 (cero desplazamiento), así solo distorsiona una franja delgada. El
+    // scroll en `y` (loop de abajo) la hace RODAR de abajo→arriba: una barra de barrido visible.
+    buildMap('band', 256, (_nx, _ny, _x, y) => {
+      const t = y / 255, d = Math.abs(t - 0.5), hw = 0.05
+      const w = d < hw ? 0.5 + 0.5 * Math.cos(Math.PI * d / hw) : 0
+      return [120 * w, 0]
+    }, setBand)
 
     let raf = 0, last: number | null = null, bandY = 0
     const loop = (now: number) => {
