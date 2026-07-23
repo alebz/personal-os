@@ -51,7 +51,7 @@ export default function BrainQueryPage() {
     <Shell>
       <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
         <div className="mb-6">
-          <Link href="/" className="text-secondary text-fg-muted transition-colors hover:text-fg">← Cerebro</Link>
+          <Link href="/brain" className="text-secondary text-fg-muted transition-colors hover:text-fg">← Cerebro</Link>
           <h1 className="mt-2 text-heading font-bold text-fg">“{query}”</h1>
           {!loading && !err && (
             <p className="mt-1 text-secondary text-fg-muted">{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</p>

@@ -5,20 +5,22 @@ import { usePathname } from 'next/navigation'
 import Clock from '@/components/Clock'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import OSSettings from '@/components/OSSettings'
+import { sectionColor } from '@/lib/sections'
 
+// Color por tab NO se define aquí — se lee de la fuente canónica (lib/sections, el tambor manda).
 const TABS = [
-  { label: 'Inicio',    href: '/',          color: null },
-  { label: 'Tareas',    href: '/crm',       color: '#EA4335' },
-  { label: 'Contactos', href: '/contactos', color: '#F6821E' },
-  { label: 'Cerebro',   href: '/brain',     color: '#FBBC05' },
-  { label: 'Finanzas',  href: '/finance',   color: '#34A853' },
-  { label: 'Uptown',    href: '/uptown',    color: '#4285F4' },
-  { label: 'Diario',    href: '/journal',   color: '#9B59B6' },
+  { label: 'Inicio',    href: '/' },
+  { label: 'Tareas',    href: '/crm' },
+  { label: 'Contactos', href: '/contactos' },
+  { label: 'Cerebro',   href: '/brain' },
+  { label: 'Finanzas',  href: '/finance' },
+  { label: 'Uptown',    href: '/uptown' },
+  { label: 'Diario',    href: '/journal' },
 ]
 
 export default function TopRail() {
   const pathname   = usePathname()
-  const clockColor = TABS.find(t => t.href === pathname)?.color ?? '#ffffff'
+  const clockColor = sectionColor(pathname)
   const { toggleSettings, settingsOpen } = useOSSettings()
 
   return (
@@ -40,15 +42,14 @@ export default function TopRail() {
         {/* Col 2 — nav + gear */}
         <div className="col-span-6 hidden items-center justify-center gap-3 md:flex">
           <nav className="flex items-center gap-1 rounded-control border border-border bg-surface-1 p-1.5 backdrop-blur-xl">
-            {TABS.map(({ label, href, color }) => {
+            {TABS.map(({ label, href }) => {
               const active = pathname === href
+              const color  = sectionColor(href)
               const baseStyle: React.CSSProperties = {
                 transition: 'color 200ms ease, background 200ms ease, text-shadow 200ms ease',
-                color: active
-                  ? (color ?? '#ffffff')
-                  : (color ? 'rgba(255,255,255,0.45)' : '#ffffff'),
-                background: active && color ? `${color}18` : 'transparent',
-                textShadow: active && color ? `0 0 12px ${color}66` : 'none',
+                color: active ? color : 'rgba(255,255,255,0.45)',
+                background: active ? `${color}18` : 'transparent',
+                textShadow: active ? `0 0 12px ${color}66` : 'none',
               }
               return (
                 <Link
@@ -59,12 +60,12 @@ export default function TopRail() {
                   onMouseEnter={e => {
                     if (active) return
                     const el = e.currentTarget as HTMLElement
-                    if (color) { el.style.color = color; el.style.background = `${color}26` }
+                    el.style.color = color; el.style.background = `${color}26`
                   }}
                   onMouseLeave={e => {
                     if (active) return
                     const el = e.currentTarget as HTMLElement
-                    el.style.color = color ? 'rgba(255,255,255,0.45)' : '#ffffff'
+                    el.style.color = 'rgba(255,255,255,0.45)'
                     el.style.background = 'transparent'
                   }}
                 >
