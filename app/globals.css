@@ -410,14 +410,22 @@ input::placeholder, textarea::placeholder {
    tarea dedicada. El <filter> y sus params quedan listos para cuando se resuelva.
    [data-crt="on"] .crt-screen { filter: url(#crtFx); } */
 
-/* Glow de fósforo + aberración cromática por letra (hereda a todo el texto del contenido).
-   La aberración va como text-shadow (offsets rojo/cian) — NO usa filtro, así que no rompe el tambor. */
+/* Glow de fósforo por letra (hereda al texto del contenido). La ABERRACIÓN ya NO vive aquí:
+   se movió al backdrop-filter frontal (.crt-front) que la aplica sobre TODO el sistema. */
 [data-crt="on"] .crt-screen {
-  text-shadow:
-    calc(-1px * var(--crt-aberr)) 0 0 rgba(255, 45, 85, 0.55),
-    calc(1px * var(--crt-aberr))  0 0 rgba(0, 232, 255, 0.55),
-    0 0 var(--crt-glow-blur) rgba(255,255,255,var(--crt-glow-a));
+  text-shadow: 0 0 var(--crt-glow-blur) rgba(255,255,255,var(--crt-glow-a));
+  /* Card ≈ negro en AMBOS modos (multi neutro; el modo mono le añade tinte de fósforo abajo). */
+  --color-surface-1: oklch(0.055 0 0);
 }
+
+/* ── Emulador de pantalla: capa óptica frontal sobre TODO EL SISTEMA ──────────────
+   backdrop-filter muestrea todo lo que hay detrás (contenido + sim: naves, estrellas) y le
+   aplica el warp — blur + aberración + fisheye + banda de deformación — SIN reparentar los
+   position:fixed (a diferencia de `filter`, que colapsaba el tambor). Es la capa más frontal:
+   por encima de todo, pointer-events:none. */
+.crt-front { position: fixed; inset: 0; z-index: 9995; pointer-events: none; }
+[data-crt="on"] .crt-front { backdrop-filter: url(#crtFx); -webkit-backdrop-filter: url(#crtFx); }
+[data-crt="off"] .crt-front { display: none; }
 
 /* MODO MONO: remapea los tokens de color a fósforo dentro del contenido. Aprovecha el
    sistema de tokens (Tier 1) para que TODO el árbol de componentes se vuelva monocromo
@@ -438,8 +446,9 @@ input::placeholder, textarea::placeholder {
   --color-cat-fijo:      var(--crt-text);
   --color-cat-extra:     var(--crt-text);
   --color-cat-vacaciones:var(--crt-text);
-  /* Superficies interactivas/seleccionadas → tinte de fósforo (antes gris-neutro basado en ink).
-     surface-1 (card) y surface-base (fondo app) NO se tiñen: quedan oscuras como contenedor. */
+  /* Superficies → tinte de fósforo (antes warm-black hue 75 = "café" que se imponía sobre el fósforo).
+     surface-1 (card) ahora se tiñe también: base negra NEUTRA + whisper de fósforo, sin café. */
+  --color-surface-1:      color-mix(in oklch, var(--crt-text) 7%, oklch(0.05 0 0));
   --color-surface-hover:  color-mix(in oklch, var(--crt-text) 9%,  transparent);
   --color-surface-active: color-mix(in oklch, var(--crt-text) 17%, transparent);
   --color-surface-2:      color-mix(in oklch, var(--crt-text) 13%, transparent);
@@ -480,6 +489,17 @@ input::placeholder, textarea::placeholder {
 }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Bordes del tema arcade ───────────────────────────────────────────────────
+   El 1px de Tailwind se sentía muy delgado para el look CRT/neón. En el contenido
+   arcade (CRT on) subimos a 2px — cards, controles, divisores, todo con más presencia. */
+[data-crt="on"] .crt-screen .border   { border-width: 2px; }
+[data-crt="on"] .crt-screen .border-t { border-top-width: 2px; }
+[data-crt="on"] .crt-screen .border-b { border-bottom-width: 2px; }
+[data-crt="on"] .crt-screen .border-l { border-left-width: 2px; }
+[data-crt="on"] .crt-screen .border-r { border-right-width: 2px; }
+[data-crt="on"] .crt-screen .border-x { border-left-width: 2px; border-right-width: 2px; }
+[data-crt="on"] .crt-screen .border-y { border-top-width: 2px; border-bottom-width: 2px; }
 
 html {
   background-color: var(--color-ink-0);

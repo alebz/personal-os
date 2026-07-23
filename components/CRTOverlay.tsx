@@ -36,8 +36,6 @@ export default function CRTOverlay() {
   const blurRef = useRef<SVGFEGaussianBlurElement>(null)
   const offRRef = useRef<SVGFEOffsetElement>(null)
   const offBRef = useRef<SVGFEOffsetElement>(null)
-  const matRRef = useRef<SVGFEColorMatrixElement>(null)
-  const matBRef = useRef<SVGFEColorMatrixElement>(null)
   const fishRef = useRef<SVGFEDisplacementMapElement>(null)
   const bandRef = useRef<SVGFEDisplacementMapElement>(null)
   const fishMapRef = useRef<SVGFEImageElement>(null)
@@ -71,11 +69,8 @@ export default function CRTOverlay() {
     blurRef.current?.setAttribute('stdDeviation', String(crt.blur))
     fishRef.current?.setAttribute('scale', String(crt.fisheye))
     bandRef.current?.setAttribute('scale', String(crt.deform))
-    const a = (crt.aberr * 0.4).toFixed(3)
     offRRef.current?.setAttribute('dx', String(crt.aberr))
     offBRef.current?.setAttribute('dx', String(-crt.aberr))
-    matRRef.current?.setAttribute('values', `1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${a} 0`)
-    matBRef.current?.setAttribute('values', `0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 ${a} 0`)
   }, [crt.blur, crt.aberr, crt.fisheye, crt.deform, crt.deformSpeed])
 
   return (
@@ -85,16 +80,23 @@ export default function CRTOverlay() {
       <div className="crt-dots" aria-hidden />
       <div className="crt-scan" aria-hidden />
       <div className="crt-vig" aria-hidden />
+      {/* capa óptica frontal — backdrop-filter (#crtFx) sobre TODO el sistema, incl. el sim */}
+      <div className="crt-front" aria-hidden />
 
       {/* Defs SVG: filtro de warp + símbolos de íconos pixel (currentColor) */}
       <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }} aria-hidden>
         <filter id="crtFx" colorInterpolationFilters="sRGB">
           <feGaussianBlur ref={blurRef} in="SourceGraphic" stdDeviation="0.2" result="b" />
-          <feOffset ref={offRRef} in="b" dx="0.6" dy="0" result="ro" />
-          <feColorMatrix ref={matRRef} in="ro" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.24 0" result="rc" />
-          <feOffset ref={offBRef} in="b" dx="-0.6" dy="0" result="bo" />
-          <feColorMatrix ref={matBRef} in="bo" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.24 0" result="bc" />
-          <feMerge result="ca"><feMergeNode in="b" /><feMergeNode in="rc" /><feMergeNode in="bc" /></feMerge>
+          {/* Aberración cromática NEUTRA — separa canales R/G/B (R→+dx, G centrado, B→−dx) y los
+              recombina con screen. Donde alinean = color original (SIN cast morado/verde); solo
+              franjas rojo/azul en los bordes. Antes apilaba fantasmas de color = teñía la pantalla. */}
+          <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="rOnly" />
+          <feOffset ref={offRRef} in="rOnly" dx="0.6" dy="0" result="rShift" />
+          <feColorMatrix in="b" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="gOnly" />
+          <feColorMatrix in="b" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="bOnly" />
+          <feOffset ref={offBRef} in="bOnly" dx="-0.6" dy="0" result="bShift" />
+          <feBlend in="rShift" in2="gOnly" mode="screen" result="rg" />
+          <feBlend in="rg" in2="bShift" mode="screen" result="ca" />
           <feImage ref={fishMapRef} result="fmap" preserveAspectRatio="none" />
           <feDisplacementMap ref={fishRef} in="ca" in2="fmap" scale="4" xChannelSelector="R" yChannelSelector="G" result="warped" />
           <feImage ref={bandImgRef} result="bmap" preserveAspectRatio="none" x="0%" y="0%" width="100%" height="200%" />

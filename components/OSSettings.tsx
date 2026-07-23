@@ -158,14 +158,15 @@ export default function OSSettings() {
                 </div>
               )}
               <Slider label="Glow letra" value={crt.glow} min={0} max={1} step={0.05} onChange={v => setCrt({ glow: v })} fmt={v => v.toFixed(2)} />
-              <Slider label="Aberración" value={crt.aberr} min={0} max={2} step={0.05} onChange={v => setCrt({ aberr: v })} fmt={v => v.toFixed(2)} />
+              <Slider label="Aberración" value={crt.aberr} min={0} max={4} step={0.1} onChange={v => setCrt({ aberr: v })} fmt={v => v.toFixed(1)} />
+              <Slider label="Blur" value={crt.blur} min={0} max={1.5} step={0.05} onChange={v => setCrt({ blur: v })} fmt={v => v.toFixed(2)} />
+              <Slider label="Fisheye" value={crt.fisheye} min={0} max={60} step={1} onChange={v => setCrt({ fisheye: v })} fmt={v => String(v)} />
               <Slider label="Scanlines"  value={crt.scan} min={0} max={0.4} step={0.01} onChange={v => setCrt({ scan: v })} fmt={v => v.toFixed(2)} />
               <Slider label="Rejilla"    value={crt.dots} min={0} max={0.7} step={0.02} onChange={v => setCrt({ dots: v })} fmt={v => v.toFixed(2)} />
               <Slider label="Bloom"      value={crt.bloom} min={0} max={0.6} step={0.01} onChange={v => setCrt({ bloom: v })} fmt={v => v.toFixed(2)} />
               <Slider label="Viñeta"     value={crt.vig} min={0} max={0.75} step={0.01} onChange={v => setCrt({ vig: v })} fmt={v => v.toFixed(2)} />
-              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>
-                Blur, curvatura y deformación (warp) próximamente
-              </p>
+              <Slider label="Barra deform." value={crt.deform} min={0} max={24} step={0.5} onChange={v => setCrt({ deform: v })} fmt={v => v.toFixed(1)} />
+              <Slider label="Barra veloc." value={crt.deformSpeed} min={4} max={30} step={1} onChange={v => setCrt({ deformSpeed: v })} fmt={v => v + 's'} />
             </>
           )}
         </Section>
