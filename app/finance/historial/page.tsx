@@ -56,7 +56,7 @@ export default function FinanceHistorialPage() {
     <Shell>
       <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
         <div className="mb-6">
-          <Link href="/" className="text-secondary text-fg-muted transition-colors hover:text-fg">← Finanzas</Link>
+          <Link href="/finance" className="text-secondary text-fg-muted transition-colors hover:text-fg">← Finanzas</Link>
           <h1 className="mt-2 text-heading font-bold text-fg">Historial completo</h1>
         </div>
 

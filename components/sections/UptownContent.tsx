@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
+import { PixelIcon } from '@/components/PixelIcon'
 import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { FundLedger } from '@/components/finance/FundLedger'
@@ -52,7 +53,6 @@ interface RentRow    { renter: string;   amount: number; paid: boolean; method: 
 interface ExpenseRow { category: string; amount: number; paid: boolean; method: 'cash' | 'card' }
 interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 'cash' | 'card' }
 interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
-interface BalanceState { starting_balance: number; cuenta_bancaria: number; efectivo: number }
 
 type ValetStatus = 'pending' | 'paid'
 interface ValetConfig  { num_weeks: number; week1_date: string | null; price_per_point: number }
@@ -240,10 +240,10 @@ function MethodToggle({ method, onChange }: { method: 'cash' | 'card'; onChange:
     <MethodCell>
       <button
         onClick={() => onChange(method === 'cash' ? 'card' : 'cash')}
-        className="text-md leading-none opacity-60 hover:opacity-100 transition-opacity"
+        className="leading-none opacity-60 hover:opacity-100 transition-opacity"
         title={method === 'cash' ? 'Efectivo — click para cambiar a tarjeta' : 'Tarjeta — click para cambiar a efectivo'}
       >
-        {method === 'cash' ? '💵' : '💳'}
+        <PixelIcon kind={method === 'cash' ? 'cash' : 'card'} />
       </button>
     </MethodCell>
   )
@@ -531,8 +531,8 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
               onChange={e => setAddMethod(e.target.value as 'cash' | 'card')}
               className="flex-1 rounded border border-border bg-surface-2 px-2 py-1 text-body text-fg outline-none focus:border-accent/40"
             >
-              <option value="cash">💵 Efectivo</option>
-              <option value="card">💳 Tarjeta</option>
+              <option value="cash">Efectivo</option>
+              <option value="card">Tarjeta</option>
             </select>
           </div>
           <div className="flex gap-2">
@@ -543,7 +543,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
             <button
               disabled={adding || !addName.trim()}
               onClick={() => void handleAdd()}
-              className="flex-1 rounded bg-accent/80 py-1 text-secondary font-semibold text-white hover:bg-accent disabled:opacity-40"
+              className="btn-primary flex-1 rounded py-1 text-secondary"
             >{adding ? '…' : 'Agregar'}</button>
           </div>
         </div>
@@ -629,71 +629,72 @@ function PrevistoCard({ rents, expenses, nomina, extraIncome, extraExpenses, fon
   )
 }
 
-// ─── SaldoActualCard ──────────────────────────────────────────────────────────
-
-function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpenses, fondoAportado, onSave }: {
-  bal: BalanceState
-  rents: RentRow[]; expenses: ExpenseRow[]; nomina: NominaRow[]
-  extraIncome: ExtraItem[]; extraExpenses: ExtraItem[]
-  fondoAportado: number
-  onSave: (starting_balance: number) => void
+// ─── CuentaCard ───────────────────────────────────────────────────────────────
+// Una cuenta (Banorte o Efectivo): saldo DERIVADO de los checks reales (split por `method`) + ritual
+// de conciliación. El input real → diferencia → "Cuadrar" registra un ajuste NOMBRADO en el fondo de
+// esa cuenta (reemplaza el fudge de editar "Inicial" a mano). Apertura = saldo conciliado del mes
+// previo (read-only). Convención: positivo = sobra (verde) / negativo = falta (rojo).
+function CuentaCard({ label, icon, prompt, saldo, apertura, cobrado, pagado, apartado, ajuste, onCuadrar, onVerAjustes }: {
+  label: string
+  icon: 'card' | 'cash'
+  prompt: string
+  saldo: number; apertura: number; cobrado: number; pagado: number; apartado: number; ajuste: number
+  onCuadrar: (real: number) => Promise<void>
+  onVerAjustes: () => void
 }) {
-  const [editing, setEditing] = useState(false)
-  const [draft,   setDraft]   = useState(String(bal.starting_balance))
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy]   = useState(false)
+  const real = parseFloat(draft)
+  const dif  = !isNaN(real) ? Math.round((real - saldo) * 100) / 100 : null
 
-  useEffect(() => {
-    if (!editing) setDraft(String(bal.starting_balance))
-  }, [bal.starting_balance, editing])
-
-  function commit() {
-    const v = parseFloat(draft) || 0
-    setEditing(false)
-    onSave(v)
+  async function cuadrar() {
+    if (dif == null || Math.abs(dif) < 0.01) { setDraft(''); return }
+    setBusy(true)
+    try { await onCuadrar(real); setDraft('') } finally { setBusy(false) }
   }
 
-  const cobrado     = rents.filter(r => r.paid).reduce((s, r) => s + r.amount, 0)
-                    + extraIncome.reduce((s, i) => s + i.amount, 0)
-  const pagado      = expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0)
-                    + nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
-                    + extraExpenses.reduce((s, i) => s + i.amount, 0)
-  // Fund contribution isn't an egreso, but it left the available cash (a transfer) — subtract it too.
-  const saldoActual = (bal.starting_balance || 0) + cobrado - pagado - fondoAportado
-
   return (
-    <div className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
+    <div className="flex flex-col rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">Saldo actual</p>
-          <p className="text-label text-fg-muted/50">Según lo marcado</p>
+        <div className="flex items-center gap-1.5">
+          <PixelIcon kind={icon} />
+          <p className="text-label font-bold uppercase tracking-widest text-fg-muted">{label}</p>
         </div>
-        <p className={`text-heading font-black tabular-nums ${saldoActual >= 0 ? 'text-fg' : 'text-danger'}`}><Mxn v={saldoActual} /></p>
+        <p className={`text-subhead font-black tabular-nums ${saldo >= 0 ? 'text-fg' : 'text-danger'}`}><Mxn v={saldo} /></p>
       </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border pt-2 text-secondary">
-        <span className="flex items-center gap-1 text-fg-muted">
-          Inicial
-          {editing ? (
-            <input
-              type="number"
-              value={draft}
-              autoFocus
-              onChange={e => setDraft(e.target.value)}
-              onBlur={commit}
-              onKeyDown={e => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-                if (e.key === 'Escape') { setEditing(false); setDraft(String(bal.starting_balance)) }
-              }}
-              className="w-20 rounded border border-accent/40 bg-surface-2 px-1 py-0.5 text-right tabular-nums text-fg outline-none"
-            />
-          ) : (
-            <button onClick={() => setEditing(true)} className="tabular-nums underline decoration-dotted underline-offset-2 hover:text-fg"><Mxn v={bal.starting_balance} /></button>
-          )}
-        </span>
-        <span className="text-fg-muted">+ Cob. <span className="font-medium text-ok"><Mxn v={cobrado} /></span></span>
-        <span className="text-fg-muted">− Pag. <span className="font-medium text-danger"><Mxn v={pagado} /></span></span>
-        {fondoAportado > 0 && (
-          <span className="text-fg-muted">− Apartado <span className="font-medium text-accent"><Mxn v={fondoAportado} /></span></span>
+
+      {/* desglose (apertura = saldo conciliado del mes previo) */}
+      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 border-t border-border pt-2 text-label text-fg-muted">
+        <span>Apert. <span className="tabular-nums"><Mxn v={apertura} /></span></span>
+        <span>+ Cob. <span className="tabular-nums text-ok"><Mxn v={cobrado} /></span></span>
+        <span>− Pag. <span className="tabular-nums text-danger"><Mxn v={pagado} /></span></span>
+        {apartado > 0 && <span>− Apart. <span className="tabular-nums text-accent"><Mxn v={apartado} /></span></span>}
+        {Math.abs(ajuste) >= 0.01 && <span>± Ajuste <span className="tabular-nums"><Mxn v={ajuste} /></span></span>}
+      </div>
+
+      {/* ritual de conciliación — único punto de edición del saldo */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border pt-2 text-secondary">
+        <span className="text-fg-muted">{prompt}</span>
+        <input
+          type="number" placeholder="$" value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && void cuadrar()}
+          className="w-24 rounded border border-border bg-surface-2 px-2 py-0.5 text-right tabular-nums text-fg outline-none focus:border-accent/50"
+        />
+        {dif != null && Math.abs(dif) >= 0.01 && (
+          <>
+            <span className={`font-bold ${dif > 0 ? 'text-ok' : 'text-danger'}`}>{dif > 0 ? 'sobra' : 'falta'} <Mxn v={Math.abs(dif)} /></span>
+            <button onClick={() => void cuadrar()} disabled={busy}
+              className="rounded-control bg-accent/15 px-2.5 py-1 font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40">
+              Cuadrar
+            </button>
+          </>
         )}
       </div>
+
+      <button onClick={onVerAjustes} className="mt-2 self-start text-label text-fg-muted underline decoration-dotted underline-offset-2 hover:text-fg">
+        Ver ajustes
+      </button>
     </div>
   )
 }
@@ -702,22 +703,26 @@ function SaldoActualCard({ bal, rents, expenses, nomina, extraIncome, extraExpen
 // Panel card: read-only rollup (Σ Uptown funds) that opens the Caja Fuerte tab, plus the mantenimiento
 // MONTHLY contribution toggle (it feeds saldoActual, so it stays in the month view). Fund detail —
 // balances, metas, libretas, other funds — lives in the tab.
-function UptownCajaFuerteCard({ total, aportadoAmount, onAportar, onQuitar, onOpen }: {
+function UptownCajaFuerteCard({ total, aportadoAmount, aportadoMethod, onAportar, onQuitar, onOpen }: {
   total: number
   aportadoAmount: number | null            // null = sin aportar este mes; número = ya aportado
-  onAportar: (amount: number) => Promise<void>
+  aportadoMethod: 'cash' | 'card'          // cuenta de origen del apartado (default efectivo)
+  onAportar: (amount: number, metodo: 'cash' | 'card') => Promise<void>
   onQuitar: () => Promise<void>
   onOpen: () => void
 }) {
   const [editing, setEditing]   = useState(false)
   const [amtDraft, setAmtDraft] = useState('')
+  const [method, setMethod]     = useState<'cash' | 'card'>(aportadoMethod)
   const [busy, setBusy]         = useState(false)
+
+  useEffect(() => { setMethod(aportadoMethod) }, [aportadoMethod])
 
   async function submit() {
     const n = parseFloat(amtDraft)
     if (!n || n <= 0) return
     setBusy(true)
-    try { await onAportar(n); setEditing(false); setAmtDraft('') } finally { setBusy(false) }
+    try { await onAportar(n, method); setEditing(false); setAmtDraft('') } finally { setBusy(false) }
   }
 
   const inputCls = 'w-24 rounded border border-border bg-surface-2 px-2 py-0.5 text-right tabular-nums text-fg outline-none focus:border-accent/50'
@@ -734,22 +739,24 @@ function UptownCajaFuerteCard({ total, aportadoAmount, onAportar, onQuitar, onOp
       <div className="border-t border-border pt-2 text-secondary">
         <p className="mb-1 text-label font-medium uppercase tracking-wide text-fg-muted">Aportación mensual · Mantenimiento</p>
         {aportadoAmount == null ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-fg-muted">Sin aportar este mes</span>
+            <MethodToggle method={method} onChange={setMethod} />
             <input type="number" value={amtDraft} onChange={e => setAmtDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') void submit() }} placeholder="$" className={inputCls} />
             <button onClick={() => void submit()} disabled={busy || !amtDraft} className={okBtn}>Aportar</button>
           </div>
         ) : editing ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <MethodToggle method={method} onChange={setMethod} />
             <input type="number" value={amtDraft} autoFocus onChange={e => setAmtDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') void submit(); if (e.key === 'Escape') { setEditing(false); setAmtDraft('') } }} className={inputCls} />
             <button onClick={() => void submit()} disabled={busy || !amtDraft} className={okBtn}>Guardar</button>
             <button onClick={() => { setEditing(false); setAmtDraft('') }} className="text-label text-fg-muted hover:text-fg">✕</button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-ok">✓ Aportado este mes: {mxn(aportadoAmount)}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-ok">✓ Aportado este mes: {mxn(aportadoAmount)} <span className="text-fg-muted">· {aportadoMethod === 'cash' ? 'efectivo' : 'banco'}</span></span>
             <button onClick={() => { setEditing(true); setAmtDraft(String(aportadoAmount)) }} className="text-label text-fg-muted hover:text-fg">editar</button>
             <button onClick={() => void onQuitar()} className="text-label text-fg-muted hover:text-danger">quitar</button>
           </div>
@@ -1212,11 +1219,13 @@ export default function UptownContent() {
   const [nomina, setNomina]           = useState<NominaRow[]>([])
   const [extraIncome, setExtraIncome] = useState<ExtraItem[]>([])
   const [extraExpenses, setExtraExp]  = useState<ExtraItem[]>([])
-  const [balance, setBalance]         = useState<BalanceState>({ starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 })
+  // Apertura por cuenta = saldo conciliado del mes previo (uptown_balance.cuenta_bancaria / efectivo).
+  const [apertura, setApertura]       = useState<{ banco: number; cash: number }>({ banco: 0, cash: 0 })
   const [paidCounts, setPaidCounts]   = useState<Record<string, { paid: number; total: number }>>({})
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
   const [pageTab, setPageTab]         = useState<'finanzas' | 'cajafuerte' | 'valet' | 'historial'>('finanzas')
+  const [ajustesModal, setAjustesModal] = useState<'banorte' | 'efectivo' | null>(null)
 
   // Uptown's Caja Fuerte funds (scope 'uptown': mantenimiento + any obra/reserva/depósito) + handlers.
   const cajaFuerte = useCajaFuerte('uptown', month)
@@ -1233,14 +1242,9 @@ export default function UptownContent() {
       setExtraExp(data.extra_expenses)
       setPaidCounts(data.paid_counts ?? {})
       // (Caja Fuerte funds load via useCajaFuerte; the monthly aportado derives from them below.)
-      // Auto-fill starting balance from previous month when no balance record exists yet
-      if (!data.has_balance && m >= '2026-07' && data.prev_saldo != null && data.prev_saldo > 0) {
-        const autoBalance = { starting_balance: data.prev_saldo, cuenta_bancaria: 0, efectivo: 0 }
-        setBalance(autoBalance)
-        post('/api/uptown/balance', { month: m, ...autoBalance }).catch(() => {})
-      } else {
-        setBalance(data.balance)
-      }
+      // Apertura de cada cuenta = saldo conciliado del mes previo (cuenta_bancaria / efectivo). Se
+      // escribe al Cuadrar; si el mes previo no se concilió, arranca en 0 y el primer cuadre lo fija.
+      setApertura({ banco: Number(data.prev_saldo_bank) || 0, cash: Number(data.prev_saldo_cash) || 0 })
     } catch (e) { setError(String(e)) }
     finally { setLoading(false) }
   }, [])
@@ -1278,8 +1282,8 @@ export default function UptownContent() {
   // Monthly mantenimiento contribution — the month's "Apartado". Same reversible mechanism: upsert
   // (aportar/editar) or delete (quitar) keyed by source_key='uptown_fondo:<month>'. Refreshes the
   // shared Caja Fuerte funds so both the panel rollup and the tab reflect it.
-  async function aportarFondo(amount: number) {
-    await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key: `uptown_fondo:${month}` })
+  async function aportarFondo(amount: number, metodo: 'cash' | 'card') {
+    await post('/api/finance/funds/movement', { key: 'mantenimiento', flow: 'out', amount, description: 'Aportación mensual', month, source_key: `uptown_fondo:${month}`, metodo })
     await cajaFuerte.refresh()
   }
   async function quitarFondo() {
@@ -1400,11 +1404,24 @@ export default function UptownContent() {
     await fetch(`/api/uptown/extra-expenses/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) })
   }
 
-  // ── Balance handler ───────────────────────────────────────────────────────
-
-  async function saveStartingBalance(starting_balance: number) {
-    setBalance(prev => ({ ...prev, starting_balance }))
-    await post('/api/uptown/balance', { month, starting_balance })
+  // ── Conciliación handler ──────────────────────────────────────────────────
+  // Único punto de edición del saldo de una cuenta: si el banco/conteo difiere del saldo derivado,
+  // registra un ajuste NOMBRADO (aportación/retiro en el fondo uptown_banorte / uptown_efectivo) y
+  // guarda el saldo real como cierre del mes → alimenta la apertura del mes siguiente. Nunca se edita
+  // a mano. delta > 0 = sobra (el banco tiene más) → 'out' sube el fondo; delta < 0 = falta → 'in'.
+  async function registrarAjuste(account: 'banorte' | 'efectivo', real: number) {
+    const saldo = account === 'banorte' ? saldoBanorte : saldoEfectivo
+    const delta = Math.round((real - saldo) * 100) / 100
+    if (Math.abs(delta) < 0.01) return
+    const date = month === currMonth() ? new Date().toISOString().slice(0, 10) : `${month}-28`
+    await post('/api/finance/funds/movement', {
+      key: account === 'banorte' ? 'uptown_banorte' : 'uptown_efectivo',
+      flow: delta > 0 ? 'out' : 'in', amount: Math.abs(delta),
+      description: 'Ajuste de conciliación', month, date,
+    })
+    // Carryover: el saldo real conciliado es el cierre del mes → apertura del siguiente.
+    await post('/api/uptown/balance', { month, [account === 'banorte' ? 'cuenta_bancaria' : 'efectivo']: real })
+    await cajaFuerte.refresh()
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1414,14 +1431,43 @@ export default function UptownContent() {
   // "Apartado" = the mantenimiento fund's source_key'd movement for this month.
   // valet_nu is the Valet's operating account (its ledger lives in the Valet tab), NOT a Caja Fuerte
   // apartado — split it out so it never shows as a fund card nor inflates the Caja Fuerte rollup.
-  const nuFund    = cajaFuerte.funds.find(f => f.key === 'valet_nu')
-  const apartados = cajaFuerte.funds.filter(f => f.key !== 'valet_nu')
+  // valet_nu (cuenta operativa del Valet) y los fondos de ajuste por cuenta (uptown_banorte /
+  // uptown_efectivo) NO son apartados de Caja Fuerte — se separan para que no salgan como card ni
+  // inflen el rollup. Sus libretas son el historial consultable de conciliaciones.
+  const nuFund       = cajaFuerte.funds.find(f => f.key === 'valet_nu')
+  const banorteFund  = cajaFuerte.funds.find(f => f.key === 'uptown_banorte')
+  const efectivoFund = cajaFuerte.funds.find(f => f.key === 'uptown_efectivo')
+  const RECONCILE_KEYS = ['valet_nu', 'uptown_banorte', 'uptown_efectivo']
+  const apartados = cajaFuerte.funds.filter(f => !RECONCILE_KEYS.includes(f.key ?? ''))
   const cajaTotal = apartados.filter(f => !f.archived).reduce((s, f) => s + Number(f.saved), 0)
   const mantFund = cajaFuerte.funds.find(f => f.key === 'mantenimiento')
   const fondoMovThisMonth = mantFund?.movements.find(m => m.source_key === `uptown_fondo:${month}`)
   const fondoAportado = fondoMovThisMonth ? Number(fondoMovThisMonth.amount) : 0   // transfer set aside this month
+  // El apartado sale de la cuenta que marcó el usuario (default efectivo; movimientos viejos sin
+  // método → efectivo). Se resta SOLO de esa cuenta.
+  const apartadoMethod: 'cash' | 'card' = fondoMovThisMonth?.metodo === 'card' ? 'card' : 'cash'
+  const bankApartado = apartadoMethod === 'card' ? fondoAportado : 0
+  const cashApartado = apartadoMethod === 'card' ? 0 : fondoAportado
+
+  // Saldo por cuenta, DERIVADO de los checks reales separados por `method` (card = Banorte, cash =
+  // Efectivo) + los ajustes de conciliación del mes. El apartado (mantenimiento) se atribuye a Banorte
+  // (transferencia bancaria al fondo). saldo = apertura + cobrado − pagado − apartado + ajustes(mes).
+  const sumBy = <T,>(rows: T[], pick: (r: T) => number) => rows.reduce((s, r) => s + pick(r), 0)
+  const ajusteMes = (f?: Fund) => (f?.movements ?? [])
+    .filter(m => (m.date ?? '').slice(0, 7) === month)
+    .reduce((s, m) => s + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount)), 0)
+
+  const bankCobrado = sumBy(rents.filter(r => r.paid && r.method === 'card'), r => r.amount) + sumBy(extraIncome.filter(i => i.method === 'card'), i => i.amount)
+  const cashCobrado = sumBy(rents.filter(r => r.paid && r.method === 'cash'), r => r.amount) + sumBy(extraIncome.filter(i => i.method === 'cash'), i => i.amount)
+  const bankPagado  = sumBy(expenses.filter(e => e.paid && e.method === 'card'), e => e.amount) + sumBy(nomina.filter(n => n.paid && n.method === 'card'), n => n.amount) + sumBy(extraExpenses.filter(i => i.method === 'card'), i => i.amount)
+  const cashPagado  = sumBy(expenses.filter(e => e.paid && e.method === 'cash'), e => e.amount) + sumBy(nomina.filter(n => n.paid && n.method === 'cash'), n => n.amount) + sumBy(extraExpenses.filter(i => i.method === 'cash'), i => i.amount)
+  const ajusteBanorte  = ajusteMes(banorteFund)
+  const ajusteEfectivo = ajusteMes(efectivoFund)
+  const saldoBanorte  = apertura.banco + bankCobrado - bankPagado - bankApartado + ajusteBanorte
+  const saldoEfectivo = apertura.cash  + cashCobrado - cashPagado - cashApartado + ajusteEfectivo
 
   return (
+    <>
     <main className="mx-auto flex h-full max-w-6xl flex-col px-6 pt-6">
         {/* Header */}
         <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
@@ -1459,22 +1505,30 @@ export default function UptownContent() {
         </div>
 
         {pageTab === 'finanzas' && !loading && !error && (
-          <div className="mb-3 grid shrink-0 grid-cols-3 gap-3">
+          <div className="mb-3 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
             <PrevistoCard
               rents={rents} expenses={expenses} nomina={nomina}
               extraIncome={extraIncome} extraExpenses={extraExpenses}
               fondoAportado={fondoAportado}
             />
-            <SaldoActualCard
-              bal={balance}
-              rents={rents} expenses={expenses} nomina={nomina}
-              extraIncome={extraIncome} extraExpenses={extraExpenses}
-              fondoAportado={fondoAportado}
-              onSave={saveStartingBalance}
+            <CuentaCard
+              label="Banorte" icon="card" prompt="¿Estado de cuenta?"
+              saldo={saldoBanorte} apertura={apertura.banco}
+              cobrado={bankCobrado} pagado={bankPagado} apartado={bankApartado} ajuste={ajusteBanorte}
+              onCuadrar={real => registrarAjuste('banorte', real)}
+              onVerAjustes={() => setAjustesModal('banorte')}
+            />
+            <CuentaCard
+              label="Efectivo" icon="cash" prompt="¿Conteo físico?"
+              saldo={saldoEfectivo} apertura={apertura.cash}
+              cobrado={cashCobrado} pagado={cashPagado} apartado={cashApartado} ajuste={ajusteEfectivo}
+              onCuadrar={real => registrarAjuste('efectivo', real)}
+              onVerAjustes={() => setAjustesModal('efectivo')}
             />
             <UptownCajaFuerteCard
               total={cajaTotal}
               aportadoAmount={fondoMovThisMonth ? fondoAportado : null}
+              aportadoMethod={apartadoMethod}
               onAportar={aportarFondo}
               onQuitar={quitarFondo}
               onOpen={() => setPageTab('cajafuerte')}
@@ -1550,5 +1604,21 @@ export default function UptownContent() {
         )}
         </div>
       </main>
+
+      {/* Libreta de ajustes de conciliación (por cuenta) */}
+      <DrumModal open={ajustesModal !== null} onClose={() => setAjustesModal(null)} ariaLabel="Libreta de ajustes">
+        {ajustesModal && (() => {
+          const f = ajustesModal === 'banorte' ? banorteFund : efectivoFund
+          return (
+            <>
+              <h2 className="mb-3 text-subhead font-bold text-fg">Ajustes · {ajustesModal === 'banorte' ? 'Banorte' : 'Efectivo'}</h2>
+              {f && f.movements.length > 0
+                ? <FundLedger movements={f.movements} />
+                : <p className="py-6 text-center text-body italic text-fg-muted">Sin ajustes todavía</p>}
+            </>
+          )
+        })()}
+      </DrumModal>
+    </>
   )
 }

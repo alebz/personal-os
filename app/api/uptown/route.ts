@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServerClient()
 
-  const [rents, expenses, nomina, extraInc, extraExp, bal, fondoRows, prevBal, paidRents, renterCounts, lastCorte] = await Promise.all([
+  const [rents, expenses, nomina, extraInc, extraExp, bal, fondoRows, prevBal, paidRents, renterCounts] = await Promise.all([
     supabase.from('uptown_rents').select('renter,amount,paid,method').eq('month', month),
     supabase.from('uptown_fixed_expenses').select('category,amount,paid,method').eq('month', month),
     supabase.from('uptown_nomina').select('week_num,amount,paid,method').eq('month', month).order('week_num'),
@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
     supabase.from('uptown_balance').select('cuenta_bancaria,efectivo').eq('month', prevMonth).maybeSingle(),
     supabase.from('uptown_rents').select('renter').eq('paid', true),
     supabase.from('uptown_renter_counts').select('renter,paid_count,total_months'),
-    supabase.from('uptown_cortes').select('real').eq('month', month).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   for (const result of [rents, expenses, nomina, extraInc, extraExp, fondoRows]) {
@@ -34,9 +33,9 @@ export async function GET(req: NextRequest) {
   if (bal.error) return NextResponse.json({ error: bal.error.message }, { status: 500 })
 
   const fondoTotal  = (fondoRows.data ?? []).reduce((s, r) => s + Number(r.amount), 0)
-  const prevSaldo   = prevBal.data
-    ? Number(prevBal.data.cuenta_bancaria) + Number(prevBal.data.efectivo)
-    : null
+  // Apertura por cuenta del mes siguiente = cierre conciliado de este mes, separado banco/efectivo.
+  const prevSaldoBank = prevBal.data ? Number(prevBal.data.cuenta_bancaria) : null
+  const prevSaldoCash = prevBal.data ? Number(prevBal.data.efectivo) : null
   const balanceData = bal.data ?? { starting_balance: 0, cuenta_bancaria: 0, efectivo: 0 }
   const hasBalance  = bal.data !== null
 
@@ -67,9 +66,9 @@ export async function GET(req: NextRequest) {
     extra_expenses: extraExp.data ?? [],
     balance:          balanceData,
     has_balance:      hasBalance,
-    prev_saldo:       prevSaldo,
+    prev_saldo_bank:  prevSaldoBank,
+    prev_saldo_cash:  prevSaldoCash,
     fondo_total:      fondoTotal,
     paid_counts:      paidCounts,
-    last_corte_real:  lastCorte.data?.real ?? null,
   })
 }

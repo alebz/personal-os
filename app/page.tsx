@@ -9,6 +9,7 @@ import ContactosContent from '@/components/sections/ContactosContent'
 import FinanzasContent from '@/components/sections/FinanzasContent'
 import UptownContent from '@/components/sections/UptownContent'
 import InicioContent from '@/components/sections/InicioContent'
+import { SECTION_COLORS } from '@/lib/sections'
 
 // OSDrum reveals faces in reverse as you scroll down (index 0 front, then N-1, N-2 … 1). So the
 // CARDS are laid out reversed-past-index-0 to make the on-screen order read top→bottom:
@@ -16,13 +17,13 @@ import InicioContent from '@/components/sections/InicioContent'
 // Inicio is index 0 so the OS loads on the clock+calendar face; Cerebro sits right below it.
 // Colors stay pinned per array position — the drum's rainbow does not move, only the cards do.
 const SECTIONS: OSSection[] = [
-  { label: 'Inicio',    color: '#e8ecff', href: '/', content: <InicioContent /> },
-  { label: 'Contactos', color: '#EA4335', href: '/contactos', content: <ContactosContent /> },
-  { label: 'Hábitos',   color: '#F6821E', href: '/habits', content: <HabitTrackerContent /> },
-  { label: 'Finanzas Alex', color: '#FBBC05', href: '/finance', content: <FinanzasContent /> },
-  { label: 'Uptown',    color: '#34A853', href: '/uptown', content: <UptownContent /> },
-  { label: 'Tareas',    color: '#4285F4', href: '/crm', content: <TareasContent /> },
-  { label: 'Cerebro',   color: '#9B59B6', href: '/brain', content: <CerebroContent /> },
+  { label: 'Inicio',    color: SECTION_COLORS['/'],          href: '/',          content: <InicioContent /> },
+  { label: 'Contactos', color: SECTION_COLORS['/contactos'], href: '/contactos', content: <ContactosContent /> },
+  { label: 'Hábitos',   color: SECTION_COLORS['/habits'],    href: '/habits',    content: <HabitTrackerContent /> },
+  { label: 'Finanzas Alex', color: SECTION_COLORS['/finance'], href: '/finance', content: <FinanzasContent /> },
+  { label: 'Uptown',    color: SECTION_COLORS['/uptown'],    href: '/uptown',    content: <UptownContent /> },
+  { label: 'Tareas',    color: SECTION_COLORS['/crm'],       href: '/crm',       content: <TareasContent /> },
+  { label: 'Cerebro',   color: SECTION_COLORS['/brain'],     href: '/brain',     content: <CerebroContent /> },
 ]
 
 export default function HomePage() {

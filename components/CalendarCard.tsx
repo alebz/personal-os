@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import type { CalEvent } from '@/app/api/calendar/route'
-import { WEEKDAY_RAINBOW, dayColor } from '@/lib/weekdayColors'
+import { WEEKDAY_RAINBOW, dayColor, crtDayColor, contrastInk } from '@/lib/weekdayColors'
+import { useOSSettings } from '@/components/OSSettingsContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export default function CalendarCard() {
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [formOpen,   setFormOpen]   = useState(false)   // collapsed to just the title until focused
   const [agendaOpen, setAgendaOpen] = useState(false)   // right agenda column; starts collapsed (month full width)
+  const { crt } = useOSSettings()   // suscribe al estado CRT → re-render al togglear mono/multi (color reactivo)
 
   function rangeForView(year: number, month: number): { from: string; to: string } {
     const gridCells = buildGridCells(year, month)
@@ -196,7 +198,7 @@ export default function CalendarCard() {
     : []
 
   const selDate      = selected ? new Date(selected + 'T12:00:00') : null
-  const selColor     = selDate ? dayColor(selDate) : '#8b7bff'
+  const selColor     = crtDayColor(selDate ? dayColor(selDate) : '#8b7bff', crt)
   const weekday      = selDate ? selDate.toLocaleDateString('es-MX', { weekday: 'long' }) : ''
   const dayMonth     = selDate ? selDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : ''
   const isTodaySel   = selected === todayKey
@@ -252,7 +254,7 @@ export default function CalendarCard() {
               <div
                 key={d}
                 className="text-center text-secondary font-semibold uppercase tracking-wider"
-                style={{ color: WEEKDAY_RAINBOW[i] + 'cc' }}
+                style={{ color: crtDayColor(WEEKDAY_RAINBOW[i], crt) + 'cc' }}
               >
                 {d}
               </div>
@@ -267,23 +269,29 @@ export default function CalendarCard() {
               const isWeekend  = idx % 7 >= 5
               const cellEvents = loading ? [] : (byDate.get(key) ?? [])
               const bday       = isCurrentMonth && isBirthday(date)
+              const cellColor  = crtDayColor(dayColor(date), crt)   // el color del propio día (rainbow / fósforo)
 
               return (
                 <button
                   key={key}
                   onClick={() => { if (selected !== key) { resetForm(); setAddDate(key) } setSelected(key) }}
                   className={`group relative flex min-h-[3.5rem] flex-col items-center gap-1 rounded-card px-1 pt-1.5 pb-1 transition-all ${
-                    isSelected ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-surface-hover'
+                    isSelected ? '' : 'hover:bg-surface-hover'
                   } ${!isCurrentMonth ? 'opacity-35' : ''}`}
+                  style={isSelected ? { background: cellColor + '1a', boxShadow: `0 0 0 1px ${cellColor}66` } : undefined}
                 >
                   <span
                     className={`flex h-7 w-7 items-center justify-center rounded-round text-body tabular-nums transition-colors ${
                       bday ? 'font-bold' :
-                      isToday ? 'bg-accent font-semibold text-white' :
-                      isSelected ? 'font-semibold text-accent' :
+                      (isToday || isSelected) ? 'font-semibold' :
                       isWeekend ? 'text-fg-muted' : 'text-fg'
                     }`}
-                    style={bday ? { background: '#f0b53a', color: '#3a2400', boxShadow: '0 0 0 1px #7a4e12, 0 0 0 2px #ffe08a' } : undefined}
+                    style={
+                      bday    ? { background: '#f0b53a', color: '#3a2400', boxShadow: '0 0 0 1px #7a4e12, 0 0 0 2px #ffe08a' } :
+                      isToday ? { background: cellColor, color: contrastInk(cellColor) } :   // relleno del color del día + texto de contraste
+                      isSelected ? { color: cellColor } :
+                      undefined
+                    }
                     title={bday ? '¡Tu cumpleaños! 🎂' : undefined}
                   >
                     {date.getDate()}
@@ -292,7 +300,7 @@ export default function CalendarCard() {
                   {cellEvents.length > 0 && (
                     <div className="flex items-center gap-[3px]">
                       {cellEvents.slice(0, 4).map(ev => (
-                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-round" style={{ background: dayColor(date) }} />
+                        <span key={ev.uid} className="h-1.5 w-1.5 rounded-round" style={{ background: crtDayColor(dayColor(date), crt) }} />
                       ))}
                       {cellEvents.length > 4 && <span className="text-label leading-none text-fg-muted">+{cellEvents.length - 4}</span>}
                     </div>
@@ -411,7 +419,7 @@ export default function CalendarCard() {
                 <button
                   type="submit"
                   disabled={adding || !addTitle.trim()}
-                  className="w-full rounded-card bg-accent px-4 py-2 text-body font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                  className="btn-primary w-full rounded-card px-4 py-2 text-body"
                 >
                   {adding ? '…' : editingUid ? 'Guardar' : 'Agregar'}
                 </button>

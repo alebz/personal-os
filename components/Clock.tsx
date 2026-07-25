@@ -58,8 +58,9 @@ function Clock({ color: colorProp = '#F59E0B', colorFn, scale = 1 }: { color?: s
 
         {/* Segment display — ghost + real layered */}
         <div style={{ position: 'relative', lineHeight: 1 }}>
-          {/* Ghost (all-segments dim) */}
-          <div style={{ fontFamily: LCD, fontSize: 28 * scale, color: ghost, lineHeight: 1, transition }}>
+          {/* Ghost (all-segments dim) — textShadow:none para no heredar el glow/aberración del CRT
+              (si no, los segmentos apagados se iluminan y el display se vuelve ilegible) */}
+          <div style={{ fontFamily: LCD, fontSize: 28 * scale, color: ghost, lineHeight: 1, transition, textShadow: 'none' }}>
             88:88:88
           </div>
 

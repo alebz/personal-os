@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { PixelIcon } from '@/components/PixelIcon'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ function MethodBadge({ digital, onToggle }: { digital: boolean; onToggle: () => 
         digital ? 'bg-accent/15 text-accent' : 'bg-surface-active text-fg-muted',
       ].join(' ')}
     >
-      {digital ? '💳' : '💵'}
+      <PixelIcon kind={digital ? 'card' : 'cash'} />
     </button>
   )
 }
@@ -411,7 +412,7 @@ function AddExtraForm({ placeholder, onAdd }: {
         onClick={() => setDigital(d => !d)}
         className={['shrink-0 rounded px-1.5 py-0.5 text-label font-bold', digital ? 'bg-accent/15 text-accent' : 'bg-surface-active text-fg-muted'].join(' ')}
       >
-        {digital ? '💳' : '💵'}
+        <PixelIcon kind={digital ? 'card' : 'cash'} />
       </button>
       <button
         onClick={submit} disabled={!name.trim() || !monto}
@@ -664,8 +665,8 @@ export default function UptownPanel({ month }: { month: string }) {
 
       {/* ── Saldo cards ── */}
       <div className="grid grid-cols-2 gap-3">
-        <SaldoCard label="Saldo Cuenta 💳" saldo={t.saldoCuenta}   inicio={ms.saldos.cuenta}   onSetInicio={setSaldoCuenta}   />
-        <SaldoCard label="Saldo Efectivo 💵" saldo={t.saldoEfectivo} inicio={ms.saldos.efectivo} onSetInicio={setSaldoEfectivo} />
+        <SaldoCard label="Saldo Cuenta" saldo={t.saldoCuenta}   inicio={ms.saldos.cuenta}   onSetInicio={setSaldoCuenta}   />
+        <SaldoCard label="Saldo Efectivo" saldo={t.saldoEfectivo} inicio={ms.saldos.efectivo} onSetInicio={setSaldoEfectivo} />
       </div>
 
       {/* ── Summary mcards ── */}

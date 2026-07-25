@@ -37,7 +37,7 @@ export default function DrumModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10050] flex items-start justify-center bg-black/60 p-4 backdrop-blur-[2px] sm:p-6"
+      className="crt-screen fixed inset-0 z-[10050] flex items-start justify-center bg-black/60 p-4 backdrop-blur-[2px] sm:p-6"
       onClick={onClose}   // backdrop click closes
     >
       <div

@@ -52,20 +52,102 @@ export function fmtDate(iso: string): string {
 
 // ── Result card ───────────────────────────────────────────────────────────────
 
+// Editable in place. A chunk maps to its source of record via metadata: nota → note_id
+// (PATCH /api/notes/:id, title+content separate — the chunk stores them joined), diario → journal_id
+// (PATCH /api/journal/:id, content only). Saving reindexes server-side; the card shows the fresh text
+// locally. Other kinds (perfil, capturas) have no free-text source here → read-only. Used by Consultar,
+// /brain browse and /brain/q, so editing works everywhere a result appears.
 export function ResultCard({ chunk }: { chunk: MemoryChunk }) {
+  const kind      = canonicalKind(chunk.metadata?.kind as string | undefined)
+  const noteId    = chunk.metadata?.note_id as string | undefined
+  const journalId = chunk.metadata?.journal_id as string | undefined
+  const editable  = (kind === 'nota' && !!noteId) || (kind === 'diario' && !!journalId)
+
+  const [content, setContent]   = useState(chunk.content)
   const [expanded, setExpanded] = useState(false)
-  const long = chunk.content.length > 160
-  const body = !expanded && long ? chunk.content.slice(0, 160).trimEnd() + '…' : chunk.content
-  const pct  = chunk.similarity != null ? Math.round(chunk.similarity * 100) : null
+  const [editing, setEditing]   = useState(false)
+  const [title, setTitle]       = useState('')     // nota: title editado por separado
+  const [body, setBody]         = useState('')
+  const [busy, setBusy]         = useState(false)
+  const [err, setErr]           = useState<string | null>(null)
+
+  const long  = content.length > 160
+  const shown = !expanded && long ? content.slice(0, 160).trimEnd() + '…' : content
+  const pct   = chunk.similarity != null ? Math.round(chunk.similarity * 100) : null
+
+  async function startEdit() {
+    setErr(null)
+    if (kind === 'nota') {
+      // El chunk guarda "título\n\ncuerpo" junto — leo la nota fuente para separarlos correctamente.
+      try {
+        const r = await fetch(`/api/notes/${noteId}`)
+        if (!r.ok) throw new Error()
+        const n = await r.json() as { title?: string; content?: string }
+        setTitle(n.title ?? ''); setBody(n.content ?? '')
+      } catch { setErr('No se pudo cargar la nota'); return }
+    } else {
+      setBody(content)   // diario: el chunk ES el cuerpo
+    }
+    setEditing(true)
+  }
+
+  async function save() {
+    setBusy(true); setErr(null)
+    try {
+      if (kind === 'nota') {
+        const r = await fetch(`/api/notes/${noteId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: title.trim(), content: body }) })
+        if (!r.ok) throw new Error()
+        setContent([title.trim(), body.trim()].filter(Boolean).join('\n\n'))
+      } else {
+        const r = await fetch(`/api/journal/${journalId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: body }) })
+        if (!r.ok) throw new Error()
+        setContent(body)
+      }
+      setEditing(false)
+    } catch { setErr('No se pudo guardar') }
+    finally { setBusy(false) }
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-card border border-accent/40 bg-surface-1 px-4 py-3.5">
+        <div className="mb-2 flex items-center gap-2 text-secondary text-fg-muted">
+          <span className="font-medium uppercase tracking-wide">{kindLabel(chunk.metadata?.kind as string | undefined)}</span>
+          <span className="ml-auto text-accent">Editando</span>
+        </div>
+        {kind === 'nota' && (
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título"
+            className="mb-2 w-full rounded border border-border bg-surface-2 px-2.5 py-1.5 text-body text-fg outline-none focus:border-accent/50" />
+        )}
+        <textarea value={body} onChange={e => setBody(e.target.value)} autoFocus
+          rows={Math.min(14, Math.max(3, body.split('\n').length + 1))}
+          className="w-full resize-y rounded border border-border bg-surface-2 px-2.5 py-1.5 text-body leading-relaxed text-fg outline-none focus:border-accent/50" />
+        {err && <p className="mt-1.5 text-secondary text-danger">{err}</p>}
+        <div className="mt-2.5 flex items-center gap-2">
+          <button onClick={() => void save()} disabled={busy}
+            className="rounded-control bg-accent/15 px-3 py-1 text-secondary font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40">
+            {busy ? 'Guardando…' : 'Guardar'}
+          </button>
+          <button onClick={() => { setEditing(false); setErr(null) }} className="text-secondary text-fg-muted transition-colors hover:text-fg">Cancelar</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="rounded-card border border-border bg-surface-1 px-4 py-3.5 transition-colors">
+    <div className="group rounded-card border border-border bg-surface-1 px-4 py-3.5 transition-colors">
       <div className="mb-1.5 flex items-center gap-2 text-secondary text-fg-muted">
         <span className="font-medium uppercase tracking-wide">{kindLabel(chunk.metadata?.kind as string | undefined)}</span>
         {chunk.created_at && <><span className="text-fg-muted/40">·</span><span>{fmtDate(chunk.created_at)}</span></>}
-        {pct != null && <span className="ml-auto tabular-nums text-fg-faint">{pct}%</span>}
+        <span className="ml-auto flex items-center gap-2.5">
+          {editable && (
+            <button onClick={() => void startEdit()} className="text-fg-faint transition-colors hover:text-accent">Editar</button>
+          )}
+          {pct != null && <span className="tabular-nums text-fg-faint">{pct}%</span>}
+        </span>
       </div>
-      <p className="whitespace-pre-wrap text-body leading-relaxed text-fg">{body}</p>
+      <p className="whitespace-pre-wrap text-body leading-relaxed text-fg">{shown}</p>
+      {err && <p className="mt-1.5 text-secondary text-danger">{err}</p>}
       {long && (
         <button onClick={() => setExpanded(e => !e)} className="mt-1.5 text-secondary text-fg-muted transition-colors hover:text-fg">
           {expanded ? 'Mostrar menos' : 'Mostrar más'}
@@ -353,7 +435,7 @@ export default function CerebroContent() {
                 type="button"
                 onClick={() => void submitCapture()}
                 disabled={saving || !capText.trim()}
-                className="shrink-0 rounded-card bg-accent/15 px-4 py-2 text-body font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn-primary shrink-0 rounded-card px-4 py-2 text-body"
               >
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>

@@ -2,6 +2,23 @@
 // home clock so each weekday gains a consistent, subconscious colour identity.
 export const WEEKDAY_RAINBOW = ['#EA4335', '#F6821E', '#FBBC05', '#34A853', '#4285F4', '#9B59B6', '#e8ecff']
 
+// La conmutación a fósforo en modo CRT monocromo NO vive aquí (estas funciones deben ser puras y
+// reactivas). Los componentes leen `crt` del contexto y aplican crtDayColor() → re-renderizan al
+// togglear. `crtDayColor(base, crt)`: en mono devuelve el fósforo, en multi el color original.
+export function crtDayColor(base: string, crt: { on: boolean; color: string; phosphor: string }): string {
+  return crt.on && crt.color === 'mono' ? crt.phosphor : base
+}
+
+// Texto legible SOBRE un relleno de color (p.ej. el marcador de "hoy"): oscuro sobre colores claros
+// (amarillo/naranja/blanco), blanco sobre los medios/oscuros (verde/rojo/azul/morado). Cumple
+// contraste a lo largo de todo el rainbow — resuelve el amarillo que preocupaba.
+export function contrastInk(hex: string): string {
+  const n = hex.replace('#', '')
+  const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16)
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return lum > 0.62 ? '#141008' : '#ffffff'
+}
+
 export function dayColor(d: Date): string {
   return WEEKDAY_RAINBOW[(d.getDay() + 6) % 7]   // Mon=0 … Sun=6
 }
