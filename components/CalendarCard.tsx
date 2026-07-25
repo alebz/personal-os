@@ -287,7 +287,7 @@ export default function CalendarCard() {
                       isWeekend ? 'text-fg-muted' : 'text-fg'
                     }`}
                     style={
-                      bday    ? { background: '#f0b53a', color: '#3a2400', boxShadow: '0 0 0 1px #7a4e12, 0 0 0 2px #ffe08a' } :
+                      bday    ? (() => { const g = crtDayColor('#f0b53a', crt); return { background: g, color: contrastInk(g), boxShadow: `0 0 0 1px ${crtDayColor('#7a4e12', crt)}, 0 0 0 2px ${crtDayColor('#ffe08a', crt)}` } })() :
                       isToday ? { background: cellColor, color: contrastInk(cellColor) } :   // relleno del color del día + texto de contraste
                       isSelected ? { color: cellColor } :
                       undefined

@@ -86,8 +86,12 @@ export default function CRTOverlay() {
       <div className="crt-dots" aria-hidden />
       <div className="crt-scan" aria-hidden />
       <div className="crt-vig" aria-hidden />
-      {/* capa óptica frontal — backdrop-filter (#crtFx) sobre TODO el sistema, incl. el sim */}
-      <div className="crt-front" aria-hidden />
+      {/* Capa óptica frontal — backdrop-filter (#crtFx) sobre TODO el sistema, incl. el sim.
+          El backdrop-filter va INLINE (no en globals.css) a propósito: el minificador CSS de
+          producción (LightningCSS) considera `backdrop-filter: url(...)` inválido y DROPEA la
+          declaración → el warp funcionaba en dev pero no en el deploy. Inline evita el minificador.
+          El gating on/off lo hace `[data-crt="off"] .crt-front { display:none }` en globals.css. */}
+      <div className="crt-front" aria-hidden style={{ backdropFilter: 'url(#crtFx)', WebkitBackdropFilter: 'url(#crtFx)' }} />
 
       {/* Defs SVG: filtro de warp + símbolos de íconos pixel (currentColor) */}
       <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }} aria-hidden>

@@ -424,7 +424,9 @@ input::placeholder, textarea::placeholder {
    position:fixed (a diferencia de `filter`, que colapsaba el tambor). Es la capa más frontal:
    por encima de todo, pointer-events:none. */
 .crt-front { position: fixed; inset: 0; z-index: 9995; pointer-events: none; }
-[data-crt="on"] .crt-front { backdrop-filter: url(#crtFx); -webkit-backdrop-filter: url(#crtFx); }
+/* El `backdrop-filter: url(#crtFx)` va INLINE en <CRTOverlay> (no aquí): el minificador CSS de
+   producción (LightningCSS) dropea `backdrop-filter: url(...)` por inválido → el warp fallaba en el
+   deploy aunque funcionaba en dev. Aquí solo el gating de visibilidad (que sí sobrevive al minify). */
 [data-crt="off"] .crt-front { display: none; }
 
 /* MODO MONO: remapea los tokens de color a fósforo dentro del contenido. Aprovecha el
