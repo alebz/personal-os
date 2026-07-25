@@ -12,6 +12,7 @@ type Move = {
   flow: 'in' | 'out'
   category: string
   source_key: string | null
+  metodo: 'cash' | 'card' | null
 }
 
 // GET /api/finance/funds
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     fundsQuery,
     supabase
       .from('finance_movements')
-      .select('id, envelope_id, date, month, description, amount, flow, category, source_key')
+      .select('id, envelope_id, date, month, description, amount, flow, category, source_key, metodo')
       .not('envelope_id', 'is', null)
       .order('date')
       .order('created_at'),

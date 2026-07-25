@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
   let b: {
     key?: string; flow?: 'in' | 'out'; amount?: number
     description?: string; month?: string; date?: string; source_key?: string | null
+    metodo?: 'cash' | 'card' | null
   }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   if (!b.key || (b.flow !== 'in' && b.flow !== 'out') || !b.amount || b.amount <= 0 || !b.description || !b.month) {
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   const row = {
     envelope_id: fund.id, flow: b.flow, amount: b.amount, description: b.description,
     month: b.month, date: b.date ?? today(), category: 'fondo', source_key: b.source_key ?? null,
+    metodo: b.metodo ?? null,
   }
   if (b.source_key) {
     await supabase.from('finance_movements').delete().eq('source_key', b.source_key)   // idempotent upsert
