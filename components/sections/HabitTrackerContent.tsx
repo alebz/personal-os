@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useOSSettings } from '@/components/OSSettingsContext'
+import { crtDayColor } from '@/lib/weekdayColors'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -194,13 +196,15 @@ function HabitRow({
   onToggle: (h: Habit) => void
   onOpen: (h: Habit) => void
 }) {
+  const { crt } = useOSSettings()
+  const color = crtDayColor(habit.color, crt)   // fósforo en mono, color real en multi/off
   const done = new Set(habit.dates)
   const doneToday = done.has(today)
 
   return (
     <div className="flex items-center gap-3 rounded-card border border-border bg-surface-1 px-3.5 py-3 shadow-lg shadow-black/10 backdrop-blur-xl dashboard-card">
       <button onClick={() => onOpen(habit)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-card text-subhead" style={{ backgroundColor: habit.color + '22' }}>{habit.icon}</span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-card text-subhead" style={{ backgroundColor: color + '22' }}>{habit.icon}</span>
         <span className="min-w-0">
           <span className="block truncate text-body font-medium text-fg">{habit.name}</span>
           <span className="block truncate text-secondary text-fg-muted">{habit.category}</span>
@@ -216,7 +220,7 @@ function HabitRow({
               key={d}
               title={d}
               className={`h-4 w-2 rounded-control bg-surface-active ${d === today ? 'ring-1 ring-border-strong' : ''}`}
-              style={filled ? { backgroundColor: habit.color } : undefined}
+              style={filled ? { backgroundColor: color } : undefined}
             />
           )
         })}
@@ -227,7 +231,7 @@ function HabitRow({
         onClick={() => onToggle(habit)}
         aria-label={doneToday ? 'Marcar no hecho' : 'Marcar hecho'}
         className={`grid h-7 w-7 shrink-0 place-items-center rounded-round border transition-colors ${doneToday ? 'border-transparent text-white' : 'border-border-strong text-transparent hover:border-border-strong'}`}
-        style={doneToday ? { backgroundColor: habit.color } : undefined}
+        style={doneToday ? { backgroundColor: color } : undefined}
       >
         <svg viewBox="0 0 12 10" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={2}><path d="M1 5l3.5 3.5L11 1" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
@@ -271,6 +275,8 @@ function HabitDetail({
   onClose: () => void
   onEdit: (h: Habit) => void
 }) {
+  const { crt } = useOSSettings()
+  const color = crtDayColor(habit.color, crt)   // fósforo en mono, color real en multi/off
   const [dates,   setDates]   = useState<string[]>(habit.dates)
   const [loading, setLoading] = useState(true)
   const [year,    setYear]    = useState(new Date().getFullYear())
@@ -314,7 +320,7 @@ function HabitDetail({
       <div className="relative my-auto w-full max-w-3xl rounded-card border border-border bg-surface-1 shadow-2xl">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card text-heading" style={{ backgroundColor: habit.color + '22' }}>{habit.icon}</span>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-card text-heading" style={{ backgroundColor: color + '22' }}>{habit.icon}</span>
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-md font-semibold text-fg">{habit.name}</h3>
             <p className="truncate text-secondary text-fg-muted">{habit.category}</p>
@@ -329,7 +335,7 @@ function HabitDetail({
         <div className="flex gap-8 px-5 py-5">
           <div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-display font-bold tabular-nums" style={{ color: habit.color }}>{streak}</span>
+              <span className="text-display font-bold tabular-nums" style={{ color }}>{streak}</span>
               <span className="text-subhead">🔥</span>
             </div>
             <p className="mt-1 text-secondary text-fg-muted">Racha actual · {streak === 1 ? '1 día' : `${streak} días`}</p>
@@ -373,7 +379,7 @@ function HabitDetail({
                           key={r}
                           title={c ? (done.has(c) ? `${c} ✓` : c) : ''}
                           className="h-[11px] w-[11px] rounded-control"
-                          style={{ backgroundColor: c ? (done.has(c) ? habit.color : 'rgb(255 255 255 / 0.06)') : 'transparent' }}
+                          style={{ backgroundColor: c ? (done.has(c) ? color : 'rgb(255 255 255 / 0.06)') : 'transparent' }}
                         />
                       ))}
                     </div>
@@ -410,6 +416,7 @@ function monthGridCells(year: number, month: number): { date: Date; inMonth: boo
 }
 
 function MonthlyHeatmap() {
+  const { crt } = useOSSettings()
   const now = new Date()
   const [year,  setYear]  = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())   // 0-11
@@ -490,7 +497,7 @@ function MonthlyHeatmap() {
                             key={h.id}
                             title={done ? `${h.name} ✓` : h.name}
                             className="h-1.5 w-1.5 rounded-round transition-colors"
-                            style={{ background: done ? h.color : 'rgb(255 255 255 / 0.08)' }}
+                            style={{ background: done ? crtDayColor(h.color, crt) : 'rgb(255 255 255 / 0.08)' }}
                           />
                         )
                       })}
@@ -505,10 +512,10 @@ function MonthlyHeatmap() {
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {active.map(h => (
               <div key={h.id} className="flex items-center gap-1.5 rounded-chip border border-border bg-surface-1 px-2.5 py-1">
-                <span className="h-2 w-2 rounded-round" style={{ background: h.color }} />
+                <span className="h-2 w-2 rounded-round" style={{ background: crtDayColor(h.color, crt) }} />
                 <span className="text-body leading-none">{h.icon}</span>
                 <span className="text-secondary text-fg-muted">{h.name}</span>
-                <span className="text-secondary font-bold tabular-nums" style={{ color: h.color }}>{h.dates.length}</span>
+                <span className="text-secondary font-bold tabular-nums" style={{ color: crtDayColor(h.color, crt) }}>{h.dates.length}</span>
               </div>
             ))}
           </div>
@@ -519,6 +526,7 @@ function MonthlyHeatmap() {
 }
 
 export default function HabitTrackerContent() {
+  const { crt } = useOSSettings()
   const [habits,  setHabits]  = useState<Habit[]>([])
   const [loading, setLoading] = useState(true)
   const [today,   setToday]   = useState('')
@@ -641,7 +649,7 @@ export default function HabitTrackerContent() {
               <div className="mt-2 space-y-1.5">
                 {archived.map(h => (
                   <div key={h.id} className="flex items-center gap-3 rounded-card border border-border bg-surface-1 px-3.5 py-2">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-control text-body opacity-60" style={{ backgroundColor: h.color + '22' }}>{h.icon}</span>
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-control text-body opacity-60" style={{ backgroundColor: crtDayColor(h.color, crt) + '22' }}>{h.icon}</span>
                     <span className="min-w-0 flex-1 truncate text-body text-fg-muted">{h.name}</span>
                     <button onClick={() => reactivate(h.id)} className="shrink-0 rounded-control px-2.5 py-1 text-secondary font-medium text-accent transition-colors hover:bg-accent/10">
                       Reactivar
