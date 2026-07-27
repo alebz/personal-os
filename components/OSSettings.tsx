@@ -94,7 +94,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function OSSettings() {
   const {
     settingsOpen, closeSettings, set, setCrt,
-    showStars, showShips, showPlanes, discreto, showLolo, crt,
+    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver,
   } = useOSSettings()
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -185,6 +185,16 @@ export default function OSSettings() {
 
         <Section title="Privacidad">
           <Row label="Modo discreto"><Toggle value={discreto} onChange={v => set('discreto', v)} /></Row>
+        </Section>
+
+        <Section title="Screensaver">
+          <Row label="Modo screensaver"><Toggle value={screensaver.enabled} onChange={v => set('screensaver', { ...screensaver, enabled: v })} /></Row>
+          {screensaver.enabled && (
+            <>
+              <Slider label="Vuelta completa" value={screensaver.speed} min={45} max={120} step={5} onChange={v => set('screensaver', { ...screensaver, speed: v })} fmt={v => v + 's'} />
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>Tras 3 min sin actividad, el tambor gira solo.</p>
+            </>
+          )}
         </Section>
 
         <Section title="Widgets">

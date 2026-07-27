@@ -45,7 +45,19 @@ function Ship({ color, px = 78 }: { color: string; px?: number }) {
 export default function OSDrum({ sections }: { sections: OSSection[] }) {
   const N = sections.length
   const router = useRouter()
-  const { toggleSettings, settingsOpen } = useOSSettings()
+  const { toggleSettings, settingsOpen, screensaverActive, screensaver } = useOSSettings()
+
+  // Screensaver: el tambor gira solo, lento y continuo, cuando el OS entra en reposo. Los valores
+  // se leen por ref dentro del loop rAF (que se monta una vez). prefers-reduced-motion → giro OFF.
+  const ssActiveRef     = useRef(false); ssActiveRef.current = screensaverActive
+  const ssSpeedRef      = useRef(75);    ssSpeedRef.current  = screensaver.speed
+  const reducedMotionRef = useRef(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => { reducedMotionRef.current = mq.matches }
+    on(); mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
 
   const sceneRef = useRef<HTMLDivElement>(null)
   const deckRef = useRef<HTMLDivElement>(null)
@@ -120,11 +132,31 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
       })
     }
 
+    // Screensaver state (loop-local, persist across frames)
+    let lastT = performance.now()
+    let ssRamp = 0        // 0→1 ease-in del giro (arranque suave, ~2s)
+    let wasSS = false
+    const FULL_CYCLE_DEG = N * PITCH_DEG   // "vuelta completa" = pasar por todas las caras una vez
+
     const tick = () => {
+      const now = performance.now()
+      const dt = Math.min(50, now - lastT); lastT = now   // clamp: evita saltos tras throttle de tab oculta
+      const ss = ssActiveRef.current && !reducedMotionRef.current
+
+      // Al salir del screensaver: fija target a la cara más cercana → el spring desacelera y aterriza.
+      if (wasSS && !ss) { target.current = Math.round(rot.current / PITCH_DEG) * PITCH_DEG; vel.current = 0 }
+      wasSS = ss
+
       if (!dragging.current) {
-        vel.current += (target.current - rot.current) * STIFFNESS
-        vel.current *= DAMP
-        rot.current += vel.current
+        if (ss) {
+          ssRamp += (1 - ssRamp) * 0.03
+          rot.current += (FULL_CYCLE_DEG / (ssSpeedRef.current * 1000)) * dt * ssRamp
+        } else {
+          ssRamp = 0
+          vel.current += (target.current - rot.current) * STIFFNESS
+          vel.current *= DAMP
+          rot.current += vel.current
+        }
       }
       const s = scrollEl.current
       if (s) {

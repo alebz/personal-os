@@ -173,15 +173,40 @@ input::placeholder, textarea::placeholder {
   box-shadow: none !important;   /* terminal: nothing levitates. Kills the soft shadow-xl on all cards + modal. */
 }
 
-/* ── Modo Discreto ───────────────────────────────────────────────────────────── */
+/* ── Modo Discreto — enmascarado terminal (bloques •), no blur ─────────────────────
+   El blur era gramática glassmorphism/iOS; esto es duro y digital, y más privado. Un ::after cubre el
+   monto con una fila de `•` (color de TOKEN → respeta MONOCOLOR), clippeada al ancho real del monto.
+   Se hornea sobre [data-sensitive] (lo pone <Mxn>), mismo mecanismo; distinta presentación. Hover revela.
+   El screensaver enciende `.modo-discreto` en el body de forma transitoria (censura automática). */
 .modo-discreto [data-sensitive] {
-  filter: blur(8px);
-  transition: filter 200ms ease;
+  position: relative;
   cursor: pointer;
 }
-.modo-discreto [data-sensitive]:hover {
-  filter: blur(0);
+.modo-discreto [data-sensitive]::after {
+  content: "••••••••••••••••••••••••••••••••••••••••";
+  position: absolute;
+  inset: -1px -1px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  letter-spacing: 0.06em;
+  border-radius: 3px;
+  background: var(--color-surface-1);
+  color: var(--color-fg-muted);
+  opacity: 1;
+  transition: opacity 180ms ease;
+  pointer-events: none;
 }
+.modo-discreto [data-sensitive]:hover::after { opacity: 0; }
+
+/* ── Screensaver — "el OS como objeto vivo" ────────────────────────────────────────
+   Sin UI nueva: es el tambor girando (lógica en OSDrum + OSSettingsContext). Aquí solo atenuamos el
+   chrome para que respire — NO al 100% (queda tenue, no desaparece). Reloj y sim quedan intactos. */
+.os-dots, .os-kicker { transition: opacity .8s ease; }
+[data-screensaver] .os-gear   { opacity: 0.12 !important; }
+[data-screensaver] .os-dots   { opacity: 0.22; }
+[data-screensaver] .os-kicker { opacity: 0.15; }
 
 /* ════════════════════════════════════════════════════════════════════════════
  * DESIGN TOKENS — two layers, built for theming.
