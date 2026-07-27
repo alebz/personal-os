@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import OSSettings from '@/components/OSSettings'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import { crtDayColor } from '@/lib/weekdayColors'
 
 export type OSSection = { label: string; color: string; href: string; content?: ReactNode }
 
@@ -45,7 +46,8 @@ function Ship({ color, px = 78 }: { color: string; px?: number }) {
 export default function OSDrum({ sections }: { sections: OSSection[] }) {
   const N = sections.length
   const router = useRouter()
-  const { toggleSettings, settingsOpen, screensaverActive, screensaver } = useOSSettings()
+  const { toggleSettings, settingsOpen, screensaverActive, screensaver, crt } = useOSSettings()
+  const crtRef = useRef(crt); crtRef.current = crt   // leído dentro del loop rAF (render) para los dots
 
   // Screensaver: el tambor gira solo, lento y continuo, cuando el OS entra en reposo. Los valores
   // se leen por ref dentro del loop rAF (que se monta una vez). prefers-reduced-motion → giro OFF.
@@ -107,12 +109,13 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         el.style.pointerEvents = (!sec.content && a < PITCH_DEG * 0.5) ? 'auto' : 'none'
 
         const near = Math.max(0, 1 - a / (PITCH_DEG * 2.5))
+        const dotColor = crtDayColor(sec.color, crtRef.current)   // fósforo en mono, color de sección en multi
         const dTransform = `rotateX(${net}deg) translateZ(120px) scale(${0.9 + near * 0.3})`
         const dOpacity = String(a > PITCH_DEG * 2.6 ? 0 : 0.22 + near * 0.78)
-        const dShadow = near > 0.45 ? `0 0 ${5 + near * 12}px ${sec.color}, 0 0 3px ${sec.color}` : 'none'
+        const dShadow = near > 0.45 ? `0 0 ${5 + near * 12}px ${dotColor}, 0 0 3px ${dotColor}` : 'none'
         for (const dot of [dotRefs.current[k], dotRefsR.current[k]]) {
           if (!dot) continue
-          dot.style.background = sec.color
+          dot.style.background = dotColor
           dot.style.transform = dTransform
           dot.style.opacity = dOpacity
           dot.style.boxShadow = dShadow
@@ -316,7 +319,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
           fontSize: 24, lineHeight: 1,
           opacity: settingsOpen ? 1 : 0.55,
           transition: 'opacity 200ms ease, transform 300ms ease',
-          color: 'var(--color-ink-3)', background: 'none', border: 'none',
+          color: 'var(--color-fg-muted)', background: 'none', border: 'none',   // token semántico (no ink-3 primitivo) → respeta MONOCOLOR
           cursor: 'pointer', padding: 0, pointerEvents: 'auto',
         }}
       >

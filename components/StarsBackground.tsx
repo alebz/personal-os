@@ -1299,16 +1299,15 @@ function ScoreHUD({ ships, tourney }: {
   // desaturan (grayscale) para no quedar en rainbow. En multi, colores reales.
   const { crt } = useOSSettings()
   const mc = (c: string) => crtDayColor(c, crt)
-  const isMono = crt.on && crt.color === 'mono'
   const AMBER = mc('#f2c744')
 
-  // One contender ROW: flag + name on the left, big live ship-count on the right.
+  // One contender ROW: nombre a la izquierda, conteo vivo grande a la derecha. Sin emblema: el
+  // pixel-art de flota lleva paleta propia que rompía MONOCOLOR; el texto + conteo bastan.
   const Side = ({ f }: { f: WarFleet }) => {
-    const m = FLEET_META[f]; const em = EMBLEMS[f]; const n = ships[f]?.alive ?? 0
+    const m = FLEET_META[f]; const n = ships[f]?.alive ?? 0
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, width: 132 }}>
-        <div style={{ width: 20, height: 20, flex: 'none', imageRendering: 'pixelated', filter: isMono ? 'grayscale(1) brightness(1.2)' : undefined }}><FleetEmblem grid={em.grid} pal={em.pal} size={20} /></div>
-        <span style={{ fontFamily: "'Silkscreen'", fontSize: 8, letterSpacing: '1px', color: mc(m.cm), textShadow: `0 0 6px ${mc(m.cm)}88`, flex: 1 }}>{m.name}</span>
+        <span style={{ fontFamily: "'Silkscreen'", fontSize: 11, letterSpacing: '1px', color: mc(m.cm), textShadow: `0 0 6px ${mc(m.cm)}88`, flex: 1 }}>{m.name}</span>
         <span style={{ fontFamily: "'Silkscreen'", fontSize: 22, lineHeight: 1, color: mc('#fff') }}>{String(n).padStart(2, '0')}</span>
       </div>
     )

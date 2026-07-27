@@ -90,6 +90,7 @@ export default function TopRail() {
               pointerEvents: 'auto',
               background: 'none',
               border:     'none',
+              color:      'var(--color-fg-muted)',   // token → respeta MONOCOLOR
               cursor:     'pointer',
               padding:    0,
             }}
