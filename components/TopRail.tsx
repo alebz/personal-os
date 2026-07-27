@@ -6,6 +6,7 @@ import Clock from '@/components/Clock'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import OSSettings from '@/components/OSSettings'
 import { sectionColor } from '@/lib/sections'
+import { crtDayColor } from '@/lib/weekdayColors'
 
 // Color por tab NO se define aquí — se lee de la fuente canónica (lib/sections, el tambor manda).
 const TABS = [
@@ -20,8 +21,8 @@ const TABS = [
 
 export default function TopRail() {
   const pathname   = usePathname()
-  const clockColor = sectionColor(pathname)
-  const { toggleSettings, settingsOpen } = useOSSettings()
+  const { toggleSettings, settingsOpen, crt } = useOSSettings()
+  const clockColor = crtDayColor(sectionColor(pathname), crt)   // fósforo en mono, color de sección en multi
 
   return (
     <header className="sticky top-0 z-[10000]" style={{ viewTransitionName: 'toprail' }}>
@@ -44,7 +45,7 @@ export default function TopRail() {
           <nav className="flex items-center gap-1 rounded-control border border-border bg-surface-1 p-1.5 backdrop-blur-xl">
             {TABS.map(({ label, href }) => {
               const active = pathname === href
-              const color  = sectionColor(href)
+              const color  = crtDayColor(sectionColor(href), crt)
               const baseStyle: React.CSSProperties = {
                 transition: 'color 200ms ease, background 200ms ease, text-shadow 200ms ease',
                 color: active ? color : 'rgba(255,255,255,0.45)',

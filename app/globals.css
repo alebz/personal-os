@@ -173,48 +173,12 @@ input::placeholder, textarea::placeholder {
   box-shadow: none !important;   /* terminal: nothing levitates. Kills the soft shadow-xl on all cards + modal. */
 }
 
-/* ── Modo Discreto — enmascarado terminal (bloques •), no blur ─────────────────────
-   El blur era gramática glassmorphism/iOS; esto es duro y digital, y más privado. Un ::after cubre el
-   monto con una fila de `•` (color de TOKEN → respeta MONOCOLOR), clippeada al ancho real del monto.
-   Se hornea sobre [data-sensitive] (lo pone <Mxn>), mismo mecanismo; distinta presentación. Hover revela.
-   El screensaver enciende `.modo-discreto` en el body de forma transitoria (censura automática). */
-.modo-discreto [data-sensitive] {
-  position: relative;
-  cursor: pointer;
-}
-/* Capa 1 (::before): fondo OPACO que cubre el monto (token → mono-safe; sin fuga). */
-.modo-discreto [data-sensitive]::before {
-  content: "";
-  position: absolute;
-  inset: -1px -1px;
-  border-radius: 3px;
-  background: var(--color-surface-1);
-  opacity: 1;
-  transition: opacity 180ms ease;
-  pointer-events: none;
-}
-/* Capa 2 (::after): los `•`. Fade en el borde derecho (mask-image) para que el último bullet no se
-   corte en seco — el fade descubre el fondo opaco de ::before, NO el número. line-height:1 evita
-   recorte vertical del glifo redondo. */
-.modo-discreto [data-sensitive]::after {
-  content: "••••••••••••••••••••••••••••••••••••••••";
-  position: absolute;
-  inset: -1px -1px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  white-space: nowrap;
-  line-height: 1;
-  letter-spacing: 0.12em;
-  color: var(--color-fg-muted);
-  opacity: 1;
-  transition: opacity 180ms ease;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 7px), transparent);
-          mask-image: linear-gradient(90deg, #000 calc(100% - 7px), transparent);
-}
-.modo-discreto [data-sensitive]:hover::before,
-.modo-discreto [data-sensitive]:hover::after { opacity: 0; }
+/* ── Modo Discreto ─────────────────────────────────────────────────────────────────
+   La censura (dots fijos `•••••`) la renderiza <Mxn> en el componente — lee el estado de privacidad
+   del contexto (discreto persistido O el screensaver transitorio), hereda color/tamaño (respeta
+   MONOCOLOR por token) y colapsa al ancho de los dots (no codifica la longitud del monto). Hover
+   revela. Aquí no va CSS de máscara: era gramática glassmorphism (blur) y luego un clip que cortaba
+   los glifos; ahora es puro componente. */
 
 /* ── Screensaver — "el OS como objeto vivo" ────────────────────────────────────────
    Sin UI nueva: es el tambor girando (lógica en OSDrum + OSSettingsContext). Aquí solo atenuamos el
