@@ -182,6 +182,20 @@ input::placeholder, textarea::placeholder {
   position: relative;
   cursor: pointer;
 }
+/* Capa 1 (::before): fondo OPACO que cubre el monto (token → mono-safe; sin fuga). */
+.modo-discreto [data-sensitive]::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px;
+  border-radius: 3px;
+  background: var(--color-surface-1);
+  opacity: 1;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+/* Capa 2 (::after): los `•`. Fade en el borde derecho (mask-image) para que el último bullet no se
+   corte en seco — el fade descubre el fondo opaco de ::before, NO el número. line-height:1 evita
+   recorte vertical del glifo redondo. */
 .modo-discreto [data-sensitive]::after {
   content: "••••••••••••••••••••••••••••••••••••••••";
   position: absolute;
@@ -190,23 +204,26 @@ input::placeholder, textarea::placeholder {
   align-items: center;
   overflow: hidden;
   white-space: nowrap;
-  letter-spacing: 0.06em;
-  border-radius: 3px;
-  background: var(--color-surface-1);
+  line-height: 1;
+  letter-spacing: 0.12em;
   color: var(--color-fg-muted);
   opacity: 1;
   transition: opacity 180ms ease;
   pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 7px), transparent);
+          mask-image: linear-gradient(90deg, #000 calc(100% - 7px), transparent);
 }
+.modo-discreto [data-sensitive]:hover::before,
 .modo-discreto [data-sensitive]:hover::after { opacity: 0; }
 
 /* ── Screensaver — "el OS como objeto vivo" ────────────────────────────────────────
    Sin UI nueva: es el tambor girando (lógica en OSDrum + OSSettingsContext). Aquí solo atenuamos el
    chrome para que respire — NO al 100% (queda tenue, no desaparece). Reloj y sim quedan intactos. */
-.os-dots, .os-kicker { transition: opacity .8s ease; }
-[data-screensaver] .os-gear   { opacity: 0.12 !important; }
-[data-screensaver] .os-dots   { opacity: 0.22; }
-[data-screensaver] .os-kicker { opacity: 0.15; }
+.os-dots, .os-kicker, .os-scoreboard { transition: opacity .8s ease; }
+[data-screensaver] .os-gear       { opacity: 0.12 !important; }
+[data-screensaver] .os-dots       { opacity: 0.22; }
+[data-screensaver] .os-kicker     { opacity: 0.15; }
+[data-screensaver] .os-scoreboard { opacity: 0.18; }
 
 /* ════════════════════════════════════════════════════════════════════════════
  * DESIGN TOKENS — two layers, built for theming.

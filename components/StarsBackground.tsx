@@ -1328,7 +1328,7 @@ function ScoreHUD({ ships, tourney }: {
   }
 
   return createPortal(
-    <div style={{ position: 'fixed', top: '50%', left: 60, transform: 'translateY(-50%)', zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
+    <div className="os-scoreboard" style={{ position: 'fixed', top: '50%', left: 60, transform: 'translateY(-50%)', zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
         {left && <Side f={left} />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
