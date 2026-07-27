@@ -189,6 +189,22 @@ input::placeholder, textarea::placeholder {
 [data-screensaver] .os-kicker     { opacity: 0.15; }
 [data-screensaver] .os-scoreboard { opacity: 0.18; }
 
+/* ── Slider del panel de Ajustes (arcade) ──────────────────────────────────────────
+   Full-custom con TOKENS → sin el gris del groove del navegador (rompía MONOCOLOR). El relleno
+   two-tone lo pinta el `background` inline (gradiente accent/surface-2); aquí el groove y el thumb. */
+.os-slider { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; outline: none; }
+.os-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; border-radius: 2px; border: none;
+  background: var(--color-accent); cursor: pointer;
+}
+.os-slider::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 2px; border: none;
+  background: var(--color-accent); cursor: pointer;
+}
+.os-slider::-moz-range-track { height: 4px; border-radius: 2px; background: var(--color-surface-2); }
+.os-slider::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--color-accent); }
+
 /* ════════════════════════════════════════════════════════════════════════════
  * DESIGN TOKENS — two layers, built for theming.
  *   Layer 1 (PRIMITIVES): raw named values — the palette of allowed values.
