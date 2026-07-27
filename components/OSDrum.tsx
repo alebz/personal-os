@@ -262,7 +262,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         .os-dots-deck { position: absolute; inset: 0; transform-style: preserve-3d; transform: translateZ(-120px); }
         .os-dots i { position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; image-rendering: pixelated; will-change: transform, opacity; }
         .os-kicker { position: fixed; top: 24px; left: 0; right: 0; text-align: center; z-index: 3; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--color-ink-3); pointer-events: none; }
-        .os-vig { position: fixed; left: 0; right: 0; height: 30vh; z-index: 2; pointer-events: none; }
+        .os-vig { position: fixed; left: 0; right: 0; height: 16vh; z-index: 2; pointer-events: none; }
         .os-vig.top { top: 0; background: linear-gradient(var(--color-ink-0), transparent); }
         .os-vig.bot { bottom: 0; background: linear-gradient(0deg, var(--color-ink-0), transparent); }
         .os-flat { position: fixed; inset: 0; z-index: 2; overflow: hidden; display: flex; align-items: center; justify-content: center; animation: os-fadein .3s ease; }
