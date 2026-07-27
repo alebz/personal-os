@@ -40,6 +40,7 @@ interface OSSettingsCtx extends OSSettingsState {
   toggleSettings: () => void
   closeSettings:  () => void
   screensaverActive: boolean   // runtime (no persistido): el OS está en modo screensaver ahora
+  startScreensaver: () => void // dispara el screensaver ahora (preview); cualquier actividad lo despierta
 }
 
 // Valores por defecto del CRT — calibrados con el usuario (2026-07-23).
@@ -146,6 +147,9 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
 
   const toggleSettings = useCallback(() => setOpen(v => !v), [])
   const closeSettings  = useCallback(() => setOpen(false),    [])
+  // Preview: entra al screensaver de inmediato (bypassa el timer/supresión). Solo tiene efecto con
+  // el modo habilitado — ahí viven los listeners de actividad que lo despiertan.
+  const startScreensaver = useCallback(() => setScreensaverActive(true), [])
 
   // Privacidad + atributo de screensaver. El body lleva `modo-discreto` si el usuario lo activó O si
   // el screensaver está activo (censura transitoria); al salir vuelve al estado guardado. `data-
@@ -189,7 +193,7 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
   }, [state.screensaver.enabled])
 
   return (
-    <Ctx.Provider value={{ ...state, set, setCrt, settingsOpen, toggleSettings, closeSettings, screensaverActive }}>
+    <Ctx.Provider value={{ ...state, set, setCrt, settingsOpen, toggleSettings, closeSettings, screensaverActive, startScreensaver }}>
       {children}
     </Ctx.Provider>
   )

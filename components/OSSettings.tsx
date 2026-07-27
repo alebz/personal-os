@@ -94,7 +94,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function OSSettings() {
   const {
     settingsOpen, closeSettings, set, setCrt,
-    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver,
+    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver,
   } = useOSSettings()
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -192,7 +192,17 @@ export default function OSSettings() {
           {screensaver.enabled && (
             <>
               <Slider label="Vuelta completa" value={screensaver.speed} min={45} max={120} step={5} onChange={v => set('screensaver', { ...screensaver, speed: v })} fmt={v => v + 's'} />
-              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>Tras 3 min sin actividad, el tambor gira solo.</p>
+              <button
+                onClick={() => { startScreensaver(); closeSettings() }}
+                style={{
+                  width: '100%', marginTop: 2, padding: '7px 0', borderRadius: 8, cursor: 'pointer',
+                  border: '1px solid oklch(0.68 0.16 255 / 0.4)', background: 'oklch(0.68 0.16 255 / 0.12)',
+                  color: 'oklch(0.68 0.16 255)', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+                }}
+              >
+                ▶ Previsualizar ahora
+              </button>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>Tras 3 min sin actividad se activa solo. Mueve el mouse para salir.</p>
             </>
           )}
         </Section>
