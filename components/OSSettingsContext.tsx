@@ -23,14 +23,23 @@ export interface CrtState {
   deformSpeed: number     // segundos por barrido
 }
 
+// Supraconsciente — la línea viva de Cerebro. Esquema listo para más TEMAS en fase 2 (facts, news,
+// horóscopo) vía `topics`; v1 solo expone on/off + intervalo y el tema 'supra'.
+export interface SupraState {
+  enabled:       boolean
+  rotateMinutes: number
+  topics:        { supra: boolean }
+}
+
 interface OSSettingsState {
-  showStars:   boolean
-  showShips:   boolean
-  showPlanes:  boolean
-  discreto:    boolean
-  showLolo:    boolean
-  crt:         CrtState
-  screensaver: { enabled: boolean; speed: number }   // speed = segundos por vuelta completa del tambor
+  showStars:      boolean
+  showShips:      boolean
+  showPlanes:     boolean
+  discreto:       boolean
+  showLolo:       boolean
+  crt:            CrtState
+  screensaver:    { enabled: boolean; speed: number }   // speed = segundos por vuelta completa del tambor
+  supraconsciente: SupraState
 }
 
 interface OSSettingsCtx extends OSSettingsState {
@@ -71,6 +80,7 @@ const DEFAULTS: OSSettingsState = {
   showLolo:    true,
   crt:         CRT_DEFAULTS,
   screensaver: { enabled: true, speed: 75 },   // 3 min idle → tambor gira; vuelta completa cada 75s
+  supraconsciente: { enabled: true, rotateMinutes: 4, topics: { supra: true } },
 }
 
 const STORAGE_KEY = 'os-settings'
@@ -80,7 +90,15 @@ function loadState(): OSSettingsState {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : {}
     const base: OSSettingsState = raw
-      ? { ...DEFAULTS, ...parsed, crt: { ...CRT_DEFAULTS, ...(parsed.crt || {}) }, screensaver: { ...DEFAULTS.screensaver, ...(parsed.screensaver || {}) } }
+      ? {
+          ...DEFAULTS, ...parsed,
+          crt: { ...CRT_DEFAULTS, ...(parsed.crt || {}) },
+          screensaver: { ...DEFAULTS.screensaver, ...(parsed.screensaver || {}) },
+          supraconsciente: {
+            ...DEFAULTS.supraconsciente, ...(parsed.supraconsciente || {}),
+            topics: { ...DEFAULTS.supraconsciente.topics, ...((parsed.supraconsciente || {}).topics || {}) },
+          },
+        }
       : { ...DEFAULTS }
     // Migrate legacy 'modo_discreto' key if no os-settings entry yet
     if (!raw && localStorage.getItem('modo_discreto') === 'true') base.discreto = true

@@ -112,7 +112,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function OSSettings() {
   const {
     settingsOpen, closeSettings, set, setCrt,
-    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver,
+    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver, supraconsciente,
   } = useOSSettings()
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -226,6 +226,13 @@ export default function OSSettings() {
               </button>
               <p style={{ fontSize: 10, color: 'var(--color-fg-faint)', margin: 0 }}>Tras 3 min sin actividad se activa solo. Mueve el mouse para salir.</p>
             </>
+          )}
+        </Section>
+
+        <Section title="Supraconsciente">
+          <Row label="Línea viva (Cerebro)"><Toggle value={supraconsciente.enabled} onChange={v => set('supraconsciente', { ...supraconsciente, enabled: v })} /></Row>
+          {supraconsciente.enabled && (
+            <Slider label="Rotación" value={supraconsciente.rotateMinutes} min={2} max={15} step={1} onChange={v => set('supraconsciente', { ...supraconsciente, rotateMinutes: v })} fmt={v => v + ' min'} />
           )}
         </Section>
 
