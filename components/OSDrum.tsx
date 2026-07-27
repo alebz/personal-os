@@ -150,7 +150,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
       if (!dragging.current) {
         if (ss) {
           ssRamp += (1 - ssRamp) * 0.03
-          rot.current += (FULL_CYCLE_DEG / (ssSpeedRef.current * 1000)) * dt * ssRamp
+          rot.current -= (FULL_CYCLE_DEG / (ssSpeedRef.current * 1000)) * dt * ssRamp   // sentido natural (como scroll-down por las secciones)
         } else {
           ssRamp = 0
           vel.current += (target.current - rot.current) * STIFFNESS
