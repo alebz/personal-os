@@ -32,9 +32,24 @@ export default function HomePage() {
   // El cascarón (Capa B) decide qué se monta: el tambor (arcade, default) o el escritorio XP. Las
   // MISMAS secciones-componente se pasan a cualquiera. Client-only (render tras mount) porque el
   // tambor y sus secciones usan `document`.
-  const { shell } = useOSSettings()
+  const { shell, screensaverActive } = useOSSettings()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   if (!mounted) return null
-  return shell === 'xp' ? <XPDesktop sections={SECTIONS} /> : <OSDrum sections={SECTIONS} />
+  if (shell !== 'xp') return <OSDrum sections={SECTIONS} />
+  return (
+    <>
+      <XPDesktop sections={SECTIONS} />
+      {/* "Apagar equipo" = excursión al alma arcade: el tambor-screensaver se monta ENCIMA como
+          overlay — el escritorio XP nunca se desmonta, así que al despertar (cualquier actividad,
+          detectada por el contexto) está EXACTAMENTE como estaba. Fuera de todo [data-theme="xp"]
+          (scoped a los cuerpos de ventana) → tokens arcade oscuros; el CRT del usuario aplica
+          durante la excursión (contexto re-activa data-crt + crt efectivo). */}
+      {screensaverActive && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: 'var(--color-surface-base)' }}>
+          <OSDrum sections={SECTIONS} />
+        </div>
+      )}
+    </>
+  )
 }

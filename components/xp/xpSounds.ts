@@ -4,7 +4,7 @@
 // navegador bloquea autoplay y lo tragamos en silencio — por eso el startup se dispara SOLO desde el
 // click que entra al tema (ceremonia de llegada, no ruido de cada reload).
 
-export type XpSoundName = 'startup' | 'minimize' | 'restore' | 'close' | 'open'
+export type XpSoundName = 'startup' | 'minimize' | 'restore' | 'close' | 'open' | 'logoff' | 'shutdown'
 
 export function playXpSound(name: XpSoundName) {
   try {

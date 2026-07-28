@@ -155,13 +155,15 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   // Cascarón (Capa B): `data-shell` en <html>; bajo XP se FUERZA el CRT off (nada de arcade se filtra),
-  // al volver a arcade se re-aplica el CRT según el ajuste. El montaje del chrome/escritorio lo hacen
-  // <ArcadeChrome> (layout) y page.tsx leyendo `shell`.
+  // al volver a arcade se re-aplica el CRT según el ajuste. EXCEPCIÓN: el screensaver ("Apagar equipo"
+  // desde XP) es una excursión al alma arcade — mientras está activo, el CRT del usuario SÍ aplica
+  // (el tambor dormido se ve arcade completo); al despertar se re-fuerza off. El montaje del chrome/
+  // escritorio lo hacen <ArcadeChrome> (layout) y page.tsx leyendo `shell`.
   useEffect(() => {
     document.documentElement.setAttribute('data-shell', state.shell)
-    if (state.shell === 'xp') document.documentElement.setAttribute('data-crt', 'off')
+    if (state.shell === 'xp' && !screensaverActive) document.documentElement.setAttribute('data-crt', 'off')
     else applyCrt(state.crt)
-  }, [state.shell, state.crt])
+  }, [state.shell, state.crt, screensaverActive])
 
   const set = useCallback(<K extends keyof OSSettingsState>(key: K, value: OSSettingsState[K]) => {
     setState(prev => {
@@ -236,8 +238,9 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
       // el atributo data-crt (CSS, efecto del shell arriba) Y aquí para los consumidores JS
       // (crtDayColor et al) — si no, las secciones en ventanas claras recibirían el fósforo mono.
       // El estado PERSISTIDO queda intacto (set/setCrt escriben crudo): al volver a arcade, tu CRT
-      // regresa tal cual.
-      crt: state.shell === 'xp' ? { ...state.crt, on: false } : state.crt,
+      // regresa tal cual. Excepción espejo del efecto de arriba: durante el screensaver ("Apagar
+      // equipo") el CRT del usuario vuelve a regir — la excursión se ve arcade completo.
+      crt: state.shell === 'xp' && !screensaverActive ? { ...state.crt, on: false } : state.crt,
       set, setCrt, settingsOpen, toggleSettings, closeSettings, screensaverActive, startScreensaver,
     }}>
       {children}
