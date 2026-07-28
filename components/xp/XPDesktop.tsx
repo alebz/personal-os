@@ -4,14 +4,14 @@ import { useState } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
 import XPWindow, { type WinState } from './XPWindow'
+import './xp-theme.css'
 
-// Escritorio Windows XP — el cascarón alterno. FASE 1: window manager propio (abrir/cerrar/mover/
-// z-order/minimizar-a-taskbar; sin resize aún = Fase 1.5) + menú Inicio como launcher. Gris funcional,
-// sin piel Luna (Fase 2). Recibe las MISMAS secciones que el tambor.
+// Escritorio Windows XP — el cascarón alterno. FASE 2: piel Luna (Bliss, Tahoma, chrome real,
+// taskbar/Start con su verde). Window manager de la Fase 1 (abrir/cerrar/mover/z-order/minimizar;
+// resize = Fase 1.5). Recibe las MISMAS secciones que el tambor.
 //
-// LAUNCHABLE: qué secciones ya están adaptadas al contenedor (el molde: breakpoints de viewport →
-// container queries, vh→rem, fixed→absolute). Fase 1 solo Tareas; el resto se agrega al adaptarse en
-// Fase 2 — el window manager de abajo ya es genérico, no cambia.
+// LAUNCHABLE: secciones ya adaptadas al contenedor (el molde). Fase 1/2 solo Tareas; el resto entra al
+// adaptarse una por una — el window manager ya es genérico.
 const LAUNCHABLE = new Set(['/crm'])
 
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
@@ -26,7 +26,6 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     setStartOpen(false)
     setWindows((prev) => {
       const top = Math.max(0, ...prev.map((w) => w.z))
-      // Una ventana por sección: si ya existe, restaura + enfoca en vez de duplicar.
       if (prev.some((w) => w.id === section.href))
         return prev.map((w) => (w.id === section.href ? { ...w, minimized: false, z: top + 1 } : w))
       const n = prev.length
@@ -38,7 +37,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     setWindows((prev) => {
       const top = Math.max(0, ...prev.map((w) => w.z))
       const w = prev.find((x) => x.id === id)
-      if (!w || (w.z === top && !w.minimized)) return prev   // ya al frente — evita rerender inútil
+      if (!w || (w.z === top && !w.minimized)) return prev
       return prev.map((x) => (x.id === id ? { ...x, z: top + 1 } : x))
     })
   }
@@ -55,7 +54,6 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, minimized: true } : w)))
   }
 
-  // Click en el botón de taskbar: minimizada → restaura+enfoca; al frente → minimiza; atrás → enfoca.
   function taskbarClick(id: string) {
     setWindows((prev) => {
       const w = prev.find((x) => x.id === id)
@@ -69,13 +67,13 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 
   return (
     <div
+      className="xp-desktop"
       style={{
         position: 'fixed', inset: 0, overflow: 'hidden',
-        background: 'linear-gradient(#5a8fd6, #4a7ec5)',   // placeholder — Bliss en Fase 2
-        fontFamily: 'Tahoma, "Segoe UI", sans-serif',
+        background: "#3a6ea5 url('/themes/xp/wallpapers/bliss.png') center / cover no-repeat",
       }}
     >
-      {/* Área de escritorio (íconos = Fase 2). Click en vacío cierra el menú Inicio. */}
+      {/* Área de escritorio (íconos = PR 2e). Click en vacío cierra el menú Inicio. */}
       <div style={{ position: 'absolute', inset: 0, bottom: 30 }} onPointerDown={() => setStartOpen(false)} />
 
       {/* Ventanas */}
@@ -93,21 +91,22 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 
       {/* Menú Inicio — launcher de secciones adaptadas + escape a arcade */}
       {startOpen && (
-        <div style={{ position: 'absolute', left: 0, bottom: 30, width: 220, zIndex: 10001, background: '#fff', border: '1px solid #0831d9', borderBottom: 'none', boxShadow: '3px -3px 10px rgba(0,0,0,0.35)' }}>
-          <div style={{ padding: '10px 12px', background: 'linear-gradient(#0058ee,#3f8cf3)', color: '#fff', fontWeight: 700, fontSize: 13 }}>Alex Mateo</div>
+        <div className="xp-startmenu" style={{ position: 'absolute', left: 0, bottom: 30, width: 224, zIndex: 10001, background: '#fff' }}>
+          <div className="xp-startmenu-header" style={{ padding: '9px 12px', color: '#fff', fontWeight: 700, fontSize: 13, textShadow: '1px 1px 1px rgba(0,0,0,0.4)' }}>Alex Mateo</div>
           {launchable.map((s) => (
-            <button key={s.href} onClick={() => openWindow(s)} style={startItem}>{s.label}</button>
+            <button key={s.href} className="xp-startmenu-item" onClick={() => openWindow(s)} style={startItem}>{s.label}</button>
           ))}
-          <div style={{ borderTop: '1px solid #d6d3c4', margin: '2px 0' }} />
-          <button onClick={() => set('shell', 'arcade')} style={startItem}>↩ Volver a Arcade</button>
+          <div style={{ borderTop: '1px solid #c8c4b4', margin: '3px 0' }} />
+          <button className="xp-startmenu-item" onClick={() => set('shell', 'arcade')} style={startItem}>↩ Volver a Arcade</button>
         </div>
       )}
 
       {/* Taskbar */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 30, zIndex: 10000, background: 'linear-gradient(#2f8bff, #235fdd)', borderTop: '1px solid #4d9bff', display: 'flex', alignItems: 'center' }}>
+      <div className="xp-taskbar" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 30, zIndex: 10000, display: 'flex', alignItems: 'center' }}>
         <button
+          className="xp-chrome-btn xp-start"
           onClick={() => setStartOpen((v) => !v)}
-          style={{ height: 30, padding: '0 18px 0 12px', border: 'none', background: 'linear-gradient(#5eac56,#3c8f37)', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, borderRadius: '0 9px 9px 0', cursor: 'pointer', fontFamily: 'inherit', textShadow: '1px 1px 1px rgba(0,0,0,0.4)' }}
+          style={{ height: 30, padding: '0 20px 0 12px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)' }}
         >
           inicio
         </button>
@@ -119,8 +118,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             return (
               <button
                 key={w.id}
+                className={`xp-chrome-btn xp-tb-btn ${isActive ? 'xp-tb-btn--active' : ''}`}
                 onClick={() => taskbarClick(w.id)}
-                style={{ height: 22, maxWidth: 160, padding: '0 12px', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 3, background: isActive ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.14)', color: '#fff', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                style={{ height: 22, maxWidth: 160, padding: '0 12px', borderRadius: 3, color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '1px 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {w.section.label}
               </button>
@@ -133,6 +133,6 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 }
 
 const startItem: React.CSSProperties = {
-  display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none',
+  display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', border: 'none',
   background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: '#000',
 }

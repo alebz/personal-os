@@ -30,3 +30,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# XP theme sources (heavy; runtime lives in public/themes/xp)
+/WinXp.zip
+/design/xp-src/
