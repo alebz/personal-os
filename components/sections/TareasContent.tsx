@@ -271,7 +271,7 @@ function KanbanView({
   onMove: (id: string, urgency: Urgency) => void
 }) {
   return (
-    <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 items-start gap-5 @2xl:grid-cols-2 @5xl:grid-cols-4">
       {tiers.map((tier) => (
         <KanbanColumn
           key={tier.id}
@@ -396,7 +396,7 @@ function ListaView({
   onMove: (id: string, urgency: Urgency) => void
 }) {
   return (
-    <div className="mx-auto max-w-3xl rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card sm:p-8">
+    <div className="mx-auto max-w-3xl rounded-card border border-border bg-surface-1 p-5 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card @2xl:p-8">
       <div className="flex flex-col gap-8">
         {tiers.map((tier) => (
           <ListaSection
@@ -874,7 +874,7 @@ export default function TareasContent() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 pb-16 pt-2">
+    <div className="@container mx-auto w-full max-w-7xl px-6 pb-16 pt-2">
       <div className="pb-2">
         <div className="flex items-center justify-between">
           <div>
