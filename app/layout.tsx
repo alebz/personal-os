@@ -5,10 +5,8 @@ import "./globals.css";
 // Mono toggle typeface = SF Mono, self-hosted via @font-face in globals.css
 // (loaded from /public/SF-Mono). No next/font import needed — the family
 // 'SF Mono' is referenced directly in the mono stack (inline script below + OSSettingsContext).
-import { StarsBackground } from "@/components/StarsBackground";
 import { OSSettingsProvider } from "@/components/OSSettingsContext";
-import LoloCompanionWrapper from "@/components/LoloCompanionWrapper";
-import CRTOverlay from "@/components/CRTOverlay";
+import ArcadeChrome from "@/components/ArcadeChrome";
 
 // React 19.1's ViewTransition is runtime-only (not yet in @types/react), and stripped from some
 // builds — so use it when present, else fall back to a no-op wrapper. Keeps the prod build/typecheck
@@ -40,9 +38,8 @@ export default function RootLayout({
       </head>
       <body className="bg-surface-base text-fg antialiased">
         <OSSettingsProvider>
-          <StarsBackground />
-          <LoloCompanionWrapper />
-          <CRTOverlay />
+          {/* Chrome del cascarón arcade (sim + Lolo + CRT) — se monta SOLO bajo shell='arcade'. */}
+          <ArcadeChrome />
           {/* Content sits above the cosmic sim (which is fixed at z:0); this baseline
               keeps every card, sub-menu and button in front of the ships. The
               .crt-screen wrapper is where the CRT warp filter (fisheye/aberration/

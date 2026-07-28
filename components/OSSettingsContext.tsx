@@ -31,6 +31,11 @@ export interface SupraState {
   topics:        { supra: boolean }
 }
 
+// El CASCARÓN de navegación (Capa B). 'arcade' = el tambor + su chrome (sim/CRT/Lolo) — el default
+// intacto. 'xp' = escritorio Windows XP con ventanas. Extensible a 'mobile'. Las MISMAS secciones-
+// componente se montan en cualquier cascarón; solo cambia la navegación que las envuelve.
+export type Shell = 'arcade' | 'xp'
+
 interface OSSettingsState {
   showStars:      boolean
   showShips:      boolean
@@ -40,6 +45,7 @@ interface OSSettingsState {
   crt:            CrtState
   screensaver:    { enabled: boolean; speed: number }   // speed = segundos por vuelta completa del tambor
   supraconsciente: SupraState
+  shell:          Shell
 }
 
 interface OSSettingsCtx extends OSSettingsState {
@@ -81,6 +87,7 @@ const DEFAULTS: OSSettingsState = {
   crt:         CRT_DEFAULTS,
   screensaver: { enabled: true, speed: 75 },   // 3 min idle → tambor gira; vuelta completa cada 75s
   supraconsciente: { enabled: true, rotateMinutes: 4, topics: { supra: true } },
+  shell:       'arcade',   // default: el tambor. 'xp' monta el escritorio Windows XP.
 }
 
 const STORAGE_KEY = 'os-settings'
@@ -143,6 +150,15 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
     setState(saved)
     applyCrt(saved.crt)
   }, [])
+
+  // Cascarón (Capa B): `data-shell` en <html>; bajo XP se FUERZA el CRT off (nada de arcade se filtra),
+  // al volver a arcade se re-aplica el CRT según el ajuste. El montaje del chrome/escritorio lo hacen
+  // <ArcadeChrome> (layout) y page.tsx leyendo `shell`.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-shell', state.shell)
+    if (state.shell === 'xp') document.documentElement.setAttribute('data-crt', 'off')
+    else applyCrt(state.crt)
+  }, [state.shell, state.crt])
 
   const set = useCallback(<K extends keyof OSSettingsState>(key: K, value: OSSettingsState[K]) => {
     setState(prev => {

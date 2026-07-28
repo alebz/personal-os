@@ -9,6 +9,8 @@ import ContactosContent from '@/components/sections/ContactosContent'
 import FinanzasContent from '@/components/sections/FinanzasContent'
 import UptownContent from '@/components/sections/UptownContent'
 import InicioContent from '@/components/sections/InicioContent'
+import XPDesktop from '@/components/xp/XPDesktop'
+import { useOSSettings } from '@/components/OSSettingsContext'
 import { SECTION_COLORS } from '@/lib/sections'
 
 // OSDrum reveals faces in reverse as you scroll down (index 0 front, then N-1, N-2 … 1). So the
@@ -27,9 +29,12 @@ const SECTIONS: OSSection[] = [
 ]
 
 export default function HomePage() {
-  // The drum (and every section it mounts) is client-only — render after mount so it never runs
-  // during SSR/prerender, where `document` isn't defined.
+  // El cascarón (Capa B) decide qué se monta: el tambor (arcade, default) o el escritorio XP. Las
+  // MISMAS secciones-componente se pasan a cualquiera. Client-only (render tras mount) porque el
+  // tambor y sus secciones usan `document`.
+  const { shell } = useOSSettings()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
-  return mounted ? <OSDrum sections={SECTIONS} /> : null
+  if (!mounted) return null
+  return shell === 'xp' ? <XPDesktop sections={SECTIONS} /> : <OSDrum sections={SECTIONS} />
 }

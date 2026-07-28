@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useOSSettings, CRT_PHOSPHORS } from './OSSettingsContext'
-import type { CrtColor } from './OSSettingsContext'
+import type { CrtColor, Shell } from './OSSettingsContext'
 
 // Panel de Ajustes — piel ARCADE / terminal. Todo por TOKENS del tema (--color-*), así respeta
 // MONOCOLOR y la paleta arcade DE RAÍZ (accent = cian, no el azul iOS viejo). Tipografía mono, bordes
@@ -112,7 +112,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function OSSettings() {
   const {
     settingsOpen, closeSettings, set, setCrt,
-    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver, supraconsciente,
+    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver, supraconsciente, shell,
   } = useOSSettings()
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -150,6 +150,17 @@ export default function OSSettings() {
           </span>
           <button onClick={closeSettings} aria-label="Cerrar" style={{ fontSize: 16, lineHeight: 1, color: 'var(--color-fg-faint)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>×</button>
         </div>
+
+        {/* ── Sistema · cascarón (Capa B) ── */}
+        <Section title="Sistema · cascarón">
+          <Row label="Interfaz">
+            <PillSelector<Shell>
+              options={[{ value: 'arcade', label: 'Arcade' }, { value: 'xp', label: 'Windows XP' }]}
+              value={shell}
+              onChange={v => set('shell', v)}
+            />
+          </Row>
+        </Section>
 
         {/* ── CRT · pantalla arcade ── */}
         <Section title="CRT · pantalla arcade">
