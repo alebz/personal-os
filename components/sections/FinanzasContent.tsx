@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
@@ -525,9 +524,13 @@ function EditModal({
     }
   }
 
-  return createPortal(
+  // Molde XP (conversión B): antes era createPortal(document.body) + fixed inset-0 (tapaba el
+  // viewport). Ahora es inline + absolute inset-0 → se ancla a la raíz `relative` de la sección:
+  // en el tambor cubre la cara (idéntico), en XP cubre SOLO su ventana (app-modal). Sin portal ya
+  // vive dentro del wrapper .crt-screen, así que la clase crt-screen sobraría (doblaría el warp).
+  return (
     <div
-      className="crt-screen fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -573,8 +576,7 @@ function EditModal({
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   )
 }
 
@@ -846,7 +848,7 @@ function PanelTab({
       </div>
 
       {/* Two-column layout */}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 @5xl:grid-cols-2">
         {/* ── LEFT: Ingresos ── */}
         <div className="space-y-4">
           {/* Ingresos previstos */}
@@ -1342,6 +1344,10 @@ export default function FinancePage() {
   const showMonthNav = tab === 'Panel' || tab === 'Historial'
 
   return (
+    // Molde XP: la raíz llena su contenedor (cara del tambor O ventana XP), es el ancla `relative` de
+    // los modales internos (absolute inset-0) y el @container de los breakpoints. Como el scroll vive
+    // ADENTRO (flex-1 overflow-y-auto), un overlay absoluto a este nivel cubre siempre el área visible.
+    <div className="@container relative h-full">
     <main className="mx-auto flex h-full max-w-5xl flex-col px-6 pt-6">
         {/* Header */}
         <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
@@ -1440,5 +1446,6 @@ export default function FinancePage() {
         )}
         </div>
       </main>
+    </div>
   )
 }

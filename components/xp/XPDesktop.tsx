@@ -10,9 +10,9 @@ import './xp-theme.css'
 // taskbar/Start con su verde). Window manager de la Fase 1 (abrir/cerrar/mover/z-order/minimizar;
 // resize = Fase 1.5). Recibe las MISMAS secciones que el tambor.
 //
-// LAUNCHABLE: secciones ya adaptadas al contenedor (el molde). Fase 1/2 solo Tareas; el resto entra al
-// adaptarse una por una — el window manager ya es genérico.
-const LAUNCHABLE = new Set(['/crm'])
+// LAUNCHABLE: secciones ya adaptadas al contenedor (el molde). El resto entra al adaptarse una por
+// una — el window manager ya es genérico. Adaptadas: Tareas (Fase 1), Finanzas (PR 2c).
+const LAUNCHABLE = new Set(['/crm', '/finance'])
 
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const { set } = useOSSettings()
