@@ -225,6 +225,30 @@ function CheckBox({ checked }: { checked: boolean }) {
   )
 }
 
+// ─── Borrado blindado ─────────────────────────────────────────────────────────
+// El × de las filas (ingresos previstos, compromisos, gastos/ingresos extra) borra DURO y sin modal
+// — así que nunca a un solo click: el primero ARMA ("¿borrar?" en rojo, 3s), el segundo confirma.
+// Misma filosofía que el DELETE blindado de fondos: la historia no se pierde por un click perdido.
+function ConfirmX({ onConfirm }: { onConfirm: () => void }) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const t = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(t)
+  }, [armed])
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); if (armed) { setArmed(false); onConfirm() } else setArmed(true) }}
+      title={armed ? 'Clic de nuevo para borrar' : 'Borrar'}
+      className={armed
+        ? 'shrink-0 text-label font-medium text-danger'
+        : 'hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block'}
+    >
+      {armed ? '¿borrar?' : '×'}
+    </button>
+  )
+}
+
 // ─── Panel sub-components ─────────────────────────────────────────────────────
 
 function IncomeRow({
@@ -321,8 +345,7 @@ function IncomeRow({
           <span className="w-24 shrink-0 text-right text-secondary tabular-nums text-fg-muted"><Mxn v={item.monto} /></span>
           <button onClick={e => { e.stopPropagation(); begin() }}
             className="hidden shrink-0 text-label text-fg-muted hover:text-fg group-hover:block">editar</button>
-          <button onClick={e => { e.stopPropagation(); onDelete(item.id) }}
-            className="hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block">×</button>
+          <ConfirmX onConfirm={() => onDelete(item.id)} />
         </>
       )}
     </div>
@@ -402,8 +425,7 @@ function GastoRow({
       <span className="w-24 shrink-0 text-right text-secondary tabular-nums text-fg-muted"><Mxn v={commitment.amount} /></span>
       <button onClick={e => { e.stopPropagation(); begin() }}
         className="hidden shrink-0 text-label text-fg-muted hover:text-fg group-hover:block">editar</button>
-      <button onClick={e => { e.stopPropagation(); onDelete(commitment.id) }}
-        className="hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block">×</button>
+      <ConfirmX onConfirm={() => onDelete(commitment.id)} />
     </div>
   )
 }
@@ -432,12 +454,7 @@ function ExtraRow({
       >
         editar
       </button>
-      <button
-        onClick={() => onDelete(mv.id)}
-        className="hidden shrink-0 text-body leading-none text-fg-muted/40 hover:text-danger group-hover:block"
-      >
-        ×
-      </button>
+      <ConfirmX onConfirm={() => onDelete(mv.id)} />
     </div>
   )
 }
