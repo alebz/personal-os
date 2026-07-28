@@ -4,6 +4,15 @@ import { useEffect, useRef } from 'react'
 import { useOSSettings, CRT_PHOSPHORS } from './OSSettingsContext'
 import type { CrtColor } from './OSSettingsContext'
 
+// Panel de Ajustes — piel ARCADE / terminal. Todo por TOKENS del tema (--color-*), así respeta
+// MONOCOLOR y la paleta arcade DE RAÍZ (accent = cian, no el azul iOS viejo). Tipografía mono, bordes
+// duros, acentos al cian/fósforo, sin blur glassmorphism. Estructura y funcionalidad idénticas.
+
+const MONO = "'SF Mono', ui-monospace, Menlo, monospace"
+const ACCENT      = 'var(--color-accent)'
+const ACCENT_TINT = 'color-mix(in oklch, var(--color-accent) 14%, transparent)'
+const ACCENT_LINE = 'color-mix(in oklch, var(--color-accent) 45%, transparent)'
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
@@ -12,15 +21,16 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       onClick={() => onChange(!value)}
       aria-pressed={value}
       style={{
-        display: 'inline-flex', alignItems: 'center', width: 36, height: 20, borderRadius: 10,
-        background: value ? 'oklch(0.68 0.16 255)' : 'rgba(255,255,255,0.1)',
-        border: 'none', cursor: 'pointer', transition: 'background 180ms ease', padding: 2, flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', width: 38, height: 18, borderRadius: 3,
+        background: value ? ACCENT_TINT : 'var(--color-surface-2)',
+        border: '1px solid', borderColor: value ? ACCENT : 'var(--color-border)',
+        cursor: 'pointer', transition: 'all 160ms ease', padding: 2, flexShrink: 0,
       }}
     >
       <span style={{
-        width: 16, height: 16, borderRadius: '50%', background: 'white',
-        transform: value ? 'translateX(16px)' : 'translateX(0)', transition: 'transform 180ms ease',
-        display: 'block', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        width: 12, height: 12, borderRadius: 2,
+        background: value ? ACCENT : 'var(--color-fg-faint)',
+        transform: value ? 'translateX(20px)' : 'translateX(0)', transition: 'all 160ms ease', display: 'block',
       }} />
     </button>
   )
@@ -30,22 +40,25 @@ function PillSelector<T extends string>({ options, value, onChange }: {
   options: { value: T; label: string }[]; value: T; onChange: (v: T) => void
 }) {
   return (
-    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-      {options.map(opt => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          style={{
-            padding: '3px 9px', borderRadius: 20, fontSize: 10, border: '1px solid',
-            borderColor: value === opt.value ? 'oklch(0.68 0.16 255)' : 'rgba(255,255,255,0.1)',
-            background: value === opt.value ? 'oklch(0.68 0.16 255 / 0.15)' : 'transparent',
-            color: value === opt.value ? 'oklch(0.68 0.16 255)' : 'rgba(255,255,255,0.4)',
-            cursor: 'pointer', transition: 'all 140ms ease', letterSpacing: '0.03em',
-          }}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {options.map(opt => {
+        const on = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              padding: '3px 10px', borderRadius: 'var(--radius-control)', fontSize: 10, fontFamily: MONO,
+              border: '1px solid', borderColor: on ? ACCENT : 'var(--color-border)',
+              background: on ? ACCENT_TINT : 'transparent',
+              color: on ? ACCENT : 'var(--color-fg-faint)',
+              cursor: 'pointer', transition: 'all 140ms ease', letterSpacing: '0.04em', textTransform: 'uppercase',
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -54,16 +67,21 @@ function Slider({ label, value, min, max, step, onChange, fmt }: {
   label: string; value: number; min: number; max: number; step: number
   onChange: (v: number) => void; fmt?: (v: number) => string
 }) {
+  // Relleno two-tone con TOKENS (mono-safe): fósforo/cian hasta el valor, surface-2 después. El
+  // gris del navegador (accent-color solo tiñe el relleno, no el groove) se elimina con appearance:
+  // none + este gradiente + el thumb estilado en globals.css (.os-slider).
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-fg-muted)', marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
         <span>{label}</span>
-        <span style={{ color: 'oklch(0.68 0.16 255)', fontVariantNumeric: 'tabular-nums' }}>{fmt ? fmt(value) : value}</span>
+        <span style={{ color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{fmt ? fmt(value) : value}</span>
       </div>
       <input
+        className="os-slider"
         type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
-        style={{ width: '100%', accentColor: 'oklch(0.68 0.16 255)', cursor: 'pointer' }}
+        style={{ width: '100%', cursor: 'pointer', background: `linear-gradient(to right, ${ACCENT} ${pct}%, var(--color-surface-2) ${pct}%)` }}
       />
     </div>
   )
@@ -71,9 +89,9 @@ function Slider({ label, value, min, max, step, onChange, fmt }: {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 18 }}>
-      <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 10, marginTop: 0 }}>
-        {title}
+    <div style={{ marginBottom: 16 }}>
+      <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-fg-faint)', margin: '0 0 10px' }}>
+        <span style={{ color: ACCENT }}>{'// '}</span>{title}
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>{children}</div>
     </div>
@@ -83,7 +101,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', flexShrink: 1 }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--color-fg-muted)', flexShrink: 1 }}>{label}</span>
       <div style={{ flexShrink: 0 }}>{children}</div>
     </div>
   )
@@ -94,7 +112,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function OSSettings() {
   const {
     settingsOpen, closeSettings, set, setCrt,
-    showStars, showShips, showPlanes, discreto, showLolo, crt,
+    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver,
   } = useOSSettings()
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -119,14 +137,18 @@ export default function OSSettings() {
         style={{
           position: 'fixed', top: 'calc(4rem + 12px)', right: 24, width: 300,
           maxHeight: 'calc(100vh - 5rem - 24px)', overflowY: 'auto',
-          backgroundColor: 'rgba(12, 12, 17, 0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '16px 18px',
-          zIndex: 10001, boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+          background: 'var(--color-surface-base)',
+          border: '1.5px solid var(--color-border-strong)', borderRadius: 'var(--radius-card)',
+          padding: '14px 16px', zIndex: 10001,
+          boxShadow: '0 18px 50px rgba(0,0,0,0.7)',
+          fontFamily: MONO, color: 'var(--color-fg)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.5)' }}>AJUSTES</span>
-          <button onClick={closeSettings} style={{ fontSize: 18, lineHeight: 1, color: 'rgba(255,255,255,0.25)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>×</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', color: 'var(--color-fg-muted)' }}>
+            <span style={{ color: ACCENT }}>◈</span> AJUSTES
+          </span>
+          <button onClick={closeSettings} aria-label="Cerrar" style={{ fontSize: 16, lineHeight: 1, color: 'var(--color-fg-faint)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>×</button>
         </div>
 
         {/* ── CRT · pantalla arcade ── */}
@@ -149,9 +171,9 @@ export default function OSSettings() {
                       onClick={() => setCrt({ phosphor: hex })}
                       aria-label={hex}
                       style={{
-                        height: 20, borderRadius: 5, background: hex, cursor: 'pointer', padding: 0,
-                        border: crt.phosphor === hex ? '2px solid white' : '2px solid transparent',
-                        boxShadow: crt.phosphor === hex ? '0 0 0 1.5px rgba(0,0,0,0.6)' : 'none',
+                        height: 20, borderRadius: 3, background: hex, cursor: 'pointer', padding: 0,
+                        border: crt.phosphor === hex ? '2px solid var(--color-fg)' : '2px solid transparent',
+                        boxShadow: crt.phosphor === hex ? '0 0 0 1.5px var(--color-surface-base)' : 'none',
                       }}
                     />
                   ))}
@@ -187,9 +209,29 @@ export default function OSSettings() {
           <Row label="Modo discreto"><Toggle value={discreto} onChange={v => set('discreto', v)} /></Row>
         </Section>
 
+        <Section title="Screensaver">
+          <Row label="Modo screensaver"><Toggle value={screensaver.enabled} onChange={v => set('screensaver', { ...screensaver, enabled: v })} /></Row>
+          {screensaver.enabled && (
+            <>
+              <Slider label="Vuelta completa" value={screensaver.speed} min={45} max={240} step={5} onChange={v => set('screensaver', { ...screensaver, speed: v })} fmt={v => v + 's'} />
+              <button
+                onClick={() => { startScreensaver(); closeSettings() }}
+                style={{
+                  width: '100%', marginTop: 2, padding: '7px 0', borderRadius: 'var(--radius-control)', cursor: 'pointer',
+                  border: `1px solid ${ACCENT_LINE}`, background: ACCENT_TINT, color: ACCENT,
+                  fontFamily: MONO, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
+                }}
+              >
+                ▶ Previsualizar ahora
+              </button>
+              <p style={{ fontSize: 10, color: 'var(--color-fg-faint)', margin: 0 }}>Tras 3 min sin actividad se activa solo. Mueve el mouse para salir.</p>
+            </>
+          )}
+        </Section>
+
         <Section title="Widgets">
           <Row label="Lolo"><Toggle value={showLolo} onChange={v => set('showLolo', v)} /></Row>
-          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>Más widgets próximamente</p>
+          <p style={{ fontSize: 10, color: 'var(--color-fg-faint)', margin: 0 }}>Más widgets próximamente</p>
         </Section>
       </div>
     </>

@@ -37,7 +37,7 @@ export default function DrumModal({
 
   return createPortal(
     <div
-      className="crt-screen fixed inset-0 z-[10050] flex items-start justify-center bg-black/60 p-4 backdrop-blur-[2px] sm:p-6"
+      className="crt-screen fixed inset-0 z-[10050] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px] sm:p-6"
       onClick={onClose}   // backdrop click closes
     >
       <div
@@ -45,7 +45,7 @@ export default function DrumModal({
         aria-modal="true"
         aria-label={ariaLabel}
         onClick={e => e.stopPropagation()}   // clicks inside never close
-        className="relative mt-[4vh] w-[min(92vw,46rem)] max-h-[88vh] overflow-y-auto rounded-card border border-border bg-surface-base/95 p-6 pr-8 shadow-2xl shadow-black/60 backdrop-blur-xl dashboard-card"
+        className="relative w-[min(92vw,46rem)] max-h-[88vh] overflow-y-auto rounded-card border border-border bg-surface-base/95 p-6 pr-8 shadow-2xl shadow-black/60 backdrop-blur-xl dashboard-card"
       >
         <button
           onClick={onClose}

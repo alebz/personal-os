@@ -60,12 +60,6 @@ interface ValetPayment { week_date: string; tenant_id: string; status: ValetStat
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const mxn = (n: number) =>
-  new Intl.NumberFormat('es-MX', {
-    style: 'currency', currency: 'MXN',
-    minimumFractionDigits: 0, maximumFractionDigits: 0,
-  }).format(n)
-
 function currMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -756,7 +750,7 @@ function UptownCajaFuerteCard({ total, aportadoAmount, aportadoMethod, onAportar
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ok">✓ Aportado este mes: {mxn(aportadoAmount)} <span className="text-fg-muted">· {aportadoMethod === 'cash' ? 'efectivo' : 'banco'}</span></span>
+            <span className="text-ok">✓ Aportado este mes: <Mxn v={aportadoAmount} /> <span className="text-fg-muted">· {aportadoMethod === 'cash' ? 'efectivo' : 'banco'}</span></span>
             <button onClick={() => { setEditing(true); setAmtDraft(String(aportadoAmount)) }} className="text-label text-fg-muted hover:text-fg">editar</button>
             <button onClick={() => void onQuitar()} className="text-label text-fg-muted hover:text-danger">quitar</button>
           </div>

@@ -80,6 +80,10 @@ export default function CalendarCard() {
   const [formOpen,   setFormOpen]   = useState(false)   // collapsed to just the title until focused
   const [agendaOpen, setAgendaOpen] = useState(false)   // right agenda column; starts collapsed (month full width)
   const { crt } = useOSSettings()   // suscribe al estado CRT → re-render al togglear mono/multi (color reactivo)
+  const isMono  = crt.on && crt.color === 'mono'
+  // Texto sobre celda rellena (hoy/cumple): en mono va OSCURO (token), no blanco — blanco sería un
+  // segundo color que rompe monocolor. En multi, contraste por-color-de-día.
+  const fillInk = (bg: string) => (isMono ? 'var(--color-surface-base)' : contrastInk(bg))
 
   function rangeForView(year: number, month: number): { from: string; to: string } {
     const gridCells = buildGridCells(year, month)
@@ -287,8 +291,8 @@ export default function CalendarCard() {
                       isWeekend ? 'text-fg-muted' : 'text-fg'
                     }`}
                     style={
-                      bday    ? (() => { const g = crtDayColor('#f0b53a', crt); return { background: g, color: contrastInk(g), boxShadow: `0 0 0 1px ${crtDayColor('#7a4e12', crt)}, 0 0 0 2px ${crtDayColor('#ffe08a', crt)}` } })() :
-                      isToday ? { background: cellColor, color: contrastInk(cellColor) } :   // relleno del color del día + texto de contraste
+                      bday    ? (() => { const g = crtDayColor('#f0b53a', crt); return { background: g, color: fillInk(g), boxShadow: `0 0 0 1px ${crtDayColor('#7a4e12', crt)}, 0 0 0 2px ${crtDayColor('#ffe08a', crt)}` } })() :
+                      isToday ? { background: cellColor, color: fillInk(cellColor) } :   // relleno del color del día + texto de contraste (oscuro en mono)
                       isSelected ? { color: cellColor } :
                       undefined
                     }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { useOSSettings } from './OSSettingsContext'
+import { crtDayColor } from '@/lib/weekdayColors'
 
 // Tipo local de flota (antes venía de OSSettingsContext; el selector de flota se retiró de Ajustes
 // pero la simulación de naves lo sigue usando internamente — se mantiene local, intacto).
@@ -1294,16 +1295,20 @@ function ScoreHUD({ ships, tourney }: {
   if (typeof document === 'undefined') return null
 
   const [left, right] = tourney.contenders
-  const AMBER = '#f2c744'
+  // MONOCOLOR: todo el scoreboard al fósforo. Texto/acentos vía crtDayColor; los emblemas pixel se
+  // desaturan (grayscale) para no quedar en rainbow. En multi, colores reales.
+  const { crt } = useOSSettings()
+  const mc = (c: string) => crtDayColor(c, crt)
+  const AMBER = mc('#f2c744')
 
-  // One contender ROW: flag + name on the left, big live ship-count on the right.
+  // One contender ROW: nombre a la izquierda, conteo vivo grande a la derecha. Sin emblema: el
+  // pixel-art de flota lleva paleta propia que rompía MONOCOLOR; el texto + conteo bastan.
   const Side = ({ f }: { f: WarFleet }) => {
-    const m = FLEET_META[f]; const em = EMBLEMS[f]; const n = ships[f]?.alive ?? 0
+    const m = FLEET_META[f]; const n = ships[f]?.alive ?? 0
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, width: 132 }}>
-        <div style={{ width: 20, height: 20, flex: 'none', imageRendering: 'pixelated' }}><FleetEmblem grid={em.grid} pal={em.pal} size={20} /></div>
-        <span style={{ fontFamily: "'Silkscreen'", fontSize: 8, letterSpacing: '1px', color: m.cm, textShadow: `0 0 6px ${m.cm}88`, flex: 1 }}>{m.name}</span>
-        <span style={{ fontFamily: "'Silkscreen'", fontSize: 22, lineHeight: 1, color: '#fff' }}>{String(n).padStart(2, '0')}</span>
+        <span style={{ fontFamily: "'Silkscreen'", fontSize: 11, letterSpacing: '1px', color: mc(m.cm), textShadow: `0 0 6px ${mc(m.cm)}88`, flex: 1 }}>{m.name}</span>
+        <span style={{ fontFamily: "'Silkscreen'", fontSize: 22, lineHeight: 1, color: mc('#fff') }}>{String(n).padStart(2, '0')}</span>
       </div>
     )
   }
@@ -1314,21 +1319,21 @@ function ScoreHUD({ ships, tourney }: {
       return (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, whiteSpace: 'nowrap' }}>
           <span style={{ fontFamily: "'Silkscreen'", fontSize: 6.5, letterSpacing: '2px', color: AMBER, textShadow: `0 0 6px ${AMBER}99` }}>BATTLE IN</span>
-          <span style={{ fontFamily: "'Silkscreen'", fontSize: 13, lineHeight: 1, color: '#fff' }}>{tourney.countdown}s</span>
+          <span style={{ fontFamily: "'Silkscreen'", fontSize: 13, lineHeight: 1, color: mc('#fff') }}>{tourney.countdown}s</span>
         </div>
       )
     }
     if (tourney.winner) {
       const wm = FLEET_META[tourney.winner]
       return (
-        <span style={{ fontFamily: "'Silkscreen'", fontSize: 8, letterSpacing: '1px', color: wm.ca, textShadow: `0 0 8px ${wm.cm}`, animation: 'blink 1s steps(1) infinite', whiteSpace: 'nowrap' }}>{wm.name} WINS!</span>
+        <span style={{ fontFamily: "'Silkscreen'", fontSize: 8, letterSpacing: '1px', color: mc(wm.ca), textShadow: `0 0 8px ${mc(wm.cm)}`, animation: 'blink 1s steps(1) infinite', whiteSpace: 'nowrap' }}>{wm.name} WINS!</span>
       )
     }
     return <span style={{ fontFamily: "'Silkscreen'", fontSize: 10, color: AMBER, textShadow: `0 0 8px ${AMBER}aa` }}>VS</span>
   }
 
   return createPortal(
-    <div style={{ position: 'fixed', top: '50%', left: 60, transform: 'translateY(-50%)', zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
+    <div className="os-scoreboard" style={{ position: 'fixed', top: '50%', left: 60, transform: 'translateY(-50%)', zIndex: 50, pointerEvents: 'none', userSelect: 'none' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
         {left && <Side f={left} />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

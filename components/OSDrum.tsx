@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import OSSettings from '@/components/OSSettings'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import { crtDayColor } from '@/lib/weekdayColors'
 
 export type OSSection = { label: string; color: string; href: string; content?: ReactNode }
 
@@ -45,7 +46,20 @@ function Ship({ color, px = 78 }: { color: string; px?: number }) {
 export default function OSDrum({ sections }: { sections: OSSection[] }) {
   const N = sections.length
   const router = useRouter()
-  const { toggleSettings, settingsOpen } = useOSSettings()
+  const { toggleSettings, settingsOpen, screensaverActive, screensaver, crt } = useOSSettings()
+  const crtRef = useRef(crt); crtRef.current = crt   // leído dentro del loop rAF (render) para los dots
+
+  // Screensaver: el tambor gira solo, lento y continuo, cuando el OS entra en reposo. Los valores
+  // se leen por ref dentro del loop rAF (que se monta una vez). prefers-reduced-motion → giro OFF.
+  const ssActiveRef     = useRef(false); ssActiveRef.current = screensaverActive
+  const ssSpeedRef      = useRef(75);    ssSpeedRef.current  = screensaver.speed
+  const reducedMotionRef = useRef(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => { reducedMotionRef.current = mq.matches }
+    on(); mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
 
   const sceneRef = useRef<HTMLDivElement>(null)
   const deckRef = useRef<HTMLDivElement>(null)
@@ -95,12 +109,13 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         el.style.pointerEvents = (!sec.content && a < PITCH_DEG * 0.5) ? 'auto' : 'none'
 
         const near = Math.max(0, 1 - a / (PITCH_DEG * 2.5))
+        const dotColor = crtDayColor(sec.color, crtRef.current)   // fósforo en mono, color de sección en multi
         const dTransform = `rotateX(${net}deg) translateZ(120px) scale(${0.9 + near * 0.3})`
         const dOpacity = String(a > PITCH_DEG * 2.6 ? 0 : 0.22 + near * 0.78)
-        const dShadow = near > 0.45 ? `0 0 ${5 + near * 12}px ${sec.color}, 0 0 3px ${sec.color}` : 'none'
+        const dShadow = near > 0.45 ? `0 0 ${5 + near * 12}px ${dotColor}, 0 0 3px ${dotColor}` : 'none'
         for (const dot of [dotRefs.current[k], dotRefsR.current[k]]) {
           if (!dot) continue
-          dot.style.background = sec.color
+          dot.style.background = dotColor
           dot.style.transform = dTransform
           dot.style.opacity = dOpacity
           dot.style.boxShadow = dShadow
@@ -120,11 +135,31 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
       })
     }
 
+    // Screensaver state (loop-local, persist across frames)
+    let lastT = performance.now()
+    let ssRamp = 0        // 0→1 ease-in del giro (arranque suave, ~2s)
+    let wasSS = false
+    const FULL_CYCLE_DEG = N * PITCH_DEG   // "vuelta completa" = pasar por todas las caras una vez
+
     const tick = () => {
+      const now = performance.now()
+      const dt = Math.min(50, now - lastT); lastT = now   // clamp: evita saltos tras throttle de tab oculta
+      const ss = ssActiveRef.current && !reducedMotionRef.current
+
+      // Al salir del screensaver: fija target a la cara más cercana → el spring desacelera y aterriza.
+      if (wasSS && !ss) { target.current = Math.round(rot.current / PITCH_DEG) * PITCH_DEG; vel.current = 0 }
+      wasSS = ss
+
       if (!dragging.current) {
-        vel.current += (target.current - rot.current) * STIFFNESS
-        vel.current *= DAMP
-        rot.current += vel.current
+        if (ss) {
+          ssRamp += (1 - ssRamp) * 0.03
+          rot.current -= (FULL_CYCLE_DEG / (ssSpeedRef.current * 1000)) * dt * ssRamp   // sentido natural (como scroll-down por las secciones)
+        } else {
+          ssRamp = 0
+          vel.current += (target.current - rot.current) * STIFFNESS
+          vel.current *= DAMP
+          rot.current += vel.current
+        }
       }
       const s = scrollEl.current
       if (s) {
@@ -227,7 +262,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
         .os-dots-deck { position: absolute; inset: 0; transform-style: preserve-3d; transform: translateZ(-120px); }
         .os-dots i { position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; image-rendering: pixelated; will-change: transform, opacity; }
         .os-kicker { position: fixed; top: 24px; left: 0; right: 0; text-align: center; z-index: 3; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--color-ink-3); pointer-events: none; }
-        .os-vig { position: fixed; left: 0; right: 0; height: 30vh; z-index: 2; pointer-events: none; }
+        .os-vig { position: fixed; left: 0; right: 0; height: 16vh; z-index: 2; pointer-events: none; }
         .os-vig.top { top: 0; background: linear-gradient(var(--color-ink-0), transparent); }
         .os-vig.bot { bottom: 0; background: linear-gradient(0deg, var(--color-ink-0), transparent); }
         .os-flat { position: fixed; inset: 0; z-index: 2; overflow: hidden; display: flex; align-items: center; justify-content: center; animation: os-fadein .3s ease; }
@@ -284,7 +319,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
           fontSize: 24, lineHeight: 1,
           opacity: settingsOpen ? 1 : 0.55,
           transition: 'opacity 200ms ease, transform 300ms ease',
-          color: 'var(--color-ink-3)', background: 'none', border: 'none',
+          color: 'var(--color-fg-muted)', background: 'none', border: 'none',   // token semántico (no ink-3 primitivo) → respeta MONOCOLOR
           cursor: 'pointer', padding: 0, pointerEvents: 'auto',
         }}
       >
