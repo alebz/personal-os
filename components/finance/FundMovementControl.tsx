@@ -22,12 +22,12 @@ export function FundMovementControl({ onSubmit }: {
       <input
         value={desc} onChange={e => setDesc(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit('out')}
         placeholder="Concepto…"
-        className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+        className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
       />
       <input
         type="number" value={amt} onChange={e => setAmt(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit('out')}
         placeholder="$"
-        className="w-24 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+        className="w-24 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
       />
       <button onClick={() => submit('out')} disabled={!ready} title="Aportar al fondo"
         className="rounded-card bg-ok/20 px-3 py-2 text-body font-medium text-ok hover:bg-ok/30 disabled:opacity-30">Aportar</button>

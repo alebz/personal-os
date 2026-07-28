@@ -162,7 +162,7 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
       aria-label={paid ? 'Marcar pendiente' : 'Marcar pagado'}
     >
       {paid && (
-        <svg viewBox="0 0 10 8" fill="none" className="h-3 w-3 text-ink-0" stroke="currentColor" strokeWidth={2}>
+        <svg viewBox="0 0 10 8" fill="none" className="h-3 w-3 text-fg-on-accent" stroke="currentColor" strokeWidth={2}>
           <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
@@ -360,13 +360,13 @@ function ExtraSection({ title, colorClass = 'text-fg-muted', items, onAdd, onDel
             value={desc} onChange={e => setDesc(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
             placeholder="Descripción"
-            className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+            className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
           />
           <input
             type="number" value={amt} onChange={e => setAmt(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
             placeholder="Monto"
-            className="w-24 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+            className="w-24 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
           />
           <button
             onClick={submit} disabled={!desc.trim() || !amt}
@@ -453,7 +453,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
               <div className="flex gap-2">
                 <button
                   onClick={async () => { await onDelete(row.category); setConfirmDel(null) }}
-                  className="rounded bg-danger/80 px-2 py-0.5 text-label font-semibold text-ink-0 hover:bg-danger"
+                  className="rounded bg-danger/80 px-2 py-0.5 text-label font-semibold text-fg-on-accent hover:bg-danger"
                 >Sí</button>
                 <button
                   onClick={() => setConfirmDel(null)}

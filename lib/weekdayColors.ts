@@ -23,6 +23,25 @@ export function dayColor(d: Date): string {
   return WEEKDAY_RAINBOW[(d.getDay() + 6) % 7]   // Mon=0 … Sun=6
 }
 
+// ── Rainbow sobre SUPERFICIE CLARA (tema xp) — presentación, NO identidad ────────────────────────
+// El WEEKDAY_RAINBOW canónico está calibrado para fondo oscuro; como TEXTO sobre claro, 4 entradas
+// fallan contraste (medido sobre card #f6f5ef): mar 2.36:1, mié 1.56, jue 2.80, dom(#e8ecff) ~1.1
+// (casi blanco = invisible), y el oro de cumpleaños 1.69. Esta LUT devuelve la variante oscurecida
+// MÍNIMA que cruza 3:1 (texto 10px bold); las entradas que ya pasan se devuelven intactas. El
+// canónico NUNCA cambia — mismo patrón que crtDayColor: el componente decide en contexto de
+// presentación. Nota: colores MEZCLADOS (dayColorFlow) no matchean la LUT — se ajustará cuando
+// Inicio entre al launcher.
+const LIGHT_INK_LUT: Record<string, string> = {
+  '#f6821e': '#d8721a',   // mar 2.36 → 3.03
+  '#fbbc05': '#b08404',   // mié 1.56 → 3.13
+  '#34a853': '#32a150',   // jue 2.80 → 3.03
+  '#e8ecff': '#898b96',   // dom ~1.1 → 3.10
+  '#f0b53a': '#b2862b',   // oro cumpleaños 1.69 → 3.03
+}
+export function lightDayInk(base: string): string {
+  return LIGHT_INK_LUT[base.toLowerCase()] ?? base
+}
+
 // Cerebro "pensando" stroke — the same rainbow, minus the white (it vanishes on the dark card),
 // repeated ×4 into tight hard-stop blocks (finer = the conic-on-rectangle size variation reads as
 // texture, not chunky corner-pausing). `from var(--rain-angle)` is animated by CSS (globals).

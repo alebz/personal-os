@@ -230,7 +230,16 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
   }, [state.screensaver.enabled])
 
   return (
-    <Ctx.Provider value={{ ...state, set, setCrt, settingsOpen, toggleSettings, closeSettings, screensaverActive, startScreensaver }}>
+    <Ctx.Provider value={{
+      ...state,
+      // CRT EFECTIVO: el CRT es presentación del cascarón ARCADE. Bajo XP se apaga en AMBOS niveles:
+      // el atributo data-crt (CSS, efecto del shell arriba) Y aquí para los consumidores JS
+      // (crtDayColor et al) — si no, las secciones en ventanas claras recibirían el fósforo mono.
+      // El estado PERSISTIDO queda intacto (set/setCrt escriben crudo): al volver a arcade, tu CRT
+      // regresa tal cual.
+      crt: state.shell === 'xp' ? { ...state.crt, on: false } : state.crt,
+      set, setCrt, settingsOpen, toggleSettings, closeSettings, screensaverActive, startScreensaver,
+    }}>
       {children}
     </Ctx.Provider>
   )

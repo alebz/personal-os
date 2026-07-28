@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useOSSettings } from '@/components/OSSettingsContext'
 
 // Shared overlay shell for modals that float OVER the drum. Portals to <body> so it (a) escapes the
 // drum face's preserve-3d transform (fixed positioning works against the viewport) and (b) lands as a
@@ -19,6 +20,9 @@ export default function DrumModal({
   ariaLabel?: string
   children: ReactNode
 }) {
+  // El portal escapa del árbol de la ventana XP → hereda el tema claro por atributo propio (misma
+  // trampa documentada de .crt-screen en portales, mismo fix). Bajo arcade: sin atributo, tema base.
+  const { shell } = useOSSettings()
   // Freeze the background while open: Esc closes, arrow keys are swallowed in the capture phase
   // (before OSDrum's window-bubble keydown listener) so the drum doesn't spin behind the modal.
   useEffect(() => {
@@ -37,6 +41,7 @@ export default function DrumModal({
 
   return createPortal(
     <div
+      data-theme={shell === 'xp' ? 'xp' : undefined}
       className="crt-screen fixed inset-0 z-[10050] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px] sm:p-6"
       onClick={onClose}   // backdrop click closes
     >

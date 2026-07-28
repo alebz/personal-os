@@ -353,6 +353,7 @@ input::placeholder, textarea::placeholder {
   --color-surface-hover:  color-mix(in oklch, var(--color-ink-4) 6%,  transparent);  /* hover fill    (was bg-ink-4/[.06])*/
   --color-surface-active: color-mix(in oklch, var(--color-ink-4) 10%, transparent);  /* active/selected fill (was static bg-ink-4/5–10) */
   --color-fg:            var(--color-ink-4);   /* primary text   (was text-ink-4) */
+  --color-fg-on-accent:  var(--color-ink-0);   /* TEMABLE · tinta SOBRE relleno sólido de acento/semántico (check en bg-ok, texto de btn danger). Oscura sobre neón (arcade); un tema claro la voltea a blanco. */
   --color-fg-muted:      var(--color-ink-3);   /* secondary text (was text-ink-3) */
   --color-fg-faint:      oklch(0.55 0.012 75);  /* faint/hint text — DECOUPLED de ink-2 (que sigue siendo la primitiva de surface-2). ink-2@L0.33 medía 1.68:1 (ilegible sobre el fondo); 0.55 = 4.24:1 vs base / 3.97 vs card, y queda por debajo de fg-muted (5.88). REGLA: es el piso de legibilidad — NUNCA usar con /alpha. */
   --color-border:        color-mix(in oklch, var(--color-ink-4) 32%, transparent); /* MARKED hairline — measures 6:1, a line that exists (was 12% = 2.9:1, invisible) */
@@ -397,6 +398,37 @@ input::placeholder, textarea::placeholder {
   --radius-chip:    var(--r-full); /* cozy rounds its tags into real pills (arcade keeps them square) */
   --color-accent:   oklch(0.78 0.13 350);   /* pink → re-tints every accent usage */
   /* a full theme would also remap surfaces/fg + --color-cat-* + declare capabilities in TS */
+}
+
+/* "xp luna light" — la variante CLARA de las secciones bajo el cascarón XP (Fase 2d-luz).
+   A DIFERENCIA de los temas de página (:root[data-theme]), este se aplica SCOPED: el atributo va en
+   el CUERPO de cada ventana XP y en los modales porteados bajo XP — nunca en <html>. El tambor jamás
+   lo ve (cero regresiones por construcción). Remapea solo TIER 1; invariantes intactos (Ley 3).
+   ok/danger conservan su lectura (verde=entra, rojo=sale), recalibrados a fondo claro — TODOS los
+   valores medidos: fg 16.4:1 · muted 6.9 · faint 3.3 (el piso) · ok 4.8 · warn 4.3 · danger 5.4 ·
+   accent 4.8 (sobre card #f6f5ef). */
+[data-theme="xp"] {
+  color-scheme: light;
+  --color-surface-base:   #ffffff;   /* lienzo de ventana — las vistas de contenido XP son blancas */
+  --color-surface-1:      #f6f5ef;   /* card — beige XP suave sobre blanco */
+  --color-surface-2:      #ebe9df;   /* inputs / tracks */
+  --color-surface-hover:  color-mix(in oklch, #1a1712 5%, transparent);
+  --color-surface-active: color-mix(in oklch, #1a1712 9%, transparent);
+  --color-fg:             #1a1712;   /* warm black (no negro clínico) */
+  --color-fg-on-accent:   #ffffff;   /* sobre rellenos sólidos, en claro la tinta se voltea */
+  --color-fg-muted:       #58544a;
+  --color-fg-faint:       #8a867a;
+  --color-border:         #d5d2c4;   /* hairline beige-gris */
+  --color-border-strong:  #aca899;   /* el gris clásico XP */
+  --color-accent:         #316ac5;   /* azul selección XP */
+  --color-ok:             #1e7d2c;   /* verde dinero sobre claro */
+  --color-warn:           #9a6b00;   /* oro legible sobre claro */
+  --color-danger:         #c0271c;
+  --color-cat-nomina:     #0d6e8c;
+  --color-cat-freelance:  #b03a7e;
+  --color-cat-fijo:       #b03a7e;
+  --color-cat-extra:      #9a6b00;
+  --color-cat-vacaciones: #6f7d1f;
 }
 
 /* "ultraminimal console" — square corners, monochrome */

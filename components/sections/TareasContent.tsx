@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import DrumModal from '@/components/DrumModal'
-import { dayColor, crtDayColor } from '@/lib/weekdayColors'
+import { dayColor, crtDayColor, lightDayInk } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -113,8 +113,11 @@ function isActionable(task: Task): boolean {
 }
 
 function DayTag({ day }: { day: Date }) {
-  const { crt } = useOSSettings()
-  const c = crtDayColor(dayColor(day), crt)
+  // crt y shell son CONTEXTO DE PRESENTACIÓN (no ubicación): mono → fósforo; cascarón xp → las
+  // secciones viven en ventanas claras → variante LUT del día legible sobre claro (canónico intacto).
+  const { crt, shell } = useOSSettings()
+  const base = crtDayColor(dayColor(day), crt)
+  const c = shell === 'xp' ? lightDayInk(base) : base
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1 rounded-chip px-2 py-0.5 text-label font-medium"

@@ -78,8 +78,9 @@ export default function XPWindow({
         <button className="xp-chrome-btn xp-title-btn xp-title-btn--close" onClick={(e) => { e.stopPropagation(); onClose(win.id) }} aria-label="Cerrar" />
       </div>
 
-      {/* Cuerpo = contenedor de la sección */}
-      <div className="relative min-h-0 flex-1 overflow-auto bg-surface-base">
+      {/* Cuerpo = contenedor de la sección. data-theme="xp" = la variante CLARA por tokens (2d-luz):
+          scoped AQUÍ (no en <html>) — el tambor jamás la ve. bg-surface-base resuelve a blanco. */}
+      <div data-theme="xp" className="relative min-h-0 flex-1 overflow-auto bg-surface-base">
         {win.section.content}
       </div>
     </div>

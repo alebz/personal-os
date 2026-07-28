@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useOSSettings } from '@/components/OSSettingsContext'
-import { crtDayColor } from '@/lib/weekdayColors'
+import { crtDayColor, contrastInk } from '@/lib/weekdayColors'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,7 +157,7 @@ function HabitModal({
                 <button
                   key={c}
                   onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-round transition-transform ${color === c ? 'scale-110 ring-2 ring-border-strong ring-offset-2 ring-offset-ink-1' : ''}`}
+                  className={`h-7 w-7 rounded-round transition-transform ${color === c ? 'scale-110 ring-2 ring-border-strong ring-offset-2 ring-offset-surface-base' : ''}`}
                   style={{ backgroundColor: c }}
                   aria-label={c}
                 />
@@ -230,8 +230,8 @@ function HabitRow({
       <button
         onClick={() => onToggle(habit)}
         aria-label={doneToday ? 'Marcar no hecho' : 'Marcar hecho'}
-        className={`grid h-7 w-7 shrink-0 place-items-center rounded-round border transition-colors ${doneToday ? 'border-transparent text-white' : 'border-border-strong text-transparent hover:border-border-strong'}`}
-        style={doneToday ? { backgroundColor: color } : undefined}
+        className={`grid h-7 w-7 shrink-0 place-items-center rounded-round border transition-colors ${doneToday ? 'border-transparent' : 'border-border-strong text-transparent hover:border-border-strong'}`}
+        style={doneToday ? { backgroundColor: color, color: contrastInk(color) } : undefined}
       >
         <svg viewBox="0 0 12 10" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth={2}><path d="M1 5l3.5 3.5L11 1" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>

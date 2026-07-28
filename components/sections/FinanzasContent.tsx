@@ -217,7 +217,7 @@ function CheckBox({ checked }: { checked: boolean }) {
       ].join(' ')}
     >
       {checked && (
-        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-ink-0" stroke="currentColor" strokeWidth={1.8}>
+        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-fg-on-accent" stroke="currentColor" strokeWidth={1.8}>
           <path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
@@ -487,7 +487,7 @@ function AddExtraForm({
         onChange={e => setNombre(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder={placeholder}
-        className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
       <input
         type="number"
@@ -495,7 +495,7 @@ function AddExtraForm({
         onChange={e => setMonto(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="$"
-        className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
       <select
         value={metodo}
@@ -622,17 +622,17 @@ function AddCommitmentForm({
       <input
         value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="Netflix, renta…"
-        className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
       <input
         type="number" value={monto} onChange={e => setMonto(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="$/mes"
-        className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
       <input
         type="number" value={meses} onChange={e => setMeses(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="meses" title="Nº de pagos (vacío = indefinido)"
-        className="w-16 rounded-control border border-border bg-surface-2 px-2 py-1.5 text-center text-secondary text-fg placeholder-ink-3/40 outline-none focus:border-accent/50"
+        className="w-16 rounded-control border border-border bg-surface-2 px-2 py-1.5 text-center text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
       <select
         value={metodo} onChange={e => setMetodo(e.target.value)}
@@ -849,8 +849,10 @@ function PanelTab({
     <div className="space-y-5">
       {/* 6 summary cards — Efectivo/Tarjeta editable (wallets); Caja Fuerte is a read-only rollup */}
       <div className="grid grid-cols-3 gap-3">
-        <EditablePositionCard account="efectivo" label="Efectivo" value={liveEfectivo} cls="text-success" subNode={deltaSub(dEfectivo)} />
-        <EditablePositionCard account="tarjeta"  label="Tarjeta"  value={liveTarjeta}  cls="text-info"    subNode={deltaSub(dTarjeta)} />
+        {/* text-success/text-info NO existían como tokens (Tailwind no emitía nada — bug latente,
+            heredaban el color del contexto). Semánticos reales: efectivo=verde dinero, tarjeta=accent. */}
+        <EditablePositionCard account="efectivo" label="Efectivo" value={liveEfectivo} cls="text-ok"     subNode={deltaSub(dEfectivo)} />
+        <EditablePositionCard account="tarjeta"  label="Tarjeta"  value={liveTarjeta}  cls="text-accent" subNode={deltaSub(dTarjeta)} />
         <button
           onClick={onOpenCajaFuerte} title="Ver apartados en Caja Fuerte"
           className="rounded-card border border-border bg-surface-1 p-4 text-left shadow-xl shadow-black/20 backdrop-blur-xl transition-colors hover:bg-surface-hover dashboard-card"

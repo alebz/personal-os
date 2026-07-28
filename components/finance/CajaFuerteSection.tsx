@@ -175,12 +175,12 @@ export function CajaFuerteSection({
           <input
             value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
             placeholder={createPlaceholder}
-            className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+            className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
           />
           <input
             type="number" value={meta} onChange={e => setMeta(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
             placeholder="Meta (opcional)"
-            className="w-36 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder-ink-3/50 outline-none focus:border-accent/50"
+            className="w-36 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
           />
           <button onClick={create} disabled={!name.trim()}
             className="rounded-card bg-accent/20 px-4 py-2 text-body font-medium text-accent hover:bg-accent/30 disabled:opacity-30">Crear</button>

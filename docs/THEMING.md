@@ -62,6 +62,19 @@ Si sigues esto, el elemento respeta MONOCOLOR (y cualquier tema futuro) sin trab
 | Panel de Ajustes (era azul iOS + rgba) | OSSettings | rediseño arcade full-token |
 | Sliders del panel (groove gris) | OSSettings + `.os-slider` | gradiente `accent`/`surface-2` + thumb token |
 | Censura de montos | Mxn | dots fijos, heredan color del contexto (token) |
+| Placeholders de inputs (era `placeholder-ink-3` ×11) | Finanzas, Uptown, CajaFuerte, FundMovement | `placeholder:text-fg-faint` (2d-luz; saldó el gap diferido de la migración) |
+| Tinta sobre rellenos sólidos (checks en `bg-ok`, botón danger) | Finanzas, Uptown | token nuevo `--color-fg-on-accent` (oscuro en arcade, blanco en claro) |
+| Check de hábito sobre color dinámico (era `text-white`) | HabitTrackerContent | `contrastInk(color)` |
+| Posiciones Efectivo/Tarjeta (eran `text-success`/`text-info` — tokens INEXISTENTES, bug latente) | FinanzasContent | `text-ok` / `text-accent` |
+| Rainbow como TEXTO sobre superficie clara | lib/weekdayColors + DayTag (Tareas) | `lightDayInk(base)` — LUT presentacional ≥3:1 (canónico intacto); aplicar en cada sitio day-color cuando su sección entre al launcher XP |
+
+### El tema claro XP (2d-luz) — patrón de tema SCOPED
+`[data-theme="xp"]` en globals remapea TIER 1 a paleta clara (valores medidos, ver bloque). Se aplica
+**scoped**: el atributo va en el CUERPO de cada ventana XP (`XPWindow`) y en los portales bajo XP
+(`DrumModal` se lo pone solo leyendo `shell`) — nunca en `<html>`; el tambor no lo ve. Contrato
+gemelo del CRT: bajo `shell='xp'` el CRT se apaga en AMBOS niveles — atributo `data-crt` (CSS) y
+`crt` EFECTIVO del contexto (JS: `crtDayColor` y demás consumidores reciben `on:false`; el estado
+persistido queda intacto para el regreso a arcade).
 
 ### ⚠️ Pendientes / candidatos para un pase completo de theming
 Estos aún usan primitivos o hex inline y romperían un tema nuevo. NO se han tocado (nadie los ha
