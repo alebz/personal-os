@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import DrumModal from '@/components/DrumModal'
 import { dayColor, crtDayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 
@@ -660,36 +660,13 @@ function TaskDrawer({
   const labelCls = 'mb-1.5 block text-label font-semibold uppercase tracking-wider text-fg-muted'
   const inputCls = 'w-full rounded-card border border-border bg-surface-1 px-3 py-2.5 text-body text-fg placeholder:text-fg-faint transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20'
 
-  return createPortal(
-    <>
-      <div
-        aria-hidden
-        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={onClose}
-      />
+  return (
+    <DrumModal open={isOpen} onClose={onClose} ariaLabel={creating ? 'Nueva tarea' : 'Editar tarea'}>
+      <h2 className="mb-5 text-secondary font-medium uppercase tracking-wider text-fg-muted">
+        {creating ? 'Nueva tarea' : 'Editar tarea'}
+      </h2>
 
-      <aside
-        aria-label={creating ? 'Nueva tarea' : 'Edit task'}
-        className={`crt-screen fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-surface-base shadow-2xl transition-transform duration-300 ease-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {isOpen && (
-          <>
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <span className="text-secondary font-medium uppercase tracking-wider text-fg-muted">
-                {creating ? 'Nueva tarea' : 'Editar tarea'}
-              </span>
-              <button onClick={onClose} aria-label="Close" className="rounded-control p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+      <div className="space-y-5">
               <div>
                 <label className={labelCls}>Título</label>
                 <input autoFocus={creating} value={form.title} onChange={(e) => set('title', e.target.value)} className={inputCls} placeholder="Nombre de la tarea" />
@@ -741,23 +718,19 @@ function TaskDrawer({
                 <input value={form.tags} onChange={(e) => set('tags', e.target.value)} className={inputCls} placeholder="diseño, cliente, urgente" />
                 <p className="mt-1 text-label text-fg-faint">Separadas por coma</p>
               </div>
-            </div>
+      </div>
 
-            <div className="flex items-center gap-3 border-t border-border px-6 py-4">
-              <button onClick={handleSave} disabled={saving || !form.title.trim()} className="flex-1 rounded-card border border-accent/20 bg-accent/10 py-2.5 text-body font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40">
-                {saving ? 'Guardando…' : creating ? 'Crear tarea' : 'Guardar cambios'}
-              </button>
-              {!creating && (
-                <button onClick={handleDelete} disabled={deleting} className="rounded-card border border-danger/20 px-4 py-2.5 text-body font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
-                  {deleting ? '…' : 'Eliminar'}
-                </button>
-              )}
-            </div>
-          </>
+      <div className="mt-6 flex items-center gap-3 border-t border-border pt-5">
+        <button onClick={handleSave} disabled={saving || !form.title.trim()} className="flex-1 rounded-card border border-accent/20 bg-accent/10 py-2.5 text-body font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40">
+          {saving ? 'Guardando…' : creating ? 'Crear tarea' : 'Guardar cambios'}
+        </button>
+        {!creating && (
+          <button onClick={handleDelete} disabled={deleting} className="rounded-card border border-danger/20 px-4 py-2.5 text-body font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40">
+            {deleting ? '…' : 'Eliminar'}
+          </button>
         )}
-      </aside>
-    </>,
-    document.body
+      </div>
+    </DrumModal>
   )
 }
 
