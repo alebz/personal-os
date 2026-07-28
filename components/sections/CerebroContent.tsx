@@ -6,6 +6,7 @@ import { canonicalKind, kindLabel } from '@/lib/memoryKinds'
 import BrainIndexModal from '@/components/BrainIndexModal'
 import DrumModal from '@/components/DrumModal'
 import CerebroResults from '@/components/CerebroResults'
+import Supraconsciente from '@/components/Supraconsciente'
 import type { QueryRoute } from '@/lib/router/classifyQuery'
 
 // Cerebro — the OS's single command bar. One box, two intents:
@@ -362,7 +363,7 @@ export default function CerebroContent() {
   )
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 pt-[7vh] pb-28">
+    <main className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-6 pt-[7vh] pb-16">
 
       {/* ── Command bar ─────────────────────────────────────────────────── */}
       <div className="rounded-card border border-border bg-surface-1 p-6 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
@@ -485,6 +486,10 @@ export default function CerebroContent() {
           </>
         )}
       </div>
+
+      {/* Supraconsciente — la línea viva (typewriter). Zona baja de la cara pero levantada del pie
+          (mt-auto la empuja abajo, mb la sube un poco → entre la card y el borde inferior). */}
+      <div className="mt-auto mb-[10vh] pt-12"><Supraconsciente /></div>
 
       {/* Consultar results — modal overlay over the drum (portals to <body>, so its scroll never
           traps the tambor). Synthesis ARRIBA (auto for questions), full fragment list ABAJO. */}
