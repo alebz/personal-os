@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useOSSettings, CRT_PHOSPHORS } from './OSSettingsContext'
 import type { CrtColor, Shell } from './OSSettingsContext'
+import { playXpSound } from './xp/xpSounds'
 
 // Panel de Ajustes — piel ARCADE / terminal. Todo por TOKENS del tema (--color-*), así respeta
 // MONOCOLOR y la paleta arcade DE RAÍZ (accent = cian, no el azul iOS viejo). Tipografía mono, bordes
@@ -112,7 +113,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function OSSettings() {
   const {
     settingsOpen, closeSettings, set, setCrt,
-    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver, supraconsciente, shell,
+    showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver, supraconsciente, shell, xpSound,
   } = useOSSettings()
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -157,9 +158,18 @@ export default function OSSettings() {
             <PillSelector<Shell>
               options={[{ value: 'arcade', label: 'Arcade' }, { value: 'xp', label: 'Windows XP' }]}
               value={shell}
-              onChange={v => set('shell', v)}
+              onChange={v => {
+                // El startup de XP es ceremonia de LLEGADA: suena solo en la transición arcade→XP,
+                // desde este click (gesto = autoplay permitido). Nunca en reloads ya estando en XP.
+                if (v === 'xp' && shell !== 'xp') playXpSound('startup')
+                set('shell', v)
+              }}
             />
           </Row>
+          <Row label="Sonidos XP"><Toggle value={xpSound.on} onChange={v => set('xpSound', { ...xpSound, on: v })} /></Row>
+          {xpSound.on && (
+            <Slider label="Volumen" value={xpSound.volume} min={0} max={1} step={0.05} onChange={v => set('xpSound', { ...xpSound, volume: v })} fmt={v => Math.round(v * 100) + '%'} />
+          )}
         </Section>
 
         {/* ── CRT · pantalla arcade ── */}

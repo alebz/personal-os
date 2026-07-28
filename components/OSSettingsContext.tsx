@@ -46,6 +46,7 @@ interface OSSettingsState {
   screensaver:    { enabled: boolean; speed: number }   // speed = segundos por vuelta completa del tambor
   supraconsciente: SupraState
   shell:          Shell
+  xpSound:        { on: boolean; volume: number }   // sonidos del cascarón XP (WAVs reales del pack)
 }
 
 interface OSSettingsCtx extends OSSettingsState {
@@ -88,6 +89,7 @@ const DEFAULTS: OSSettingsState = {
   screensaver: { enabled: true, speed: 75 },   // 3 min idle → tambor gira; vuelta completa cada 75s
   supraconsciente: { enabled: true, rotateMinutes: 4, topics: { supra: true } },
   shell:       'arcade',   // default: el tambor. 'xp' monta el escritorio Windows XP.
+  xpSound:     { on: true, volume: 0.25 },   // volumen BAJO por default — nostalgia sin fatiga
 }
 
 const STORAGE_KEY = 'os-settings'
@@ -101,6 +103,7 @@ function loadState(): OSSettingsState {
           ...DEFAULTS, ...parsed,
           crt: { ...CRT_DEFAULTS, ...(parsed.crt || {}) },
           screensaver: { ...DEFAULTS.screensaver, ...(parsed.screensaver || {}) },
+          xpSound: { ...DEFAULTS.xpSound, ...(parsed.xpSound || {}) },
           supraconsciente: {
             ...DEFAULTS.supraconsciente, ...(parsed.supraconsciente || {}),
             topics: { ...DEFAULTS.supraconsciente.topics, ...((parsed.supraconsciente || {}).topics || {}) },

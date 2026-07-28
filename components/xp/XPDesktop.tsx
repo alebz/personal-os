@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
 import XPWindow, { type WinState } from './XPWindow'
+import { playXpSound } from './xpSounds'
 import './xp-theme.css'
 
 // Escritorio Windows XP — el cascarón alterno. FASE 2: piel Luna (Bliss, Tahoma, chrome real,
@@ -15,7 +16,7 @@ import './xp-theme.css'
 const LAUNCHABLE = new Set(['/crm', '/finance'])
 
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
-  const { set } = useOSSettings()
+  const { set, xpSound } = useOSSettings()
   const [startOpen, setStartOpen] = useState(false)
   const [windows, setWindows] = useState<WinState[]>([])
 
@@ -24,6 +25,10 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 
   function openWindow(section: OSSection) {
     setStartOpen(false)
+    const existing = windows.find((w) => w.id === section.href)
+    if (existing?.minimized) playXpSound('restore')
+    else if (!existing) playXpSound('open')
+    // existente y visible → solo foco, sin sonido
     setWindows((prev) => {
       const top = Math.max(0, ...prev.map((w) => w.z))
       if (prev.some((w) => w.id === section.href))
@@ -43,6 +48,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   }
 
   function closeWindow(id: string) {
+    playXpSound('close')
     setWindows((prev) => prev.filter((w) => w.id !== id))
   }
 
@@ -51,16 +57,21 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   }
 
   function minimizeWindow(id: string) {
+    playXpSound('minimize')
     setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, minimized: true } : w)))
   }
 
   function taskbarClick(id: string) {
+    const w = windows.find((x) => x.id === id)
+    if (w?.minimized) playXpSound('restore')
+    else if (w && w.z === topZ) playXpSound('minimize')
+    // atrás y visible → solo foco, sin sonido
     setWindows((prev) => {
-      const w = prev.find((x) => x.id === id)
-      if (!w) return prev
+      const win = prev.find((x) => x.id === id)
+      if (!win) return prev
       const top = Math.max(0, ...prev.map((x) => x.z))
-      if (w.minimized) return prev.map((x) => (x.id === id ? { ...x, minimized: false, z: top + 1 } : x))
-      if (w.z === top) return prev.map((x) => (x.id === id ? { ...x, minimized: true } : x))
+      if (win.minimized) return prev.map((x) => (x.id === id ? { ...x, minimized: false, z: top + 1 } : x))
+      if (win.z === top) return prev.map((x) => (x.id === id ? { ...x, minimized: true } : x))
       return prev.map((x) => (x.id === id ? { ...x, z: top + 1 } : x))
     })
   }
@@ -109,6 +120,17 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           style={{ height: 30, padding: '0 20px 0 12px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)' }}
         >
           inicio
+        </button>
+
+        {/* Tray: bocina — mute de los sonidos XP a UN click (la fatiga de la 3ª semana, resuelta) */}
+        <button
+          className="xp-chrome-btn"
+          onClick={() => set('xpSound', { ...xpSound, on: !xpSound.on })}
+          title={xpSound.on ? 'Silenciar sonidos XP' : 'Activar sonidos XP'}
+          aria-label={xpSound.on ? 'Silenciar sonidos XP' : 'Activar sonidos XP'}
+          style={{ order: 2, marginLeft: 'auto', marginRight: 6, height: 22, padding: '0 8px', border: 'none', borderRadius: 3, background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: xpSound.on ? 1 : 0.55 }}
+        >
+          {xpSound.on ? '🔊' : '🔇'}
         </button>
 
         {/* Botones de ventanas abiertas */}
