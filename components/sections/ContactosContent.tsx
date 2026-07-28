@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import DrumModal from '@/components/DrumModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -389,7 +390,6 @@ function ContactDrawer({
     finally { setDeleting(false) }
   }
 
-  const isOpen = !!drawer
   const labelCls = 'mb-1.5 block text-label font-semibold uppercase tracking-wider text-fg-muted'
   const inputCls =
     'w-full rounded-card border border-border bg-surface-1 px-3 py-2.5 text-body text-fg placeholder:text-fg-faint transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20 backdrop-blur-xl'
@@ -399,38 +399,15 @@ function ContactDrawer({
     ? categoryNames
     : [...categoryNames, form.category]
 
-  return createPortal(
-    <>
-      <div
-        aria-hidden
-        onClick={onClose}
-        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-      />
-      <aside
-        className={`crt-screen fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-surface-base shadow-2xl transition-transform duration-300 ease-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {drawer && (
-          <>
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <span className="text-secondary font-medium uppercase tracking-wider text-fg-muted">
-                {drawer.mode === 'create' ? 'Nuevo contacto' : 'Editar contacto'}
-              </span>
-              <button
-                onClick={onClose}
-                aria-label="Cerrar"
-                className="rounded-control p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
+  return (
+    <DrumModal open={!!drawer} onClose={onClose} ariaLabel={drawer?.mode === 'create' ? 'Nuevo contacto' : 'Editar contacto'}>
+      {drawer && (
+        <>
+          <h2 className="mb-5 text-secondary font-medium uppercase tracking-wider text-fg-muted">
+            {drawer.mode === 'create' ? 'Nuevo contacto' : 'Editar contacto'}
+          </h2>
 
-            <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          <div className="space-y-5">
               <div>
                 <label className={labelCls}>Nombre</label>
                 <input
@@ -506,31 +483,29 @@ function ContactDrawer({
                   placeholder="Contexto, intereses, cosas a recordar…"
                 />
               </div>
-            </div>
+          </div>
 
-            <div className="flex items-center gap-3 border-t border-border px-6 py-4">
+          <div className="mt-6 flex items-center gap-3 border-t border-border pt-5">
+            <button
+              onClick={handleSave}
+              disabled={saving || !form.name.trim()}
+              className="flex-1 rounded-card border border-accent/20 bg-accent/10 py-2.5 text-body font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+            {drawer.mode === 'edit' && (
               <button
-                onClick={handleSave}
-                disabled={saving || !form.name.trim()}
-                className="flex-1 rounded-card border border-accent/20 bg-accent/10 py-2.5 text-body font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="rounded-card border border-danger/20 px-4 py-2.5 text-body font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
               >
-                {saving ? 'Guardando…' : 'Guardar'}
+                {deleting ? '…' : 'Eliminar'}
               </button>
-              {drawer.mode === 'edit' && (
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="rounded-card border border-danger/20 px-4 py-2.5 text-body font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
-                >
-                  {deleting ? '…' : 'Eliminar'}
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </aside>
-    </>,
-    document.body
+            )}
+          </div>
+        </>
+      )}
+    </DrumModal>
   )
 }
 
