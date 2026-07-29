@@ -3,8 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
-import OSSettings from '@/components/OSSettings'
 import CalendarCard from '@/components/CalendarCard'
+import DisplayProperties from './DisplayProperties'
 import XPWindow, { type WinState } from './XPWindow'
 import { playXpSound } from './xpSounds'
 import './xp-theme.css'
@@ -23,10 +23,8 @@ const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptow
 // en displays modernos. FILL sin letterbox: la altura LÓGICA se fija; f = viewportH/alturaLógica; el
 // ancho es fluido (viewportW/f). transform:scale(f) desde top-left → el lienzo escalado llena el
 // viewport. Solo en .xp-desktop (el arcade ni se entera). El texto sigue real (seleccionable, zoom
-// del browser encima). LOGICAL_H es el DIAL — se vuelve slider persistente en "Propiedades de
-// Pantalla" (Tema 3); por ahora, arranque.
-const LOGICAL_H = 800
-
+// del browser encima). La altura lógica es el DIAL — vive en el contexto (xpLogicalH), gobernado por
+// "Propiedades de Pantalla" (Tema 3).
 function useViewport() {
   const [vp, setVp] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
   useEffect(() => {
@@ -63,13 +61,14 @@ function XPClock({ onOpen }: { onOpen: () => void }) {
 }
 
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
-  const { set, xpSound, toggleSettings, startScreensaver } = useOSSettings()
+  const { set, xpSound, xpLogicalH, startScreensaver } = useOSSettings()
   const [startOpen, setStartOpen] = useState(false)
   const [allOpen, setAllOpen] = useState(false)
   const [windows, setWindows] = useState<WinState[]>([])
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)   // menú contextual (logical px)
 
   const vp = useViewport()
-  const scale = vp.h / LOGICAL_H            // f
+  const scale = vp.h / xpLogicalH           // f
   const logicalW = vp.w / scale             // ancho lógico (fluido)
 
   // Inicio ('/') se disuelve en XP → fuera del menú por completo (ni launchable ni en "Todos").
@@ -100,6 +99,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   // Fecha y hora — el 1er DIÁLOGO DE SISTEMA: tamaño FIJO, sin resize ni max (canon XP). Se invoca
   // desde el reloj (no desde el menú); el calendario nativo con rainbow de días + markers.
   const openDateTime = () => openWindow('date-time', 'Fecha y hora', <div className="p-3"><CalendarCard /></div>, { w: 452, h: 480 })
+  // Propiedades de Pantalla — diálogo FIJO (hereda el canon), el dial de la escala. Se invoca del
+  // menú contextual del escritorio y del "Panel de control" (su primer inquilino).
+  const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466 }) }
 
   function focusWindow(id: string) {
     setWindows((prev) => {
@@ -141,7 +143,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     <div
       className="xp-desktop"
       style={{
-        position: 'fixed', top: 0, left: 0, width: logicalW, height: LOGICAL_H,
+        position: 'fixed', top: 0, left: 0, width: logicalW, height: xpLogicalH,
         transform: `scale(${scale})`, transformOrigin: 'top left', overflow: 'hidden',
         background: "#3a6ea5 url('/themes/xp/wallpapers/bliss.png') center / cover no-repeat",
       }}
@@ -151,8 +153,20 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           data-theme claro. Fuera del transform se verían chiquitos. */}
       <div id="xp-modal-root" />
 
-      {/* Área de escritorio (íconos = 2e). Click en vacío cierra el menú Inicio. */}
-      <div style={{ position: 'absolute', inset: 0, bottom: 30 }} onPointerDown={closeStart} />
+      {/* Área de escritorio (íconos = 2e). Click en vacío cierra el menú Inicio; click-derecho abre el
+          menú contextual mínimo (coords en px LÓGICOS: clientX ÷ scale). */}
+      <div
+        style={{ position: 'absolute', inset: 0, bottom: 30 }}
+        onPointerDown={() => { closeStart(); setCtxMenu(null) }}
+        onContextMenu={(e) => { e.preventDefault(); closeStart(); setCtxMenu({ x: e.clientX / scale, y: e.clientY / scale }) }}
+      />
+
+      {/* Menú contextual del escritorio (mínimo: solo Propiedades por ahora) */}
+      {ctxMenu && (
+        <div style={{ position: 'absolute', left: ctxMenu.x, top: ctxMenu.y, zIndex: 10002, minWidth: 160, background: '#fff', border: '1px solid #0831d9', boxShadow: '3px 3px 10px rgba(0,0,0,0.35)', padding: '3px 0' }}>
+          <button className="xp-startmenu-item" onClick={openDisplayProps} style={{ ...startItem, padding: '6px 16px' }}>Propiedades</button>
+        </div>
+      )}
 
       {/* Ventanas */}
       {windows.map((w) => (
@@ -201,7 +215,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             </div>
 
             <div style={{ width: 148, background: '#d3e5fa', borderLeft: '1px solid #96b8e0', padding: '6px 0' }}>
-              <button className="xp-startmenu-item" onClick={() => { closeStart(); toggleSettings() }} style={{ ...startItem, fontWeight: 600, color: '#1a3d75' }}>
+              <button className="xp-startmenu-item" onClick={openDisplayProps} style={{ ...startItem, fontWeight: 600, color: '#1a3d75' }}>
                 Panel de control
               </button>
             </div>
@@ -255,8 +269,6 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         </div>
       </div>
 
-      {/* Panel de Ajustes (Panel de control) — se abre sobre el escritorio */}
-      <OSSettings />
     </div>
   )
 }

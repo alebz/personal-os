@@ -47,6 +47,7 @@ interface OSSettingsState {
   supraconsciente: SupraState
   shell:          Shell
   xpSound:        { on: boolean; volume: number }   // sonidos del cascarón XP (WAVs reales del pack)
+  xpLogicalH:     number                            // altura lógica del lienzo XP (dial de "Propiedades de Pantalla")
 }
 
 interface OSSettingsCtx extends OSSettingsState {
@@ -90,6 +91,7 @@ const DEFAULTS: OSSettingsState = {
   supraconsciente: { enabled: true, rotateMinutes: 4, topics: { supra: true } },
   shell:       'arcade',   // default: el tambor. 'xp' monta el escritorio Windows XP.
   xpSound:     { on: true, volume: 0.25 },   // volumen BAJO por default — nostalgia sin fatiga
+  xpLogicalH:  800,   // arranque del dial (escalar amable ~época); ajustable en Propiedades de Pantalla
 }
 
 const STORAGE_KEY = 'os-settings'

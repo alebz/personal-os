@@ -94,6 +94,19 @@ top-left. Solo en `.xp-desktop`; el arcade nunca se transforma.
 - **Texto**: sigue real/seleccionable; `transform:scale` en Retina queda nítido; zoom del browser
   compone encima.
 
+### Cada tema configura LO SUYO con SU interfaz
+Los ajustes DEL TEMA viven en la interfaz nativa de ESE tema; los ajustes del OS (no del tema) siguen
+donde están.
+- Arcade: su panel CRT (`OSSettings`, terminal) con sliders de fósforo/scan/etc — alcanzable por el
+  gear del tambor.
+- XP: sus diálogos nativos. "Propiedades de Pantalla" (diálogo fijo) gobierna la escala del lienzo
+  (`xpLogicalH`, slider Menos↔Más, persistido); se invoca de click-derecho-escritorio → Propiedades
+  y de "Panel de control" (su 1er inquilino; el Panel completo es hogar futuro de sonidos/wallpaper).
+- Consecuencia: bajo XP NO se monta el panel arcade `OSSettings` (sería la interfaz del OTRO tema).
+  Los ajustes OS (shell, screensaver, supraconsciente, y de momento el VOLUMEN de xpSound) se tocan
+  desde el arcade; XP sale por "Cerrar sesión" y silencia por la bocina del tray. El volumen tendrá
+  hogar XP cuando el Panel de Control crezca.
+
 ### El tema claro XP (2d-luz) — patrón de tema SCOPED
 `[data-theme="xp"]` en globals remapea TIER 1 a paleta clara (valores medidos, ver bloque). Se aplica
 **scoped**: el atributo va en el CUERPO de cada ventana XP (`XPWindow`) y en los portales bajo XP
