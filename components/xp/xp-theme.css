@@ -47,8 +47,21 @@
 }
 .xp-title-btn:hover { filter: brightness(1.12); }
 .xp-title-btn:active { filter: brightness(0.9); }
-.xp-title-btn--min   { background-image: url('/themes/xp/chrome/btn-min.png'); }
-.xp-title-btn--close { background-image: url('/themes/xp/chrome/btn-close.png'); }
+.xp-title-btn--min     { background-image: url('/themes/xp/chrome/btn-min.png'); }
+.xp-title-btn--max     { background-image: url('/themes/xp/chrome/btn-max.png'); }
+.xp-title-btn--restore { background-image: url('/themes/xp/chrome/btn-restore.png'); }
+.xp-title-btn--close   { background-image: url('/themes/xp/chrome/btn-close.png'); }
+
+/* ── Handles de resize (solo ventanas de sección; los diálogos de sistema no los llevan) ── */
+.xp-rz { position: absolute; z-index: 5; touch-action: none; }
+.xp-rz-n  { top: 0; left: 7px; right: 7px; height: 4px; cursor: ns-resize; }
+.xp-rz-s  { bottom: 0; left: 7px; right: 7px; height: 4px; cursor: ns-resize; }
+.xp-rz-e  { right: 0; top: 7px; bottom: 7px; width: 4px; cursor: ew-resize; }
+.xp-rz-w  { left: 0; top: 7px; bottom: 7px; width: 4px; cursor: ew-resize; }
+.xp-rz-ne { top: 0; right: 0; width: 9px; height: 9px; cursor: nesw-resize; }
+.xp-rz-nw { top: 0; left: 0; width: 9px; height: 9px; cursor: nwse-resize; }
+.xp-rz-se { bottom: 0; right: 0; width: 9px; height: 9px; cursor: nwse-resize; }
+.xp-rz-sw { bottom: 0; left: 0; width: 9px; height: 9px; cursor: nesw-resize; }
 
 /* ── Taskbar ──────────────────────────────────────────────────────────────── */
 .xp-taskbar {

@@ -81,7 +81,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   function closeStart() { setStartOpen(false); setAllOpen(false) }
 
   // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
-  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number }) {
+  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; resizable?: boolean }) {
     closeStart()
     const existing = windows.find((w) => w.id === id)
     if (existing?.minimized) playXpSound('restore')
@@ -91,12 +91,14 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       if (prev.some((w) => w.id === id))
         return prev.map((w) => (w.id === id ? { ...w, minimized: false, z: top + 1 } : w))
       const n = prev.length
-      return [...prev, { id, title, content, x: 90 + n * 32, y: 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h }]
+      return [...prev, { id, title, content, x: 90 + n * 32, y: 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable }]
     })
   }
 
-  const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content)
-  // Fecha y hora — el calendario nativo de XP, invocado desde el reloj (no desde el menú).
+  // Las SECCIONES son resizables + maximizables (contenido denso, responden por container queries).
+  const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content, { resizable: true })
+  // Fecha y hora — el 1er DIÁLOGO DE SISTEMA: tamaño FIJO, sin resize ni max (canon XP). Se invoca
+  // desde el reloj (no desde el menú); el calendario nativo con rainbow de días + markers.
   const openDateTime = () => openWindow('date-time', 'Fecha y hora', <div className="p-3"><CalendarCard /></div>, { w: 452, h: 480 })
 
   function focusWindow(id: string) {
@@ -110,6 +112,13 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   function closeWindow(id: string) { playXpSound('close'); setWindows((prev) => prev.filter((w) => w.id !== id)) }
   function moveWindow(id: string, x: number, y: number) { setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, x, y } : w))) }
   function minimizeWindow(id: string) { playXpSound('minimize'); setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, minimized: true } : w))) }
+  // Resize: escribe la geometría lógica (win.x/y/w/h) — que también es la de RESTAURAR.
+  function resizeWindow(id: string, g: { x: number; y: number; w: number; h: number }) {
+    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, x: g.x, y: g.y, w: g.w, h: g.h } : w)))
+  }
+  // Maximizar/restaurar: solo togglea el flag; la geometría maximizada la calcula <XPWindow> en vivo,
+  // y x/y/w/h se conservan como el tamaño de restaurar.
+  function maximizeWindow(id: string) { setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, maximized: !w.maximized } : w))) }
 
   function taskbarClick(id: string) {
     const w = windows.find((x) => x.id === id)
@@ -147,7 +156,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 
       {/* Ventanas */}
       {windows.map((w) => (
-        <XPWindow key={w.id} win={w} active={!w.minimized && w.z === topZ} scale={scale} onFocus={focusWindow} onClose={closeWindow} onMinimize={minimizeWindow} onMove={moveWindow} />
+        <XPWindow key={w.id} win={w} active={!w.minimized && w.z === topZ} scale={scale} onFocus={focusWindow} onClose={closeWindow} onMinimize={minimizeWindow} onMove={moveWindow} onMaximize={maximizeWindow} onResize={resizeWindow} />
       ))}
 
       {/* ── Menú Inicio · dos columnas ── */}
