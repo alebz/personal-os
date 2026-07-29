@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
 import DisplayProperties from './DisplayProperties'
@@ -73,6 +73,12 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)   // menú contextual (logical px)
   const [volOpen, setVolOpen] = useState(false)   // popup de volumen del tray
   const [deskSel, setDeskSel] = useState<string | null>(null)   // ícono de escritorio seleccionado
+  const [iconPos, setIconPos] = useState<Record<string, { x: number; y: number }>>(() => {
+    try { const s = localStorage.getItem('xp-desktop-icons'); if (s) return JSON.parse(s) } catch { /* */ }
+    return {}
+  })
+  const iconDrag = useRef<{ id: string; gx: number; gy: number } | null>(null)
+  useEffect(() => { try { localStorage.setItem('xp-desktop-icons', JSON.stringify(iconPos)) } catch { /* */ } }, [iconPos])
 
   const vp = useViewport()
   const scale = vp.h / xpLogicalH           // f
@@ -172,30 +178,31 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         onContextMenu={(e) => { e.preventDefault(); closeStart(); setVolOpen(false); setCtxMenu({ x: e.clientX / scale, y: e.clientY / scale }) }}
       />
 
-      {/* Rejilla de íconos del escritorio (arriba-izquierda). Etiqueta blanca con sombra (legible
-          sobre Bliss). Un click selecciona (resalte azul), doble-click abre. */}
-      <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, width: 76 }}>
-        {[{ id: 'mi-pc', icon: 'mipc', label: 'Mi PC', open: openMiPC },
-          ...launchable.map((s) => ({ id: s.href, icon: SECTION_ICON[s.href], label: s.label, open: () => openSection(s) })),
-          { id: 'papelera', icon: 'papelera', label: 'Papelera de reciclaje', open: openPapelera }].map((it) => {
-          const sel = deskSel === it.id
-          return (
-            <button
-              key={it.id}
-              onPointerDown={(e) => { e.stopPropagation(); setDeskSel(it.id) }}
-              onDoubleClick={it.open}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '3px 2px', border: 0, background: 'none', cursor: 'default', width: '100%' }}
-            >
-              <span style={{ background: sel ? 'rgba(49,99,200,0.55)' : 'transparent', padding: 1, borderRadius: 1 }}>
-                <XpIcon name={it.icon} size={32} />
-              </span>
-              <span style={{ fontSize: 11, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.15, padding: sel ? '0 2px' : 0, background: sel ? '#3163c8' : 'transparent' }}>
-                {it.label}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Íconos del escritorio — ARRASTRABLES (posición libre, persistida; deltas ÷ escala). Un click
+          selecciona, doble-click abre, drag reposiciona. Etiqueta blanca con sombra sobre Bliss. */}
+      {[{ id: 'mi-pc', icon: 'mipc', label: 'Mi PC', open: openMiPC },
+        ...launchable.map((s) => ({ id: s.href, icon: SECTION_ICON[s.href], label: s.label, open: () => openSection(s) })),
+        { id: 'papelera', icon: 'papelera', label: 'Papelera de reciclaje', open: openPapelera }].map((it, i) => {
+        const pos = iconPos[it.id] ?? { x: 8, y: 8 + i * 74 }
+        const sel = deskSel === it.id
+        return (
+          <button
+            key={it.id}
+            onPointerDown={(e) => { e.stopPropagation(); setDeskSel(it.id); const p = iconPos[it.id] ?? { x: 8, y: 8 + i * 74 }; iconDrag.current = { id: it.id, gx: e.clientX / scale - p.x, gy: e.clientY / scale - p.y }; try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch {} }}
+            onPointerMove={(e) => { const d = iconDrag.current; if (!d) return; setIconPos((prev) => ({ ...prev, [d.id]: { x: Math.max(0, e.clientX / scale - d.gx), y: Math.max(0, e.clientY / scale - d.gy) } })) }}
+            onPointerUp={(e) => { iconDrag.current = null; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch {} }}
+            onDoubleClick={it.open}
+            style={{ position: 'absolute', left: pos.x, top: pos.y, width: 76, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '3px 2px', border: 0, background: 'none', cursor: 'default', touchAction: 'none' }}
+          >
+            <span style={{ background: sel ? 'rgba(49,99,200,0.55)' : 'transparent', padding: 1, borderRadius: 1 }}>
+              <XpIcon name={it.icon} size={32} />
+            </span>
+            <span style={{ fontSize: 11, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.15, padding: sel ? '0 2px' : 0, background: sel ? '#3163c8' : 'transparent' }}>
+              {it.label}
+            </span>
+          </button>
+        )
+      })}
 
       {/* Menú contextual del escritorio (mínimo: solo Propiedades por ahora) */}
       {ctxMenu && (

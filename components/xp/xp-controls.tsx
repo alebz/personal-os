@@ -5,6 +5,45 @@ import { useRef, type ReactNode, type CSSProperties } from 'react'
 // Vocabulario de controles de DIÁLOGOS de sistema XP — nativo LITERAL (no tokens del OS). Se construye
 // una vez y sirve a todos los diálogos (Fecha/Hora, Propiedades, popup de volumen). Ver THEMING.md.
 
+// Diálogo de FORMULARIO app-modal XP (para los modales de sección bajo XP). Scrim sobre la ventana
+// padre (absolute inset-0 → scopea al wrapper `relative` de la sección) + caja #ECE9D8 compacta con
+// caption azul, cuerpo, y OK/Cancelar (+ Eliminar opcional) abajo-derecha. Canon XP.
+export function XpDialogModal({
+  open, title, onCancel, onOk, okLabel = 'Aceptar', okDisabled, onDelete, deleteLabel = 'Eliminar', width = 460, children,
+}: {
+  open: boolean; title: string; onCancel: () => void; onOk: () => void
+  okLabel?: string; okDisabled?: boolean; onDelete?: () => void; deleteLabel?: string; width?: number; children: ReactNode
+}) {
+  if (!open) return null
+  return (
+    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/45 p-4" onClick={onCancel}>
+      <div
+        className="xp-dialog" onClick={(e) => e.stopPropagation()}
+        style={{ width, maxWidth: '96%', maxHeight: '94%', display: 'flex', flexDirection: 'column', border: '1px solid #0831d8', boxShadow: '4px 5px 18px rgba(0,0,0,0.45)' }}
+      >
+        <div className="xp-titlebar" style={{ height: 24, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 4px 0 7px' }}>
+          <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '1px 1px 1px rgba(0,0,0,0.5)' }}>{title}</span>
+          <button className="xp-chrome-btn xp-title-btn xp-title-btn--close" onClick={onCancel} aria-label="Cerrar" />
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 12 }}>{children}</div>
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, padding: '8px 10px', borderTop: '1px solid #c9c6ba' }}>
+          {onDelete && <button className="xp-raised" onClick={onDelete} style={{ marginRight: 'auto', padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', color: '#a0201a' }}>{deleteLabel}</button>}
+          <button className="xp-raised" onClick={onOk} disabled={okDisabled} style={{ padding: '3px 18px', fontSize: 11, fontFamily: 'inherit', cursor: okDisabled ? 'default' : 'pointer', opacity: okDisabled ? 0.5 : 1 }}>{okLabel}</button>
+          <button className="xp-raised" onClick={onCancel} style={{ padding: '3px 14px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Campo hundido genérico para formularios de diálogo (input/textarea/select nativos con piel XP).
+export function XpField(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className="xp-sunken" style={{ width: '100%', height: 21, padding: '0 5px', fontFamily: 'inherit', fontSize: 11, outline: 'none', ...props.style }} />
+}
+export function XpLabel({ children }: { children: ReactNode }) {
+  return <label style={{ display: 'block', fontSize: 11, marginBottom: 3, color: '#000' }}>{children}</label>
+}
+
 export function GroupBox({ label, children, style }: { label: string; children: ReactNode; style?: CSSProperties }) {
   return (
     <fieldset className="xp-groupbox" style={{ margin: 0, minInlineSize: 'auto', ...style }}>
@@ -59,15 +98,17 @@ export function XpSlider({
   const pct = (value - min) / (max - min || 1)
 
   function fromPointer(clientX: number, clientY: number) {
-    const r = trackRef.current!.getBoundingClientRect()
+    const el = trackRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
     let p = vertical ? 1 - (clientY - r.top) / r.height : (clientX - r.left) / r.width
     p = Math.min(1, Math.max(0, p))
     const v = Math.round((min + p * (max - min)) / step) * step
     onChange(Math.min(max, Math.max(min, v)))
   }
-  const down = (e: React.PointerEvent) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); fromPointer(e.clientX, e.clientY) }
+  const down = (e: React.PointerEvent) => { dragging.current = true; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* sin captura */ } fromPointer(e.clientX, e.clientY) }
   const move = (e: React.PointerEvent) => { if (dragging.current) fromPointer(e.clientX, e.clientY) }
-  const up = (e: React.PointerEvent) => { dragging.current = false; e.currentTarget.releasePointerCapture(e.pointerId) }
+  const up = (e: React.PointerEvent) => { dragging.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ } }
 
   const THUMB = 11    // grosor del thumb (a lo largo del eje)
   const CROSS = 20    // ancho del thumb (eje cruzado)
@@ -84,6 +125,7 @@ export function XpSlider({
 
   return (
     <div
+      ref={trackRef}
       className="xp-slider" style={cont}
       onPointerDown={down} onPointerMove={move} onPointerUp={up}
       role="slider" aria-valuenow={value} aria-valuemin={min} aria-valuemax={max}
