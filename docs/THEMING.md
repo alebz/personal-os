@@ -118,6 +118,20 @@ Bajo un cascarón de época hay DOS clases de superficie, con reglas opuestas:
   - Los sliders custom miden el valor por posición RELATIVA al track (ratio scale-invariante) → NO
     necesitan el factor de escala.
 
+### Los SCREENSAVERS son POR TEMA (como la capa ambiental)
+El protector de pantalla es CONTENIDO del mundo activo, no algo trans-tema. Lo compartido es solo el
+DETECTOR de inactividad (el timer); el CONTENIDO lo trae cada tema — misma arquitectura que el chrome
+ambiental (`ArcadeChrome` vs escritorio XP).
+- Arcade: su protector = el tambor girando censurado (naves, fósforo). Se dispara cuando el tema
+  activo es arcade.
+- XP: sus protectores de época (Mystify, logo flotante, starfield…), elegibles en la pestaña
+  "Protector". "Apagar equipo" bajo XP invoca el XP ELEGIDO, NUNCA el tambor (sería fuga entre mundos).
+- Threshold de inactividad = SHARED (`screensaverMinutes`, propiedad del detector, no del tema). La
+  selección XP (`xpScreensaver`) y el `speed` de rotación del tambor son params de contenido de cada
+  tema.
+- Los protectores XP TAPAN la pantalla (opacos, sin datos) → la censura de montos no aplica mientras
+  corren: la privacidad sale gratis por oclusión.
+
 ### Cada tema configura LO SUYO con SU interfaz
 Los ajustes DEL TEMA viven en la interfaz nativa de ESE tema; los ajustes del OS (no del tema) siguen
 donde están.
