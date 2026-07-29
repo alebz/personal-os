@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { CalEvent } from '@/app/api/calendar/route'
-import { WEEKDAY_RAINBOW, dayColor, crtDayColor, contrastInk } from '@/lib/weekdayColors'
+import { WEEKDAY_RAINBOW, dayColor, crtDayColor, contrastInk, lightDayInk } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -79,8 +79,11 @@ export default function CalendarCard() {
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [formOpen,   setFormOpen]   = useState(false)   // collapsed to just the title until focused
   const [agendaOpen, setAgendaOpen] = useState(false)   // right agenda column; starts collapsed (month full width)
-  const { crt } = useOSSettings()   // suscribe al estado CRT → re-render al togglear mono/multi (color reactivo)
+  const { crt, shell } = useOSSettings()   // suscribe al estado CRT → re-render al togglear mono/multi (color reactivo)
   const isMono  = crt.on && crt.color === 'mono'
+  // Color de día como TEXTO: bajo XP (ventana clara) se oscurece para legibilidad; los rellenos NO
+  // (contrastInk maneja su texto). Mismo patrón presentacional que crtDayColor.
+  const ink = (hex: string) => (shell === 'xp' ? lightDayInk(hex) : hex)
   // Texto sobre celda rellena (hoy/cumple): en mono va OSCURO (token), no blanco — blanco sería un
   // segundo color que rompe monocolor. En multi, contraste por-color-de-día.
   const fillInk = (bg: string) => (isMono ? 'var(--color-surface-base)' : contrastInk(bg))
@@ -202,7 +205,7 @@ export default function CalendarCard() {
     : []
 
   const selDate      = selected ? new Date(selected + 'T12:00:00') : null
-  const selColor     = crtDayColor(selDate ? dayColor(selDate) : '#8b7bff', crt)
+  const selColor     = ink(crtDayColor(selDate ? dayColor(selDate) : '#8b7bff', crt))   // usado como TEXTO
   const weekday      = selDate ? selDate.toLocaleDateString('es-MX', { weekday: 'long' }) : ''
   const dayMonth     = selDate ? selDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : ''
   const isTodaySel   = selected === todayKey
@@ -258,7 +261,7 @@ export default function CalendarCard() {
               <div
                 key={d}
                 className="text-center text-secondary font-semibold uppercase tracking-wider"
-                style={{ color: crtDayColor(WEEKDAY_RAINBOW[i], crt) + 'cc' }}
+                style={{ color: ink(crtDayColor(WEEKDAY_RAINBOW[i], crt)) + 'cc' }}
               >
                 {d}
               </div>
