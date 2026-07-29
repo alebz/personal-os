@@ -7,6 +7,8 @@ import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
 import { XpSlider, XpCheckbox } from './xp-controls'
 import { XpIcon, SECTION_ICON } from './xp-icons'
+import { RunDialog } from './RunDialog'
+import { SearchDialog } from './SearchDialog'
 import XPWindow, { type WinState } from './XPWindow'
 import { playXpSound } from './xpSounds'
 import './xp-theme.css'
@@ -106,6 +108,10 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   // sabiendo que existe. Papelera — decorativa (canon "está vacía").
   const openMiPC = () => openWindow('mi-pc', 'Mi PC', <div className="xp-dialog" style={{ padding: 16, lineHeight: 1.6 }}>Aquí vivirán tus fondos de <b>Caja Fuerte</b> como unidades de disco (cada uno con su barra de capacidad). Próximamente.</div>, { w: 360, h: 200, icon: 'mipc' })
   const openPapelera = () => openWindow('papelera', 'Papelera de reciclaje', <div className="xp-dialog" style={{ padding: 16, color: '#555' }}>La Papelera de reciclaje está vacía.</div>, { w: 340, h: 180, icon: 'papelera' })
+  // Ejecutar — launcher por teclado ("finanzas" → abre). Buscar — consultar Cerebro desde cualquier
+  // lado. Ambos renacen el capture global muerto del audit (P2), diegéticamente.
+  const openRun = () => openWindow('run', 'Ejecutar', <RunDialog sections={launchable} onLaunch={(href) => { closeWindow('run'); const s = launchable.find((x) => x.href === href); if (s) openSection(s) }} />, { w: 360, h: 178, icon: 'ejecutar' })
+  const openSearch = () => openWindow('search', 'Buscar', <SearchDialog />, { w: 420, h: 380, icon: 'buscar' })
 
   function focusWindow(id: string) {
     setWindows((prev) => {
@@ -214,7 +220,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'stretch' }}>
-            <div style={{ flex: 1, background: '#fff', padding: '6px 0' }}>
+            {/* Columna IZQUIERDA (blanca): las secciones como programas */}
+            <div className="xp-sm-left" style={{ flex: 1, padding: '6px 0', minWidth: 0 }}>
               {launchable.map((s) => (
                 <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <XpIcon name={SECTION_ICON[s.href]} size={24} />
@@ -223,10 +230,10 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
               ))}
               {allOpen && pending.length > 0 && (
                 <>
-                  <div style={{ borderTop: '1px solid #e3e1d5', margin: '4px 10px' }} />
+                  <div className="xp-sm-sep" />
                   {pending.map((s) => (
-                    <button key={s.href} disabled title="Se adapta pronto" style={{ ...startItem, color: '#9a9a92', cursor: 'default' }}>
-                      <span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 9, borderRadius: 2, background: s.color, opacity: 0.35 }} />
+                    <button key={s.href} disabled title="Se adapta pronto" style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, color: '#9a9a92', cursor: 'default' }}>
+                      <span style={{ display: 'inline-block', width: 24, height: 24, flexShrink: 0, borderRadius: 3, background: s.color, opacity: 0.28 }} />
                       {s.label}
                     </button>
                   ))}
@@ -234,19 +241,22 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
               )}
               {pending.length > 0 && (
                 <>
-                  <div style={{ borderTop: '1px solid #e3e1d5', margin: '4px 10px' }} />
-                  <button className="xp-startmenu-item" onClick={() => setAllOpen((v) => !v)} style={{ ...startItem, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="xp-sm-sep" />
+                  <button className="xp-startmenu-item" onClick={() => setAllOpen((v) => !v)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="xp-allprogs-arrow">{allOpen ? '▾' : '▸'}</span>
                     <b>Todos los programas</b>
-                    <span style={{ color: '#3c9a3a', fontSize: 11 }}>{allOpen ? '▾' : '▸'}</span>
                   </button>
                 </>
               )}
             </div>
 
-            <div style={{ width: 148, background: '#d3e5fa', borderLeft: '1px solid #96b8e0', padding: '6px 0' }}>
-              <button className="xp-startmenu-item" onClick={openDisplayProps} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 7, fontWeight: 600, color: '#1a3d75' }}>
-                <XpIcon name="panel" size={22} /> Panel de control
-              </button>
+            {/* Columna DERECHA (azul claro): lugares y utilidades */}
+            <div className="xp-sm-right" style={{ width: 156, padding: '6px 0', display: 'flex', flexDirection: 'column' }}>
+              <button className="xp-startmenu-item" onClick={openMiPC} style={rightItem}><XpIcon name="mipc" size={22} /> Mi PC</button>
+              <button className="xp-startmenu-item" onClick={openDisplayProps} style={rightItem}><XpIcon name="panel" size={22} /> Panel de control</button>
+              <div className="xp-sm-sep" />
+              <button className="xp-startmenu-item" onClick={openSearch} style={rightItem}><XpIcon name="buscar" size={22} /> Buscar</button>
+              <button className="xp-startmenu-item" onClick={openRun} style={rightItem}><XpIcon name="ejecutar" size={22} /> Ejecutar…</button>
             </div>
           </div>
 
@@ -314,8 +324,12 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 }
 
 const startItem: React.CSSProperties = {
-  display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none',
+  display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none',
   background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: '#000',
+}
+const rightItem: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '6px 12px',
+  border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: '#1c3d6e',
 }
 const footBtn: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', cursor: 'pointer',

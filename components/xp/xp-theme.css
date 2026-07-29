@@ -152,16 +152,27 @@
 .xp-spin-btns button { flex: 1; border-style: solid; border-width: 1px; border-color: #ffffff #808080 #808080 #ffffff; background: linear-gradient(#f4f2ea,#dcd8ca); font-size: 6px; line-height: 1; cursor: pointer; padding: 0; color: #000; }
 .xp-spin-btns button:active { border-color: #808080 #ffffff #ffffff #808080; }
 
-/* ── Menú Inicio ──────────────────────────────────────────────────────────── */
+/* ── Menú Inicio (estructura real XP) ─────────────────────────────────────── */
 .xp-startmenu {
   border: 1px solid #0831d9;
   border-bottom: none;
-  border-radius: 8px 8px 0 0;
-  box-shadow: 4px -3px 14px rgba(0,0,0,0.4);
+  border-radius: 9px 9px 0 0;
+  box-shadow: 4px -3px 16px rgba(0,0,0,0.45);
   overflow: hidden;
 }
 .xp-startmenu-header {
-  background: linear-gradient(180deg, #1f6fe0 0%, #0a52d8 40%, #0a52d8 60%, #1866dd 100%);
-  border-bottom: 2px solid #d8a01f;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, #3f8bf0 0%, #1257d8 46%, #0c50d6 62%, #2a72e6 100%);
+  border-bottom: 2px solid #003ca5;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
 }
-.xp-startmenu-item:hover { background: #2f71e8; color: #fff; }
+/* Columnas */
+.xp-sm-left  { background: #fff; }
+.xp-sm-right { background: linear-gradient(180deg, #d5e6fb, #c0d7f2); border-left: 1px solid #a7c1e6; box-shadow: inset 1px 0 0 #edf3fc; }
+.xp-sm-sep   { height: 1px; background: linear-gradient(90deg, transparent, #c9c6ba 12%, #c9c6ba 88%, transparent); margin: 4px 8px; }
+.xp-sm-right .xp-sm-sep { background: linear-gradient(90deg, transparent, #9db8dd 12%, #9db8dd 88%, transparent); }
+/* Item hover = barra azul XP (gradiente) */
+.xp-startmenu-item:hover { background: linear-gradient(180deg, #3f8ef2, #2464d8); color: #fff !important; }
+.xp-startmenu-item:hover * { color: #fff !important; }
+/* Botón "Todos los programas" con su flecha verde */
+.xp-allprogs-arrow { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 3px; background: linear-gradient(#63b95a, #2f8f37); color: #fff; font-size: 9px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4); }
