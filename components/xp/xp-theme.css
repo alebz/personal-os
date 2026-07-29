@@ -13,13 +13,19 @@
 .xp-desktop {
   /* Tahoma como fuente del tema (cascadea a ventanas + secciones) */
   font-family: 'XP Tahoma', Tahoma, 'Segoe UI', sans-serif;
-  /* Cursor XP heredado en todo el escritorio; las secciones con cursor propio lo sobreescriben */
-  cursor: url('/themes/xp/cursors/arrow.png') 1 1, default;
+  /* Cursor XP AUTÉNTICO (recreado como vector, no el pixel-art del pack) — flecha blanca lisa, borde
+     negro, sombra. ~48px para casar con la escala del lienzo (×~1.5, el cursor NO se escala con el
+     transform). image-set → nítido en Retina 2x. Hotspot = la punta (4,4). En XP real los botones
+     muestran la FLECHA (la manita es solo para hyperlinks, que no tenemos). */
+  cursor: -webkit-image-set(url('/themes/xp/cursors/xparrow.png') 1x, url('/themes/xp/cursors/xparrow2x.png') 2x) 4 4, default;
+  cursor: image-set(url('/themes/xp/cursors/xparrow.png') 1x, url('/themes/xp/cursors/xparrow2x.png') 2x) 4 4, default;
 }
 
-/* Manita XP en los controles del chrome (no en el contenido de secciones, que conserva el suyo) */
-.xp-desktop .xp-chrome-btn {
-  cursor: url('/themes/xp/cursors/link.png') 8 2, pointer;
+/* I-beam XP auténtico en campos de texto (centro = hotspot 18,18) */
+.xp-desktop input:not([type=checkbox]):not([type=range]):not([type=button]),
+.xp-desktop textarea {
+  cursor: -webkit-image-set(url('/themes/xp/cursors/xpibeam.png') 1x, url('/themes/xp/cursors/xpibeam2x.png') 2x) 18 18, text;
+  cursor: image-set(url('/themes/xp/cursors/xpibeam.png') 1x, url('/themes/xp/cursors/xpibeam2x.png') 2x) 18 18, text;
 }
 
 /* ── Ventana ──────────────────────────────────────────────────────────────── */
