@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, type ReactNode } from 'react'
+import { XpIcon } from './xp-icons'
 
 // Una ventana XP con piel Luna. Modelo GENÉRICO: title + content. Arrastrable por la barra, z-order al
 // enfocar, minimizable. RESIZE (bordes/esquinas) + MAXIMIZAR solo si `resizable` (secciones); los
@@ -15,6 +16,7 @@ export interface WinState {
   y: number
   z: number
   minimized: boolean
+  icon?: string          // nombre de ícono XP (barra de título + taskbar)
   w?: number
   h?: number
   resizable?: boolean    // secciones sí; diálogos de sistema no
@@ -115,8 +117,9 @@ export default function XPWindow({
         onPointerMove={onTitleMove}
         onPointerUp={onTitleUp}
         onDoubleClick={() => win.resizable && onMaximize(win.id)}
-        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '0 3px 0 7px', userSelect: 'none', touchAction: 'none' }}
+        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '0 3px 0 5px', userSelect: 'none', touchAction: 'none' }}
       >
+        {win.icon && <XpIcon name={win.icon} size={16} />}
         <span style={{ flex: 1, fontWeight: 700, fontSize: 12.5, color: '#fff', textShadow: '1px 1px 1px rgba(0,0,0,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {win.title}
         </span>

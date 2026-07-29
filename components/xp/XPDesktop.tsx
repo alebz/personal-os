@@ -6,6 +6,7 @@ import type { OSSection } from '@/components/OSDrum'
 import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
 import { XpSlider, XpCheckbox } from './xp-controls'
+import { XpIcon, SECTION_ICON } from './xp-icons'
 import XPWindow, { type WinState } from './XPWindow'
 import { playXpSound } from './xpSounds'
 import './xp-theme.css'
@@ -68,6 +69,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [windows, setWindows] = useState<WinState[]>([])
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)   // menú contextual (logical px)
   const [volOpen, setVolOpen] = useState(false)   // popup de volumen del tray
+  const [deskSel, setDeskSel] = useState<string | null>(null)   // ícono de escritorio seleccionado
 
   const vp = useViewport()
   const scale = vp.h / xpLogicalH           // f
@@ -82,7 +84,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   function closeStart() { setStartOpen(false); setAllOpen(false) }
 
   // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
-  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; resizable?: boolean }) {
+  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; resizable?: boolean; icon?: string }) {
     closeStart()
     const existing = windows.find((w) => w.id === id)
     if (existing?.minimized) playXpSound('restore')
@@ -92,18 +94,18 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       if (prev.some((w) => w.id === id))
         return prev.map((w) => (w.id === id ? { ...w, minimized: false, z: top + 1 } : w))
       const n = prev.length
-      return [...prev, { id, title, content, x: 90 + n * 32, y: 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable }]
+      return [...prev, { id, title, content, x: 90 + n * 32, y: 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable, icon: opts?.icon }]
     })
   }
 
   // Las SECCIONES son resizables + maximizables (contenido denso, responden por container queries).
-  const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content, { resizable: true })
-  // Fecha y hora — el 1er DIÁLOGO DE SISTEMA: tamaño FIJO, sin resize ni max (canon XP). Se invoca
-  // desde el reloj (no desde el menú); el calendario nativo con rainbow de días + markers.
-  const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 470, h: 306 })
-  // Propiedades de Pantalla — diálogo FIJO (hereda el canon), el dial de la escala. Se invoca del
-  // menú contextual del escritorio y del "Panel de control" (su primer inquilino).
-  const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466 }) }
+  const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href] })
+  const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 470, h: 306, icon: 'clock' })
+  const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466, icon: 'display' }) }
+  // Mi PC — STUB (su ventana real = Caja Fuerte como unidades de disco, futuro). El escritorio nace
+  // sabiendo que existe. Papelera — decorativa (canon "está vacía").
+  const openMiPC = () => openWindow('mi-pc', 'Mi PC', <div className="xp-dialog" style={{ padding: 16, lineHeight: 1.6 }}>Aquí vivirán tus fondos de <b>Caja Fuerte</b> como unidades de disco (cada uno con su barra de capacidad). Próximamente.</div>, { w: 360, h: 200, icon: 'mipc' })
+  const openPapelera = () => openWindow('papelera', 'Papelera de reciclaje', <div className="xp-dialog" style={{ padding: 16, color: '#555' }}>La Papelera de reciclaje está vacía.</div>, { w: 340, h: 180, icon: 'papelera' })
 
   function focusWindow(id: string) {
     setWindows((prev) => {
@@ -147,7 +149,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       style={{
         position: 'fixed', top: 0, left: 0, width: logicalW, height: xpLogicalH,
         transform: `scale(${scale})`, transformOrigin: 'top left', overflow: 'hidden',
-        background: "#3a6ea5 url('/themes/xp/wallpapers/bliss.png') center / cover no-repeat",
+        background: "#3a6ea5 url('/themes/xp/wallpapers/bliss_4k.jpg') center / cover no-repeat",
       }}
     >
       {/* Raíz de portales bajo XP: los modales que escapan a body (DrumModal/libretas) portalean AQUÍ
@@ -155,13 +157,38 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           data-theme claro. Fuera del transform se verían chiquitos. */}
       <div id="xp-modal-root" />
 
-      {/* Área de escritorio (íconos = 2e). Click en vacío cierra el menú Inicio; click-derecho abre el
-          menú contextual mínimo (coords en px LÓGICOS: clientX ÷ scale). */}
+      {/* Área de escritorio. Click en vacío cierra menús + deselecciona; click-derecho abre el menú
+          contextual mínimo (coords en px LÓGICOS: clientX ÷ scale). */}
       <div
         style={{ position: 'absolute', inset: 0, bottom: 30 }}
-        onPointerDown={() => { closeStart(); setCtxMenu(null); setVolOpen(false) }}
+        onPointerDown={() => { closeStart(); setCtxMenu(null); setVolOpen(false); setDeskSel(null) }}
         onContextMenu={(e) => { e.preventDefault(); closeStart(); setVolOpen(false); setCtxMenu({ x: e.clientX / scale, y: e.clientY / scale }) }}
       />
+
+      {/* Rejilla de íconos del escritorio (arriba-izquierda). Etiqueta blanca con sombra (legible
+          sobre Bliss). Un click selecciona (resalte azul), doble-click abre. */}
+      <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, width: 76 }}>
+        {[{ id: 'mi-pc', icon: 'mipc', label: 'Mi PC', open: openMiPC },
+          ...launchable.map((s) => ({ id: s.href, icon: SECTION_ICON[s.href], label: s.label, open: () => openSection(s) })),
+          { id: 'papelera', icon: 'papelera', label: 'Papelera de reciclaje', open: openPapelera }].map((it) => {
+          const sel = deskSel === it.id
+          return (
+            <button
+              key={it.id}
+              onPointerDown={(e) => { e.stopPropagation(); setDeskSel(it.id) }}
+              onDoubleClick={it.open}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '3px 2px', border: 0, background: 'none', cursor: 'default', width: '100%' }}
+            >
+              <span style={{ background: sel ? 'rgba(49,99,200,0.55)' : 'transparent', padding: 1, borderRadius: 1 }}>
+                <XpIcon name={it.icon} size={32} />
+              </span>
+              <span style={{ fontSize: 11, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.15, padding: sel ? '0 2px' : 0, background: sel ? '#3163c8' : 'transparent' }}>
+                {it.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* Menú contextual del escritorio (mínimo: solo Propiedades por ahora) */}
       {ctxMenu && (
@@ -189,8 +216,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           <div style={{ display: 'flex', alignItems: 'stretch' }}>
             <div style={{ flex: 1, background: '#fff', padding: '6px 0' }}>
               {launchable.map((s) => (
-                <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} style={startItem}>
-                  <span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 9, borderRadius: 2, background: s.color, boxShadow: 'inset 0 0 1px rgba(0,0,0,0.4)' }} />
+                <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <XpIcon name={SECTION_ICON[s.href]} size={24} />
                   <b>{s.label}</b>
                 </button>
               ))}
@@ -217,8 +244,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             </div>
 
             <div style={{ width: 148, background: '#d3e5fa', borderLeft: '1px solid #96b8e0', padding: '6px 0' }}>
-              <button className="xp-startmenu-item" onClick={openDisplayProps} style={{ ...startItem, fontWeight: 600, color: '#1a3d75' }}>
-                Panel de control
+              <button className="xp-startmenu-item" onClick={openDisplayProps} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 7, fontWeight: 600, color: '#1a3d75' }}>
+                <XpIcon name="panel" size={22} /> Panel de control
               </button>
             </div>
           </div>
@@ -249,8 +276,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             const isActive = !w.minimized && w.z === topZ
             return (
               <button key={w.id} className={`xp-chrome-btn xp-tb-btn ${isActive ? 'xp-tb-btn--active' : ''}`} onClick={() => taskbarClick(w.id)}
-                style={{ height: 22, maxWidth: 160, padding: '0 12px', borderRadius: 3, color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '1px 1px 1px rgba(0,0,0,0.35)' }}>
-                {w.title}
+                style={{ height: 22, maxWidth: 160, padding: '0 10px 0 6px', borderRadius: 3, color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 5, textShadow: '1px 1px 1px rgba(0,0,0,0.35)' }}>
+                <XpIcon name={w.icon} size={16} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.title}</span>
               </button>
             )
           })}
