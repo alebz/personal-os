@@ -5,6 +5,7 @@ import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
 import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
+import { XpSlider, XpCheckbox } from './xp-controls'
 import XPWindow, { type WinState } from './XPWindow'
 import { playXpSound } from './xpSounds'
 import './xp-theme.css'
@@ -269,20 +270,13 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           <XPClock onOpen={openDateTime} />
         </div>
 
-        {/* Popup de volumen — la bocina es la puerta al volumen (canon XP): slider vertical + Silenciar */}
+        {/* Popup de volumen — diálogo de sistema XP LITERAL: caja gris raised, slider vertical con
+            groove hundido + ticks, checkbox clásico. La bocina es la puerta al volumen (canon XP). */}
         {volOpen && (
-          <div style={{ position: 'absolute', right: 18, bottom: 34, zIndex: 10002, width: 58, background: '#fff', border: '1px solid #0831d9', boxShadow: '2px 2px 9px rgba(0,0,0,0.32)', padding: '9px 6px 7px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#1a1712' }}>Volumen</span>
-            <input
-              type="range" min={0} max={1} step={0.05} value={xpSound.volume}
-              onChange={(e) => set('xpSound', { ...xpSound, volume: +e.target.value })}
-              aria-label="Volumen"
-              style={{ writingMode: 'vertical-lr' as React.CSSProperties['writingMode'], direction: 'rtl', width: 22, height: 88, accentColor: '#316ac5', cursor: 'pointer' }}
-            />
-            <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 3, color: '#1a1712', cursor: 'pointer' }}>
-              <input type="checkbox" checked={!xpSound.on} onChange={(e) => set('xpSound', { ...xpSound, on: !e.target.checked })} style={{ accentColor: '#316ac5' }} />
-              Silenciar
-            </label>
+          <div className="xp-dialog xp-raised" style={{ position: 'absolute', right: 16, bottom: 34, zIndex: 10002, padding: '7px 10px 9px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontWeight: 400 }}>Volumen</span>
+            <XpSlider value={xpSound.volume} min={0} max={1} step={0.05} vertical length={92} ticks={5} onChange={(v) => set('xpSound', { ...xpSound, volume: v })} />
+            <XpCheckbox checked={!xpSound.on} label="Silenciar" onChange={(muted) => set('xpSound', { ...xpSound, on: !muted })} />
           </div>
         )}
       </div>

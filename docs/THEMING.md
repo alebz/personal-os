@@ -94,6 +94,30 @@ top-left. Solo en `.xp-desktop`; el arcade nunca se transforma.
 - **Texto**: sigue real/seleccionable; `transform:scale` en Retina queda nítido; zoom del browser
   compone encima.
 
+### REGLA DE PROCESO — XP REAL ES EL SPEC (rige para todo chrome/diálogo de tema de época)
+Ninguna pieza de chrome o diálogo de sistema se reporta LISTA sin validación **lado-a-lado** contra
+referencia canónica de XP (conocimiento del asistente + UI kit de Figma + screenshots que el asistente
+mismo busca). El criterio de "listo" INCLUYE la comparación: no "funciona y se parece", sino **"un
+usuario de XP no notaría la diferencia a primera vista"**. Cazar fugas de fidelidad es trabajo del
+asistente (su ojo contra la referencia), no del usuario con screenshots. Aplica igual a temas futuros
+(cualquier cascarón que imite un OS real: su realidad es el spec).
+
+### Secciones portadas vs DIÁLOGOS de sistema — dos pieles distintas
+Bajo un cascarón de época hay DOS clases de superficie, con reglas opuestas:
+- **SECCIONES portadas** (Tareas, Finanzas, …): mi contenido dentro del chrome del tema. Piel por
+  TOKENS (la variante clara `[data-theme=xp]`). Reusan mis componentes del OS. Adaptan al contenedor.
+- **DIÁLOGOS de sistema** (Fecha/Hora, Propiedades, popup de volumen): **XP nativo LITERAL**. Replican
+  los widgets de época pixel-a-pixel. **NO reusan componentes del OS** — se construyen los controles
+  del sistema. NO usan tokens: colores XP hardcodeados (fondo `#ECE9D8`, no blanco).
+  - Vocabulario XP (construido una vez, sirve a todos — `components/xp/xp-controls.tsx` + CSS
+    `.xp-dialog/.xp-groupbox/.xp-check/.xp-slider/.xp-select/.xp-spinner`): fondo `#ECE9D8`, Tahoma
+    11px, group box (fieldset etched con legend arriba-izq), sunken/raised 3D (border top-left oscuro
+    / bottom-right claro), checkbox cuadrado clásico, trackbar con groove hundido + thumb, dropdown
+    con flecha, spinner ↑↓. El pack (WinXp.zip) trae checkboxes verde-temáticos (no clásicos) y NO
+    trae slider/spinner → sintetizados en CSS (como el chrome).
+  - Los sliders custom miden el valor por posición RELATIVA al track (ratio scale-invariante) → NO
+    necesitan el factor de escala.
+
 ### Cada tema configura LO SUYO con SU interfaz
 Los ajustes DEL TEMA viven en la interfaz nativa de ESE tema; los ajustes del OS (no del tema) siguen
 donde están.
