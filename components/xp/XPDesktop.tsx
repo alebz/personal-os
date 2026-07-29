@@ -13,8 +13,8 @@ import './xp-theme.css'
 // tray separado con reloj vivo AM/PM. Window manager de Fase 1; piel Luna 2a; tema claro 2d-luz.
 //
 // LAUNCHABLE: secciones ya adaptadas al contenedor (el molde). El resto aparece en "Todos los
-// programas" deshabilitado — el roadmap a la vista. Adaptadas: Tareas (F1), Finanzas (2c).
-const LAUNCHABLE = new Set(['/crm', '/finance'])
+// programas" deshabilitado — el roadmap a la vista. Adaptadas: Tareas (F1), Finanzas (2c), Hábitos.
+const LAUNCHABLE = new Set(['/crm', '/finance', '/habits'])
 
 // Reloj vivo del tray — h:mm AM/PM, el canon XP. Tick de 1s; solo re-renderiza al cambiar el minuto
 // (mismo string → React hace bail del setState).

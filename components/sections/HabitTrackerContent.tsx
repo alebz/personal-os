@@ -1,9 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useOSSettings } from '@/components/OSSettingsContext'
-import { crtDayColor, contrastInk } from '@/lib/weekdayColors'
+import { crtDayColor, contrastInk, lightDayInk } from '@/lib/weekdayColors'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,8 +98,12 @@ function HabitModal({
     }
   }
 
-  return createPortal(
-    <div className="crt-screen fixed inset-0 z-[60] flex items-center justify-center p-4">
+  // Molde XP (conversión B): antes createPortal(body) + fixed inset-0. Ahora inline + absolute
+  // inset-0 → se ancla a la raíz `relative` de la sección (cubre la cara en tambor, la ventana en XP).
+  // Sin portal ya vive bajo .crt-screen (arcade) o [data-theme=xp] (ventana), así que la clase
+  // crt-screen sobra (la heredaría dos veces).
+  return (
+    <div className="absolute inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-card border border-border bg-surface-1 shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
@@ -180,8 +183,7 @@ function HabitModal({
           </div>
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   )
 }
 
@@ -212,7 +214,7 @@ function HabitRow({
       </button>
 
       {/* Mini heatmap — last 14 days */}
-      <div className="hidden shrink-0 items-center gap-[3px] sm:flex">
+      <div className="hidden shrink-0 items-center gap-[3px] @lg:flex">
         {days.map(d => {
           const filled = done.has(d)
           return (
@@ -275,8 +277,9 @@ function HabitDetail({
   onClose: () => void
   onEdit: (h: Habit) => void
 }) {
-  const { crt } = useOSSettings()
+  const { crt, shell } = useOSSettings()
   const color = crtDayColor(habit.color, crt)   // fósforo en mono, color real en multi/off
+  const ink   = shell === 'xp' ? lightDayInk(color) : color   // como TEXTO: legible sobre claro
   const [dates,   setDates]   = useState<string[]>(habit.dates)
   const [loading, setLoading] = useState(true)
   const [year,    setYear]    = useState(new Date().getFullYear())
@@ -314,8 +317,10 @@ function HabitDetail({
   const yearCount = dates.filter(d => d.startsWith(String(year))).length
   const thisYear  = new Date().getFullYear()
 
-  return createPortal(
-    <div className="crt-screen fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-8">
+  // Molde XP (conversión B): inline + absolute inset-0 (antes portal+fixed). Cubre la cara/ventana;
+  // scroll interno propio (overflow-y-auto) para el detalle alto.
+  return (
+    <div className="absolute inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 @2xl:p-8">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative my-auto w-full max-w-3xl rounded-card border border-border bg-surface-1 shadow-2xl">
         {/* Header */}
@@ -335,7 +340,7 @@ function HabitDetail({
         <div className="flex gap-8 px-5 py-5">
           <div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-display font-bold tabular-nums" style={{ color }}>{streak}</span>
+              <span className="text-display font-bold tabular-nums" style={{ color: ink }}>{streak}</span>
               <span className="text-subhead">🔥</span>
             </div>
             <p className="mt-1 text-secondary text-fg-muted">Racha actual · {streak === 1 ? '1 día' : `${streak} días`}</p>
@@ -390,8 +395,7 @@ function HabitDetail({
           )}
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   )
 }
 
@@ -416,7 +420,8 @@ function monthGridCells(year: number, month: number): { date: Date; inMonth: boo
 }
 
 function MonthlyHeatmap() {
-  const { crt } = useOSSettings()
+  const { crt, shell } = useOSSettings()
+  const inkOf = (hex: string) => (shell === 'xp' ? lightDayInk(crtDayColor(hex, crt)) : crtDayColor(hex, crt))
   const now = new Date()
   const [year,  setYear]  = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())   // 0-11
@@ -515,7 +520,7 @@ function MonthlyHeatmap() {
                 <span className="h-2 w-2 rounded-round" style={{ background: crtDayColor(h.color, crt) }} />
                 <span className="text-body leading-none">{h.icon}</span>
                 <span className="text-secondary text-fg-muted">{h.name}</span>
-                <span className="text-secondary font-bold tabular-nums" style={{ color: crtDayColor(h.color, crt) }}>{h.dates.length}</span>
+                <span className="text-secondary font-bold tabular-nums" style={{ color: inkOf(h.color) }}>{h.dates.length}</span>
               </div>
             ))}
           </div>
@@ -589,6 +594,9 @@ export default function HabitTrackerContent() {
   }
 
   return (
+    // Molde XP: raíz full-width `relative h-full` (ancla de los modales absolute inset-0) + @container.
+    // El <main> centrado vive dentro; los modales son hermanos → cubren la cara/ventana completa.
+    <div className="@container relative h-full">
     <main className="mx-auto flex h-full max-w-2xl flex-col px-6 pt-6">
       {/* Header */}
       <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
@@ -618,7 +626,7 @@ export default function HabitTrackerContent() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pb-[35vh]">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-24">
         {view === 'month' ? <MonthlyHeatmap /> : (<div className="space-y-2">
         {loading ? (
           <div className="flex justify-center py-16">
@@ -662,7 +670,10 @@ export default function HabitTrackerContent() {
         )}
         </div>)}
       </div>
+    </main>
 
+      {/* Modales hermanos del <main>, dentro del wrapper `relative` → absolute inset-0 cubre la
+          cara/ventana completa (no la columna centrada max-w-2xl). */}
       {detail !== null && (
         <HabitDetail
           habit={detail}
@@ -674,6 +685,6 @@ export default function HabitTrackerContent() {
       {modal !== null && (
         <HabitModal habit={modal} onClose={() => setModal(null)} onSaved={upsert} onArchived={markArchived} />
       )}
-    </main>
+    </div>
   )
 }

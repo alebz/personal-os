@@ -23,23 +23,32 @@ export function dayColor(d: Date): string {
   return WEEKDAY_RAINBOW[(d.getDay() + 6) % 7]   // Mon=0 … Sun=6
 }
 
-// ── Rainbow sobre SUPERFICIE CLARA (tema xp) — presentación, NO identidad ────────────────────────
-// El WEEKDAY_RAINBOW canónico está calibrado para fondo oscuro; como TEXTO sobre claro, 4 entradas
-// fallan contraste (medido sobre card #f6f5ef): mar 2.36:1, mié 1.56, jue 2.80, dom(#e8ecff) ~1.1
-// (casi blanco = invisible), y el oro de cumpleaños 1.69. Esta LUT devuelve la variante oscurecida
-// MÍNIMA que cruza 3:1 (texto 10px bold); las entradas que ya pasan se devuelven intactas. El
-// canónico NUNCA cambia — mismo patrón que crtDayColor: el componente decide en contexto de
-// presentación. Nota: colores MEZCLADOS (dayColorFlow) no matchean la LUT — se ajustará cuando
-// Inicio entre al launcher.
-const LIGHT_INK_LUT: Record<string, string> = {
-  '#f6821e': '#d8721a',   // mar 2.36 → 3.03
-  '#fbbc05': '#b08404',   // mié 1.56 → 3.13
-  '#34a853': '#32a150',   // jue 2.80 → 3.03
-  '#e8ecff': '#898b96',   // dom ~1.1 → 3.10
-  '#f0b53a': '#b2862b',   // oro cumpleaños 1.69 → 3.03
+// ── Color como TEXTO sobre SUPERFICIE CLARA (tema xp) — presentación, NO identidad ───────────────
+// El rainbow canónico (y los swatches libres de hábitos) están calibrados para fondo oscuro; como
+// TEXTO sobre claro varios fallan contraste (medido sobre card #f6f5ef: mar 2.36:1, mié 1.56, jue
+// 2.80, dom #e8ecff ~1.1 invisible, oro 1.69). `lightDayInk` oscurece CUALQUIER hex lo MÍNIMO para
+// cruzar 3:1 (texto pequeño); los que ya pasan vuelven intactos. Computado (no LUT) → cubre el
+// rainbow Y colores arbitrarios de hábitos. El valor canónico NUNCA cambia — mismo patrón que
+// crtDayColor: el componente decide en contexto de presentación (shell xp).
+const XP_LIGHT_CARD = '#f6f5ef'
+function relLum(hex: string): number {
+  const n = hex.replace('#', '')
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(n.slice(i, i + 2), 16) / 255)
+    .map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
 }
 export function lightDayInk(base: string): string {
-  return LIGHT_INK_LUT[base.toLowerCase()] ?? base
+  if (!/^#[0-9a-fA-F]{6}$/.test(base) || contrastRatio(base, XP_LIGHT_CARD) >= 3) return base
+  const ch = [0, 2, 4].map(i => parseInt(base.replace('#', '').slice(i, i + 2), 16))
+  for (let p = 0.04; p <= 0.8; p += 0.04) {
+    const d = '#' + ch.map(v => Math.round(v * (1 - p)).toString(16).padStart(2, '0')).join('')
+    if (contrastRatio(d, XP_LIGHT_CARD) >= 3) return d
+  }
+  return '#1a1712'   // fallback: warm black (colores casi-negros que nunca cruzan por multiplicación)
 }
 
 // Cerebro "pensando" stroke — the same rainbow, minus the white (it vanishes on the dark card),
