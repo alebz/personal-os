@@ -14,7 +14,7 @@ import './xp-theme.css'
 //
 // LAUNCHABLE: secciones ya adaptadas al contenedor (el molde). El resto aparece en "Todos los
 // programas" deshabilitado — el roadmap a la vista. Adaptadas: Tareas (F1), Finanzas (2c), Hábitos.
-const LAUNCHABLE = new Set(['/crm', '/finance', '/habits'])
+const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptown'])
 
 // Reloj vivo del tray — h:mm AM/PM, el canon XP. Tick de 1s; solo re-renderiza al cambiar el minuto
 // (mismo string → React hace bail del setState).

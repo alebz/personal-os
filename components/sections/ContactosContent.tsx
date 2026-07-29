@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import DrumModal from '@/components/DrumModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -216,18 +215,20 @@ function CategoryManagerModal({
     try { await onDelete(id, name) } finally { setDeletingId(null) }
   }
 
-  return createPortal(
+  // Molde XP (conversión B): inline + absolute inset-0 (antes portal+fixed) → ancla a la raíz
+  // `relative` de la sección (cubre la cara en tambor, la ventana en XP). Sin crt-screen (ya heredado).
+  return (
     <>
       <div
         aria-hidden
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]"
+        className="absolute inset-0 z-40 bg-black/60 backdrop-blur-[2px]"
       />
       <div
         role="dialog"
         aria-modal
         aria-label="Gestionar categorías"
-        className="crt-screen fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-card border border-border bg-surface-base shadow-2xl"
+        className="absolute left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-card border border-border bg-surface-base shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -294,8 +295,7 @@ function CategoryManagerModal({
           </div>
         </div>
       </div>
-    </>,
-    document.body
+    </>
   )
 }
 
@@ -626,7 +626,9 @@ export default function ContactosContent() {
   }
 
   return (
-    <>
+    // Molde XP: raíz `@container relative h-full` — container de breakpoints y ancla del modal de
+    // categorías (absolute inset-0). El <main> centrado vive dentro; el modal es hermano.
+    <div className="@container relative h-full">
       <main className="mx-auto flex h-full max-w-3xl flex-col px-6 pt-6 pb-4">
         {/* Header */}
         <div className="mb-6 flex shrink-0 items-center justify-between">
@@ -737,7 +739,7 @@ export default function ContactosContent() {
             </p>
           </div>
         ) : listOpen ? (
-          <div className="max-h-[55vh] overflow-y-auto rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
+          <div className="max-h-full overflow-y-auto rounded-card border border-border bg-surface-1 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
             {sort === 'tipo'
               ? groupByType(filtered, catNames).map(({ cat, items }) => (
                   <div key={cat}>
@@ -777,6 +779,6 @@ export default function ContactosContent() {
           onDelete={handleDeleteCategory}
         />
       )}
-    </>
+    </div>
   )
 }

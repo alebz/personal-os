@@ -1184,7 +1184,7 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
       )}
 
       {/* Semanas */}
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 @3xl:grid-cols-2 @6xl:grid-cols-3">
       {Array.from({ length: numWeeks }, (_, i) => i + 1).map(w => (
         <ValetWeekCard
           key={w}
@@ -1461,7 +1461,10 @@ export default function UptownContent() {
   const saldoEfectivo = apertura.cash  + cashCobrado - cashPagado - cashApartado + ajusteEfectivo
 
   return (
-    <>
+    // Molde XP: `@container` para los breakpoints (grids del Valet/posiciones). Los modales de Uptown
+    // son DrumModal (libretas) → portales shell-aware, no necesitan ancla absolute. relative h-full
+    // por consistencia. La densidad de Uptown vive en el contenido, no en acoplamiento a viewport.
+    <div className="@container relative h-full">
     <main className="mx-auto flex h-full max-w-6xl flex-col px-6 pt-6">
         {/* Header */}
         <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
@@ -1499,7 +1502,7 @@ export default function UptownContent() {
         </div>
 
         {pageTab === 'finanzas' && !loading && !error && (
-          <div className="mb-3 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mb-3 grid shrink-0 grid-cols-2 gap-3 @4xl:grid-cols-4">
             <PrevistoCard
               rents={rents} expenses={expenses} nomina={nomina}
               extraIncome={extraIncome} extraExpenses={extraExpenses}
@@ -1553,7 +1556,7 @@ export default function UptownContent() {
         ) : (
           <div className="space-y-3">
             {/* Main grid: income | expenses */}
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-3 @4xl:grid-cols-2">
               {/* ── Ingresos ── */}
               <div className="space-y-3">
                 <p className="text-label font-black uppercase tracking-widest text-ok">↑ Ingresos</p>
@@ -1613,6 +1616,6 @@ export default function UptownContent() {
           )
         })()}
       </DrumModal>
-    </>
+    </div>
   )
 }
