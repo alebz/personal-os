@@ -68,6 +68,15 @@ Si sigues esto, el elemento respeta MONOCOLOR (y cualquier tema futuro) sin trab
 | Posiciones Efectivo/Tarjeta (eran `text-success`/`text-info` — tokens INEXISTENTES, bug latente) | FinanzasContent | `text-ok` / `text-accent` |
 | Rainbow como TEXTO sobre superficie clara | lib/weekdayColors + DayTag (Tareas) | `lightDayInk(base)` — LUT presentacional ≥3:1 (canónico intacto); aplicar en cada sitio day-color cuando su sección entre al launcher XP |
 
+### Pertenencia sobre prominencia — POR TEMA
+Cada cosa vive donde PERTENECE según las reglas del mundo activo, no donde se ve más. Y "dónde
+pertenece" **depende del tema**: el mismo dato tiene lugares nativos distintos por cascarón.
+- Ej: el **calendario**. Tambor → vive en la cara Inicio (el ambiente de esa cara). XP → NO es una
+  app; se invoca con doble-click al reloj del tray ("Fecha y hora"), como en XP real. La sección
+  Inicio no se porta a XP: se DISUELVE (reloj al tray, calendario al reloj, quote no se porta).
+- Corolario: una sección del tambor puede NO existir como ventana en XP. `InicioContent` solo se
+  monta en el tambor; XP la excluye del launcher/menú. No todo se traduce 1:1 entre cascarones.
+
 ### El tema claro XP (2d-luz) — patrón de tema SCOPED
 `[data-theme="xp"]` en globals remapea TIER 1 a paleta clara (valores medidos, ver bloque). Se aplica
 **scoped**: el atributo va en el CUERPO de cada ventana XP (`XPWindow`) y en los portales bajo XP
