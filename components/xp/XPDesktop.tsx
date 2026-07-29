@@ -100,7 +100,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content, { resizable: true })
   // Fecha y hora — el 1er DIÁLOGO DE SISTEMA: tamaño FIJO, sin resize ni max (canon XP). Se invoca
   // desde el reloj (no desde el menú); el calendario nativo con rainbow de días + markers.
-  const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 620, h: 486 })
+  const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 470, h: 306 })
   // Propiedades de Pantalla — diálogo FIJO (hereda el canon), el dial de la escala. Se invoca del
   // menú contextual del escritorio y del "Panel de control" (su primer inquilino).
   const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466 }) }
