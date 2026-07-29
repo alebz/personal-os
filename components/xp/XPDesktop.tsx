@@ -3,8 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
-import CalendarCard from '@/components/CalendarCard'
 import DisplayProperties from './DisplayProperties'
+import DateTimeProperties from './DateTimeProperties'
 import XPWindow, { type WinState } from './XPWindow'
 import { playXpSound } from './xpSounds'
 import './xp-theme.css'
@@ -66,6 +66,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [allOpen, setAllOpen] = useState(false)
   const [windows, setWindows] = useState<WinState[]>([])
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)   // menú contextual (logical px)
+  const [volOpen, setVolOpen] = useState(false)   // popup de volumen del tray
 
   const vp = useViewport()
   const scale = vp.h / xpLogicalH           // f
@@ -98,7 +99,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content, { resizable: true })
   // Fecha y hora — el 1er DIÁLOGO DE SISTEMA: tamaño FIJO, sin resize ni max (canon XP). Se invoca
   // desde el reloj (no desde el menú); el calendario nativo con rainbow de días + markers.
-  const openDateTime = () => openWindow('date-time', 'Fecha y hora', <div className="p-3"><CalendarCard /></div>, { w: 452, h: 480 })
+  const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 620, h: 486 })
   // Propiedades de Pantalla — diálogo FIJO (hereda el canon), el dial de la escala. Se invoca del
   // menú contextual del escritorio y del "Panel de control" (su primer inquilino).
   const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466 }) }
@@ -157,8 +158,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           menú contextual mínimo (coords en px LÓGICOS: clientX ÷ scale). */}
       <div
         style={{ position: 'absolute', inset: 0, bottom: 30 }}
-        onPointerDown={() => { closeStart(); setCtxMenu(null) }}
-        onContextMenu={(e) => { e.preventDefault(); closeStart(); setCtxMenu({ x: e.clientX / scale, y: e.clientY / scale }) }}
+        onPointerDown={() => { closeStart(); setCtxMenu(null); setVolOpen(false) }}
+        onContextMenu={(e) => { e.preventDefault(); closeStart(); setVolOpen(false); setCtxMenu({ x: e.clientX / scale, y: e.clientY / scale }) }}
       />
 
       {/* Menú contextual del escritorio (mínimo: solo Propiedades por ahora) */}
@@ -258,15 +259,32 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         <div className="xp-tray" style={{ height: 30, display: 'flex', alignItems: 'center', gap: 7, padding: '0 11px 0 9px' }}>
           <button
             className="xp-chrome-btn"
-            onClick={() => set('xpSound', { ...xpSound, on: !xpSound.on })}
-            title={xpSound.on ? 'Silenciar sonidos XP' : 'Activar sonidos XP'}
-            aria-label={xpSound.on ? 'Silenciar sonidos XP' : 'Activar sonidos XP'}
+            onClick={() => setVolOpen((v) => !v)}
+            title="Volumen"
+            aria-label="Volumen"
             style={{ border: 'none', background: 'none', padding: 0, fontSize: 13, cursor: 'pointer', lineHeight: 1, opacity: xpSound.on ? 1 : 0.55, filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }}
           >
             {xpSound.on ? '🔊' : '🔇'}
           </button>
           <XPClock onOpen={openDateTime} />
         </div>
+
+        {/* Popup de volumen — la bocina es la puerta al volumen (canon XP): slider vertical + Silenciar */}
+        {volOpen && (
+          <div style={{ position: 'absolute', right: 18, bottom: 34, zIndex: 10002, width: 58, background: '#fff', border: '1px solid #0831d9', boxShadow: '2px 2px 9px rgba(0,0,0,0.32)', padding: '9px 6px 7px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: '#1a1712' }}>Volumen</span>
+            <input
+              type="range" min={0} max={1} step={0.05} value={xpSound.volume}
+              onChange={(e) => set('xpSound', { ...xpSound, volume: +e.target.value })}
+              aria-label="Volumen"
+              style={{ writingMode: 'vertical-lr' as React.CSSProperties['writingMode'], direction: 'rtl', width: 22, height: 88, accentColor: '#316ac5', cursor: 'pointer' }}
+            />
+            <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 3, color: '#1a1712', cursor: 'pointer' }}>
+              <input type="checkbox" checked={!xpSound.on} onChange={(e) => set('xpSound', { ...xpSound, on: !e.target.checked })} style={{ accentColor: '#316ac5' }} />
+              Silenciar
+            </label>
+          </div>
+        )}
       </div>
 
     </div>
