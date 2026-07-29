@@ -77,6 +77,23 @@ pertenece" **depende del tema**: el mismo dato tiene lugares nativos distintos p
 - Corolario: una sección del tambor puede NO existir como ventana en XP. `InicioContent` solo se
   monta en el tambor; XP la excluye del launcher/menú. No todo se traduce 1:1 entre cascarones.
 
+### Escala del lienzo XP (emulación de monitor de época)
+`.xp-desktop` es un lienzo LÓGICO escalado a fill (sin letterbox): altura lógica fija (`LOGICAL_H`,
+dial en Propiedades de Pantalla), `f = viewportH/LOGICAL_H`, ancho fluido, `transform: scale(f)` desde
+top-left. Solo en `.xp-desktop`; el arcade nunca se transforma.
+- **Coordenadas**: el estado del WM (win.x/y/w/h) vive en px LÓGICOS; `clientX/Y` de los eventos son
+  VISUALES → el drag/resize convierte dividiendo por `f` ("deltas ÷ factor"). El hit-testing lo mapea
+  el browser solo (transform).
+- **Portales** (DrumModal/libretas escapan a body): bajo XP portalean a `#xp-modal-root` DENTRO de
+  `.xp-desktop` → heredan la escala (transform hace a .xp-desktop bloque contenedor de sus `fixed`) y
+  el `data-theme` claro. Bajo arcade siguen a `<body>` (escapar el 3D del tambor). Shell-condicional,
+  igual patrón que el `data-theme`.
+- **MEDICIONES DE VALIDACIÓN**: `getBoundingClientRect` devuelve px VISUALES bajo escala → dividir por
+  `f` para px lógicos, o leer del estado del WM (ya lógico). Un modal que "mide su ventana" da números
+  visuales = lógicos×f.
+- **Texto**: sigue real/seleccionable; `transform:scale` en Retina queda nítido; zoom del browser
+  compone encima.
+
 ### El tema claro XP (2d-luz) — patrón de tema SCOPED
 `[data-theme="xp"]` en globals remapea TIER 1 a paleta clara (valores medidos, ver bloque). Se aplica
 **scoped**: el atributo va en el CUERPO de cada ventana XP (`XPWindow`) y en los portales bajo XP

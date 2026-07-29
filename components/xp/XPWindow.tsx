@@ -25,10 +25,11 @@ export const WIN_H = 560
 const TASKBAR_H = 30
 
 export default function XPWindow({
-  win, active, onFocus, onClose, onMinimize, onMove,
+  win, active, scale, onFocus, onClose, onMinimize, onMove,
 }: {
   win: WinState
   active: boolean
+  scale: number     // factor del lienzo — el drag opera en px LÓGICOS: clientX (visual) ÷ scale
   onFocus: (id: string) => void
   onClose: (id: string) => void
   onMinimize: (id: string) => void
@@ -41,15 +42,16 @@ export default function XPWindow({
   function onTitleDown(e: React.PointerEvent) {
     if ((e.target as HTMLElement).closest('button')) return   // no arrastrar al pulsar min/close
     onFocus(win.id)
-    drag.current = { dx: e.clientX - win.x, dy: e.clientY - win.y }
+    // clientX/Y son VISUALES; el estado (win.x/y) es LÓGICO → todo en lógico dividiendo por scale.
+    drag.current = { dx: e.clientX / scale - win.x, dy: e.clientY / scale - win.y }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
   function onTitleMove(e: React.PointerEvent) {
     if (!drag.current) return
-    const maxX = window.innerWidth - 90
-    const maxY = window.innerHeight - TASKBAR_H - 22
-    const x = Math.min(maxX, Math.max(90 - w, e.clientX - drag.current.dx))
-    const y = Math.min(maxY, Math.max(0, e.clientY - drag.current.dy))
+    const maxX = window.innerWidth / scale - 90    // límites en px lógicos
+    const maxY = window.innerHeight / scale - TASKBAR_H - 22
+    const x = Math.min(maxX, Math.max(90 - w, e.clientX / scale - drag.current.dx))
+    const y = Math.min(maxY, Math.max(0, e.clientY / scale - drag.current.dy))
     onMove(win.id, x, y)
   }
   function onTitleUp(e: React.PointerEvent) {

@@ -39,6 +39,11 @@ export default function DrumModal({
 
   if (!open || typeof document === 'undefined') return null
 
+  // Destino del portal: bajo XP, DENTRO del lienzo escalado (#xp-modal-root) → hereda la escala
+  // (transform:scale hace a .xp-desktop bloque contenedor de este fixed) y el data-theme claro. Bajo
+  // arcade, a <body> para escapar el preserve-3d del tambor. Si aún no montó el root, cae a body.
+  const target = (shell === 'xp' && document.getElementById('xp-modal-root')) || document.body
+
   return createPortal(
     <div
       data-theme={shell === 'xp' ? 'xp' : undefined}
@@ -64,6 +69,6 @@ export default function DrumModal({
         {children}
       </div>
     </div>,
-    document.body,
+    target,
   )
 }

@@ -18,6 +18,25 @@ import './xp-theme.css'
 // la quote no se porta. Por eso '/' no está en LAUNCHABLE ni aparece en el menú.
 const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptown'])
 
+// ── Escala del lienzo (emulación de monitor de época) ────────────────────────────────────────────
+// XP nació para ~1024×768@96dpi; sus proporciones son de esa pantalla y a px nativos se ve diminuto
+// en displays modernos. FILL sin letterbox: la altura LÓGICA se fija; f = viewportH/alturaLógica; el
+// ancho es fluido (viewportW/f). transform:scale(f) desde top-left → el lienzo escalado llena el
+// viewport. Solo en .xp-desktop (el arcade ni se entera). El texto sigue real (seleccionable, zoom
+// del browser encima). LOGICAL_H es el DIAL — se vuelve slider persistente en "Propiedades de
+// Pantalla" (Tema 3); por ahora, arranque.
+const LOGICAL_H = 800
+
+function useViewport() {
+  const [vp, setVp] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
+  useEffect(() => {
+    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return vp
+}
+
 // Reloj vivo del tray — h:mm AM/PM, el canon XP. Doble-click → Fecha y hora (comportamiento nativo).
 function XPClock({ onOpen }: { onOpen: () => void }) {
   const fmt = () => {
@@ -48,6 +67,10 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [startOpen, setStartOpen] = useState(false)
   const [allOpen, setAllOpen] = useState(false)
   const [windows, setWindows] = useState<WinState[]>([])
+
+  const vp = useViewport()
+  const scale = vp.h / LOGICAL_H            // f
+  const logicalW = vp.w / scale             // ancho lógico (fluido)
 
   // Inicio ('/') se disuelve en XP → fuera del menú por completo (ni launchable ni en "Todos").
   const xpSections = sections.filter((s) => s.href !== '/')
@@ -109,16 +132,22 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     <div
       className="xp-desktop"
       style={{
-        position: 'fixed', inset: 0, overflow: 'hidden',
+        position: 'fixed', top: 0, left: 0, width: logicalW, height: LOGICAL_H,
+        transform: `scale(${scale})`, transformOrigin: 'top left', overflow: 'hidden',
         background: "#3a6ea5 url('/themes/xp/wallpapers/bliss.png') center / cover no-repeat",
       }}
     >
+      {/* Raíz de portales bajo XP: los modales que escapan a body (DrumModal/libretas) portalean AQUÍ
+          → heredan la escala (transform:scale hace a .xp-desktop bloque contenedor de sus fixed) y el
+          data-theme claro. Fuera del transform se verían chiquitos. */}
+      <div id="xp-modal-root" />
+
       {/* Área de escritorio (íconos = 2e). Click en vacío cierra el menú Inicio. */}
       <div style={{ position: 'absolute', inset: 0, bottom: 30 }} onPointerDown={closeStart} />
 
       {/* Ventanas */}
       {windows.map((w) => (
-        <XPWindow key={w.id} win={w} active={!w.minimized && w.z === topZ} onFocus={focusWindow} onClose={closeWindow} onMinimize={minimizeWindow} onMove={moveWindow} />
+        <XPWindow key={w.id} win={w} active={!w.minimized && w.z === topZ} scale={scale} onFocus={focusWindow} onClose={closeWindow} onMinimize={minimizeWindow} onMove={moveWindow} />
       ))}
 
       {/* ── Menú Inicio · dos columnas ── */}
