@@ -1,24 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
 import OSSettings from '@/components/OSSettings'
+import CalendarCard from '@/components/CalendarCard'
 import XPWindow, { type WinState } from './XPWindow'
 import { playXpSound } from './xpSounds'
 import './xp-theme.css'
 
-// Escritorio Windows XP — el cascarón alterno. FASE 2d-chrome: menú Inicio de DOS columnas (avatar
-// con la firma, secciones-como-programas, Panel de control como lugar, footer Cerrar sesión/Apagar),
-// tray separado con reloj vivo AM/PM. Window manager de Fase 1; piel Luna 2a; tema claro 2d-luz.
+// Escritorio Windows XP — el cascarón alterno. Window manager de Fase 1 (modelo de ventana genérico:
+// title+content); piel Luna 2a; tema claro 2d-luz; chrome 2d-chrome.
 //
-// LAUNCHABLE: secciones ya adaptadas al contenedor (el molde). El resto aparece en "Todos los
-// programas" deshabilitado — el roadmap a la vista. Adaptadas: Tareas (F1), Finanzas (2c), Hábitos.
-const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptown', '/'])
+// PERTENENCIA SOBRE PROMINENCIA, POR TEMA: cada cosa vive donde pertenece según el mundo activo.
+// INICIO no es una app en XP — es el ambiente de la cara del tambor. Aquí se DISUELVE: el reloj vive
+// en el tray, el calendario se invoca con doble-click al reloj (ventanita "Fecha y hora", nativo XP),
+// la quote no se porta. Por eso '/' no está en LAUNCHABLE ni aparece en el menú.
+const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptown'])
 
-// Reloj vivo del tray — h:mm AM/PM, el canon XP. Tick de 1s; solo re-renderiza al cambiar el minuto
-// (mismo string → React hace bail del setState).
-function XPClock() {
+// Reloj vivo del tray — h:mm AM/PM, el canon XP. Doble-click → Fecha y hora (comportamiento nativo).
+function XPClock({ onOpen }: { onOpen: () => void }) {
   const fmt = () => {
     const d = new Date()
     let h = d.getHours()
@@ -31,7 +32,15 @@ function XPClock() {
     const id = setInterval(() => setTime(fmt()), 1000)
     return () => clearInterval(id)
   }, [])
-  return <span style={{ fontSize: 12, color: '#fff', textShadow: '1px 1px 1px rgba(0,0,0,0.35)', letterSpacing: 0.2 }}>{time}</span>
+  return (
+    <button
+      onDoubleClick={onOpen}
+      title="Doble clic: Fecha y hora"
+      style={{ border: 'none', background: 'none', padding: 0, cursor: 'default', fontSize: 12, color: '#fff', textShadow: '1px 1px 1px rgba(0,0,0,0.35)', letterSpacing: 0.2, fontFamily: 'inherit' }}
+    >
+      {time}
+    </button>
+  )
 }
 
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
@@ -40,25 +49,32 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [allOpen, setAllOpen] = useState(false)
   const [windows, setWindows] = useState<WinState[]>([])
 
-  const launchable = sections.filter((s) => LAUNCHABLE.has(s.href))
+  // Inicio ('/') se disuelve en XP → fuera del menú por completo (ni launchable ni en "Todos").
+  const xpSections = sections.filter((s) => s.href !== '/')
+  const launchable = xpSections.filter((s) => LAUNCHABLE.has(s.href))
+  const pending = xpSections.filter((s) => !LAUNCHABLE.has(s.href))
   const topZ = Math.max(0, ...windows.map((w) => w.z))
 
   function closeStart() { setStartOpen(false); setAllOpen(false) }
 
-  function openWindow(section: OSSection) {
+  // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
+  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number }) {
     closeStart()
-    const existing = windows.find((w) => w.id === section.href)
+    const existing = windows.find((w) => w.id === id)
     if (existing?.minimized) playXpSound('restore')
     else if (!existing) playXpSound('open')
-    // existente y visible → solo foco, sin sonido
     setWindows((prev) => {
       const top = Math.max(0, ...prev.map((w) => w.z))
-      if (prev.some((w) => w.id === section.href))
-        return prev.map((w) => (w.id === section.href ? { ...w, minimized: false, z: top + 1 } : w))
+      if (prev.some((w) => w.id === id))
+        return prev.map((w) => (w.id === id ? { ...w, minimized: false, z: top + 1 } : w))
       const n = prev.length
-      return [...prev, { id: section.href, section, x: 90 + n * 32, y: 52 + n * 32, z: top + 1, minimized: false }]
+      return [...prev, { id, title, content, x: 90 + n * 32, y: 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h }]
     })
   }
+
+  const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content)
+  // Fecha y hora — el calendario nativo de XP, invocado desde el reloj (no desde el menú).
+  const openDateTime = () => openWindow('date-time', 'Fecha y hora', <div className="p-3"><CalendarCard /></div>, { w: 452, h: 480 })
 
   function focusWindow(id: string) {
     setWindows((prev) => {
@@ -68,26 +84,14 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       return prev.map((x) => (x.id === id ? { ...x, z: top + 1 } : x))
     })
   }
-
-  function closeWindow(id: string) {
-    playXpSound('close')
-    setWindows((prev) => prev.filter((w) => w.id !== id))
-  }
-
-  function moveWindow(id: string, x: number, y: number) {
-    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, x, y } : w)))
-  }
-
-  function minimizeWindow(id: string) {
-    playXpSound('minimize')
-    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, minimized: true } : w)))
-  }
+  function closeWindow(id: string) { playXpSound('close'); setWindows((prev) => prev.filter((w) => w.id !== id)) }
+  function moveWindow(id: string, x: number, y: number) { setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, x, y } : w))) }
+  function minimizeWindow(id: string) { playXpSound('minimize'); setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, minimized: true } : w))) }
 
   function taskbarClick(id: string) {
     const w = windows.find((x) => x.id === id)
     if (w?.minimized) playXpSound('restore')
     else if (w && w.z === topZ) playXpSound('minimize')
-    // atrás y visible → solo foco, sin sonido
     setWindows((prev) => {
       const win = prev.find((x) => x.id === id)
       if (!win) return prev
@@ -98,21 +102,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     })
   }
 
-  // "Cerrar sesión" = cambiar de cascarón (mapeo honesto). El WAV sobrevive al desmontaje (Audio no
-  // vive en el DOM), así la despedida suena mientras el arcade regresa.
-  function logOff() {
-    playXpSound('logoff')
-    set('shell', 'arcade')
-  }
-
-  // "Apagar equipo" = el apagado de un OS que nunca se apaga: la excursión al screensaver (tambor
-  // girando censurado, overlay de page.tsx ENCIMA de este escritorio — que no se desmonta). Cualquier
-  // actividad despierta (listeners globales del contexto) y XP sigue exactamente como estaba.
-  function shutDown() {
-    closeStart()
-    playXpSound('shutdown')
-    startScreensaver()
-  }
+  function logOff() { playXpSound('logoff'); set('shell', 'arcade') }
+  function shutDown() { closeStart(); playXpSound('shutdown'); startScreensaver() }
 
   return (
     <div
@@ -127,43 +118,32 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 
       {/* Ventanas */}
       {windows.map((w) => (
-        <XPWindow
-          key={w.id}
-          win={w}
-          active={!w.minimized && w.z === topZ}
-          onFocus={focusWindow}
-          onClose={closeWindow}
-          onMinimize={minimizeWindow}
-          onMove={moveWindow}
-        />
+        <XPWindow key={w.id} win={w} active={!w.minimized && w.z === topZ} onFocus={focusWindow} onClose={closeWindow} onMinimize={minimizeWindow} onMove={moveWindow} />
       ))}
 
       {/* ── Menú Inicio · dos columnas ── */}
       {startOpen && (
         <div className="xp-startmenu" style={{ position: 'absolute', left: 0, bottom: 30, width: 384, zIndex: 10001, background: '#fff' }}>
-          {/* Header: marquito con la firma + nombre */}
           <div className="xp-startmenu-header" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px' }}>
             <div style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 4, border: '2px solid rgba(255,255,255,0.85)', background: '#171410', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- asset local chico, sin optimización */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- asset local chico */}
               <img src="/logo.png" alt="Alex Mateo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 3 }} />
             </div>
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, textShadow: '1px 1px 1px rgba(0,0,0,0.45)' }}>Alex Mateo</span>
           </div>
 
-          {/* Cuerpo: programas (blanco) | lugares (azul claro) */}
           <div style={{ display: 'flex', alignItems: 'stretch' }}>
-            {/* Izquierda — las secciones del OS como programas */}
             <div style={{ flex: 1, background: '#fff', padding: '6px 0' }}>
               {launchable.map((s) => (
-                <button key={s.href} className="xp-startmenu-item" onClick={() => openWindow(s)} style={startItem}>
+                <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} style={startItem}>
                   <span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 9, borderRadius: 2, background: s.color, boxShadow: 'inset 0 0 1px rgba(0,0,0,0.4)' }} />
                   <b>{s.label}</b>
                 </button>
               ))}
-              {allOpen && (
+              {allOpen && pending.length > 0 && (
                 <>
                   <div style={{ borderTop: '1px solid #e3e1d5', margin: '4px 10px' }} />
-                  {sections.filter((s) => !LAUNCHABLE.has(s.href)).map((s) => (
+                  {pending.map((s) => (
                     <button key={s.href} disabled title="Se adapta pronto" style={{ ...startItem, color: '#9a9a92', cursor: 'default' }}>
                       <span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 9, borderRadius: 2, background: s.color, opacity: 0.35 }} />
                       {s.label}
@@ -171,23 +151,24 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
                   ))}
                 </>
               )}
-              <div style={{ borderTop: '1px solid #e3e1d5', margin: '4px 10px' }} />
-              <button className="xp-startmenu-item" onClick={() => setAllOpen((v) => !v)} style={{ ...startItem, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <b>Todos los programas</b>
-                <span style={{ color: '#3c9a3a', fontSize: 11 }}>{allOpen ? '▾' : '▸'}</span>
-              </button>
+              {pending.length > 0 && (
+                <>
+                  <div style={{ borderTop: '1px solid #e3e1d5', margin: '4px 10px' }} />
+                  <button className="xp-startmenu-item" onClick={() => setAllOpen((v) => !v)} style={{ ...startItem, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <b>Todos los programas</b>
+                    <span style={{ color: '#3c9a3a', fontSize: 11 }}>{allOpen ? '▾' : '▸'}</span>
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Derecha — lugares/utilidades */}
             <div style={{ width: 148, background: '#d3e5fa', borderLeft: '1px solid #96b8e0', padding: '6px 0' }}>
               <button className="xp-startmenu-item" onClick={() => { closeStart(); toggleSettings() }} style={{ ...startItem, fontWeight: 600, color: '#1a3d75' }}>
                 Panel de control
               </button>
-              {/* Papelera y demás lugares llegan en 2e */}
             </div>
           </div>
 
-          {/* Footer: Cerrar sesión / Apagar equipo */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 10px', background: 'linear-gradient(180deg,#4282d6,#3a76c8)', borderTop: '1px solid #2f62b0' }}>
             <button className="xp-chrome-btn" onClick={logOff} style={footBtn} title="Volver al cascarón arcade">
               <span style={{ ...footIcon, background: 'linear-gradient(#f9a94b,#e8862a)' }}>⇤</span> Cerrar sesión
@@ -209,24 +190,19 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           inicio
         </button>
 
-        {/* Botones de ventanas abiertas */}
         <div style={{ display: 'flex', gap: 4, marginLeft: 8, overflow: 'hidden', flex: 1 }}>
           {windows.map((w) => {
             const isActive = !w.minimized && w.z === topZ
             return (
-              <button
-                key={w.id}
-                className={`xp-chrome-btn xp-tb-btn ${isActive ? 'xp-tb-btn--active' : ''}`}
-                onClick={() => taskbarClick(w.id)}
-                style={{ height: 22, maxWidth: 160, padding: '0 12px', borderRadius: 3, color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '1px 1px 1px rgba(0,0,0,0.35)' }}
-              >
-                {w.section.label}
+              <button key={w.id} className={`xp-chrome-btn xp-tb-btn ${isActive ? 'xp-tb-btn--active' : ''}`} onClick={() => taskbarClick(w.id)}
+                style={{ height: 22, maxWidth: 160, padding: '0 12px', borderRadius: 3, color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '1px 1px 1px rgba(0,0,0,0.35)' }}>
+                {w.title}
               </button>
             )
           })}
         </div>
 
-        {/* System tray: pozo azul claro separado — bocina + reloj vivo */}
+        {/* System tray: pozo hundido con bocina + reloj vivo (doble-click → Fecha y hora) */}
         <div className="xp-tray" style={{ height: 30, display: 'flex', alignItems: 'center', gap: 7, padding: '0 11px 0 9px' }}>
           <button
             className="xp-chrome-btn"
@@ -237,11 +213,11 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           >
             {xpSound.on ? '🔊' : '🔇'}
           </button>
-          <XPClock />
+          <XPClock onOpen={openDateTime} />
         </div>
       </div>
 
-      {/* Panel de Ajustes (Panel de control) — mismo panel del sistema; se abre sobre el escritorio */}
+      {/* Panel de Ajustes (Panel de control) — se abre sobre el escritorio */}
       <OSSettings />
     </div>
   )
@@ -251,13 +227,10 @@ const startItem: React.CSSProperties = {
   display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none',
   background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: '#000',
 }
-
 const footBtn: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', cursor: 'pointer',
-  color: '#fff', fontSize: 12.5, fontFamily: 'inherit', padding: '3px 6px', borderRadius: 3,
-  textShadow: '1px 1px 1px rgba(0,0,0,0.35)',
+  color: '#fff', fontSize: 12.5, fontFamily: 'inherit', padding: '3px 6px', borderRadius: 3, textShadow: '1px 1px 1px rgba(0,0,0,0.35)',
 }
-
 const footIcon: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18,
   borderRadius: 3, fontSize: 11, color: '#fff', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.3)',
