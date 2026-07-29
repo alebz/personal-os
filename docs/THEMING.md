@@ -102,6 +102,24 @@ usuario de XP no notaría la diferencia a primera vista"**. Cazar fugas de fidel
 asistente (su ojo contra la referencia), no del usuario con screenshots. Aplica igual a temas futuros
 (cualquier cascarón que imite un OS real: su realidad es el spec).
 
+### Los MODALES DE FORMULARIO de sección bajo XP = DIÁLOGOS XP
+Matiz sobre "secciones = tokens": el CONTENIDO de la sección (kanban, listas) es tokens-claro; pero
+sus MODALES DE FORMULARIO (Nueva tarea, editar, equivalentes) bajo XP se presentan como DIÁLOGO XP
+literal (no la sábana blanca moderna con campos redondeados):
+- COMPACTO — el contenido dicta el tamaño (~420-480px lógicos), no la ventana.
+- Fondo #ECE9D8 + vocabulario de diálogos (labels Tahoma 11, inputs hundidos, dropdowns/spinners de
+  época, group boxes si agrupan).
+- Botones OK / CANCELAR abajo a la derecha (canon absoluto — nada de botón ancho centrado "Crear X").
+- App-modal: centrado sobre su ventana padre con su scrim (`absolute inset-0` scoped al wrapper).
+- En el TAMBOR no cambia nada (allá el modal actual — DrumModal/sábana — es correcto). → shell-cond.
+- Piloto: EditModal de Tareas. El censo marca los demás.
+
+### IDENTIDAD: el logo del OS bajo XP = la BANDERA DE 7 FRANJAS (arcoíris recto)
+Donde XP pondría el logo de Windows, va el `WEEKDAY_RAINBOW` de 7 colores en versión RECTA (franjas
+verticales, pasos duros, sin fades — la gramática digital del OS). `components/xp/RainbowFlag.tsx`.
+Ya en el botón Inicio (izq del texto "inicio"); reutilizable donde XP pida logo (login screen futuro,
+'Acerca de', etc.). Cuidar el off-white del domingo (#e8ecff) con borde hairline.
+
 ### Secciones portadas vs DIÁLOGOS de sistema — dos pieles distintas
 Bajo un cascarón de época hay DOS clases de superficie, con reglas opuestas:
 - **SECCIONES portadas** (Tareas, Finanzas, …): mi contenido dentro del chrome del tema. Piel por

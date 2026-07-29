@@ -9,6 +9,7 @@ import { XpSlider, XpCheckbox } from './xp-controls'
 import { XpIcon, SECTION_ICON } from './xp-icons'
 import { RunDialog } from './RunDialog'
 import { SearchDialog } from './SearchDialog'
+import { RainbowFlag } from './RainbowFlag'
 import XPWindow, { type WinState } from './XPWindow'
 import { playXpSound } from './xpSounds'
 import './xp-theme.css'
@@ -276,8 +277,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         <button
           className="xp-chrome-btn xp-start"
           onClick={() => (startOpen ? closeStart() : setStartOpen(true))}
-          style={{ height: 30, padding: '0 20px 0 12px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)' }}
+          style={{ height: 30, padding: '0 20px 0 11px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: 7 }}
         >
+          <RainbowFlag w={18} h={13} />
           inicio
         </button>
 
