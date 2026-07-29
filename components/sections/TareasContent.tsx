@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import DrumModal from '@/components/DrumModal'
 import { dayColor, crtDayColor, lightDayInk } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import { XpDialogModal, XpField, XpLabel, XpSelect } from '@/components/xp/xp-controls'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -617,6 +618,7 @@ function TaskDrawer({
   onCreate: (data: Partial<Task>) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
+  const { shell } = useOSSettings()
   const [form, setForm] = useState<DrawerForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -662,6 +664,69 @@ function TaskDrawer({
   const isOpen = !!task || creating
   const labelCls = 'mb-1.5 block text-label font-semibold uppercase tracking-wider text-fg-muted'
   const inputCls = 'w-full rounded-card border border-border bg-surface-1 px-3 py-2.5 text-body text-fg placeholder:text-fg-faint transition-colors focus:border-accent/30 focus:outline-none focus:ring-1 focus:ring-accent/20'
+
+  // Bajo XP el modal de sección ES un diálogo XP: caja #ECE9D8 compacta, vocabulario nativo
+  // (labels Tahoma 11, campos hundidos, dropdowns XP), OK/Cancelar abajo-derecha. El tambor no
+  // cambia (rama DrumModal de abajo). Regla en THEMING.md.
+  if (shell === 'xp') {
+    return (
+      <XpDialogModal
+        open={isOpen}
+        title={creating ? 'Nueva tarea' : 'Editar tarea'}
+        width={472}
+        onCancel={onClose}
+        onOk={handleSave}
+        okLabel={saving ? 'Guardando…' : creating ? 'Crear' : 'Aceptar'}
+        okDisabled={saving || !form.title.trim()}
+        onDelete={!creating && task ? handleDelete : undefined}
+        deleteLabel={deleting ? '…' : 'Eliminar'}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <div>
+            <XpLabel>Título</XpLabel>
+            <XpField autoFocus={creating} value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="Nombre de la tarea" />
+          </div>
+          <div>
+            <XpLabel>Descripción</XpLabel>
+            <textarea
+              className="xp-sunken" value={form.description} onChange={(e) => set('description', e.target.value)} rows={3}
+              style={{ width: '100%', padding: '4px 5px', fontFamily: 'inherit', fontSize: 11, resize: 'none', outline: 'none' }}
+              placeholder="Detalles opcionales…"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <XpLabel>Urgencia</XpLabel>
+              <XpSelect value={form.urgency} onChange={(v) => set('urgency', v)} options={TIERS.map((t) => ({ value: t.id, label: t.label }))} width="100%" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <XpLabel>Día</XpLabel>
+              <XpField type="date" value={form.due_date} onChange={(e) => set('due_date', e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <XpLabel>Entidad</XpLabel>
+            <XpSelect value={form.entity_name} onChange={(v) => set('entity_name', v)} options={[{ value: '', label: '— Ninguno —' }, ...entities.map((e) => ({ value: e.name, label: e.name }))]} width="100%" />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <XpLabel>Key</XpLabel>
+              <XpField value={form.key} onChange={(e) => set('key', e.target.value)} placeholder="CRM-01" style={{ fontFamily: 'monospace' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <XpLabel>Prioridad</XpLabel>
+              <XpField type="number" min={0} max={100} value={form.priority_score} onChange={(e) => set('priority_score', e.target.value)} placeholder="0–100" />
+            </div>
+          </div>
+          <div>
+            <XpLabel>Etiquetas</XpLabel>
+            <XpField value={form.tags} onChange={(e) => set('tags', e.target.value)} placeholder="diseño, cliente, urgente" />
+            <p style={{ marginTop: 3, fontSize: 10, color: '#555' }}>Separadas por coma</p>
+          </div>
+        </div>
+      </XpDialogModal>
+    )
+  }
 
   return (
     <DrumModal open={isOpen} onClose={onClose} ariaLabel={creating ? 'Nueva tarea' : 'Editar tarea'}>
@@ -877,6 +942,7 @@ export default function TareasContent() {
   ]
 
   return (
+    <>
     <div className="@container mx-auto w-full max-w-7xl px-6 pb-16 pt-2">
       <div className="pb-2">
         <div className="flex items-center justify-between">
@@ -985,16 +1051,20 @@ export default function TareasContent() {
           </>
         )}
       </div>
-
-      <TaskDrawer
-        task={drawerTask}
-        creating={creating}
-        entities={entities}
-        onClose={() => { setDrawerTask(null); setCreating(false) }}
-        onCreate={handleCreateTask}
-        onSave={handleSave}
-        onDelete={handleDelete}
-      />
     </div>
+
+    {/* Fuera del `@container` a propósito: bajo XP el modal es `absolute inset-0` y un container-type
+        establece containing-block — dentro del root scoparía el scrim a la caja max-w-7xl en vez de a
+        la ventana padre. Como hermano de la sección, se scopea al content-area `relative` de la ventana. */}
+    <TaskDrawer
+      task={drawerTask}
+      creating={creating}
+      entities={entities}
+      onClose={() => { setDrawerTask(null); setCreating(false) }}
+      onCreate={handleCreateTask}
+      onSave={handleSave}
+      onDelete={handleDelete}
+    />
+    </>
   )
 }

@@ -5,7 +5,7 @@ import { useOSSettings } from '@/components/OSSettingsContext'
 import type { OSSection } from '@/components/OSDrum'
 import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
-import { XpSlider, XpCheckbox } from './xp-controls'
+import { XpSlider, XpCheckbox, XpContextMenu } from './xp-controls'
 import { XpIcon, SECTION_ICON } from './xp-icons'
 import { RunDialog } from './RunDialog'
 import { SearchDialog } from './SearchDialog'
@@ -109,7 +109,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 
   // Las SECCIONES son resizables + maximizables (contenido denso, responden por container queries).
   const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href] })
-  const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 470, h: 306, icon: 'clock' })
+  const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 470, h: 344, icon: 'clock' })
   const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466, icon: 'display' }) }
   // Mi PC — STUB (su ventana real = Caja Fuerte como unidades de disco, futuro). El escritorio nace
   // sabiendo que existe. Papelera — decorativa (canon "está vacía").
@@ -204,11 +204,12 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         )
       })}
 
-      {/* Menú contextual del escritorio (mínimo: solo Propiedades por ahora) */}
+      {/* Menú contextual del escritorio (mínimo: Propiedades → Propiedades de Pantalla) */}
       {ctxMenu && (
-        <div style={{ position: 'absolute', left: ctxMenu.x, top: ctxMenu.y, zIndex: 10002, minWidth: 160, background: '#fff', border: '1px solid #0831d9', boxShadow: '3px 3px 10px rgba(0,0,0,0.35)', padding: '3px 0' }}>
-          <button className="xp-startmenu-item" onClick={openDisplayProps} style={{ ...startItem, padding: '6px 16px' }}>Propiedades</button>
-        </div>
+        <XpContextMenu
+          x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}
+          items={[{ label: 'Propiedades', onClick: openDisplayProps }]}
+        />
       )}
 
       {/* Ventanas */}

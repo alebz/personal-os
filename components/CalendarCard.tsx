@@ -215,19 +215,6 @@ export default function CalendarCard() {
   return (
     <div className={`relative rounded-card border border-border p-6 shadow-xl shadow-black/20 dashboard-card transition-[width] duration-300 ease-out sm:p-8 ${agendaOpen ? 'lg:w-full' : 'lg:mx-auto lg:w-[85%]'}`}>
 
-      {/* Collapse tab — folds the agenda column away so the month fills the full width (lg only) */}
-      <button
-        type="button"
-        onClick={() => setAgendaOpen(o => !o)}
-        aria-label={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
-        title={agendaOpen ? 'Ocultar agenda' : 'Mostrar agenda'}
-        className="absolute left-full top-1/2 z-10 ml-2 hidden h-16 w-6 -translate-y-1/2 items-center justify-center text-fg-muted/70 transition-colors hover:text-fg lg:flex"
-      >
-        <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
-          <path d={agendaOpen ? 'M10 3L5 8l5 5' : 'M6 3l5 5-5 5'} strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
       {/* Header */}
       <div className="mb-6 flex items-end justify-between">
         <div className="flex items-baseline gap-2.5">
@@ -235,6 +222,20 @@ export default function CalendarCard() {
           <span className="text-subhead font-light text-fg-muted">{viewYear}</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Toggle de agenda — en el header, SIEMPRE visible (antes era un chevron `hidden lg:flex`
+              colgado `absolute left-full`: invisible debajo de lg y recortable fuera del borde → la
+              escritura de eventos quedaba inalcanzable en pantallas medianas). Icono de lista = panel. */}
+          <button
+            type="button"
+            onClick={() => setAgendaOpen(o => !o)}
+            aria-label={agendaOpen ? 'Ocultar agenda del día' : 'Mostrar agenda del día'}
+            title={agendaOpen ? 'Ocultar agenda del día' : 'Mostrar agenda del día'}
+            className={`flex h-9 w-9 items-center justify-center rounded-control transition-colors ${agendaOpen ? 'bg-surface-active text-fg' : 'text-fg-muted hover:bg-surface-hover hover:text-fg'}`}
+          >
+            <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth={1.8}>
+              <path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h7" strokeLinecap="round" />
+            </svg>
+          </button>
           {showTodayBtn && (
             <button
               onClick={goToday}

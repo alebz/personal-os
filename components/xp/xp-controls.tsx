@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, type ReactNode, type CSSProperties } from 'react'
+import { useEffect, useRef, type ReactNode, type CSSProperties } from 'react'
 
 // Vocabulario de controles de DIÁLOGOS de sistema XP — nativo LITERAL (no tokens del OS). Se construye
 // una vez y sirve a todos los diálogos (Fecha/Hora, Propiedades, popup de volumen). Ver THEMING.md.
@@ -44,6 +44,44 @@ export function XpLabel({ children }: { children: ReactNode }) {
   return <label style={{ display: 'block', fontSize: 11, marginBottom: 3, color: '#000' }}>{children}</label>
 }
 
+// Menú contextual XP (click derecho): recuadro blanco borde azul, items con hover azul (.xp-startmenu-item).
+// Se posiciona en px LÓGICOS del subárbol escalado (el llamador convierte clientX/Y ÷ escala). Reutilizado
+// por el escritorio (Propiedades) y el calendario de Fecha/Hora (Nuevo/Editar evento).
+export function XpContextMenu({
+  x, y, items, onClose,
+}: {
+  x: number; y: number
+  items: { label: string; onClick: () => void; disabled?: boolean }[]
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  // Cierre al hacer click AFUERA. Chequeo de contención (no basta stopPropagation: el synthetic de React
+  // no frena un listener nativo en document, así que un click DENTRO igual dispararía este handler).
+  useEffect(() => {
+    const onDown = (e: Event) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [onClose])
+  return (
+    <div
+      ref={ref}
+      style={{ position: 'absolute', left: x, top: y, zIndex: 10002, minWidth: 168, background: '#fff', border: '1px solid #0831d9', boxShadow: '3px 3px 10px rgba(0,0,0,0.35)', padding: '3px 0' }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {items.map((it, i) => (
+        <button
+          key={i} className={it.disabled ? undefined : 'xp-startmenu-item'} disabled={it.disabled}
+          onClick={() => { if (!it.disabled) { it.onClick(); onClose() } }}
+          style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 12, padding: '6px 16px', color: it.disabled ? '#9a968a' : '#000', cursor: it.disabled ? 'default' : 'pointer' }}
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function GroupBox({ label, children, style }: { label: string; children: ReactNode; style?: CSSProperties }) {
   return (
     <fieldset className="xp-groupbox" style={{ margin: 0, minInlineSize: 'auto', ...style }}>
@@ -62,7 +100,7 @@ export function XpCheckbox({ checked, onChange, label }: { checked: boolean; onC
   )
 }
 
-export function XpSelect({ value, options, onChange, width }: { value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; width?: number }) {
+export function XpSelect({ value, options, onChange, width }: { value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; width?: number | string }) {
   return (
     <span className="xp-select" style={{ width }}>
       <select value={value} onChange={(e) => onChange(e.target.value)}>
