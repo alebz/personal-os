@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { wallpaperSrc } from '@/lib/xpWallpapers'
+import { XpWMContext, type XpWM } from './wm-context'
 import type { OSSection } from '@/components/OSDrum'
 import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
@@ -157,7 +158,17 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   function logOff() { playXpSound('logoff'); set('shell', 'arcade') }
   function shutDown() { closeStart(); playXpSound('shutdown'); startScreensaver() }
 
+  // Valor ESTABLE del WM para las secciones (refs → siempre llaman a la última versión de open/closeWindow;
+  // identidad memo [] → los consumidores no re-renderean por cambio de identidad del contexto).
+  const openRef = useRef(openWindow); openRef.current = openWindow
+  const closeRef = useRef(closeWindow); closeRef.current = closeWindow
+  const wmValue = useMemo<XpWM>(() => ({
+    openWindow: (id, title, content, opts) => openRef.current(id, title, content, opts),
+    closeWindow: (id) => closeRef.current(id),
+  }), [])
+
   return (
+    <XpWMContext.Provider value={wmValue}>
     <div
       className="xp-desktop"
       style={{
@@ -332,6 +343,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       </div>
 
     </div>
+    </XpWMContext.Provider>
   )
 }
 

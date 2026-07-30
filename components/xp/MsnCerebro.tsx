@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useXpWM } from './wm-context'
+import MsnChat, { type ChatBuddy } from './MsnChat'
 
 // MSN-CEREBRO — la re-encarnación de época de Cerebro (regla "alma de época": cada app resuelta como
 // en 2003). NO envuelve CerebroContent: es una presentación nueva. Windows/MSN Messenger 6/7: ventana
@@ -123,8 +125,11 @@ export default function MsnCerebro() {
     return ordered.map((cat) => ({ cat, items: by[cat].slice().sort((a, b) => a.name.localeCompare(b.name)) }))
   }, [contacts])
 
-  const openChat = (_id: string) => { /* inc.2: abre la ventana de chat */ }
+  const wm = useXpWM()
+  const openChat = (b: ChatBuddy) => wm?.openWindow(`chat:${b.id}`, b.name, <MsnChat buddy={b} />, { w: 404, h: 432, resizable: true, icon: 'cerebro' })
   const toggle = (k: string) => setCollapsed((p) => ({ ...p, [k]: !p[k] }))
+
+  const specialKind = (id: string): ChatBuddy['kind'] => (id === 'sys:cerebro' ? 'cerebro' : id === 'sys:lolo' ? 'lolo' : 'diario')
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
@@ -170,7 +175,7 @@ export default function MsnCerebro() {
         {/* Buddies fijos: Cerebro, Lolo, Diario */}
         <GroupHeader label="Mi mundo" count={SPECIALS.length} open={!collapsed['__sys']} onToggle={() => toggle('__sys')} />
         {!collapsed['__sys'] && SPECIALS.map((s) => (
-          <BuddyRow key={s.id} name={s.name} status={s.status} avatar={s.avatar} onOpen={() => openChat(s.id)} />
+          <BuddyRow key={s.id} name={s.name} status={s.status} avatar={s.avatar} onOpen={() => openChat({ id: s.id, name: s.name, kind: specialKind(s.id), avatar: s.avatar })} />
         ))}
 
         {/* Contactos reales por categoría */}
@@ -183,7 +188,7 @@ export default function MsnCerebro() {
                 key={c.id} name={c.name}
                 status={c.company ?? undefined}
                 avatar={{ initials: c.name.trim().charAt(0).toUpperCase() || '?', bg: '#8aa0c0' }}
-                onOpen={() => openChat(c.id)}
+                onOpen={() => openChat({ id: c.id, name: c.name, kind: 'person', avatar: { initials: c.name.trim().charAt(0).toUpperCase() || '?', bg: '#8aa0c0' } })}
               />
             ))}
           </div>
