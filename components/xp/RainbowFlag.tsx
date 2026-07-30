@@ -18,6 +18,7 @@ export function RainbowFlag({ w = 17, h = 14 }: { w?: number; h?: number }) {
       style={{
         display: 'inline-block', width: w, height: h, flexShrink: 0, borderRadius: 1,
         background: `linear-gradient(180deg, ${stops})`,   // horizontal = franjas apiladas
+        boxShadow: '0 1px 1.5px rgba(0,0,0,0.4)',          // lift sutil (se despega del pill / fondo)
       }}
     />
   )

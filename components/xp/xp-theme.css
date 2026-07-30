@@ -28,6 +28,8 @@
 .xp-titlebar {
   height: 29px;
   background: linear-gradient(180deg, #2c8cff 0%, #015ff0 8%, #0043d4 16%, #0039d5 46%, #0052f2 88%, #0140dd 100%);
+  /* Gloss Luna: borde superior brillante + sombra inferior sutil (el reflejo del cristal) */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 2px rgba(0, 0, 0, 0.2);
 }
 .xp-titlebar--inactive {
   background: linear-gradient(180deg, #9fc0f0 0%, #7fa2df 14%, #6f92d8 50%, #7f9fe0 90%, #6d86cf 100%);
@@ -95,6 +97,19 @@
   box-shadow:
     inset 1px 1px 2px rgba(0, 0, 0, 0.28),    /* hundido */
     inset 2px 0 0 rgba(255, 255, 255, 0.18);  /* highlight del divisor */
+}
+/* Grip del tray — el "asa" de la barra: doble cresta vertical con relieve (highlight+sombra),
+   como el gripper de XP. Da el borde-mango del pozo de notificación. */
+.xp-tray-grip {
+  flex-shrink: 0;
+  width: 3px;
+  height: 18px;
+  margin: 0 6px 0 -3px;
+  border-radius: 1px;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.55) 0, rgba(255, 255, 255, 0.55) 1px,
+    rgba(0, 0, 0, 0.22) 1px, rgba(0, 0, 0, 0.22) 2px,
+    transparent 2px);
 }
 
 /* ══ Vocabulario de DIÁLOGOS de sistema (XP nativo LITERAL — no tokens, colores XP hardcodeados) ══ */

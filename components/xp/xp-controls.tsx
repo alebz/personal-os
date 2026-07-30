@@ -65,7 +65,7 @@ export function XpContextMenu({
   return (
     <div
       ref={ref}
-      style={{ position: 'absolute', left: x, top: y, zIndex: 10002, minWidth: 168, background: '#fff', border: '1px solid #0831d9', boxShadow: '3px 3px 10px rgba(0,0,0,0.35)', padding: '3px 0' }}
+      style={{ position: 'absolute', left: x, top: y, zIndex: 10002, minWidth: 168, background: '#fff', border: '1px solid #97948a', boxShadow: '2px 3px 6px rgba(0,0,0,0.28)', padding: '2px 0' }}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >

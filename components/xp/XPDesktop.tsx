@@ -307,6 +307,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
 
         {/* System tray: pozo hundido con bocina + reloj vivo (doble-click → Fecha y hora) */}
         <div className="xp-tray" style={{ height: 30, display: 'flex', alignItems: 'center', gap: 7, padding: '0 11px 0 9px' }}>
+          <span className="xp-tray-grip" aria-hidden />
           <button
             className="xp-chrome-btn"
             onClick={() => setVolOpen((v) => !v)}
