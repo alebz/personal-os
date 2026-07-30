@@ -1,28 +1,31 @@
 'use client'
 
-// La mariposa de MSN Messenger, reimaginada en el rainbow del OS (regla "alma de época": es MI msn).
-// Cuatro alas (azul/verde/amarillo/naranja, el arco de la mariposa original) + cuerpo. SVG escalable.
+// La mariposa de MSN Messenger, calcada del logo real: cuatro alas (azul arriba-izq, naranja arriba-der,
+// verde abajo-izq, amarillo abajo-der) + ala púrpura vertical al centro, con mezcla `multiply` que oscurece
+// los solapes (como el original). SVG escalable. (Regla "alma de época": la mariposa de MI msn.)
 
 export function CerebroButterfly({ size = 20 }: { size?: number }) {
-  const h = Math.round(size * 0.9)
   return (
-    <svg width={size} height={h} viewBox="0 0 64 58" aria-hidden style={{ display: 'block', flexShrink: 0 }}>
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden style={{ display: 'block', flexShrink: 0 }}>
       <defs>
-        <radialGradient id="cbw1" cx="0.4" cy="0.35" r="0.8"><stop offset="0" stopColor="#7db0f7" /><stop offset="1" stopColor="#2f6fd0" /></radialGradient>
-        <radialGradient id="cbw2" cx="0.6" cy="0.35" r="0.8"><stop offset="0" stopColor="#79d98a" /><stop offset="1" stopColor="#2f9a3a" /></radialGradient>
-        <radialGradient id="cbw3" cx="0.4" cy="0.6" r="0.8"><stop offset="0" stopColor="#ffd759" /><stop offset="1" stopColor="#e0a500" /></radialGradient>
-        <radialGradient id="cbw4" cx="0.6" cy="0.6" r="0.8"><stop offset="0" stopColor="#ffa95a" /><stop offset="1" stopColor="#e8720f" /></radialGradient>
+        <radialGradient id="cbB" cx="0.42" cy="0.35" r="0.85"><stop offset="0" stopColor="#6fb3ec" /><stop offset="1" stopColor="#1c6cbf" /></radialGradient>
+        <radialGradient id="cbO" cx="0.58" cy="0.35" r="0.85"><stop offset="0" stopColor="#f7a24c" /><stop offset="1" stopColor="#e2540d" /></radialGradient>
+        <radialGradient id="cbG" cx="0.42" cy="0.62" r="0.85"><stop offset="0" stopColor="#6ac576" /><stop offset="1" stopColor="#1e8d34" /></radialGradient>
+        <radialGradient id="cbY" cx="0.58" cy="0.62" r="0.85"><stop offset="0" stopColor="#ffdc57" /><stop offset="1" stopColor="#efa800" /></radialGradient>
+        <radialGradient id="cbP" cx="0.5" cy="0.4" r="0.9"><stop offset="0" stopColor="#7f74c4" /><stop offset="1" stopColor="#463a90" /></radialGradient>
       </defs>
-      {/* alas superiores (más grandes) */}
-      <ellipse cx="23" cy="21" rx="16" ry="13.5" transform="rotate(-24 23 21)" fill="url(#cbw1)" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
-      <ellipse cx="41" cy="21" rx="16" ry="13.5" transform="rotate(24 41 21)" fill="url(#cbw2)" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
-      {/* alas inferiores (más chicas) */}
-      <ellipse cx="26" cy="39" rx="11.5" ry="9.5" transform="rotate(26 26 39)" fill="url(#cbw3)" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
-      <ellipse cx="38" cy="39" rx="11.5" ry="9.5" transform="rotate(-26 38 39)" fill="url(#cbw4)" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
-      {/* cuerpo + antenas */}
-      <path d="M32 7 C 34.5 20, 34.5 38, 32 51 C 29.5 38, 29.5 20, 32 7 Z" fill="#2b2b2b" />
-      <path d="M32 9 C 30 5, 27 3.5, 24.5 3.5" stroke="#2b2b2b" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-      <path d="M32 9 C 34 5, 37 3.5, 39.5 3.5" stroke="#2b2b2b" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+      <g style={{ mixBlendMode: 'multiply' }}>
+        {/* ala azul (arriba-izquierda) */}
+        <ellipse cx="35" cy="37" rx="28" ry="15" transform="rotate(-52 35 37)" fill="url(#cbB)" />
+        {/* ala naranja (arriba-derecha, la más grande) */}
+        <ellipse cx="66" cy="34" rx="31" ry="17" transform="rotate(52 66 34)" fill="url(#cbO)" />
+        {/* ala verde (abajo-izquierda) */}
+        <ellipse cx="38" cy="64" rx="22" ry="13" transform="rotate(48 38 64)" fill="url(#cbG)" />
+        {/* ala amarilla (abajo-derecha) */}
+        <ellipse cx="64" cy="66" rx="24" ry="14" transform="rotate(-48 64 66)" fill="url(#cbY)" />
+        {/* ala púrpura central (vertical) */}
+        <ellipse cx="50" cy="49" rx="8" ry="26" transform="rotate(-11 50 49)" fill="url(#cbP)" />
+      </g>
     </svg>
   )
 }

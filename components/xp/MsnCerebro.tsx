@@ -4,6 +4,25 @@ import { useEffect, useMemo, useState } from 'react'
 import { useXpWM } from './wm-context'
 import MsnChat, { type ChatBuddy } from './MsnChat'
 import { CerebroButterfly } from './CerebroButterfly'
+import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
+
+// ── Cumpleaños ────────────────────────────────────────────────────────────────
+const MONTHS_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+function parseBday(b: string | null): { m: number; d: number } | null {
+  if (!b) return null
+  const mm = /^(\d{4})-(\d{2})-(\d{2})/.exec(b)
+  return mm ? { m: +mm[2] - 1, d: +mm[3] } : null
+}
+export function bdayLabel(b: string | null | undefined): string | null {
+  const p = parseBday(b ?? null); return p ? `${p.d} ${MONTHS_ABBR[p.m]}` : null
+}
+function daysUntilBday(b: string | null, today: Date): number {
+  const p = parseBday(b); if (!p) return Infinity
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  let next = new Date(t0.getFullYear(), p.m, p.d)
+  if (next < t0) next = new Date(t0.getFullYear() + 1, p.m, p.d)
+  return Math.round((next.getTime() - t0.getTime()) / 86_400_000)
+}
 
 // MSN-CEREBRO — la re-encarnación de época de Cerebro (regla "alma de época": cada app resuelta como
 // en 2003). NO envuelve CerebroContent: es una presentación nueva. Windows/MSN Messenger 6/7: ventana
@@ -17,6 +36,7 @@ interface Contact {
   name: string
   category: string
   company: string | null
+  birthday: string | null
 }
 
 // Buddies fijos (siempre en línea). id con prefijo para no chocar con uuids de contactos.
@@ -32,12 +52,6 @@ const SPECIALS: Special[] = [
   { id: 'sys:diario',  name: 'Alex (Diario)',  status: 'yo, hablando conmigo mismo',                 avatar: { initials: 'A', bg: '#3163c8' } },
 ]
 
-const CAT_ORDER = ['Familia', 'Círculo cercano', 'Círculo extendido', 'Proveedores', 'Clientes', 'Enemigos']
-const CAT_EMOJI: Record<string, string> = {
-  'Familia': '👨‍👩‍👧', 'Círculo cercano': '🤝', 'Círculo extendido': '🌐',
-  'Proveedores': '🔧', 'Clientes': '💼', 'Enemigos': '⚔️',
-}
-
 // Icono de presencia MSN (buddy verde "en línea"): silueta simple de dos tonos.
 function Presence() {
   return (
@@ -50,25 +64,28 @@ function Presence() {
   )
 }
 
-function Avatar({ img, initials, bg, size = 20 }: { img?: string; initials?: string; bg?: string; size?: number }) {
+function Avatar({ id, img, initials, bg, size = 20, onPick }: { id?: string; img?: string; initials?: string; bg?: string; size?: number; onPick?: () => void }) {
+  const stored = useAvatar(id ?? '')
+  const src = stored || img
   return (
     <span
-      aria-hidden
+      onClick={onPick ? (e) => { e.stopPropagation(); onPick() } : undefined}
+      title={onPick ? 'Cambiar foto…' : undefined}
       style={{
         display: 'inline-flex', width: size, height: size, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
         borderRadius: 2, background: bg ?? '#8aa0c0', overflow: 'hidden',
         border: '1px solid rgba(0,0,0,0.35)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.4)',
-        color: '#fff', fontSize: size * 0.5, fontWeight: 700,
+        color: '#fff', fontSize: size * 0.5, fontWeight: 700, cursor: onPick ? 'pointer' : 'default',
       }}
     >
-      {img
-        ? <img src={img} alt="" width={size} height={size} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'auto' }} />
+      {src
+        ? <img src={src} alt="" width={size} height={size} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'auto' }} />
         : initials}
     </span>
   )
 }
 
-function BuddyRow({ name, status, avatar, onOpen }: { name: string; status?: string; avatar: Special['avatar']; onOpen: () => void }) {
+function BuddyRow({ id, name, status, avatar, onOpen }: { id: string; name: string; status?: string; avatar: Special['avatar']; onOpen: () => void }) {
   const [hover, setHover] = useState(false)
   return (
     <button
@@ -81,7 +98,7 @@ function BuddyRow({ name, status, avatar, onOpen }: { name: string; status?: str
       }}
     >
       <Presence />
-      <Avatar {...avatar} size={18} />
+      <Avatar id={id} {...avatar} size={18} />
       <span style={{ minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {name}
         {status && <span style={{ color: '#7a7a7a', fontStyle: 'italic' }}> — {status}</span>}
@@ -118,12 +135,13 @@ export default function MsnCerebro() {
     return () => { live = false }
   }, [])
 
-  // Agrupa contactos por categoría, en el orden canónico (categorías desconocidas al final).
-  const groups = useMemo(() => {
-    const by: Record<string, Contact[]> = {}
-    for (const c of contacts) (by[c.category] ??= []).push(c)
-    const ordered = [...CAT_ORDER.filter((c) => by[c]), ...Object.keys(by).filter((c) => !CAT_ORDER.includes(c)).sort()]
-    return ordered.map((cat) => ({ cat, items: by[cat].slice().sort((a, b) => a.name.localeCompare(b.name)) }))
+  // Contactos ordenados por CUMPLEAÑOS próximo (el más cercano primero); sin fecha → al final, alfabético.
+  const sorted = useMemo(() => {
+    const today = new Date()
+    return contacts.slice().sort((a, b) => {
+      const da = daysUntilBday(a.birthday, today), db = daysUntilBday(b.birthday, today)
+      return da !== db ? da - db : a.name.localeCompare(b.name)
+    })
   }, [contacts])
 
   const wm = useXpWM()
@@ -148,7 +166,7 @@ export default function MsnCerebro() {
 
       {/* Panel de estado: tu foto + nombre + presencia + mensaje personal */}
       <div style={{ flexShrink: 0, display: 'flex', gap: 9, padding: '8px 10px', alignItems: 'center', borderBottom: '1px solid #d7d4c8' }}>
-        <Avatar initials="A" bg="#3163c8" size={44} />
+        <Avatar id="me" initials="A" bg="#3163c8" size={44} onPick={() => changeAvatar('me')} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: '#111' }}>Alex</span>
@@ -184,24 +202,27 @@ export default function MsnCerebro() {
         {/* Buddies fijos: Cerebro, Lolo, Diario */}
         <GroupHeader label="Mi mundo" count={SPECIALS.length} open={!collapsed['__sys']} onToggle={() => toggle('__sys')} />
         {!collapsed['__sys'] && SPECIALS.map((s) => (
-          <BuddyRow key={s.id} name={s.name} status={s.status} avatar={s.avatar} onOpen={() => openChat({ id: s.id, name: s.name, kind: specialKind(s.id), avatar: s.avatar })} />
+          <BuddyRow key={s.id} id={s.id} name={s.name} status={s.status} avatar={s.avatar} onOpen={() => openChat({ id: s.id, name: s.name, kind: specialKind(s.id), avatar: s.avatar })} />
         ))}
 
-        {/* Contactos reales por categoría */}
+        {/* Contactos reales, ORDENADOS POR CUMPLEAÑOS próximo (el cumple visible en cada fila) */}
         {loading && <div style={{ padding: '8px 20px', color: '#8a867a', fontStyle: 'italic' }}>Cargando contactos…</div>}
-        {groups.map(({ cat, items }) => (
-          <div key={cat}>
-            <GroupHeader label={`${CAT_EMOJI[cat] ?? '🏷️'} ${cat}`} count={items.length} open={!collapsed[cat]} onToggle={() => toggle(cat)} />
-            {!collapsed[cat] && items.map((c) => (
-              <BuddyRow
-                key={c.id} name={c.name}
-                status={c.company ?? undefined}
-                avatar={{ initials: c.name.trim().charAt(0).toUpperCase() || '?', bg: '#8aa0c0' }}
-                onOpen={() => openChat({ id: c.id, name: c.name, kind: 'person', avatar: { initials: c.name.trim().charAt(0).toUpperCase() || '?', bg: '#8aa0c0' } })}
-              />
-            ))}
-          </div>
-        ))}
+        {sorted.length > 0 && (
+          <>
+            <GroupHeader label="🎂 Contactos (por cumpleaños)" count={sorted.length} open={!collapsed.contacts} onToggle={() => toggle('contacts')} />
+            {!collapsed.contacts && sorted.map((c) => {
+              const bd = bdayLabel(c.birthday)
+              const status = [bd ? `🎂 ${bd}` : null, c.company].filter(Boolean).join(' · ') || undefined
+              const avatar = { initials: c.name.trim().charAt(0).toUpperCase() || '?', bg: '#8aa0c0' }
+              return (
+                <BuddyRow
+                  key={c.id} id={c.id} name={c.name} status={status} avatar={avatar}
+                  onOpen={() => openChat({ id: c.id, name: c.name, kind: 'person', avatar, birthday: c.birthday, category: c.category })}
+                />
+              )
+            })}
+          </>
+        )}
       </div>
 
       {/* Banner inferior — el "ad" .net de MSN, con la mariposa */}

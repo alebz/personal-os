@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 
 // Ventana de conversación MSN (canon MSN 6/7: cada chat es su propia ventana del WM). Inc.2 cablea
 // SOLO al buddy "Cerebro" = Consultar (RAG streaming vía /api/ask, con fuentes). Los demás buddies
@@ -12,6 +13,15 @@ export interface ChatBuddy {
   name: string
   kind: ChatKind
   avatar: { img?: string; initials?: string; bg?: string }
+  birthday?: string | null
+  category?: string
+}
+
+// Cumpleaños "28 jul" (formateo local, sin dependencia circular con MsnCerebro).
+const MONTHS_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+function bdayLabel(b: string | null | undefined): string | null {
+  const mm = b ? /^(\d{4})-(\d{2})-(\d{2})/.exec(b) : null
+  return mm ? `${+mm[3]} ${MONTHS_ABBR[+mm[2] - 1]}` : null
 }
 
 interface Source { id: string; content: string }
@@ -27,6 +37,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const wired = buddy.kind === 'cerebro'
+  const bd = bdayLabel(buddy.birthday)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
@@ -83,12 +94,13 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
-      {/* Cabecera del contacto */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'linear-gradient(180deg,#eaf3fd,#cfe0f5)', borderBottom: '1px solid #9db8dd' }}>
-        <Avatar {...buddy.avatar} size={28} />
+      {/* Cabecera del contacto — foto (click = cambiar), nombre, presencia y CUMPLEAÑOS siempre visible */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', background: 'linear-gradient(180deg,#eaf3fd,#cfe0f5)', borderBottom: '1px solid #9db8dd' }}>
+        <Avatar id={buddy.id} {...buddy.avatar} size={38} onPick={() => changeAvatar(buddy.id)} />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#1c4a86' }}>{buddy.name}</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1c4a86' }}>{buddy.name}</div>
           <div style={{ fontSize: 10.5, color: '#2f9a22' }}>En línea</div>
+          {bd && <div style={{ fontSize: 10.5, color: '#9a6b1a' }}>🎂 Cumpleaños: {bd}</div>}
         </div>
       </div>
 
@@ -151,17 +163,21 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   )
 }
 
-function Avatar({ img, initials, bg, size = 20 }: { img?: string; initials?: string; bg?: string; size?: number }) {
+function Avatar({ id, img, initials, bg, size = 20, onPick }: { id?: string; img?: string; initials?: string; bg?: string; size?: number; onPick?: () => void }) {
+  const stored = useAvatar(id ?? '')
+  const src = stored || img
   return (
     <span
-      aria-hidden
+      onClick={onPick ? (e) => { e.stopPropagation(); onPick() } : undefined}
+      title={onPick ? 'Cambiar foto…' : undefined}
       style={{
         display: 'inline-flex', width: size, height: size, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
         borderRadius: 2, background: bg ?? '#8aa0c0', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.35)',
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.4)', color: '#fff', fontSize: size * 0.5, fontWeight: 700,
+        cursor: onPick ? 'pointer' : 'default',
       }}
     >
-      {img ? <img src={img} alt="" width={size} height={size} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+      {src ? <img src={src} alt="" width={size} height={size} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
     </span>
   )
 }
