@@ -10,6 +10,7 @@ import FinanzasContent from '@/components/sections/FinanzasContent'
 import UptownContent from '@/components/sections/UptownContent'
 import InicioContent from '@/components/sections/InicioContent'
 import XPDesktop from '@/components/xp/XPDesktop'
+import XpScreensaver from '@/components/xp/XpScreensaver'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { SECTION_COLORS } from '@/lib/sections'
 
@@ -32,7 +33,7 @@ export default function HomePage() {
   // El cascarón (Capa B) decide qué se monta: el tambor (arcade, default) o el escritorio XP. Las
   // MISMAS secciones-componente se pasan a cualquiera. Client-only (render tras mount) porque el
   // tambor y sus secciones usan `document`.
-  const { shell, screensaverActive } = useOSSettings()
+  const { shell, screensaverActive, xpScreensaver } = useOSSettings()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   if (!mounted) return null
@@ -40,14 +41,13 @@ export default function HomePage() {
   return (
     <>
       <XPDesktop sections={SECTIONS} />
-      {/* "Apagar equipo" = excursión al alma arcade: el tambor-screensaver se monta ENCIMA como
-          overlay — el escritorio XP nunca se desmonta, así que al despertar (cualquier actividad,
-          detectada por el contexto) está EXACTAMENTE como estaba. Fuera de todo [data-theme="xp"]
-          (scoped a los cuerpos de ventana) → tokens arcade oscuros; el CRT del usuario aplica
-          durante la excursión (contexto re-activa data-crt + crt efectivo). */}
+      {/* Screensaver POR TEMA: bajo XP "Apagar equipo"/idle monta el PROTECTOR XP elegido (Mystify /
+          Logo / Starfield), NO el tambor — antes montaba OSDrum aquí (fuga corregida). El escritorio
+          XP nunca se desmonta → al despertar (cualquier actividad, detectada por el contexto) queda
+          EXACTAMENTE como estaba. El protector es canvas limpio (sin CRT: eso es del arcade). */}
       {screensaverActive && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: 'var(--color-surface-base)' }}>
-          <OSDrum sections={SECTIONS} />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
+          <XpScreensaver variant={xpScreensaver} />
         </div>
       )}
     </>

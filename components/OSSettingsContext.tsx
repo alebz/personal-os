@@ -43,12 +43,18 @@ interface OSSettingsState {
   discreto:       boolean
   showLolo:       boolean
   crt:            CrtState
-  screensaver:    { enabled: boolean; speed: number }   // speed = segundos por vuelta completa del tambor
+  screensaver:    { enabled: boolean; speed: number; minutes: number }   // speed = seg/vuelta del tambor; minutes = umbral de inactividad (compartido arcade+XP)
   supraconsciente: SupraState
   shell:          Shell
   xpSound:        { on: boolean; volume: number }   // sonidos del cascarón XP (WAVs reales del pack)
   xpLogicalH:     number                            // altura lógica del lienzo XP (dial de "Propiedades de Pantalla")
+  xpScreensaver:  XpScreensaverKind                 // protector de pantalla elegido bajo XP ("Apagar equipo"/idle lo invoca)
+  xpWallpaper:    string                            // key del wallpaper del escritorio XP (ver lib/xpWallpapers)
 }
+
+// Protectores de pantalla XP (canvas 2D). 'mystify' = líneas rebotando con estela; 'logo' = logo del OS
+// flotante; 'starfield' = campo de estrellas. POR TEMA: bajo XP se monta el elegido (no el tambor).
+export type XpScreensaverKind = 'mystify' | 'logo' | 'starfield'
 
 interface OSSettingsCtx extends OSSettingsState {
   set:            <K extends keyof OSSettingsState>(key: K, value: OSSettingsState[K]) => void
@@ -87,11 +93,13 @@ const DEFAULTS: OSSettingsState = {
   discreto:    false,
   showLolo:    true,
   crt:         CRT_DEFAULTS,
-  screensaver: { enabled: true, speed: 75 },   // 3 min idle → tambor gira; vuelta completa cada 75s
+  screensaver: { enabled: true, speed: 75, minutes: 3 },   // 3 min idle → protector; tambor gira cada 75s
   supraconsciente: { enabled: true, rotateMinutes: 4, topics: { supra: true } },
   shell:       'arcade',   // default: el tambor. 'xp' monta el escritorio Windows XP.
   xpSound:     { on: true, volume: 0.25 },   // volumen BAJO por default — nostalgia sin fatiga
   xpLogicalH:  800,   // arranque del dial (escalar amable ~época); ajustable en Propiedades de Pantalla
+  xpScreensaver: 'mystify',   // protector XP por default (canon de época)
+  xpWallpaper: 'bliss_4k',    // wallpaper XP por default (el Bliss 4K real)
 }
 
 const STORAGE_KEY = 'os-settings'
@@ -208,7 +216,7 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
   const settingsOpenRef = useRef(false); settingsOpenRef.current = settingsOpen
   useEffect(() => {
     if (!state.screensaver.enabled) { setScreensaverActive(false); return }
-    const IDLE_MS = 180_000
+    const IDLE_MS = Math.max(1, state.screensaver.minutes) * 60_000
     let timer: ReturnType<typeof setTimeout>
     let lastWakeT = 0
     const suppressed = () => {
@@ -231,7 +239,7 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
       evs.forEach(ev => window.removeEventListener(ev, onActivity, { capture: true }))
       window.removeEventListener('click', onClickCapture, true)
     }
-  }, [state.screensaver.enabled])
+  }, [state.screensaver.enabled, state.screensaver.minutes])
 
   return (
     <Ctx.Provider value={{

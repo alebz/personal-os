@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import { wallpaperSrc } from '@/lib/xpWallpapers'
 import type { OSSection } from '@/components/OSDrum'
 import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
@@ -66,7 +67,7 @@ function XPClock({ onOpen }: { onOpen: () => void }) {
 }
 
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
-  const { set, xpSound, xpLogicalH, startScreensaver } = useOSSettings()
+  const { set, xpSound, xpLogicalH, startScreensaver, xpWallpaper } = useOSSettings()
   const [startOpen, setStartOpen] = useState(false)
   const [allOpen, setAllOpen] = useState(false)
   const [windows, setWindows] = useState<WinState[]>([])
@@ -162,7 +163,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       style={{
         position: 'fixed', top: 0, left: 0, width: logicalW, height: xpLogicalH,
         transform: `scale(${scale})`, transformOrigin: 'top left', overflow: 'hidden',
-        background: "#3a6ea5 url('/themes/xp/wallpapers/bliss_4k.jpg') center / cover no-repeat",
+        background: `#3a6ea5 url('${wallpaperSrc(xpWallpaper)}') center / cover no-repeat`,
       }}
     >
       {/* Raíz de portales bajo XP: los modales que escapan a body (DrumModal/libretas) portalean AQUÍ

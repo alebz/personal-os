@@ -126,13 +126,15 @@ export function XpSpinner({ value, onStep, width }: { value: number | string; on
 // Trackbar custom: mide el valor por posición RELATIVA al track (ratio scale-invariante → sin factor
 // de escala). Groove hundido + thumb + tick marks. Vertical (volumen) u horizontal.
 export function XpSlider({
-  value, min = 0, max = 1, step = 0.05, onChange, vertical = false, length = 96, ticks = 0,
+  value, min = 0, max = 1, step = 0.05, onChange, onCommit, vertical = false, length = 96, ticks = 0,
 }: {
   value: number; min?: number; max?: number; step?: number; onChange: (v: number) => void
+  onCommit?: (v: number) => void   // se dispara al SOLTAR (para commits caros como re-escalar el lienzo)
   vertical?: boolean; length?: number; ticks?: number
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
+  const lastVal = useRef(value); lastVal.current = value
   const pct = (value - min) / (max - min || 1)
 
   function fromPointer(clientX: number, clientY: number) {
@@ -146,7 +148,7 @@ export function XpSlider({
   }
   const down = (e: React.PointerEvent) => { dragging.current = true; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* sin captura */ } fromPointer(e.clientX, e.clientY) }
   const move = (e: React.PointerEvent) => { if (dragging.current) fromPointer(e.clientX, e.clientY) }
-  const up = (e: React.PointerEvent) => { dragging.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ } }
+  const up = (e: React.PointerEvent) => { dragging.current = false; try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ } onCommit?.(lastVal.current) }
 
   const THUMB = 11    // grosor del thumb (a lo largo del eje)
   const CROSS = 20    // ancho del thumb (eje cruzado)
