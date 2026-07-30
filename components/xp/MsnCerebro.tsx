@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useXpWM } from './wm-context'
 import MsnChat, { type ChatBuddy } from './MsnChat'
 import { CerebroButterfly } from './CerebroButterfly'
 import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
+import { XpDialogModal, XpField, XpLabel, XpSelect } from './xp-controls'
 
 // ── Cumpleaños ────────────────────────────────────────────────────────────────
 const MONTHS_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -124,16 +125,16 @@ export default function MsnCerebro() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => {
-    let live = true
+  const loadContacts = useCallback(() => {
     fetch('/api/contacts')
       .then((r) => r.json())
-      .then((d) => { if (live && Array.isArray(d)) setContacts(d) })
+      .then((d) => { if (Array.isArray(d)) setContacts(d) })
       .catch(() => {})
-      .finally(() => { if (live) setLoading(false) })
-    return () => { live = false }
+      .finally(() => setLoading(false))
   }, [])
+  useEffect(() => { loadContacts() }, [loadContacts])
 
   // Contactos ordenados por CUMPLEAÑOS próximo (el más cercano primero); sin fecha → al final, alfabético.
   const sorted = useMemo(() => {
@@ -194,7 +195,7 @@ export default function MsnCerebro() {
           </span>
           <span style={{ position: 'absolute', right: -1, bottom: -1, fontSize: 9, fontWeight: 900, color: '#2f9a22' }}>+</span>
         </span>
-        <span style={{ cursor: 'pointer' }}>Agregar un contacto</span>
+        <span role="button" tabIndex={0} onClick={() => setAddOpen(true)} style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>Agregar un contacto</span>
       </div>
 
       {/* Lista de contactos — backdrop del Messenger original al ~20% (velo blanco 0.8 encima, ya que los
@@ -232,6 +233,78 @@ export default function MsnCerebro() {
         <span style={{ fontSize: 12, color: '#5f6b7a' }}><b style={{ color: '#15559e' }}>Cerebro</b> Messenger</span>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#8a93a0' }}>.mx</span>
       </div>
+
+      {addOpen && <AddContactDialog onClose={() => setAddOpen(false)} onCreated={loadContacts} />}
     </div>
+  )
+}
+
+// Diálogo XP "Agregar un contacto" — misma funcionalidad que el arcade (POST /api/contacts), presentada
+// como diálogo XP centrado sobre la ventana. Categorías de /api/contact-categories.
+function AddContactDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState('')
+  const [company, setCompany] = useState('')
+  const [birthday, setBirthday] = useState('')
+  const [notes, setNotes] = useState('')
+  const [cats, setCats] = useState<{ id: string; name: string }[]>([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/contact-categories')
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d)) { setCats(d); if (d[0]) setCategory(d[0].name) } })
+      .catch(() => {})
+  }, [])
+
+  async function save() {
+    if (!name.trim() || !category || busy) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/contacts', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), category, company: company || null, birthday: birthday || null, notes: notes || null }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok || d.error) { setErr(d.error ?? 'No se pudo agregar'); return }
+      onCreated(); onClose()
+    } catch (e) { setErr(String(e)) } finally { setBusy(false) }
+  }
+
+  return (
+    <XpDialogModal
+      open title="Agregar un contacto" width={384}
+      onCancel={onClose} onOk={save}
+      okLabel={busy ? 'Guardando…' : 'Aceptar'} okDisabled={busy || !name.trim() || !category}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        <div>
+          <XpLabel>Nombre</XpLabel>
+          <XpField autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del contacto" />
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <XpLabel>Categoría</XpLabel>
+            <XpSelect value={category} width="100%" onChange={setCategory} options={cats.map((c) => ({ value: c.name, label: c.name }))} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <XpLabel>Cumpleaños</XpLabel>
+            <XpField type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+          </div>
+        </div>
+        <div>
+          <XpLabel>Empresa</XpLabel>
+          <XpField value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Opcional" />
+        </div>
+        <div>
+          <XpLabel>Notas</XpLabel>
+          <textarea className="xp-sunken" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+            style={{ width: '100%', padding: '4px 5px', fontFamily: 'inherit', fontSize: 11, resize: 'none', outline: 'none' }} placeholder="Opcional" />
+        </div>
+        {cats.length === 0 && <p style={{ fontSize: 10.5, color: '#8a6a1a', margin: 0 }}>No hay categorías aún — créalas en la sección Contactos.</p>}
+        {err && <p style={{ fontSize: 11, color: '#a0201a', margin: 0 }}>{err}</p>}
+      </div>
+    </XpDialogModal>
   )
 }
