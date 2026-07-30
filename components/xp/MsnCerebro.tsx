@@ -197,8 +197,9 @@ export default function MsnCerebro() {
         <span style={{ cursor: 'pointer' }}>Agregar un contacto</span>
       </div>
 
-      {/* Lista de contactos */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: '#fff', padding: '4px 0' }}>
+      {/* Lista de contactos — backdrop del Messenger original al ~20% (velo blanco 0.8 encima, ya que los
+          fondos CSS no tienen opacity directa), fijado al fondo del área visible */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: "linear-gradient(rgba(255,255,255,0.8), rgba(255,255,255,0.8)), #fff url('/themes/xp/msn_messenger_background.png') center bottom / contain no-repeat", padding: '4px 0' }}>
         {/* Buddies fijos: Cerebro, Lolo, Diario */}
         <GroupHeader label="Mi mundo" count={SPECIALS.length} open={!collapsed['__sys']} onToggle={() => toggle('__sys')} />
         {!collapsed['__sys'] && SPECIALS.map((s) => (

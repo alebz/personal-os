@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { MOODS } from '@/components/sections/DiarioContent'
+import { renderEmoticons, EMOTICONS, emoSrc } from '@/lib/msnEmoticons'
+import { CerebroButterfly } from './CerebroButterfly'
 
 // Ventana de conversación MSN (canon MSN 6/7: cada chat es su propia ventana del WM). Cablea los 4
 // tipos de buddy (regla "no resta funcionalidad" — cada función de Cerebro tiene su puerta aquí):
@@ -45,9 +47,11 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [mood, setMood] = useState('')
+  const [showEmo, setShowEmo] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const bd = bdayLabel(buddy.birthday)
+  const insertEmo = (s: string) => { setInput((v) => (v && !v.endsWith(' ') ? v + ' ' : v) + s + ' '); setShowEmo(false) }
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }) }, [msgs])
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -183,42 +187,59 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
-      {/* Cabecera del contacto — foto (click = cambiar), nombre, presencia y CUMPLEAÑOS siempre visible */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', background: 'linear-gradient(180deg,#eaf3fd,#cfe0f5)', borderBottom: '1px solid #9db8dd' }}>
-        <Avatar id={buddy.id} {...buddy.avatar} size={38} onPick={() => changeAvatar(buddy.id)} />
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1c4a86' }}>{buddy.name}</div>
-          <div style={{ fontSize: 10.5, color: '#2f9a22' }}>En línea</div>
-          {bd && <div style={{ fontSize: 10.5, color: '#9a6b1a' }}>🎂 Cumpleaños: {bd}</div>}
-        </div>
+      {/* Toolbar MSN (decorativo) + mariposa */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '3px 10px', background: 'linear-gradient(#fbfcfe,#eaeef4)', borderBottom: '1px solid #cdd6e2', fontSize: 10.5, color: '#2a4d8f' }}>
+        {['Invitar', 'Enviar archivos', 'Voz', 'Actividades', 'Juegos'].map((x) => <span key={x} style={{ cursor: 'default' }}>{x}</span>)}
+        <span style={{ marginLeft: 'auto', display: 'inline-flex' }}><CerebroButterfly size={18} /></span>
       </div>
 
-      {/* Historial */}
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: '#fff' }}>
-        {msgs.length === 0 ? (
-          <div style={{ color: '#8a867a', fontStyle: 'italic', fontSize: 11 }}>{emptyHint[buddy.kind]}</div>
-        ) : (
-          msgs.map((m) => m.from === 'sys' ? (
-            <div key={m.id} style={{ textAlign: 'center', color: '#8a867a', fontSize: 10.5, margin: '6px 0' }}>{m.text}</div>
+      {/* Para: contacto + CUMPLEAÑOS siempre visible */}
+      <div style={{ flexShrink: 0, padding: '5px 10px', borderBottom: '1px solid #d7d4c8', fontSize: 11 }}>
+        <span style={{ color: '#555' }}>Para: </span>
+        <span style={{ fontWeight: 700, color: '#1c4a86' }}>{buddy.name}</span>
+        <span style={{ color: '#2f9a22' }}> (En línea)</span>
+        {bd && <span style={{ color: '#9a6b1a' }}> · 🎂 {bd}</span>}
+      </div>
+
+      {/* Banner de seguridad (icónico de MSN) */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: '#fbf8d8', borderBottom: '1px solid #e6dfa8', fontSize: 10.5, color: '#4a4632' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 13, height: 13, flexShrink: 0, borderRadius: '50%', background: '#3163c8', color: '#fff', fontSize: 9, fontWeight: 700, fontStyle: 'italic' }}>i</span>
+        Nunca compartas contraseñas ni datos de tarjeta en una conversación.
+      </div>
+
+      {/* Fila principal: historial (izq) + display pictures (der, canon MSN 7) */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <div ref={scrollRef} style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '8px 10px', background: '#fff' }}>
+          {msgs.length === 0 ? (
+            <div style={{ color: '#8a867a', fontStyle: 'italic', fontSize: 11 }}>{emptyHint[buddy.kind]}</div>
           ) : (
-            <div key={m.id} style={{ marginBottom: 8 }}>
-              <span style={{ fontWeight: 700, color: m.from === 'me' ? '#c0271c' : '#1c4a86' }}>{m.name} dice:</span>
-              <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.45, marginTop: 1 }}>
-                {m.text}
-                {m.streaming && !m.text && <span style={{ fontStyle: 'italic', color: '#8a867a' }}>escribiendo un mensaje…</span>}
-              </div>
-              {m.sources && m.sources.length > 0 && (
-                <div style={{ marginTop: 4, paddingLeft: 8, borderLeft: '2px solid #d5e0ef', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {m.sources.slice(0, 6).map((s) => (
-                    <div key={s.id} style={{ fontSize: 10, color: '#5b6b7f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      📎 {s.content.replace(/\s+/g, ' ').slice(0, 90)}
-                    </div>
-                  ))}
+            msgs.map((m) => m.from === 'sys' ? (
+              <div key={m.id} style={{ textAlign: 'center', color: '#8a867a', fontSize: 10.5, margin: '6px 0' }}>{m.text}</div>
+            ) : (
+              <div key={m.id} style={{ marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, color: m.from === 'me' ? '#c0271c' : '#1c4a86' }}>{m.name} dice:</span>
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, marginTop: 1 }}>
+                  {m.text ? renderEmoticons(m.text) : (m.streaming && <span style={{ fontStyle: 'italic', color: '#8a867a' }}>escribiendo un mensaje…</span>)}
                 </div>
-              )}
-            </div>
-          ))
-        )}
+                {m.sources && m.sources.length > 0 && (
+                  <div style={{ marginTop: 4, paddingLeft: 8, borderLeft: '2px solid #d5e0ef', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {m.sources.slice(0, 6).map((s) => (
+                      <div key={s.id} style={{ fontSize: 10, color: '#5b6b7f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        📎 {s.content.replace(/\s+/g, ' ').slice(0, 90)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        {/* Display pictures: la del contacto arriba, la tuya abajo — click para cambiar */}
+        <div style={{ flexShrink: 0, width: 84, borderLeft: '1px solid #dbe1ea', background: 'linear-gradient(#f4f7fb,#e7edf5)', padding: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <Avatar id={buddy.id} {...buddy.avatar} size={64} onPick={() => changeAvatar(buddy.id)} />
+          <div style={{ flex: 1 }} />
+          <Avatar id="me" initials="A" bg="#3163c8" size={64} onPick={() => changeAvatar('me')} />
+        </div>
       </div>
 
       {/* Selector de ánimo (solo Diario) */}
@@ -233,6 +254,24 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
           ))}
         </div>
       )}
+
+      {/* Barra de formato: fuente + picker de emoticons */}
+      <div style={{ flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: '2px 9px', background: '#f4f7fb', borderTop: '1px solid #dbe1ea' }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: '#333', cursor: 'default' }} title="Fuente">A</span>
+        <button onClick={() => setShowEmo((v) => !v)} title="Emoticons" style={{ border: 0, background: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex' }}>
+          <img src={emoSrc(EMOTICONS[0])} alt="Emoticons" width={18} height={18} />
+        </button>
+        {showEmo && (
+          <div style={{ position: 'absolute', left: 8, bottom: '100%', marginBottom: 3, zIndex: 20, width: 214, background: '#fff', border: '1px solid #97948a', boxShadow: '2px 3px 6px rgba(0,0,0,0.28)', padding: 4, display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 1 }}>
+            {EMOTICONS.map((e) => (
+              <button key={e.file} onClick={() => insertEmo(e.shortcuts[0])} title={`${e.name}  ${e.shortcuts[0]}`}
+                style={{ border: 0, background: 'none', cursor: 'pointer', padding: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src={emoSrc(e)} alt={e.shortcuts[0]} width={18} height={18} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Barra de entrada */}
       <div style={{ flexShrink: 0, borderTop: '1px solid #c9c6ba', background: '#ece9d8', padding: 6 }}>
