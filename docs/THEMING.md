@@ -93,6 +93,22 @@ en la gramática de ese mundo (no se sacrifica).
   solo-lectura); se re-presentó con click-derecho → diálogo XP. El reloj sí tenía puerta (tray).
 - La forma cambia entre mundos; la potencia no. Un dato editable en un tema es editable en todos.
 
+### …pero un tema SÍ puede REGALAR exclusivas (asimetría)
+La regla anterior es un piso, no un techo. Un tema **no puede RESTAR** funcionalidad (toda capacidad
+del OS viaja a todos los mundos), pero **SÍ puede AÑADIR** cosas que solo tienen sentido en su gramática
+— exclusivas que no obligan a las demás. La simetría es solo hacia abajo.
+- Ej: las **naves/aviones** son del arcade (su física, su tambor); el **ticker USD/MXN** y el portal
+  MSN.com son de XP (su época). Ninguno le debe una traducción al otro mundo.
+- Criterio: ¿es una CAPACIDAD (dato/acción del OS) o un SABOR (presentación de un mundo)? Las capacidades
+  son universales (piso); los sabores son libres (exclusivas).
+
+### ALMA DE ÉPOCA — cada app resuelta como en su año
+Bajo un cascarón que imita un OS real, cada app no solo se re-viste: **se resuelve como la habrían
+resuelto en el año de ese OS**. No es envolver la sección actual en chrome de época — es re-imaginar la
+capacidad con la gramática de producto de entonces. MSN-Cerebro (Messenger) fue el primer caso; el
+principio lo generaliza: Finanzas bajo XP → MSN Money 2003; un navegador → IE6 con su portal. El dato es
+el mismo (regla "no resta funcionalidad"); la ENCARNACIÓN es de época. Aplica a temas que evocan una era.
+
 ### Escala del lienzo XP (emulación de monitor de época)
 `.xp-desktop` es un lienzo LÓGICO escalado a fill (sin letterbox): altura lógica fija (`LOGICAL_H`,
 dial en Propiedades de Pantalla), `f = viewportH/LOGICAL_H`, ancho fluido, `transform: scale(f)` desde
