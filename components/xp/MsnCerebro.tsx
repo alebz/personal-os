@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useXpWM } from './wm-context'
 import MsnChat, { type ChatBuddy } from './MsnChat'
+import { CerebroButterfly } from './CerebroButterfly'
 
 // MSN-CEREBRO — la re-encarnación de época de Cerebro (regla "alma de época": cada app resuelta como
 // en 2003). NO envuelve CerebroContent: es una presentación nueva. Windows/MSN Messenger 6/7: ventana
@@ -134,19 +135,15 @@ export default function MsnCerebro() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
       {/* Menú (decorativo, sabor MSN) */}
-      <div style={{ display: 'flex', gap: 12, padding: '2px 8px', background: '#ece9d8', borderBottom: '1px solid #c9c6ba', fontSize: 11, color: '#333' }}>
-        {['Archivo', 'Contactos', 'Acciones', 'Ayuda'].map((m) => <span key={m}>{m}</span>)}
+      <div style={{ display: 'flex', gap: 13, padding: '2px 9px', background: '#f7f9fc', borderBottom: '1px solid #cdd6e2', fontSize: 11, color: '#333' }}>
+        {['Archivo', 'Contactos', 'Acciones', 'Herramientas', 'Ayuda'].map((m) => <span key={m}>{m}</span>)}
       </div>
 
-      {/* Banner MSN (gradiente azul con marca) */}
-      <div style={{ height: 46, flexShrink: 0, background: 'linear-gradient(180deg,#eaf3fd,#c7ddf5)', borderBottom: '1px solid #9db8dd', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26 }}>
-          <span style={{ position: 'relative', width: 20, height: 20 }}>
-            <span style={{ position: 'absolute', top: 1, left: 6, width: 8, height: 8, borderRadius: '50%', background: 'linear-gradient(#8ef07a,#2f9a22)' }} />
-            <span style={{ position: 'absolute', bottom: 1, left: 0, width: 20, height: 10, borderRadius: '10px 10px 4px 4px', background: 'linear-gradient(#8ef07a,#2f9a22)' }} />
-          </span>
-        </span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: '#1c4a86', letterSpacing: 0.2 }}>Cerebro<span style={{ color: '#5b8bd0', fontWeight: 400 }}> Messenger</span></span>
+      {/* Banner con la marca: la mariposa de MSN reimaginada en el rainbow del OS */}
+      <div style={{ height: 44, flexShrink: 0, background: 'linear-gradient(180deg,#f3f8ff,#d3e4f7)', borderBottom: '1px solid #9db8dd', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 6 }}>
+        <span style={{ fontSize: 17, fontWeight: 800, color: '#15559e', letterSpacing: -0.3 }}>Cerebro</span>
+        <CerebroButterfly size={27} />
+        <span style={{ fontSize: 15, fontWeight: 600, color: '#5f6b7a' }}>Messenger</span>
       </div>
 
       {/* Panel de estado: tu foto + nombre + presencia + mensaje personal */}
@@ -164,10 +161,22 @@ export default function MsnCerebro() {
         </div>
       </div>
 
+      {/* Banda de info amarilla (icónica de MSN) */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: '#fbf8d8', borderBottom: '1px solid #e6dfa8', fontSize: 11, color: '#4a4632' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, flexShrink: 0, borderRadius: '50%', background: '#3163c8', color: '#fff', fontSize: 10, fontWeight: 700, fontStyle: 'italic' }}>i</span>
+        <span style={{ color: '#1c4a86', textDecoration: 'underline', cursor: 'pointer' }}>Tu segundo cerebro está en línea — pregúntale lo que sea.</span>
+      </div>
+
       {/* Toolbar (decorativo) */}
-      <div style={{ flexShrink: 0, display: 'flex', gap: 14, padding: '3px 10px', background: 'linear-gradient(#fbfcfe,#eef2f7)', borderBottom: '1px solid #d7dbe2', fontSize: 11, color: '#2a4d8f' }}>
-        <span>Agregar un contacto</span>
-        <span>Enviar un mensaje</span>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '3px 10px', background: 'linear-gradient(#fbfcfe,#eef2f7)', borderBottom: '1px solid #d7dbe2', fontSize: 11, color: '#2a4d8f' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 14, position: 'relative' }} aria-hidden>
+          <span style={{ position: 'relative', width: 9, height: 9 }}>
+            <span style={{ position: 'absolute', top: 0, left: 2, width: 5, height: 5, borderRadius: '50%', background: 'linear-gradient(#8ef07a,#2f9a22)' }} />
+            <span style={{ position: 'absolute', bottom: 0, left: 0, width: 9, height: 5, borderRadius: '5px 5px 2px 2px', background: 'linear-gradient(#8ef07a,#2f9a22)' }} />
+          </span>
+          <span style={{ position: 'absolute', right: -1, bottom: -1, fontSize: 9, fontWeight: 900, color: '#2f9a22' }}>+</span>
+        </span>
+        <span style={{ cursor: 'pointer' }}>Agregar un contacto</span>
       </div>
 
       {/* Lista de contactos */}
@@ -193,6 +202,13 @@ export default function MsnCerebro() {
             ))}
           </div>
         ))}
+      </div>
+
+      {/* Banner inferior — el "ad" .net de MSN, con la mariposa */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'linear-gradient(180deg,#ffffff,#e9f0f9)', borderTop: '1px solid #cdd6e2' }}>
+        <CerebroButterfly size={18} />
+        <span style={{ fontSize: 12, color: '#5f6b7a' }}><b style={{ color: '#15559e' }}>Cerebro</b> Messenger</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#8a93a0' }}>.mx</span>
       </div>
     </div>
   )

@@ -13,6 +13,10 @@
 .xp-desktop {
   /* Tahoma como fuente del tema (cascadea a ventanas + secciones) */
   font-family: 'XP Tahoma', Tahoma, 'Segoe UI', sans-serif;
+  /* Redefine --os-font en el scope XP: globals.css fuerza `input,textarea{font-family:var(--os-font)!important}`
+     (para seguir el toggle Mono del arcade) → sin esto los campos/placeholders bajo XP saldrían en la
+     fuente del arcade (sans/SF-Mono), no en Tahoma. Redefinir la var los alinea sin pelear especificidad. */
+  --os-font: 'XP Tahoma', Tahoma, 'Segoe UI', sans-serif;
   /* Cursor: NATIVO. El auténtico recreado salió demasiado grande y fragmentaba (custom en el
      escritorio, nativo negro más chico en hover) — sin fidelidad nítida → nativo, honesto sobre
      disfrazado a medias (regla del usuario). */
