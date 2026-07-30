@@ -7,6 +7,7 @@ import { XpWMContext, type XpWM } from './wm-context'
 import type { OSSection } from '@/components/OSDrum'
 import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
+import BlocDeNotas from './BlocDeNotas'
 import { XpSlider, XpCheckbox, XpContextMenu } from './xp-controls'
 import { XpIcon, SECTION_ICON } from './xp-icons'
 import { RunDialog } from './RunDialog'
@@ -117,6 +118,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   // sabiendo que existe. Papelera — decorativa (canon "está vacía").
   const openMiPC = () => openWindow('mi-pc', 'Mi PC', <div className="xp-dialog" style={{ padding: 16, lineHeight: 1.6 }}>Aquí vivirán tus fondos de <b>Caja Fuerte</b> como unidades de disco (cada uno con su barra de capacidad). Próximamente.</div>, { w: 360, h: 200, icon: 'mipc' })
   const openPapelera = () => openWindow('papelera', 'Papelera de reciclaje', <div className="xp-dialog" style={{ padding: 16, color: '#555' }}>La Papelera de reciclaje está vacía.</div>, { w: 340, h: 180, icon: 'papelera' })
+  // Bloc de notas — app propia del OS (hogar de las notas, tabla `notes`). Resizable.
+  const openBloc = () => openWindow('bloc', 'Bloc de notas', <BlocDeNotas />, { w: 580, h: 440, resizable: true, icon: 'bloc' })
   // Ejecutar — launcher por teclado ("finanzas" → abre). Buscar — consultar Cerebro desde cualquier
   // lado. Ambos renacen el capture global muerto del audit (P2), diegéticamente.
   const openRun = () => openWindow('run', 'Ejecutar', <RunDialog sections={launchable} onLaunch={(href) => { closeWindow('run'); const s = launchable.find((x) => x.href === href); if (s) openSection(s) }} />, { w: 360, h: 178, icon: 'ejecutar' })
@@ -194,6 +197,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           selecciona, doble-click abre, drag reposiciona. Etiqueta blanca con sombra sobre Bliss. */}
       {[{ id: 'mi-pc', icon: 'mipc', label: 'Mi PC', open: openMiPC },
         ...launchable.map((s) => ({ id: s.href, icon: SECTION_ICON[s.href], label: s.label, open: () => openSection(s) })),
+        { id: 'bloc', icon: 'bloc', label: 'Bloc de notas', open: openBloc },
         { id: 'papelera', icon: 'papelera', label: 'Papelera de reciclaje', open: openPapelera }].map((it, i) => {
         const pos = iconPos[it.id] ?? { x: 8, y: 8 + i * 74 }
         const sel = deskSel === it.id
@@ -275,6 +279,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             <div className="xp-sm-right" style={{ width: 156, padding: '6px 0', display: 'flex', flexDirection: 'column' }}>
               <button className="xp-startmenu-item" onClick={openMiPC} style={rightItem}><XpIcon name="mipc" size={22} /> Mi PC</button>
               <button className="xp-startmenu-item" onClick={openDisplayProps} style={rightItem}><XpIcon name="panel" size={22} /> Panel de control</button>
+              <button className="xp-startmenu-item" onClick={openBloc} style={rightItem}><XpIcon name="bloc" size={22} /> Bloc de notas</button>
               <div className="xp-sm-sep" />
               <button className="xp-startmenu-item" onClick={openSearch} style={rightItem}><XpIcon name="buscar" size={22} /> Buscar</button>
               <button className="xp-startmenu-item" onClick={openRun} style={rightItem}><XpIcon name="ejecutar" size={22} /> Ejecutar…</button>

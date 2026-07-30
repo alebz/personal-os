@@ -18,6 +18,7 @@ export const XP_ICON: Record<string, string> = {
   clock: '/themes/xp/icons/clock.png',
   display: '/themes/xp/icons/display.png',
   cerebro: '/logo.png',   // el logo del OS = tu segundo cerebro (consistente con el avatar de MSN-Cerebro)
+  bloc: '/themes/xp/icons/bloc.png',
 }
 
 // href de sección → nombre de ícono
