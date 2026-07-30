@@ -52,19 +52,36 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }) }, [msgs])
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  // Historial de una persona = sus notas previas (tag contacto:<id>), más viejas primero.
+  // Carga de historial al abrir la ventana (por tipo). El dato ya está persistido en su tabla:
+  //  · persona → notas con tag contacto:<id> (/api/notes)
+  //  · lolo    → buffer verbatim de lolo_memory (/api/companion/memory) — COMPARTIDO con el arcade
+  //  · diario  → entradas del journal (/api/journal)
+  // Cerebro NO carga: su transcripción es efímera por diseño (sus respuestas se re-derivan de tu memoria).
   useEffect(() => {
-    if (buddy.kind !== 'person') return
     let live = true
-    fetch('/api/notes')
-      .then((r) => r.json())
-      .then((all: NoteRow[]) => {
-        if (!live || !Array.isArray(all)) return
-        const tag = `contacto:${buddy.id}`
-        const mine = all.filter((n) => Array.isArray(n.tags) && n.tags.includes(tag)).reverse()
-        if (mine.length) setMsgs(mine.map((n) => ({ id: nextId(), from: 'me' as const, name: 'Alex', text: n.content || n.title })))
-      })
-      .catch(() => {})
+    const mk = (from: Msg['from'], name: string, text: string): Msg => ({ id: nextId(), from, name, text })
+    async function load() {
+      try {
+        if (buddy.kind === 'person') {
+          const all = (await fetch('/api/notes').then((r) => r.json())) as NoteRow[]
+          if (!live || !Array.isArray(all)) return
+          const tag = `contacto:${buddy.id}`
+          const mine = all.filter((n) => Array.isArray(n.tags) && n.tags.includes(tag)).reverse()
+          if (mine.length) setMsgs(mine.map((n) => mk('me', 'Alex', n.content || n.title)))
+        } else if (buddy.kind === 'lolo') {
+          const mem = await fetch('/api/companion/memory').then((r) => r.json())
+          if (!live || !mem || !Array.isArray(mem.buffer)) return
+          const buf = mem.buffer as { role: string; content: string }[]
+          if (buf.length) setMsgs(buf.map((m) => (m.role === 'user' ? mk('me', 'Alex', m.content) : mk('them', 'Lolo', m.content))))
+        } else if (buddy.kind === 'diario') {
+          const entries = (await fetch('/api/journal?limit=25').then((r) => r.json())) as { content: string | null }[]
+          if (!live || !Array.isArray(entries)) return
+          const withText = entries.filter((e) => (e.content ?? '').trim()).reverse()
+          if (withText.length) setMsgs(withText.map((e) => mk('me', 'Alex', e.content as string)))
+        }
+      } catch { /* red caída → arranca vacío */ }
+    }
+    load()
     return () => { live = false }
   }, [buddy.id, buddy.kind])
 
@@ -118,16 +135,22 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
 
   async function askLolo(t: string) {
     setBusy(true)
+    // `msgs` aquí = historial ANTES de este turno (el user recién tecleado aún no está en el estado).
+    const prior = msgs.filter((m) => m.from !== 'sys').map((m) => ({ role: m.from === 'me' ? 'user' as const : 'assistant' as const, content: m.text }))
     const replyId = nextId()
     setMsgs((m) => [...m, { id: replyId, from: 'them', name: 'Lolo', text: '', streaming: true }])
     try {
-      const history = msgs.filter((m) => m.from !== 'sys').map((m) => ({ role: m.from === 'me' ? 'user' : 'assistant', content: m.text }))
+      // /api/companion/chat: intacto — solo genera la respuesta (no persiste).
       const r = await fetch('/api/companion/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ system: LOLO_SYSTEM, messages: [...history, { role: 'user', content: t }] }),
+        body: JSON.stringify({ system: LOLO_SYSTEM, messages: [...prior, { role: 'user', content: t }] }),
       })
       const d = await r.json().catch(() => ({}))
-      patchMsg(replyId, (m) => ({ ...m, streaming: false, text: (d.text as string) || '…' }))
+      const reply = (d.text as string) || '…'
+      patchMsg(replyId, (m) => ({ ...m, streaming: false, text: reply }))
+      // Persistir el buffer COMPLETO en lolo_memory (igual que el arcade) → memoria compartida arcade↔MSN.
+      const buffer = [...prior, { role: 'user', content: t }, { role: 'assistant', content: reply }]
+      fetch('/api/companion/memory', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer }) }).catch(() => {})
     } catch (e) {
       patchMsg(replyId, (m) => ({ ...m, streaming: false, text: `⚠ ${String(e)}` }))
     } finally { setBusy(false) }
