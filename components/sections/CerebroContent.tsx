@@ -7,6 +7,8 @@ import BrainIndexModal from '@/components/BrainIndexModal'
 import DrumModal from '@/components/DrumModal'
 import CerebroResults from '@/components/CerebroResults'
 import Supraconsciente from '@/components/Supraconsciente'
+import { useOSSettings } from '@/components/OSSettingsContext'
+import MsnCerebro from '@/components/xp/MsnCerebro'
 import type { QueryRoute } from '@/lib/router/classifyQuery'
 
 // Cerebro — the OS's single command bar. One box, two intents:
@@ -160,7 +162,15 @@ export function ResultCard({ chunk }: { chunk: MemoryChunk }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// Cerebro es SHELL-CONDICIONAL a nivel de sección (regla "alma de época", como MSN): bajo XP se
+// re-encarna como MsnCerebro (presentación nueva, no envuelve); en el tambor sigue el command bar.
 export default function CerebroContent() {
+  const { shell } = useOSSettings()
+  if (shell === 'xp') return <MsnCerebro />
+  return <CerebroArcade />
+}
+
+function CerebroArcade() {
   const [intent, setIntent] = useState<'capturar' | 'consultar'>('capturar')
 
   // Capture

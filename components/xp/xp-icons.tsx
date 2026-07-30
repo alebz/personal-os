@@ -17,6 +17,7 @@ export const XP_ICON: Record<string, string> = {
   ejecutar: '/themes/xp/icons/ejecutar.png',
   clock: '/themes/xp/icons/clock.png',
   display: '/themes/xp/icons/display.png',
+  cerebro: '/logo.png',   // el logo del OS = tu segundo cerebro (consistente con el avatar de MSN-Cerebro)
 }
 
 // href de sección → nombre de ícono
@@ -26,6 +27,7 @@ export const SECTION_ICON: Record<string, string> = {
   '/habits': 'habitos',
   '/contactos': 'contactos',
   '/uptown': 'uptown',
+  '/brain': 'cerebro',
 }
 
 export function XpIcon({ name, size = 16 }: { name?: string; size?: number }) {

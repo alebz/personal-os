@@ -22,7 +22,7 @@ import './xp-theme.css'
 // INICIO no es una app en XP — es el ambiente de la cara del tambor. Aquí se DISUELVE: el reloj vive
 // en el tray, el calendario se invoca con doble-click al reloj (ventanita "Fecha y hora", nativo XP),
 // la quote no se porta. Por eso '/' no está en LAUNCHABLE ni aparece en el menú.
-const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptown'])
+const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptown', '/brain'])
 
 // ── Escala del lienzo (emulación de monitor de época) ────────────────────────────────────────────
 // XP nació para ~1024×768@96dpi; sus proporciones son de esa pantalla y a px nativos se ve diminuto
