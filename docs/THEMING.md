@@ -71,11 +71,27 @@ Si sigues esto, el elemento respeta MONOCOLOR (y cualquier tema futuro) sin trab
 ### Pertenencia sobre prominencia — POR TEMA
 Cada cosa vive donde PERTENECE según las reglas del mundo activo, no donde se ve más. Y "dónde
 pertenece" **depende del tema**: el mismo dato tiene lugares nativos distintos por cascarón.
-- Ej: el **calendario**. Tambor → vive en la cara Inicio (el ambiente de esa cara). XP → NO es una
-  app; se invoca con doble-click al reloj del tray ("Fecha y hora"), como en XP real. La sección
-  Inicio no se porta a XP: se DISUELVE (reloj al tray, calendario al reloj, quote no se porta).
+- Ej: el **calendario**. Tambor → vive en la cara Inicio (el ambiente de esa cara). XP → se invoca con
+  doble-click al reloj del tray ("Fecha y hora"). La sección Inicio no se porta a XP: se DISUELVE
+  (reloj al tray, calendario al reloj, quote no se porta). PERO el ALCANCE viaja completo (ver regla
+  abajo): la escritura de eventos —que al disolver Inicio quedó atrapada en el CalendarCard del
+  arcade— se re-presentó bajo XP como **click-derecho sobre un día → menú "Nuevo/Editar evento…" →
+  diálogo XP**. (Futuro "Calendario Chingón": app XP propia con ventana e ícono; la ventanita
+  Fecha/Hora se queda como diálogo compacto de sistema — quick-view + quick-add.)
 - Corolario: una sección del tambor puede NO existir como ventana en XP. `InicioContent` solo se
-  monta en el tambor; XP la excluye del launcher/menú. No todo se traduce 1:1 entre cascarones.
+  monta en el tambor; XP la excluye del launcher/menú. No todo se traduce 1:1 entre cascarones — pero
+  "no traducir la SECCIÓN" ≠ "perder la FUNCIÓN": la función encuentra otra puerta (regla siguiente).
+
+### LO TEMATIZADO NO RESTA FUNCIONALIDAD
+La capacidad es del OS y **viaja completa a todos los mundos; cada tema decide su PRESENTACIÓN, nunca
+su ALCANCE.** Tematizar es re-presentar, no recortar. Si al mover/disolver algo entre cascarones una
+función se queda sin puerta en un mundo, es un BUG, no una simplificación — la función se re-presenta
+en la gramática de ese mundo (no se sacrifica).
+- Cómo cazarlo: al portar/disolver una sección, hacer el CENSO de lo que vivía ahí y preguntar por
+  cada función "¿tiene puerta en el mundo destino?". Si no, dásela antes de dar por hecho el port.
+- Ej vivido: disolver Inicio dejó la ESCRITURA de eventos sin puerta bajo XP (Fecha/Hora era
+  solo-lectura); se re-presentó con click-derecho → diálogo XP. El reloj sí tenía puerta (tray).
+- La forma cambia entre mundos; la potencia no. Un dato editable en un tema es editable en todos.
 
 ### Escala del lienzo XP (emulación de monitor de época)
 `.xp-desktop` es un lienzo LÓGICO escalado a fill (sin letterbox): altura lógica fija (`LOGICAL_H`,
