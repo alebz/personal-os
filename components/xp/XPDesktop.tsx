@@ -311,30 +311,34 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
               {/* eslint-disable-next-line @next/next/no-img-element -- asset local chico */}
               <img src="/logo.png" alt="Alex Mateo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 3 }} />
             </div>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, textShadow: '1px 1px 1px rgba(0,0,0,0.45)' }}>Alex Mateo</span>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 15, textShadow: '1px 1px 1px rgba(0,0,0,0.45)' }}>Alex Mateo</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'stretch', position: 'relative' }}>
-            {/* Columna IZQUIERDA (blanca): las secciones como programas */}
-            <div className="xp-sm-left" style={{ flex: 1, padding: '6px 0', minWidth: 0 }}>
+          {/* Franja acento naranja/ámbar entre header y columnas — detalle icónico de Luna. */}
+          <div style={{ height: 3, background: 'linear-gradient(90deg, #dd821f 0%, #f6c85a 45%, #f9d878 55%, #dd821f 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), 0 1px 1px rgba(0,0,0,0.15)' }} />
+
+          <div style={{ display: 'flex', alignItems: 'stretch', position: 'relative', minHeight: 306 }}>
+            {/* Columna IZQUIERDA (blanca): las secciones como programas — con aire, Favoritos/Todos al fondo. */}
+            <div className="xp-sm-left" style={{ flex: 1, padding: '6px 0', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               {launchable.map((s) => (
-                <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} onMouseEnter={() => setFlyout(null)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} onMouseEnter={() => setFlyout(null)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px' }}>
                   <XpIcon name={SECTION_ICON[s.href]} size={24} />
                   <b>{s.label}</b>
                 </button>
               ))}
 
+              <div style={{ flex: 1, minHeight: 16 }} />   {/* aire — empuja Favoritos/Todos al fondo, como XP */}
               <div className="xp-sm-sep" />
               {/* Favoritos — apps fijadas. Cajón cascada a la derecha (canon XP). */}
               <button className="xp-startmenu-item" onClick={() => openFly('fav')} onMouseEnter={() => openFly('fav')} onMouseLeave={closeFlySoon}
-                style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, background: flyout === 'fav' ? '#316ac5' : undefined, color: flyout === 'fav' ? '#fff' : undefined }}>
-                <XpIcon name="favoritos" size={24} /><b style={{ flex: 1 }}>Favoritos</b><span style={{ fontSize: 10, color: flyout === 'fav' ? '#fff' : '#2a6f2a' }}>▶</span>
+                style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: flyout === 'fav' ? 'linear-gradient(180deg,#3f8ef2,#2464d8)' : 'none', color: flyout === 'fav' ? '#fff' : '#000' }}>
+                <XpIcon name="favoritos" size={24} /><b style={{ flex: 1 }}>Favoritos</b><span className="xp-allprogs-arrow" style={flyout === 'fav' ? { background: 'rgba(255,255,255,0.25)' } : undefined}>▶</span>
               </button>
 
               {/* Todos los programas — launcher completo. Cajón cascada a la derecha. */}
               <button className="xp-startmenu-item" onClick={() => openFly('all')} onMouseEnter={() => openFly('all')} onMouseLeave={closeFlySoon}
-                style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, background: flyout === 'all' ? '#316ac5' : undefined, color: flyout === 'all' ? '#fff' : undefined }}>
-                <XpIcon name="programas" size={24} /><b style={{ flex: 1 }}>Todos los programas</b><span style={{ fontSize: 10, color: flyout === 'all' ? '#fff' : '#2a6f2a' }}>▶</span>
+                style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: flyout === 'all' ? 'linear-gradient(180deg,#3f8ef2,#2464d8)' : 'none', color: flyout === 'all' ? '#fff' : '#000' }}>
+                <XpIcon name="programas" size={24} /><b style={{ flex: 1 }}>Todos los programas</b><span className="xp-allprogs-arrow" style={flyout === 'all' ? { background: 'rgba(255,255,255,0.25)' } : undefined}>▶</span>
               </button>
             </div>
 
@@ -352,7 +356,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             {/* Cajón cascada (Favoritos / Todos los programas) — abre a la DERECHA del menú. */}
             {flyout && (
               <div onMouseEnter={keepFly} onMouseLeave={closeFlySoon}
-                style={{ position: 'absolute', left: '100%', bottom: 0, marginLeft: 2, minWidth: 208, maxHeight: 360, overflowY: 'auto', background: '#fff', border: '1px solid #245edb', borderRadius: '0 4px 4px 4px', boxShadow: '3px 4px 13px rgba(0,0,0,0.32)', padding: '4px 0', zIndex: 30 }}>
+                style={{ position: 'absolute', left: '100%', bottom: -1, marginLeft: -1, minWidth: 210, maxHeight: 360, overflowY: 'auto', background: '#fff', border: '1px solid #0831d9', borderRadius: '0 6px 6px 0', boxShadow: '4px 2px 14px rgba(0,0,0,0.35)', padding: '4px 0', zIndex: 30 }}>
                 {flyout === 'fav' && (favApps.length > 0
                   ? favApps.map((a) => (
                       <button key={a.id} className="xp-startmenu-item" onClick={() => { a.open(); closeStart() }} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -394,9 +398,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       {/* ── Taskbar ── */}
       <div className="xp-taskbar" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 30, zIndex: 10000, display: 'flex', alignItems: 'center' }}>
         <button
-          className="xp-chrome-btn xp-start"
+          className={`xp-chrome-btn xp-start ${startOpen ? 'xp-start--open' : ''}`}
           onClick={() => (startOpen ? closeStart() : setStartOpen(true))}
-          style={{ height: 30, padding: '0 20px 0 11px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: 7 }}
+          style={{ height: 30, padding: '0 20px 0 11px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: 7, ...(startOpen ? { boxShadow: 'inset 3px 3px 6px rgba(0,0,0,0.45), inset -1px -1px 2px rgba(255,255,255,0.15)', filter: 'brightness(0.88)' } : {}) }}
         >
           <RainbowFlag w={18} h={13} />
           Inicio

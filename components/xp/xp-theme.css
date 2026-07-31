@@ -183,15 +183,16 @@
   border: 1px solid #0831d9;
   border-bottom: none;
   border-radius: 9px 9px 0 0;
-  box-shadow: 4px -3px 16px rgba(0,0,0,0.45);
+  /* Sombra externa + línea interna clara → se siente "contenido" dentro de sus bordes (como XP). */
+  box-shadow: 4px -3px 16px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.55);
   /* sin overflow:hidden — el cajón cascada (Favoritos/Todos los programas) sale por la derecha; las
      esquinas superiores las redondea el propio header. */
 }
 .xp-startmenu-header {
   border-radius: 8px 8px 0 0;
-  background: linear-gradient(180deg, #3f8bf0 0%, #1257d8 46%, #0c50d6 62%, #2a72e6 100%);
-  border-bottom: 2px solid #003ca5;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+  /* Degradado Luna: brillo arriba, azul medio, glossy — más fiel al header de XP. */
+  background: linear-gradient(180deg, #55a0ee 0%, #2c7ce4 10%, #175fd6 48%, #1358d2 58%, #2f79e4 88%, #4b93ec 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
 }
 /* Columnas */
 .xp-sm-left  { background: #fff; }
