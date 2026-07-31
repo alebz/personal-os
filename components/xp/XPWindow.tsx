@@ -23,6 +23,7 @@ export interface WinState {
   h?: number
   resizable?: boolean    // secciones sí; diálogos de sistema no
   maximized?: boolean    // llena el lienzo menos taskbar; x/y/w/h guardan el tamaño de RESTAURAR
+  bare?: boolean         // sin chrome Luna: la app dibuja su propia ventana (WMP). Drag por [data-xp-drag].
 }
 
 export const WIN_W = 800
@@ -104,12 +105,25 @@ export default function XPWindow({
 
   useEffect(() => () => { if (animT.current) clearTimeout(animT.current) }, [])
 
-  // ── Drag (barra de título) ──
-  function onTitleDown(e: React.PointerEvent) {
-    if (maximized || (e.target as HTMLElement).closest('button')) return
+  const bare = !!win.bare
+
+  // ── Drag (barra de título Luna, o cualquier [data-xp-drag] en ventanas bare) ──
+  function beginDrag(e: React.PointerEvent) {
     onFocus(win.id)
+    if (maximized) return
     drag.current = { dx: e.clientX / scale - geom.x, dy: e.clientY / scale - geom.y }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function onTitleDown(e: React.PointerEvent) {
+    if (maximized || (e.target as HTMLElement).closest('button')) return
+    beginDrag(e)
+  }
+  // En bare, el drag arranca solo desde un elemento marcado [data-xp-drag] (la barra de la propia app);
+  // clics en botones/controles no arrastran (y no capturamos el puntero → los clics normales funcionan).
+  function onBareDown(e: React.PointerEvent) {
+    const t = e.target as HTMLElement
+    if (t.closest('button') || !t.closest('[data-xp-drag]')) { onFocus(win.id); return }
+    beginDrag(e)
   }
   function onTitleMove(e: React.PointerEvent) {
     if (!drag.current) return
@@ -150,44 +164,51 @@ export default function XPWindow({
 
   return (
     <div
-      className="xp-window"
-      onPointerDown={() => onFocus(win.id)}
+      className={bare ? undefined : 'xp-window'}
+      onPointerDown={bare ? onBareDown : () => onFocus(win.id)}
+      onPointerMove={bare ? onTitleMove : undefined}
+      onPointerUp={bare ? onTitleUp : undefined}
       style={{
         position: 'absolute', left: geom.x, top: geom.y, width: geom.w, height: geom.h, zIndex: win.z,
         display: hidden ? 'none' : 'flex', flexDirection: 'column',
-        background: '#0831d8', boxShadow: active ? '5px 6px 22px rgba(0,0,0,0.45)' : '2px 3px 12px rgba(0,0,0,0.28)',
+        ...(bare ? { background: 'transparent', borderRadius: 9 } : { background: '#0831d8' }),
+        boxShadow: active ? '5px 6px 22px rgba(0,0,0,0.45)' : '2px 3px 12px rgba(0,0,0,0.28)',
         transition: zoom ? `left ${ANIM_MS}ms ease-out, top ${ANIM_MS}ms ease-out, width ${ANIM_MS}ms ease-out, height ${ANIM_MS}ms ease-out` : (tf?.transition ?? 'none'),
         transform: tf?.transform, transformOrigin: tf?.transformOrigin, opacity: tf?.opacity,
       }}
     >
-      {/* Barra de título — doble-click maximiza/restaura (solo resizables) */}
-      <div
-        className={`xp-titlebar ${active ? '' : 'xp-titlebar--inactive'}`}
-        onPointerDown={onTitleDown}
-        onPointerMove={onTitleMove}
-        onPointerUp={onTitleUp}
-        onDoubleClick={() => win.resizable && onMaximize(win.id)}
-        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '0 3px 0 5px', userSelect: 'none', touchAction: 'none' }}
-      >
-        {win.icon && <XpIcon name={win.icon} size={16} />}
-        <span style={{ flex: 1, fontWeight: 700, fontSize: 12.5, color: '#fff', textShadow: '1px 1px 1px rgba(0,0,0,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {win.title}
-        </span>
-        <button className="xp-chrome-btn xp-title-btn xp-title-btn--min" onClick={(e) => { e.stopPropagation(); onMinimize(win.id) }} aria-label="Minimizar" />
-        {win.resizable && (
-          <button
-            className={`xp-chrome-btn xp-title-btn ${maximized ? 'xp-title-btn--restore' : 'xp-title-btn--max'}`}
-            onClick={(e) => { e.stopPropagation(); onMaximize(win.id) }}
-            aria-label={maximized ? 'Restaurar' : 'Maximizar'}
-          />
-        )}
-        <button className="xp-chrome-btn xp-title-btn xp-title-btn--close" onClick={(e) => { e.stopPropagation(); onClose(win.id) }} aria-label="Cerrar" />
-      </div>
+      {/* Barra de título Luna — doble-click maximiza/restaura (solo resizables). Bare: la app la dibuja. */}
+      {!bare && (
+        <div
+          className={`xp-titlebar ${active ? '' : 'xp-titlebar--inactive'}`}
+          onPointerDown={onTitleDown}
+          onPointerMove={onTitleMove}
+          onPointerUp={onTitleUp}
+          onDoubleClick={() => win.resizable && onMaximize(win.id)}
+          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '0 3px 0 5px', userSelect: 'none', touchAction: 'none' }}
+        >
+          {win.icon && <XpIcon name={win.icon} size={16} />}
+          <span style={{ flex: 1, fontWeight: 700, fontSize: 12.5, color: '#fff', textShadow: '1px 1px 1px rgba(0,0,0,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {win.title}
+          </span>
+          <button className="xp-chrome-btn xp-title-btn xp-title-btn--min" onClick={(e) => { e.stopPropagation(); onMinimize(win.id) }} aria-label="Minimizar" />
+          {win.resizable && (
+            <button
+              className={`xp-chrome-btn xp-title-btn ${maximized ? 'xp-title-btn--restore' : 'xp-title-btn--max'}`}
+              onClick={(e) => { e.stopPropagation(); onMaximize(win.id) }}
+              aria-label={maximized ? 'Restaurar' : 'Maximizar'}
+            />
+          )}
+          <button className="xp-chrome-btn xp-title-btn xp-title-btn--close" onClick={(e) => { e.stopPropagation(); onClose(win.id) }} aria-label="Cerrar" />
+        </div>
+      )}
 
-      {/* Cuerpo = contenedor. data-theme=xp = variante clara scoped (el tambor no la ve). */}
-      <div data-theme="xp" className="relative min-h-0 flex-1 overflow-auto bg-surface-base">
-        {win.content}
-      </div>
+      {/* Cuerpo. Bare: la app llena todo con su propio chrome (sin fondo claro ni scroll del WM). */}
+      {bare ? (
+        <div className="relative min-h-0 flex-1" style={{ overflow: 'hidden', borderRadius: 9 }}>{win.content}</div>
+      ) : (
+        <div data-theme="xp" className="relative min-h-0 flex-1 overflow-auto bg-surface-base">{win.content}</div>
+      )}
 
       {/* Handles de resize — solo secciones, y no cuando está maximizada */}
       {win.resizable && !maximized && DIRS.map((d) => (

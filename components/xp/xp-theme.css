@@ -242,6 +242,63 @@
   font-family: 'XP Tahoma', Tahoma, 'Segoe UI', sans-serif;
 }
 
+/* ── Reproductor de Windows Media (skin WMP 9, ventana BARE con chrome propio) ────────────────── */
+.wmp {
+  height: 100%; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 9px; border: 1px solid #0a1c44;
+  background: linear-gradient(#20437e, #0e2350);
+  font-family: 'XP Tahoma', Tahoma, 'Segoe UI', sans-serif; color: #dce8ff;
+}
+.wmp-titlebar {
+  flex-shrink: 0; display: flex; align-items: center; gap: 6; height: 22px; padding: 0 4px 0 8px;
+  background: linear-gradient(#3c6cb8, #1f4890); border-bottom: 1px solid #0a1c44;
+  border-radius: 8px 8px 0 0; user-select: none; touch-action: none; cursor: default;
+}
+.wmp-title { flex: 1; font-size: 11px; font-weight: 700; color: #eaf2ff; text-shadow: 1px 1px 1px rgba(0,0,0,0.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wmp-winbtn { width: 19px; height: 16px; padding: 0; font-size: 11px; line-height: 1; cursor: pointer; color: #16346e; border: 1px solid #4a6aa0; border-radius: 3px; background: linear-gradient(#eff4fb, #b7c8e2); }
+.wmp-winbtn:hover { filter: brightness(1.06); }
+.wmp-winbtn--close:hover { background: linear-gradient(#f6c0b6, #d8695a); color: #fff; }
+.wmp-body { flex: 1; min-height: 0; display: flex; gap: 5px; padding: 5px; }
+.wmp-nav { width: 116px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; padding: 6px 5px; border: 1px solid #0a1c44; border-radius: 6px; background: linear-gradient(#16346e, #0e2350); }
+.wmp-navitem { text-align: left; padding: 5px 8px; border: 0; background: none; color: #b9d0f2; font-family: inherit; font-size: 11.5px; border-radius: 4px; cursor: pointer; }
+.wmp-navitem:hover { background: rgba(255,255,255,0.09); }
+.wmp-navitem--on { background: linear-gradient(#5a8fe0, #2f66c4); color: #fff; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3); }
+.wmp-nav-logo { align-self: center; opacity: 0.55; padding: 6px; }
+.wmp-panel { flex: 1; min-width: 0; overflow: auto; border: 1px solid #0a1c44; border-radius: 6px; background: linear-gradient(#eaeff7, #d3ddee); color: #12315f; }
+.wmp-list-wrap { display: flex; flex-direction: column; }
+.wmp-search { display: flex; gap: 5px; padding: 7px; position: sticky; top: 0; background: linear-gradient(#eaeff7, #e2e9f4); border-bottom: 1px solid #cdd8ea; }
+.wmp-search input { flex: 1; min-width: 0; border: 1px solid #7f9db9; border-radius: 3px; padding: 3px 6px; font-family: inherit; font-size: 11.5px; outline: none; background: #fff; color: #12315f; }
+.wmp-search button { border: 1px solid #4a6aa0; border-radius: 3px; background: linear-gradient(#eff4fb, #b7c8e2); color: #16346e; font-family: inherit; font-size: 11px; padding: 2px 12px; cursor: pointer; }
+.wmp-group { font-size: 10px; font-weight: 700; color: #33517f; padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+.wmp-row { display: flex; align-items: center; border-bottom: 1px solid #dfe6f1; }
+.wmp-row--on { background: #cfe0fb; }
+.wmp-row-play { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0; background: none; text-align: left; cursor: pointer; font-family: inherit; font-size: 11.5px; color: #12315f; }
+.wmp-row-icon { color: #2f66c4; width: 12px; flex-shrink: 0; }
+.wmp-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wmp-row-meta { font-size: 10px; color: #7a86a0; flex-shrink: 0; }
+.wmp-row-fav { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 8px; }
+.wmp-empty { padding: 16px; color: #5b6b88; font-style: italic; font-size: 11.5px; line-height: 1.5; }
+.wmp-now { display: flex; flex-direction: column; height: 100%; background: #08132b; }
+.wmp-viz { width: 100%; flex: 1; min-height: 0; display: block; background: radial-gradient(circle at 50% 40%, #0e2044, #06101f); }
+.wmp-now-info { padding: 10px 12px; background: linear-gradient(#0c1b3a, #0a1730); border-top: 1px solid #24457f; }
+.wmp-now-name { font-size: 15px; font-weight: 700; color: #fff; }
+.wmp-now-meta { font-size: 11px; color: #9fb8e6; margin-top: 2px; }
+.wmp-now-status { font-size: 11px; margin-top: 4px; }
+.wmp-now-fav { margin-top: 9px; border: 1px solid #4a6aa0; border-radius: 4px; background: linear-gradient(#eff4fb, #b7c8e2); color: #16346e; font-family: inherit; font-size: 11px; padding: 3px 12px; cursor: pointer; }
+.wmp-transport {
+  flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 7px 14px;
+  background: linear-gradient(#3f70bc, #1a3f80); border-top: 1px solid #0a1c44;
+  border-radius: 20px 20px 8px 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
+}
+.wmp-nowtext { display: flex; flex-direction: column; line-height: 1.2; width: 132px; flex-shrink: 0; font-size: 11px; color: #eaf2ff; overflow: hidden; }
+.wmp-nowsub { font-size: 9.5px; color: #a9c4ef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wmp-controls { display: flex; align-items: center; gap: 5px; margin: 0 auto; }
+.wmp-tbtn { width: 28px; height: 24px; border: 1px solid #14356f; border-radius: 5px; background: linear-gradient(#e8eff8, #b7c8e2); color: #16346e; cursor: pointer; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.wmp-tbtn:active { background: linear-gradient(#a7b8d2, #cdd9ec); }
+.wmp-play { width: 34px; height: 28px; font-size: 12px; background: linear-gradient(#7fb0f0, #2f6cc8); color: #fff; border-color: #123765; }
+.wmp-vol { display: flex; align-items: center; gap: 5px; width: 112px; flex-shrink: 0; justify-content: flex-end; }
+.wmp-vol input[type=range] { width: 84px; }
+
 /* ══ Vocabulario de DIÁLOGOS de sistema (XP nativo LITERAL — no tokens, colores XP hardcodeados) ══ */
 .xp-dialog {
   background: #ece9d8;

@@ -27,6 +27,7 @@ export const XP_ICON: Record<string, string> = {
   juegos: '/themes/xp/icons/juegos.png',   // carpeta Juegos (Game Controller)
   buscaminas: '/themes/xp/icons/buscaminas.png',
   sudoku: '/themes/xp/icons/sudoku.png',   // generado (SVG rejilla)
+  wmp: '/themes/xp/icons/wmp.png',         // Windows Media Player 9 (orbe play)
 }
 
 // href de sección → nombre de ícono

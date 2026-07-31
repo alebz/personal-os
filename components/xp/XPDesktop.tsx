@@ -13,6 +13,7 @@ import Calculadora from './Calculadora'
 import Solitario from './Solitario'
 import Buscaminas from './Buscaminas'
 import Sudoku from './Sudoku'
+import RadioPlayer from './RadioPlayer'
 import XpNotifications from './XpNotifications'
 import LoloHeartbeat from './LoloHeartbeat'
 import CaptureBox from './CaptureBox'
@@ -160,7 +161,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const closeFlySoon = () => { if (flyTimer.current) clearTimeout(flyTimer.current); flyTimer.current = setTimeout(() => setFlyout(null), 320) }
 
   // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
-  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; icon?: string }) {
+  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; icon?: string; bare?: boolean }) {
     closeStart()
     const existing = windows.find((w) => w.id === id)
     if (existing?.minimized) playXpSound('restore')
@@ -170,7 +171,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       if (prev.some((w) => w.id === id))
         return prev.map((w) => (w.id === id ? { ...w, minimized: false, z: top + 1 } : w))
       const n = prev.length
-      return [...prev, { id, title, content, x: opts?.x ?? 90 + n * 32, y: opts?.y ?? 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable, icon: opts?.icon }]
+      return [...prev, { id, title, content, x: opts?.x ?? 90 + n * 32, y: opts?.y ?? 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable, icon: opts?.icon, bare: opts?.bare }]
     })
   }
 
@@ -204,6 +205,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const openBuscaminas = () => openWindow('buscaminas', 'Buscaminas', <Buscaminas />, { w: 300, h: 400, resizable: true, icon: 'buscaminas' })
   // Sudoku — pedido del usuario (no es de época pero cabe en Juegos).
   const openSudoku = () => openWindow('sudoku', 'Sudoku', <Sudoku />, { w: 344, h: 470, resizable: true, icon: 'sudoku' })
+  // Reproductor de Windows Media (radio) — ventana BARE: la app dibuja su chrome WMP; sus botones
+  // min/cerrar se cablean aquí al WM. Tamaño fijo (no resizable).
+  const openReproductor = () => openWindow('radio', 'Reproductor de Windows Media', <RadioPlayer onClose={() => closeWindow('radio')} onMinimize={() => minimizeWindow('radio')} />, { w: 520, h: 400, bare: true, icon: 'wmp' })
   // Carpetas anidadas de "Todos los programas" (cascada canónica de XP).
   const FOLDERS = [
     { id: 'juegos', label: 'Juegos', icon: 'juegos', items: [
@@ -226,6 +230,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     { id: 'bloc', label: 'Bloc de notas', icon: 'bloc', open: openBloc },
     { id: 'calendario', label: 'Calendario', icon: 'calendario', open: openCalendario },
     { id: 'calc', label: 'Calculadora', icon: 'calc', open: openCalc },
+    { id: 'radio', label: 'Reproductor de Windows Media', icon: 'wmp', open: openReproductor },
   ]
   const favApps = APPS.filter((a) => favorites.includes(a.id))
   // El cajón se ancla al ITEM clickeado (bottom alineado con su borde inferior) y abre SOBRE la 2ª columna.
@@ -310,6 +315,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         ...launchable.map((s) => ({ id: s.href, icon: SECTION_ICON[s.href], label: s.label, open: () => openSection(s) })),
         { id: 'bloc', icon: 'bloc', label: 'Bloc de notas', open: openBloc },
         { id: 'calendario', icon: 'calendario', label: 'Calendario', open: openCalendario },
+        { id: 'radio', icon: 'wmp', label: 'Reproductor', open: openReproductor },
         { id: 'papelera', icon: 'papelera', label: 'Papelera de reciclaje', open: openPapelera }].map((it, i) => {
         // Límites del lienzo lógico: los íconos NUNCA se van del borde derecho/inferior (bug: solo se
         // clampeaba a ≥0). Clampear también AL RENDER auto-sana posiciones persistidas fuera de pantalla.
@@ -401,6 +407,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
               <button className="xp-startmenu-item" onClick={openBloc} style={rightItem}><XpIcon name="bloc" size={22} /> Bloc de notas</button>
               <button className="xp-startmenu-item" onClick={openCalendario} style={rightItem}><XpIcon name="calendario" size={22} /> Calendario</button>
               <button className="xp-startmenu-item" onClick={openCalc} style={rightItem}><XpIcon name="calc" size={22} /> Calculadora</button>
+              <button className="xp-startmenu-item" onClick={openReproductor} style={rightItem}><XpIcon name="wmp" size={22} /> Reproductor de Windows Media</button>
               <div className="xp-sm-sep" />
               <button className="xp-startmenu-item" onClick={openSearch} style={rightItem}><XpIcon name="buscar" size={22} /> Buscar</button>
               <button className="xp-startmenu-item" onClick={openRun} style={rightItem}><XpIcon name="ejecutar" size={22} /> Ejecutar…</button>
