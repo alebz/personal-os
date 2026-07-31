@@ -11,6 +11,8 @@ import BlocDeNotas from './BlocDeNotas'
 import CalendarioApp from './CalendarioApp'
 import XpNotifications from './XpNotifications'
 import LoloHeartbeat from './LoloHeartbeat'
+import CaptureBox from './CaptureBox'
+import { CerebroButterfly } from './CerebroButterfly'
 import MsnChat, { type ChatBuddy } from './MsnChat'
 import { useNotifications, markAllRead, clearAll, timeAgo, type NotifTarget } from '@/lib/notifications'
 import { XpSlider, XpCheckbox, XpContextMenu } from './xp-controls'
@@ -84,9 +86,16 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)   // menú contextual (logical px)
   const [volOpen, setVolOpen] = useState(false)   // popup de volumen del tray
   const [notifOpen, setNotifOpen] = useState(false)   // centro de notificaciones del tray
+  const [captureOpen, setCaptureOpen] = useState(false)   // captura global rápida
   const [deskSel, setDeskSel] = useState<string | null>(null)   // ícono de escritorio seleccionado
   const notifs = useNotifications()
   const unread = notifs.reduce((s, n) => s + (n.read ? 0 : 1), 0)
+  // Atajo global de captura rápida (Ctrl+Espacio, mientras la pestaña tiene foco).
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'Space') { e.preventDefault(); setCaptureOpen(true) } }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
   const [iconPos, setIconPos] = useState<Record<string, { x: number; y: number }>>(() => {
     try { const s = localStorage.getItem('xp-desktop-icons'); if (s) return JSON.parse(s) } catch { /* */ }
     return {}
@@ -151,6 +160,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     } else if (target === 'calendario') openCalendario()
     else if (target === 'cerebro' || target === 'tareas') { const s = sections.find((x) => x.href === (target === 'cerebro' ? '/brain' : '/crm')); if (s) openSection(s) }
   }
+  const openCapture = () => { closeStart(); setCaptureOpen(true) }
   // Ejecutar — launcher por teclado ("finanzas" → abre). Buscar — consultar Cerebro desde cualquier
   // lado. Ambos renacen el capture global muerto del audit (P2), diegéticamente.
   const openRun = () => openWindow('run', 'Ejecutar', <RunDialog sections={launchable} onLaunch={(href) => { closeWindow('run'); const s = launchable.find((x) => x.href === href); if (s) openSection(s) }} />, { w: 360, h: 178, icon: 'ejecutar' })
@@ -273,6 +283,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       {/* Toasts apilados (cumpleaños/eventos/tareas + Lolo) + Lolo proactivo que te escribe solo. */}
       <XpNotifications onOpen={openNotifTarget} />
       <LoloHeartbeat />
+      {captureOpen && <CaptureBox onClose={() => setCaptureOpen(false)} />}
 
       {/* ── Menú Inicio · dos columnas ── */}
       {startOpen && (
@@ -320,6 +331,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             <div className="xp-sm-right" style={{ width: 156, padding: '6px 0', display: 'flex', flexDirection: 'column' }}>
               <button className="xp-startmenu-item" onClick={openMiPC} style={rightItem}><XpIcon name="mipc" size={22} /> Mi PC</button>
               <button className="xp-startmenu-item" onClick={openDisplayProps} style={rightItem}><XpIcon name="panel" size={22} /> Panel de control</button>
+              <button className="xp-startmenu-item" onClick={openCapture} style={rightItem}><span style={{ display: 'inline-flex', width: 22, justifyContent: 'center' }}><CerebroButterfly size={18} /></span> Capturar…</button>
               <button className="xp-startmenu-item" onClick={openBloc} style={rightItem}><XpIcon name="bloc" size={22} /> Bloc de notas</button>
               <button className="xp-startmenu-item" onClick={openCalendario} style={rightItem}><XpIcon name="calendario" size={22} /> Calendario</button>
               <div className="xp-sm-sep" />
@@ -349,6 +361,14 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           <RainbowFlag w={18} h={13} />
           Inicio
         </button>
+
+        {/* Quick Launch: captura rápida (alimenta tu segundo cerebro). Atajo Ctrl+Espacio. */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '0 5px', marginLeft: 2, borderLeft: '1px solid rgba(255,255,255,0.22)', borderRight: '1px solid rgba(0,0,0,0.28)' }}>
+          <button onClick={openCapture} title="Capturar  ·  Ctrl+Espacio" className="xp-chrome-btn"
+            style={{ display: 'flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', borderRadius: 3, color: '#fff', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.35)', background: 'rgba(255,255,255,0.12)', border: 'none' }}>
+            <CerebroButterfly size={14} /> Capturar
+          </button>
+        </div>
 
         <div style={{ display: 'flex', gap: 4, marginLeft: 8, overflow: 'hidden', flex: 1 }}>
           {windows.map((w) => {
