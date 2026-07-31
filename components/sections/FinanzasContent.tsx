@@ -7,6 +7,8 @@ import { MethodCell } from '@/components/finance/MethodCell'
 import { PixelIcon } from '@/components/PixelIcon'
 import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
+import { useOSSettings } from '@/components/OSSettingsContext'
+import MsnMoney from '@/components/xp/MsnMoney'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1073,7 +1075,14 @@ const TABS: Tab[] = ['Panel', 'Historial', 'Caja Fuerte']
 
 const EMPTY_CHECKS: MonthChecks = { checks: {}, realM: {}, movIds: {} }
 
-export default function FinancePage() {
+// Bajo XP, Finanzas se re-presenta como MSN Money 2003 (regla "alma de época"). Arcade = intacto.
+export default function FinanzasContent() {
+  const { shell } = useOSSettings()
+  if (shell === 'xp') return <MsnMoney />
+  return <FinanzasArcade />
+}
+
+function FinanzasArcade() {
   const [tab,   setTab]   = useState<Tab>('Panel')
   const [month, setMonth] = useState(currMonth)
 
