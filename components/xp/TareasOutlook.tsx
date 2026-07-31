@@ -232,8 +232,8 @@ function TaskDialog({ task, entities, onClose, onSave, onDelete }: { task: Task 
   async function save() { if (!f.title.trim() || busy) return; setBusy(true); try { await onSave(f) } catch { setBusy(false) } }
   return (
     <div onMouseDown={onClose} style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(20,40,80,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div onMouseDown={(e) => e.stopPropagation()} style={{ width: 400, maxWidth: '94%', background: '#ece9d8', border: '1px solid #0a3a86', borderRadius: 4, boxShadow: '0 6px 22px rgba(0,0,0,0.35)', overflow: 'hidden', fontSize: 11 }}>
-        <div style={{ background: 'linear-gradient(180deg,#2b5fb0,#1c4790)', color: '#fff', fontWeight: 700, padding: '4px 9px', display: 'flex' }}><span style={{ flex: 1 }}>{editing ? 'Tarea' : 'Nueva tarea'}</span><button onClick={onClose} style={{ border: 0, background: 'rgba(255,255,255,0.15)', color: '#fff', width: 16, height: 16, borderRadius: 2, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
+      <div onMouseDown={(e) => e.stopPropagation()} style={{ width: 400, maxWidth: '94%', background: '#ece9d8', border: '1px solid #0831d8', borderRadius: 4, boxShadow: '0 6px 22px rgba(0,0,0,0.35)', overflow: 'hidden', fontSize: 11 }}>
+        <div className="xp-titlebar" style={{ height: 24, color: '#fff', fontWeight: 700, padding: '0 4px 0 9px', display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{editing ? 'Tarea' : 'Nueva tarea'}</span><button onClick={onClose} style={{ border: 0, background: 'rgba(255,255,255,0.18)', color: '#fff', width: 16, height: 16, borderRadius: 2, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
         <div style={{ padding: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <label style={lbl}>Asunto<input autoFocus value={f.title} onChange={(e) => set('title', e.target.value)} className="xp-sunken" style={inp} /></label>
           <div style={{ display: 'flex', gap: 8 }}>
