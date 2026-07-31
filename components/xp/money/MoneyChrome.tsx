@@ -124,16 +124,18 @@ export function MarketRail() {
 }
 
 // CHROME — cabecera Money + tabs de folder + [riel | contenido]. Compartido Finanzas/Uptown.
-export function MoneyChrome({ brand = 'Money', tabs, active, onTab, right, children }: {
+// `modal` se pinta como overlay absoluto sobre TODA la ventana (raíz relative), como el EditModal del arcade.
+export function MoneyChrome({ brand = 'Money', tabs, active, onTab, right, children, modal }: {
   brand?: string
   tabs: { id: string; label: string }[]
   active: string
   onTab: (id: string) => void
   right?: React.ReactNode
   children: React.ReactNode
+  modal?: React.ReactNode
 }) {
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: MONEY.ink }}>
+    <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: MONEY.ink }}>
       {/* Cabecera azul: mariposa + MSN Money */}
       <div style={{ flexShrink: 0, height: 40, background: `linear-gradient(180deg,${MONEY.headFrom},${MONEY.headTo})`, display: 'flex', alignItems: 'center', padding: '0 11px', gap: 7, boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
         <CerebroButterfly size={23} />
@@ -165,6 +167,57 @@ export function MoneyChrome({ brand = 'Money', tabs, active, onTab, right, child
           {children}
         </div>
       </div>
+      {modal}
     </div>
+  )
+}
+
+// Overlay modal Money (scrim + caja centrada), scopeado a la ventana. Para EditModal, add-forms, etc.
+export function MoneyModal({ title, onClose, children, footer, width = 320 }: {
+  title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; width?: number
+}) {
+  return (
+    <div onMouseDown={onClose} style={{ position: 'absolute', inset: 0, zIndex: 40, background: 'rgba(20,40,80,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div onMouseDown={(e) => e.stopPropagation()} style={{ width, maxWidth: '92%', background: '#fff', border: `1px solid ${MONEY.headTo}`, borderRadius: 4, boxShadow: '0 6px 22px rgba(0,0,0,0.35)', overflow: 'hidden' }}>
+        <div style={{ background: `linear-gradient(180deg,${MONEY.headFrom},${MONEY.headTo})`, color: '#fff', fontWeight: 700, fontSize: 11, padding: '4px 9px', display: 'flex', alignItems: 'center' }}>
+          <span style={{ flex: 1 }}>{title}</span>
+          <button onClick={onClose} style={{ border: 0, background: 'rgba(255,255,255,0.15)', color: '#fff', width: 16, height: 16, borderRadius: 2, cursor: 'pointer', lineHeight: 1, fontSize: 11 }}>×</button>
+        </div>
+        <div style={{ padding: '10px 11px' }}>{children}</div>
+        {footer && <div style={{ padding: '7px 11px', borderTop: `1px solid ${MONEY.rule}`, background: '#f3f7fd', display: 'flex', justifyContent: 'flex-end', gap: 7 }}>{footer}</div>}
+      </div>
+    </div>
+  )
+}
+
+// Botones Money reutilizables.
+export function MoneyBtn({ children, onClick, primary, danger, disabled }: { children: React.ReactNode; onClick?: () => void; primary?: boolean; danger?: boolean; disabled?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      border: `1px solid ${danger ? '#a02015' : primary ? MONEY.headTo : MONEY.rule}`, borderRadius: 3,
+      padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: disabled ? 'default' : 'pointer',
+      color: danger ? '#a02015' : primary ? '#fff' : MONEY.ink, opacity: disabled ? 0.5 : 1,
+      background: primary ? `linear-gradient(${MONEY.headFrom},${MONEY.headTo})` : 'linear-gradient(#fff,#e9f0fa)',
+    }}>{children}</button>
+  )
+}
+
+// Input de texto/número Money.
+export function MoneyInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} style={{ border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit', outline: 'none', width: '100%', ...props.style }} />
+}
+
+// Toggle de método efectivo/tarjeta (los únicos dos, canon del arcade).
+export function MethodPick({ value, onChange, compact }: { value: string; onChange: (v: 'efectivo' | 'tarjeta') => void; compact?: boolean }) {
+  const v = value === 'efectivo' ? 'efectivo' : 'tarjeta'
+  return (
+    <span style={{ display: 'inline-flex', border: `1px solid ${MONEY.rule}`, borderRadius: 3, overflow: 'hidden', flexShrink: 0 }}>
+      {(['efectivo', 'tarjeta'] as const).map((m) => (
+        <button key={m} onClick={(e) => { e.stopPropagation(); onChange(m) }} title={m === 'efectivo' ? 'Efectivo' : 'Tarjeta'} style={{
+          border: 0, cursor: 'pointer', padding: compact ? '1px 5px' : '2px 8px', fontSize: compact ? 11 : 11,
+          background: v === m ? `linear-gradient(${MONEY.barFrom},${MONEY.barTo})` : '#eef3fb', color: v === m ? '#fff' : '#5a6a86',
+        }}>{m === 'efectivo' ? '💵' : '💳'}</button>
+      ))}
+    </span>
   )
 }
