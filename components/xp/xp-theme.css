@@ -125,30 +125,40 @@
 }
 .xp-dialog, .xp-dialog * { box-sizing: border-box; }
 
-/* Group box (fieldset etched) con legend arriba-izquierda */
+/* Group box XP LUNA: marco redondeado con etch suave (no el bisel duro de 2000) */
 .xp-groupbox {
   position: relative;
-  border-top: 1px solid #919b9c; border-left: 1px solid #919b9c;
-  border-right: 1px solid #ffffff; border-bottom: 1px solid #ffffff;
+  border: 1px solid #d5d2c4; border-radius: 3px;
+  box-shadow: inset 0 0 0 1px #ffffff;
   padding: 11px 10px 10px;
 }
-.xp-legend { position: absolute; top: -7px; left: 8px; padding: 0 4px; background: #ece9d8; font-size: 11px; color: #000; }
+.xp-legend { position: absolute; top: -7px; left: 8px; padding: 0 4px; background: #ece9d8; font-size: 11px; font-weight: 700; color: #1c3d6e; }
 
-/* Sunken (campos) / raised (botones) 3D clásico */
-.xp-sunken { border-style: solid; border-width: 2px; border-color: #808080 #ffffff #ffffff #808080; background: #fff; }
-.xp-raised { border-style: solid; border-width: 2px; border-color: #ffffff #808080 #808080 #ffffff; background: #ece9d8; }
-.xp-raised:active { border-color: #808080 #ffffff #ffffff #808080; }
+/* Campos XP LUNA: borde azul-gris 1px (el input de XP), no el doble bisel de 2000 */
+.xp-sunken { border: 1px solid #7f9db9; background: #fff; }
+.xp-sunken:focus, .xp-sunken:focus-within { border-color: #3f8ef2; }
 
-/* Checkbox cuadrado clásico */
+/* Botones XP LUNA: redondeados, gradiente vertical, glow ÁMBAR en hover (la firma de Luna) */
+.xp-raised {
+  border: 1px solid #8b8b7e; border-radius: 3px;
+  background: linear-gradient(180deg, #ffffff 0%, #f2f1ea 46%, #e4e3d6 54%, #eeede3 100%);
+  box-shadow: inset 0 1px 0 #ffffff;
+  color: #000;
+}
+.xp-raised:hover { border-color: #e0a11e; box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(232,170,45,0.55), 0 0 4px rgba(255,190,80,0.5); }
+.xp-raised:active { background: linear-gradient(180deg,#dcdace,#edece2); box-shadow: inset 0 1px 3px rgba(0,0,0,0.14); }
+.xp-raised:disabled { color: #9a988c; background: linear-gradient(#f4f3ec,#e9e8dd); border-color: #c6c4b7; box-shadow: none; }
+
+/* Checkbox XP LUNA: borde azul-gris, esquinas suaves, gradiente sutil */
 .xp-cb-label { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #000; cursor: pointer; }
 .xp-check {
   appearance: none; -webkit-appearance: none; margin: 0;
   width: 13px; height: 13px; flex-shrink: 0; position: relative; cursor: pointer;
-  border-style: solid; border-width: 2px; border-color: #808080 #ffffff #ffffff #808080; background: #fff;
+  border: 1px solid #7f9db9; border-radius: 2px; background: linear-gradient(#ffffff,#edf2f8);
 }
 .xp-check:checked::after {
   content: ''; position: absolute; left: 3px; top: 0px; width: 3px; height: 7px;
-  border: solid #101010; border-width: 0 2px 2px 0; transform: rotate(43deg);
+  border: solid #16407a; border-width: 0 2px 2px 0; transform: rotate(43deg);
 }
 
 /* Trackbar (slider custom) — groove hundido + thumb + tick marks */
@@ -157,15 +167,16 @@
 .xp-slider-thumb { position: absolute; background: linear-gradient(#5a92e6, #2f6fd0); border-style: solid; border-width: 1px; border-color: #8fbdf2 #17418f #17418f #8fbdf2; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4); }
 .xp-slider-tick { position: absolute; background: #6a6658; }
 
-/* Dropdown (select con flecha) + spinner ↑↓ */
-.xp-select { position: relative; display: inline-flex; height: 21px; background: #fff; border-style: solid; border-width: 2px; border-color: #808080 #ffffff #ffffff #808080; }
+/* Dropdown XP LUNA (select con flecha): borde azul-gris + botón de flecha con gradiente azulado */
+.xp-select { position: relative; display: inline-flex; height: 21px; background: #fff; border: 1px solid #7f9db9; }
 .xp-select select { flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; border: 0; background: transparent; font-family: inherit; font-size: 11px; padding: 0 20px 0 5px; outline: none; cursor: pointer; height: 100%; }
-.xp-select-arrow { position: absolute; right: 0; top: 0; bottom: 0; width: 17px; display: flex; align-items: center; justify-content: center; pointer-events: none; border-left: 1px solid #808080; background: linear-gradient(#f4f2ea,#d8d4c6); font-size: 8px; color: #000; }
+.xp-select-arrow { position: absolute; right: 0; top: 0; bottom: 0; width: 17px; display: flex; align-items: center; justify-content: center; pointer-events: none; border-left: 1px solid #a8c0da; background: linear-gradient(#fbfcff,#d4e1f2); font-size: 8px; color: #1c3d6e; }
 .xp-spinner { display: inline-flex; height: 21px; }
-.xp-spinner input { width: 44px; border-style: solid; border-width: 2px; border-color: #808080 #ffffff #ffffff #808080; border-right: 0; background: #fff; font-family: inherit; font-size: 11px; padding: 0 4px; outline: none; text-align: right; }
-.xp-spin-btns { display: flex; flex-direction: column; width: 16px; }
-.xp-spin-btns button { flex: 1; border-style: solid; border-width: 1px; border-color: #ffffff #808080 #808080 #ffffff; background: linear-gradient(#f4f2ea,#dcd8ca); font-size: 6px; line-height: 1; cursor: pointer; padding: 0; color: #000; }
-.xp-spin-btns button:active { border-color: #808080 #ffffff #ffffff #808080; }
+.xp-spinner input { width: 44px; border: 1px solid #7f9db9; border-right: 0; background: #fff; font-family: inherit; font-size: 11px; padding: 0 4px; outline: none; text-align: right; }
+.xp-spin-btns { display: flex; flex-direction: column; width: 16px; border: 1px solid #7f9db9; }
+.xp-spin-btns button { flex: 1; border: 0; border-bottom: 1px solid #a8c0da; background: linear-gradient(#fbfcff,#dce6f4); font-size: 6px; line-height: 1; cursor: pointer; padding: 0; color: #1c3d6e; }
+.xp-spin-btns button:last-child { border-bottom: 0; }
+.xp-spin-btns button:active { background: linear-gradient(#c8d6ea, #e8eef7); }
 
 /* ── Menú Inicio (estructura real XP) ─────────────────────────────────────── */
 .xp-startmenu {

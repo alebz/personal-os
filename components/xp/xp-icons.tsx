@@ -17,7 +17,7 @@ export const XP_ICON: Record<string, string> = {
   ejecutar: '/themes/xp/icons/ejecutar.png',
   clock: '/themes/xp/icons/clock.png',
   display: '/themes/xp/icons/display.png',
-  cerebro: '/logo.png',   // el logo del OS = tu segundo cerebro (consistente con el avatar de MSN-Cerebro)
+  cerebro: '/themes/xp/icons/cerebro.png',   // MSN Messenger (Cerebro ES Messenger bajo XP)
   bloc: '/themes/xp/icons/bloc.png',
 }
 

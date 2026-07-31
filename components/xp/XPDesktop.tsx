@@ -305,7 +305,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           style={{ height: 30, padding: '0 20px 0 11px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: 7 }}
         >
           <RainbowFlag w={18} h={13} />
-          inicio
+          Inicio
         </button>
 
         <div style={{ display: 'flex', gap: 4, marginLeft: 8, overflow: 'hidden', flex: 1 }}>

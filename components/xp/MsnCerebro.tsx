@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useXpWM } from './wm-context'
 import MsnChat, { type ChatBuddy } from './MsnChat'
 import { CerebroButterfly } from './CerebroButterfly'
 import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
-import { XpDialogModal, XpField, XpLabel, XpSelect } from './xp-controls'
+import { XpDialogModal, XpField, XpLabel, XpSelect, XpContextMenu } from './xp-controls'
 
 // ── Cumpleaños ────────────────────────────────────────────────────────────────
 const MONTHS_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -38,6 +38,7 @@ interface Contact {
   category: string
   company: string | null
   birthday: string | null
+  notes: string | null
 }
 
 // Buddies fijos (siempre en línea). id con prefijo para no chocar con uuids de contactos.
@@ -48,7 +49,7 @@ interface Special {
   avatar: { img?: string; initials?: string; bg?: string }
 }
 const SPECIALS: Special[] = [
-  { id: 'sys:cerebro', name: 'Cerebro',        status: 'tu segundo cerebro — pregúntame lo que sea', avatar: { img: '/logo.png', bg: '#171410' } },
+  { id: 'sys:cerebro', name: 'Cerebro',        status: 'tu segundo cerebro — pregúntame lo que sea', avatar: { img: '/themes/xp/icons/cerebro.png', bg: '#eef4fb' } },
   { id: 'sys:lolo',    name: 'Lolo',           status: 'del arcade, de visita 👋',                   avatar: { img: '/Lolo/Idle/lolo_idle_2.png', bg: '#eef4fb' } },
   { id: 'sys:diario',  name: 'Alex (Diario)',  status: 'yo, hablando conmigo mismo',                 avatar: { initials: 'A', bg: '#3163c8' } },
 ]
@@ -86,11 +87,12 @@ function Avatar({ id, img, initials, bg, size = 20, onPick }: { id?: string; img
   )
 }
 
-function BuddyRow({ id, name, status, avatar, onOpen }: { id: string; name: string; status?: string; avatar: Special['avatar']; onOpen: () => void }) {
+function BuddyRow({ id, name, status, avatar, onOpen, onContext }: { id: string; name: string; status?: string; avatar: Special['avatar']; onOpen: () => void; onContext?: (e: React.MouseEvent) => void }) {
   const [hover, setHover] = useState(false)
   return (
     <button
       onDoubleClick={onOpen}
+      onContextMenu={onContext}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', border: 0, cursor: 'default',
@@ -125,7 +127,9 @@ export default function MsnCerebro() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
-  const [addOpen, setAddOpen] = useState(false)
+  const [dialog, setDialog] = useState<{ mode: 'create' } | { mode: 'edit'; contact: Contact } | null>(null)
+  const [ctx, setCtx] = useState<{ x: number; y: number; contact: Contact } | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   const loadContacts = useCallback(() => {
     fetch('/api/contacts')
@@ -151,8 +155,24 @@ export default function MsnCerebro() {
 
   const specialKind = (id: string): ChatBuddy['kind'] => (id === 'sys:cerebro' ? 'cerebro' : id === 'sys:lolo' ? 'lolo' : 'diario')
 
+  const contactBuddy = (c: Contact): ChatBuddy => ({ id: c.id, name: c.name, kind: 'person', avatar: { initials: c.name.trim().charAt(0).toUpperCase() || '?', bg: '#8aa0c0' }, birthday: c.birthday, category: c.category })
+
+  // Click derecho sobre un contacto → menú (coords a px LÓGICOS: la escala del subárbol se cancela con rect.width/offsetWidth).
+  function openCtx(e: React.MouseEvent, contact: Contact) {
+    e.preventDefault()
+    const root = rootRef.current
+    if (!root) return
+    const r = root.getBoundingClientRect()
+    const f = r.width / root.offsetWidth || 1
+    setCtx({ x: (e.clientX - r.left) / f, y: (e.clientY - r.top) / f, contact })
+  }
+  async function removeContact(c: Contact) {
+    await fetch(`/api/contacts/${c.id}`, { method: 'DELETE' }).catch(() => {})
+    loadContacts()
+  }
+
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
+    <div ref={rootRef} style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
       {/* Menú (decorativo, sabor MSN) */}
       <div style={{ display: 'flex', gap: 13, padding: '2px 9px', background: '#f7f9fc', borderBottom: '1px solid #cdd6e2', fontSize: 11, color: '#333' }}>
         {['Archivo', 'Contactos', 'Acciones', 'Herramientas', 'Ayuda'].map((m) => <span key={m}>{m}</span>)}
@@ -195,7 +215,7 @@ export default function MsnCerebro() {
           </span>
           <span style={{ position: 'absolute', right: -1, bottom: -1, fontSize: 9, fontWeight: 900, color: '#2f9a22' }}>+</span>
         </span>
-        <span role="button" tabIndex={0} onClick={() => setAddOpen(true)} style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>Agregar un contacto</span>
+        <span role="button" tabIndex={0} onClick={() => setDialog({ mode: 'create' })} style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>Agregar un contacto</span>
       </div>
 
       {/* Lista de contactos — backdrop del Messenger original al ~20% (velo blanco 0.8 encima, ya que los
@@ -219,7 +239,8 @@ export default function MsnCerebro() {
               return (
                 <BuddyRow
                   key={c.id} id={c.id} name={c.name} status={status} avatar={avatar}
-                  onOpen={() => openChat({ id: c.id, name: c.name, kind: 'person', avatar, birthday: c.birthday, category: c.category })}
+                  onOpen={() => openChat(contactBuddy(c))}
+                  onContext={(e) => openCtx(e, c)}
                 />
               )
             })}
@@ -234,19 +255,36 @@ export default function MsnCerebro() {
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#8a93a0' }}>.mx</span>
       </div>
 
-      {addOpen && <AddContactDialog onClose={() => setAddOpen(false)} onCreated={loadContacts} />}
+      {ctx && (
+        <XpContextMenu
+          x={ctx.x} y={ctx.y} onClose={() => setCtx(null)}
+          items={[
+            { label: 'Enviar un mensaje', onClick: () => openChat(contactBuddy(ctx.contact)) },
+            { label: 'Editar contacto…', onClick: () => setDialog({ mode: 'edit', contact: ctx.contact }) },
+          ]}
+        />
+      )}
+      {dialog && (
+        <ContactDialog
+          contact={dialog.mode === 'edit' ? dialog.contact : null}
+          onClose={() => setDialog(null)}
+          onSaved={loadContacts}
+        />
+      )}
     </div>
   )
 }
 
-// Diálogo XP "Agregar un contacto" — misma funcionalidad que el arcade (POST /api/contacts), presentada
-// como diálogo XP centrado sobre la ventana. Categorías de /api/contact-categories.
-function AddContactDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
-  const [company, setCompany] = useState('')
-  const [birthday, setBirthday] = useState('')
-  const [notes, setNotes] = useState('')
+// Diálogo XP de contacto — crear (POST) o editar (PATCH) + eliminar (DELETE), como diálogo XP centrado
+// sobre la ventana. Misma funcionalidad que el arcade. Categorías de /api/contact-categories.
+interface ContactRow { id: string; name: string; category: string; company: string | null; birthday: string | null; notes: string | null }
+function ContactDialog({ contact, onClose, onSaved }: { contact: ContactRow | null; onClose: () => void; onSaved: () => void }) {
+  const editing = !!contact
+  const [name, setName] = useState(contact?.name ?? '')
+  const [category, setCategory] = useState(contact?.category ?? '')
+  const [company, setCompany] = useState(contact?.company ?? '')
+  const [birthday, setBirthday] = useState(contact?.birthday ?? '')
+  const [notes, setNotes] = useState(contact?.notes ?? '')
   const [cats, setCats] = useState<{ id: string; name: string }[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -254,29 +292,37 @@ function AddContactDialog({ onClose, onCreated }: { onClose: () => void; onCreat
   useEffect(() => {
     fetch('/api/contact-categories')
       .then((r) => r.json())
-      .then((d) => { if (Array.isArray(d)) { setCats(d); if (d[0]) setCategory(d[0].name) } })
+      .then((d) => { if (Array.isArray(d)) { setCats(d); if (!contact && d[0]) setCategory(d[0].name) } })
       .catch(() => {})
-  }, [])
+  }, [contact])
 
   async function save() {
     if (!name.trim() || !category || busy) return
     setBusy(true); setErr(null)
     try {
-      const r = await fetch('/api/contacts', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), category, company: company || null, birthday: birthday || null, notes: notes || null }),
+      const body = { name: name.trim(), category, company: company || null, birthday: birthday || null, notes: notes || null }
+      const r = await fetch(editing ? `/api/contacts/${contact!.id}` : '/api/contacts', {
+        method: editing ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
       })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok || d.error) { setErr(d.error ?? 'No se pudo agregar'); return }
-      onCreated(); onClose()
+      if (!r.ok || d.error) { setErr(d.error ?? 'No se pudo guardar'); return }
+      onSaved(); onClose()
     } catch (e) { setErr(String(e)) } finally { setBusy(false) }
+  }
+
+  async function remove() {
+    if (!editing || busy) return
+    setBusy(true)
+    try { await fetch(`/api/contacts/${contact!.id}`, { method: 'DELETE' }); onSaved(); onClose() }
+    catch (e) { setErr(String(e)); setBusy(false) }
   }
 
   return (
     <XpDialogModal
-      open title="Agregar un contacto" width={384}
+      open title={editing ? 'Editar contacto' : 'Agregar un contacto'} width={384}
       onCancel={onClose} onOk={save}
       okLabel={busy ? 'Guardando…' : 'Aceptar'} okDisabled={busy || !name.trim() || !category}
+      onDelete={editing ? remove : undefined} deleteLabel="Eliminar"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
         <div>
