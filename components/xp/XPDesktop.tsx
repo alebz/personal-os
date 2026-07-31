@@ -53,7 +53,7 @@ function StartFolder({ folder, onLaunch }: { folder: { id: string; label: string
   const leave = () => { t.current = setTimeout(() => setOpen(false), 260) }
   return (
     <div style={{ position: 'relative' }} onMouseEnter={enter} onMouseLeave={leave}>
-      <div className="xp-startmenu-item" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 6px 3px 10px', cursor: 'default', background: open ? 'linear-gradient(180deg,#3f8ef2,#2464d8)' : 'none', color: open ? '#fff' : '#000' }}>
+      <div className="xp-startmenu-item" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 6px 3px 10px', fontSize: 12, cursor: 'default', background: open ? 'linear-gradient(180deg,#3f8ef2,#2464d8)' : 'none', color: open ? '#fff' : '#000' }}>
         <XpIcon name={folder.icon} size={16} /><span style={{ flex: 1 }}>{folder.label}</span><span style={{ fontSize: 9 }}>▶</span>
       </div>
       {open && (
