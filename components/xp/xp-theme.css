@@ -89,13 +89,17 @@
 
 /* ── Botón de ventana en taskbar ──────────────────────────────────────────── */
 .xp-tb-btn {
-  background: linear-gradient(180deg, #4a94f0 0%, #3576dd 50%, #2b62cf 100%);
+  /* Botón de ventana en 2º plano: elevado, glossy (mitad superior brillante). */
+  background: linear-gradient(180deg, #5ca0f4 0%, #3f83e7 47%, #3777de 53%, #2c66d2 100%);
   border: 1px solid #1c4fbf;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.42);
 }
+.xp-tb-btn:not(.xp-tb-btn--active):hover { filter: brightness(1.07); }
 .xp-tb-btn--active {
-  background: linear-gradient(180deg, #235bc6 0%, #1c4fbb 50%, #2158c8 100%);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+  /* Ventana en FOCO: botón hundido/recesado, azul más oscuro (canon Luna). */
+  background: linear-gradient(180deg, #1e55c1 0%, #2560cc 55%, #2a6ad5 100%);
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.45), inset -1px 0 0 rgba(255,255,255,0.1);
 }
 
 /* ── System tray — la zona derecha con CASA PROPIA (canon XP): recuadro visualmente separado,

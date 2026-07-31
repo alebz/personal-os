@@ -406,7 +406,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         <button
           className={`xp-chrome-btn xp-start ${startOpen ? 'xp-start--open' : ''}`}
           onClick={() => (startOpen ? closeStart() : setStartOpen(true))}
-          style={{ height: 30, padding: '0 20px 0 11px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: 7, ...(startOpen ? { boxShadow: 'inset 3px 3px 6px rgba(0,0,0,0.45), inset -1px -1px 2px rgba(255,255,255,0.15)', filter: 'brightness(0.88)' } : {}) }}
+          style={{ height: 30, padding: '0 22px 0 11px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 800, fontSize: 15, letterSpacing: 0.2, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: 7, ...(startOpen ? { boxShadow: 'inset 3px 3px 6px rgba(0,0,0,0.45), inset -1px -1px 2px rgba(255,255,255,0.15)', filter: 'brightness(0.88)' } : {}) }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- asset local chico */}
           <img src="/themes/xp/icons/windows-xp.png" alt="" width={18} height={18} draggable={false} style={{ display: 'block', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' }} />
@@ -418,9 +418,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             const isActive = !w.minimized && w.z === topZ
             return (
               <button key={w.id} data-taskbtn={w.id} className={`xp-chrome-btn xp-tb-btn ${isActive ? 'xp-tb-btn--active' : ''}`} onClick={() => taskbarClick(w.id)}
-                style={{ height: 22, maxWidth: 160, padding: '0 10px 0 6px', borderRadius: 3, color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 5, textShadow: '1px 1px 1px rgba(0,0,0,0.35)' }}>
+                style={{ height: 23, flex: '0 1 158px', minWidth: 0, padding: '0 12px 0 7px', color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 6, textShadow: '1px 1px 1px rgba(0,0,0,0.35)', textAlign: 'left' }}>
                 <XpIcon name={w.icon} size={16} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.title}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.title}</span>
               </button>
             )
           })}
