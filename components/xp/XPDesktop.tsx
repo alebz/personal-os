@@ -9,6 +9,7 @@ import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
 import BlocDeNotas from './BlocDeNotas'
 import CalendarioApp from './CalendarioApp'
+import XpNotifications from './XpNotifications'
 import { XpSlider, XpCheckbox, XpContextMenu } from './xp-controls'
 import { XpIcon, SECTION_ICON } from './xp-icons'
 import { RunDialog } from './RunDialog'
@@ -254,6 +255,13 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       {windows.map((w) => (
         <XPWindow key={w.id} win={w} active={!w.minimized && w.z === topZ} scale={scale} onFocus={focusWindow} onClose={closeWindow} onMinimize={minimizeWindow} onMove={moveWindow} onMaximize={maximizeWindow} onResize={resizeWindow} />
       ))}
+
+      {/* Globos de notificación del tray — vuelven proactivo al OS (cumpleaños/eventos/tareas de hoy). */}
+      <XpNotifications
+        onOpenCerebro={() => { const s = sections.find((x) => x.href === '/brain'); if (s) openSection(s) }}
+        onOpenCalendario={openCalendario}
+        onOpenTareas={() => { const s = sections.find((x) => x.href === '/crm'); if (s) openSection(s) }}
+      />
 
       {/* ── Menú Inicio · dos columnas ── */}
       {startOpen && (
