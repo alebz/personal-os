@@ -409,7 +409,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           style={{ height: 30, padding: '0 20px 0 11px', border: 'none', color: '#fff', fontStyle: 'italic', fontWeight: 700, fontSize: 15, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: 7, ...(startOpen ? { boxShadow: 'inset 3px 3px 6px rgba(0,0,0,0.45), inset -1px -1px 2px rgba(255,255,255,0.15)', filter: 'brightness(0.88)' } : {}) }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- asset local chico */}
-          <img src="/themes/xp/win-logo.png" alt="" width={19} height={16} draggable={false} style={{ display: 'block', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' }} />
+          <img src="/themes/xp/icons/windows-xp.png" alt="" width={18} height={18} draggable={false} style={{ display: 'block', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' }} />
           Inicio
         </button>
 
