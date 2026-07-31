@@ -8,6 +8,8 @@ import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSec
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { FundLedger } from '@/components/finance/FundLedger'
 import DrumModal from '@/components/DrumModal'
+import { useOSSettings } from '@/components/OSSettingsContext'
+import UptownMoney from '@/components/xp/UptownMoney'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
@@ -1206,7 +1208,14 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
 
 // ─── UptownPage ───────────────────────────────────────────────────────────────
 
+// Bajo XP, Uptown se re-presenta como MSN Money 2003 (misma familia que Finanzas). Arcade = intacto.
 export default function UptownContent() {
+  const { shell } = useOSSettings()
+  if (shell === 'xp') return <UptownMoney />
+  return <UptownArcade />
+}
+
+function UptownArcade() {
   const [month, setMonth]             = useState(currMonth)
   const [rents, setRents]             = useState<RentRow[]>([])
   const [expenses, setExpenses]       = useState<ExpenseRow[]>([])

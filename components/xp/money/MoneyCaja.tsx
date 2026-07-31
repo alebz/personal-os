@@ -16,17 +16,17 @@ interface Fund { id: string; key: string | null; label: string; target: number |
 async function post(url: string, body: unknown) { const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error(await r.text()); return r.json() }
 async function patch(url: string, body: unknown) { const r = await fetch(url, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error(await r.text()); return r.json() }
 
-export default function MoneyCaja({ month, onChange }: { month: string; onChange: () => void }) {
+export default function MoneyCaja({ month, onChange, scope = 'personal', excludeKeys = [], createPlaceholder = 'Vacaciones, colchón…' }: { month: string; onChange: () => void; scope?: string; excludeKeys?: string[]; createPlaceholder?: string }) {
   const [funds, setFunds] = useState<Fund[]>([])
   const [showArchived, setShowArchived] = useState(false)
   const [open, setOpen] = useState<string | null>(null)   // fund id cuya libreta está abierta
   const [creating, setCreating] = useState(false)
 
   const load = useCallback(() => {
-    fetch('/api/finance/funds?scope=personal&archived=1').then((r) => r.json()).then((d) => {
-      if (Array.isArray(d)) setFunds(d.map((f) => ({ ...f, saved: num(f.saved), target: f.target == null ? null : num(f.target), movements: (f.movements ?? []).map((m: Move) => ({ ...m, amount: num(m.amount) })) })))
+    fetch(`/api/finance/funds?scope=${scope}&archived=1`).then((r) => r.json()).then((d) => {
+      if (Array.isArray(d)) setFunds(d.filter((f) => !f.key || !excludeKeys.includes(f.key)).map((f) => ({ ...f, saved: num(f.saved), target: f.target == null ? null : num(f.target), movements: (f.movements ?? []).map((m: Move) => ({ ...m, amount: num(m.amount) })) })))
     }).catch(() => {})
-  }, [])
+  }, [scope, excludeKeys])
   useEffect(() => { load() }, [load])
 
   const refresh = () => { load(); onChange() }
@@ -35,7 +35,7 @@ export default function MoneyCaja({ month, onChange }: { month: string; onChange
     await post('/api/finance/movements', { month, date: todayStr(), description, amount, flow, category: 'fondo', commitment_id: null, envelope_id: id, metodo: null })
     refresh()
   }
-  async function createFund(label: string, target: number | null) { await post('/api/finance/envelopes', { label, target, scope: 'personal' }); setCreating(false); refresh() }
+  async function createFund(label: string, target: number | null) { await post('/api/finance/envelopes', { label, target, scope }); setCreating(false); refresh() }
   async function updateFund(id: string, body: Record<string, unknown>) { await patch(`/api/finance/envelopes/${id}`, body); refresh() }
   async function deleteFund(id: string) { await fetch(`/api/finance/envelopes/${id}`, { method: 'DELETE' }); setOpen(null); refresh() }
 
@@ -76,7 +76,7 @@ export default function MoneyCaja({ month, onChange }: { month: string; onChange
         </div>
       )}
 
-      {creating && <CreateFundModal onClose={() => setCreating(false)} onCreate={createFund} />}
+      {creating && <CreateFundModal placeholder={createPlaceholder} onClose={() => setCreating(false)} onCreate={createFund} />}
       {openFund && <LibretaModal fund={openFund} onClose={() => setOpen(null)} onAporta={(d, a) => aportaRetira(openFund.id, 'out', d, a)} onRetira={(d, a) => aportaRetira(openFund.id, 'in', d, a)} onDelete={() => deleteFund(openFund.id)} />}
     </div>
   )
@@ -140,14 +140,14 @@ function FundRow({ fund, onOpen, onRename, onMeta, onArchive, onDelete }: {
 }
 const linkBtn: React.CSSProperties = { border: 0, background: 'none', cursor: 'pointer', color: MONEY.link, fontSize: 10.5, fontFamily: 'inherit', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }
 
-function CreateFundModal({ onClose, onCreate }: { onClose: () => void; onCreate: (label: string, target: number | null) => void }) {
+function CreateFundModal({ onClose, onCreate, placeholder }: { onClose: () => void; onCreate: (label: string, target: number | null) => void; placeholder: string }) {
   const [label, setLabel] = useState('')
   const [target, setTarget] = useState('')
   return (
     <MoneyModal title="Nuevo apartado" onClose={onClose}
       footer={<><MoneyBtn onClick={onClose}>Cancelar</MoneyBtn><MoneyBtn primary disabled={!label.trim()} onClick={() => label.trim() && onCreate(label.trim(), target.trim() === '' ? null : num(target))}>Crear</MoneyBtn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <label style={lbl}>Nombre<MoneyInput autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Vacaciones, colchón…" /></label>
+        <label style={lbl}>Nombre<MoneyInput autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder={placeholder} /></label>
         <label style={lbl}>Meta (opcional)<MoneyInput type="number" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="sin meta" /></label>
       </div>
     </MoneyModal>
