@@ -184,7 +184,8 @@
   border-bottom: none;
   border-radius: 9px 9px 0 0;
   box-shadow: 4px -3px 16px rgba(0,0,0,0.45);
-  overflow: hidden;
+  /* sin overflow:hidden — el cajón cascada (Favoritos/Todos los programas) sale por la derecha; las
+     esquinas superiores las redondea el propio header. */
 }
 .xp-startmenu-header {
   border-radius: 8px 8px 0 0;

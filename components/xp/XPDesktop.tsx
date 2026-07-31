@@ -81,8 +81,8 @@ function XPClock({ onOpen }: { onOpen: () => void }) {
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const { set, xpSound, xpLogicalH, startScreensaver, xpWallpaper } = useOSSettings()
   const [startOpen, setStartOpen] = useState(false)
-  const [allOpen, setAllOpen] = useState(false)
-  const [favOpen, setFavOpen] = useState(false)
+  const [flyout, setFlyout] = useState<'fav' | 'all' | null>(null)   // cajón cascada a la derecha (canon XP)
+  const flyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [favorites, setFavorites] = useState<string[]>([])   // apps fijadas (ids), persistidas
   const favLoaded = useRef(false)
   useEffect(() => {
@@ -121,7 +121,11 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const pending = xpSections.filter((s) => !LAUNCHABLE.has(s.href))
   const topZ = Math.max(0, ...windows.map((w) => w.z))
 
-  function closeStart() { setStartOpen(false); setAllOpen(false); setFavOpen(false) }
+  function closeStart() { setStartOpen(false); setFlyout(null) }
+  // Cajón cascada (hover con intención): abrir cancela el cierre; salir programa cierre con delay.
+  const openFly = (k: 'fav' | 'all') => { if (flyTimer.current) clearTimeout(flyTimer.current); setFlyout(k) }
+  const keepFly = () => { if (flyTimer.current) clearTimeout(flyTimer.current) }
+  const closeFlySoon = () => { if (flyTimer.current) clearTimeout(flyTimer.current); flyTimer.current = setTimeout(() => setFlyout(null), 320) }
 
   // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
   function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; icon?: string }) {
@@ -310,49 +314,28 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, textShadow: '1px 1px 1px rgba(0,0,0,0.45)' }}>Alex Mateo</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', position: 'relative' }}>
             {/* Columna IZQUIERDA (blanca): las secciones como programas */}
             <div className="xp-sm-left" style={{ flex: 1, padding: '6px 0', minWidth: 0 }}>
               {launchable.map((s) => (
-                <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button key={s.href} className="xp-startmenu-item" onClick={() => openSection(s)} onMouseEnter={() => setFlyout(null)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <XpIcon name={SECTION_ICON[s.href]} size={24} />
                   <b>{s.label}</b>
                 </button>
               ))}
 
               <div className="xp-sm-sep" />
-              {/* Favoritos — apps que fijaste (desde "Todos los programas"), para un clic rápido. */}
-              <button className="xp-startmenu-item" onClick={() => setFavOpen((v) => !v)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="xp-allprogs-arrow">{favOpen ? '▾' : '▸'}</span>
-                <span style={{ color: '#e0a11e', width: 16, textAlign: 'center' }}>★</span>
-                <b>Favoritos</b>
+              {/* Favoritos — apps fijadas. Cajón cascada a la derecha (canon XP). */}
+              <button className="xp-startmenu-item" onClick={() => openFly('fav')} onMouseEnter={() => openFly('fav')} onMouseLeave={closeFlySoon}
+                style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, background: flyout === 'fav' ? '#316ac5' : undefined, color: flyout === 'fav' ? '#fff' : undefined }}>
+                <XpIcon name="favoritos" size={24} /><b style={{ flex: 1 }}>Favoritos</b><span style={{ fontSize: 10, color: flyout === 'fav' ? '#fff' : '#2a6f2a' }}>▶</span>
               </button>
-              {favOpen && (favApps.length > 0
-                ? favApps.map((a) => (
-                    <button key={a.id} className="xp-startmenu-item" onClick={a.open} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 30 }}>
-                      <XpIcon name={a.icon} size={20} /> {a.label}
-                    </button>
-                  ))
-                : <div style={{ padding: '4px 14px 4px 30px', color: '#9a9a92', fontSize: 12, fontStyle: 'italic' }}>Aún no fijas nada. Fija apps con la ★ desde “Todos los programas”.</div>
-              )}
 
-              {/* Todos los programas — el launcher completo; fija/quita con la ★ de cada app. */}
-              <button className="xp-startmenu-item" onClick={() => setAllOpen((v) => !v)} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="xp-allprogs-arrow">{allOpen ? '▾' : '▸'}</span>
-                <b>Todos los programas</b>
+              {/* Todos los programas — launcher completo. Cajón cascada a la derecha. */}
+              <button className="xp-startmenu-item" onClick={() => openFly('all')} onMouseEnter={() => openFly('all')} onMouseLeave={closeFlySoon}
+                style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8, background: flyout === 'all' ? '#316ac5' : undefined, color: flyout === 'all' ? '#fff' : undefined }}>
+                <XpIcon name="programas" size={24} /><b style={{ flex: 1 }}>Todos los programas</b><span style={{ fontSize: 10, color: flyout === 'all' ? '#fff' : '#2a6f2a' }}>▶</span>
               </button>
-              {allOpen && APPS.map((a) => {
-                const pinned = favorites.includes(a.id)
-                return (
-                  <div key={a.id} className="xp-startmenu-item" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 30, paddingRight: 8 }}>
-                    <button onClick={a.open} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, border: 0, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: '#000', padding: '4px 0', textAlign: 'left' }}>
-                      <XpIcon name={a.icon} size={20} /> {a.label}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); toggleFav(a.id) }} title={pinned ? 'Quitar de Favoritos' : 'Fijar a Favoritos'}
-                      style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 14, color: pinned ? '#e0a11e' : '#c2c2b8', lineHeight: 1, padding: '0 2px' }}>{pinned ? '★' : '☆'}</button>
-                  </div>
-                )
-              })}
             </div>
 
             {/* Columna DERECHA (azul claro): lugares y utilidades */}
@@ -365,6 +348,33 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
               <button className="xp-startmenu-item" onClick={openSearch} style={rightItem}><XpIcon name="buscar" size={22} /> Buscar</button>
               <button className="xp-startmenu-item" onClick={openRun} style={rightItem}><XpIcon name="ejecutar" size={22} /> Ejecutar…</button>
             </div>
+
+            {/* Cajón cascada (Favoritos / Todos los programas) — abre a la DERECHA del menú. */}
+            {flyout && (
+              <div onMouseEnter={keepFly} onMouseLeave={closeFlySoon}
+                style={{ position: 'absolute', left: '100%', bottom: 0, marginLeft: 2, minWidth: 208, maxHeight: 360, overflowY: 'auto', background: '#fff', border: '1px solid #245edb', borderRadius: '0 4px 4px 4px', boxShadow: '3px 4px 13px rgba(0,0,0,0.32)', padding: '4px 0', zIndex: 30 }}>
+                {flyout === 'fav' && (favApps.length > 0
+                  ? favApps.map((a) => (
+                      <button key={a.id} className="xp-startmenu-item" onClick={() => { a.open(); closeStart() }} style={{ ...startItem, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <XpIcon name={a.icon} size={22} /> {a.label}
+                      </button>
+                    ))
+                  : <div style={{ padding: '10px 14px', color: '#9a9a92', fontSize: 12, fontStyle: 'italic', width: 200 }}>Aún no fijas nada. Fíjalas con la ★ desde “Todos los programas”.</div>
+                )}
+                {flyout === 'all' && APPS.map((a) => {
+                  const pinned = favorites.includes(a.id)
+                  return (
+                    <div key={a.id} className="xp-startmenu-item" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 8 }}>
+                      <button onClick={() => { a.open(); closeStart() }} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, border: 0, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: '#000', padding: '5px 0 5px 14px', textAlign: 'left' }}>
+                        <XpIcon name={a.icon} size={22} /> {a.label}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); toggleFav(a.id) }} title={pinned ? 'Quitar de Favoritos' : 'Fijar a Favoritos'}
+                        style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 15, color: pinned ? '#e0a11e' : '#c2c2b8', lineHeight: 1, padding: '0 4px' }}>{pinned ? '★' : '☆'}</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Captura rápida — dentro del menú, arriba del pie (estilo la barra de búsqueda de Vista/7). */}
