@@ -10,6 +10,7 @@ import DateTimeProperties from './DateTimeProperties'
 import BlocDeNotas from './BlocDeNotas'
 import CalendarioApp from './CalendarioApp'
 import Calculadora from './Calculadora'
+import Solitario from './Solitario'
 import XpNotifications from './XpNotifications'
 import LoloHeartbeat from './LoloHeartbeat'
 import CaptureBox from './CaptureBox'
@@ -43,6 +44,32 @@ const XP_DISSOLVED = new Set(['/', '/contactos'])
 // viewport. Solo en .xp-desktop (el arcade ni se entera). El texto sigue real (seleccionable, zoom
 // del browser encima). La altura lógica es el DIAL — vive en el contexto (xpLogicalH), gobernado por
 // "Propiedades de Pantalla" (Tema 3).
+// Carpeta anidada de "Todos los programas" (p.ej. Juegos). Fila con ▶; al pasar el mouse abre un
+// sub-cajón a la DERECHA anclado a la fila (cascada canónica de XP). Maneja su propio hover con delay.
+function StartFolder({ folder, onLaunch }: { folder: { id: string; label: string; icon: string; items: { id: string; label: string; icon: string; open: () => void }[] }; onLaunch: () => void }) {
+  const [open, setOpen] = useState(false)
+  const t = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const enter = () => { if (t.current) clearTimeout(t.current); setOpen(true) }
+  const leave = () => { t.current = setTimeout(() => setOpen(false), 260) }
+  return (
+    <div style={{ position: 'relative' }} onMouseEnter={enter} onMouseLeave={leave}>
+      <div className="xp-startmenu-item" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 6px 3px 10px', cursor: 'default', background: open ? 'linear-gradient(180deg,#3f8ef2,#2464d8)' : 'none', color: open ? '#fff' : '#000' }}>
+        <XpIcon name={folder.icon} size={16} /><span style={{ flex: 1 }}>{folder.label}</span><span style={{ fontSize: 9 }}>▶</span>
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', left: '100%', top: -2, minWidth: 172, background: '#fff', boxShadow: '4px 4px 11px rgba(0,0,0,0.32)', padding: '2px 0', zIndex: 41 }}>
+          {folder.items.map((it) => (
+            <button key={it.id} className="xp-startmenu-item" onClick={() => { it.open(); onLaunch() }}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left', border: 0, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: '#000', padding: '3px 16px 3px 10px' }}>
+              <XpIcon name={it.icon} size={16} /> {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function useViewport() {
   const [vp, setVp] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
   useEffect(() => {
@@ -169,6 +196,12 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const openCalendario = () => openWindow('calendario', 'Calendario', <CalendarioApp />, { w: 720, h: 520, resizable: true, icon: 'calendario' })
   // Calculadora — applet clásico (Estándar). Tamaño fijo, como en XP (no resizable).
   const openCalc = () => openWindow('calc', 'Calculadora', <Calculadora />, { w: 258, h: 300, icon: 'calc' })
+  // Solitario (Klondike) — carpeta Juegos. Resizable (el tablero crece).
+  const openSolitario = () => openWindow('solitario', 'Solitario', <Solitario />, { w: 640, h: 540, resizable: true, icon: 'solitario' })
+  // Carpetas anidadas de "Todos los programas" (cascada canónica de XP).
+  const FOLDERS = [
+    { id: 'juegos', label: 'Juegos', icon: 'juegos', items: [{ id: 'solitario', label: 'Solitario', icon: 'solitario', open: openSolitario }] },
+  ]
   // Abre la app destino de una notificación (Lolo→su chat directo; el resto → sección/app).
   const openNotifTarget = (target: NotifTarget) => {
     if (target === 'lolo') {
@@ -367,7 +400,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
                 fuente/íconos chicos, sin borde ni esquinas redondeadas (solo sombra). */}
             {flyout && (
               <div onMouseEnter={keepFly} onMouseLeave={closeFlySoon}
-                style={{ position: 'absolute', left: 'calc(100% - 156px)', bottom: flyBottom, minWidth: 188, maxHeight: 384, overflowY: 'auto', background: '#fff', boxShadow: '4px 4px 11px rgba(0,0,0,0.32)', padding: '2px 0', zIndex: 40 }}>
+                style={{ position: 'absolute', left: 'calc(100% - 156px)', bottom: flyBottom, minWidth: 188, background: '#fff', boxShadow: '4px 4px 11px rgba(0,0,0,0.32)', padding: '2px 0', zIndex: 40 }}>
                 {flyout === 'fav' && (favApps.length > 0
                   ? favApps.map((a) => (
                       <button key={a.id} className="xp-startmenu-item" onClick={() => { a.open(); closeStart() }} style={{ display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left', border: 0, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: '#000', padding: '3px 14px 3px 10px' }}>
@@ -376,18 +409,23 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
                     ))
                   : <div style={{ padding: '8px 12px', color: '#9a9a92', fontSize: 11.5, fontStyle: 'italic', width: 190 }}>Aún no fijas nada. Fíjalas con la ★ desde “Todos los programas”.</div>
                 )}
-                {flyout === 'all' && APPS.map((a) => {
-                  const pinned = favorites.includes(a.id)
-                  return (
-                    <div key={a.id} className="xp-startmenu-item" style={{ display: 'flex', alignItems: 'center', gap: 7, paddingRight: 6 }}>
-                      <button onClick={() => { a.open(); closeStart() }} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, border: 0, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: '#000', padding: '3px 0 3px 10px', textAlign: 'left' }}>
-                        <XpIcon name={a.icon} size={16} /> {a.label}
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); toggleFav(a.id) }} title={pinned ? 'Quitar de Favoritos' : 'Fijar a Favoritos'}
-                        style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 12, color: pinned ? '#e0a11e' : '#c2c2b8', lineHeight: 1, padding: '0 3px' }}>{pinned ? '★' : '☆'}</button>
-                    </div>
-                  )
-                })}
+                {flyout === 'all' && <>
+                  {/* Carpetas anidadas arriba (canon XP), luego separador, luego programas */}
+                  {FOLDERS.map((f) => <StartFolder key={f.id} folder={f} onLaunch={closeStart} />)}
+                  <div style={{ height: 1, background: '#e3e1d5', margin: '3px 0' }} />
+                  {APPS.map((a) => {
+                    const pinned = favorites.includes(a.id)
+                    return (
+                      <div key={a.id} className="xp-startmenu-item" style={{ display: 'flex', alignItems: 'center', gap: 7, paddingRight: 6 }}>
+                        <button onClick={() => { a.open(); closeStart() }} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, border: 0, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: '#000', padding: '3px 0 3px 10px', textAlign: 'left' }}>
+                          <XpIcon name={a.icon} size={16} /> {a.label}
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); toggleFav(a.id) }} title={pinned ? 'Quitar de Favoritos' : 'Fijar a Favoritos'}
+                          style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 12, color: pinned ? '#e0a11e' : '#c2c2b8', lineHeight: 1, padding: '0 3px' }}>{pinned ? '★' : '☆'}</button>
+                      </div>
+                    )
+                  })}
+                </>}
               </div>
             )}
           </div>

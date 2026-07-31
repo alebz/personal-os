@@ -177,6 +177,18 @@
 }
 .xp-calc-btn:focus-visible { outline: 1px dotted #000; outline-offset: -3px; }
 
+/* ── Solitario (Klondike) — menú clásico sobre fieltro verde ── */
+.xp-solitaire-menu {
+  padding: 2px 8px;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 11px;
+  color: #000;
+  cursor: pointer;
+}
+.xp-solitaire-menu:hover { background: #316ac5; color: #fff; }
+
 /* ══ Vocabulario de DIÁLOGOS de sistema (XP nativo LITERAL — no tokens, colores XP hardcodeados) ══ */
 .xp-dialog {
   background: #ece9d8;
