@@ -171,8 +171,12 @@ export default function Solitario() {
             const positions = col.map((c) => { const at = y; y += c.up ? 24 : 13; return at })
             const height = (col.length ? y : 0) + CARD_H
             return (
-              <div key={ci} style={{ width: CARD_W, position: 'relative', minHeight: CARD_H }}>
-                {col.length === 0 && <EmptyCol onClick={() => sel && moveToTableau(ci)} />}
+              <div key={ci}
+                onClick={col.length === 0 ? () => { if (sel) moveToTableau(ci) } : undefined}
+                style={{ width: CARD_W, position: 'relative', minHeight: CARD_H, cursor: col.length === 0 && sel ? 'pointer' : undefined }}>
+                {/* Columna vacía: el drop se maneja en el wrapper (recibe el clic por burbujeo aunque el
+                    div de apilado transparente quede encima del EmptyCol). Rey (o corrida con Rey) → OK. */}
+                {col.length === 0 && <EmptyCol />}
                 <div style={{ position: 'relative', height }}>
                   {col.map((c, i) => (
                     <div key={c.id} style={{ position: 'absolute', top: positions[i], left: 0 }}
