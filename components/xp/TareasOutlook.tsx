@@ -28,11 +28,6 @@ interface Entity { id: string; name: string; type: string }
 
 const taskDay = (t: Task): string | null => t.due_date || t.metadata?.event_date || t.metadata?.date || null
 const tierOf = (t: Task): TierId => ((t.urgency ?? 'someday') as TierId)
-function isActionable(t: Task): boolean {
-  if (t.completed_at) return false
-  const day = taskDay(t)
-  return t.urgency === 'today' || t.urgency === 'this_week' || (!!day && day <= todayStr())
-}
 
 async function post(url: string, b: unknown) { const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); if (!r.ok) throw new Error(await r.text()); return r.json().catch(() => ({})) }
 async function patch(url: string, b: unknown) { const r = await fetch(url, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); if (!r.ok) throw new Error(await r.text()); return r.json().catch(() => ({})) }
@@ -88,8 +83,8 @@ export default function TareasOutlook() {
   const filtered = useMemo(() => tasks.filter((t) => !entityFilter || t.entity_name === entityFilter), [tasks, entityFilter])
   const byTier = useMemo(() => { const m: Record<string, Task[]> = { today: [], this_week: [], this_month: [], someday: [] }; for (const t of filtered) m[tierOf(t)].push(t); return m }, [filtered])
   const openCount = filtered.filter((t) => !t.completed_at).length
-  const actionableCount = filtered.filter(isActionable).length
-  const shownTiers = actionableOnly ? TIERS.filter((t) => t.id === 'today' || t.id === 'this_week' || byTier[t.id].some((x) => isActionable(x))) : TIERS
+  // Siempre las 4 secciones (Hoy/Esta Semana/Este Mes/Algún Día). "Activas" solo oculta las completadas.
+  const shownTiers = TIERS
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: OL.ink }}>
@@ -99,7 +94,7 @@ export default function TareasOutlook() {
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: `linear-gradient(180deg,${OL.head1},${OL.head2})`, borderBottom: `1px solid ${OL.line}`, position: 'relative' }}>
         <OlBtn onClick={() => setDialog({ task: null })} primary>🗒 Nueva tarea</OlBtn>
         <span style={{ width: 1, height: 18, background: OL.line, margin: '0 2px' }} />
-        <OlBtn onClick={() => setActionableOnly((v) => !v)} pressed={actionableOnly}>Activas{actionableOnly && ` (${actionableCount})`}</OlBtn>
+        <OlBtn onClick={() => setActionableOnly((v) => !v)} pressed={actionableOnly}>Activas{actionableOnly && ` (${openCount})`}</OlBtn>
         <OlBtn onClick={() => setFilterOpen((v) => !v)} pressed={!!entityFilter}>Filtro{entityFilter ? `: ${entityFilter}` : ''} ▾</OlBtn>
         <span style={{ flex: 1 }} />
         <span style={{ color: '#5a6a86', fontSize: 10.5 }}>{openCount} tareas abiertas</span>
@@ -132,7 +127,6 @@ export default function TareasOutlook() {
             </div>
           )
         })}
-        {!loading && shownTiers.length === 0 && <div style={{ padding: 14, color: '#8a93a8', fontStyle: 'italic' }}>Nada pendiente. 🎉</div>}
       </div>
 
       {dialog && <TaskDialog task={dialog.task} entities={entities} onClose={() => setDialog(null)} onSave={(f) => saveTask(f, dialog.task)} onDelete={dialog.task ? () => deleteTask(dialog.task!) : undefined} />}
