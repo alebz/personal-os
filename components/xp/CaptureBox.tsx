@@ -2,28 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { CerebroButterfly } from './CerebroButterfly'
-import { pushNotification, type NotifTarget } from '@/lib/notifications'
+import { captureText, type CaptureResult } from '@/lib/capture'
 
 // CAPTURA GLOBAL RÁPIDA — escribe lo que sea desde cualquier lado; la IA lo clasifica y lo enruta
 // (tarea/evento/nota/contacto/bitácora) vía /api/capture. Se queda abierta para capturar en ráfaga;
-// Enter captura, Esc cierra. Alimenta tu segundo cerebro (de ahí la mariposa). QoL #2.
-
-const KIND: Record<string, { label: string; emoji: string; color: string; target: NotifTarget }> = {
-  task: { label: 'Tarea', emoji: '🗒', color: '#2b6fd6', target: 'tareas' },
-  reminder: { label: 'Recordatorio', emoji: '🗒', color: '#2b6fd6', target: 'tareas' },
-  event: { label: 'Evento', emoji: '📅', color: '#0a9e6e', target: 'calendario' },
-  contact: { label: 'Contacto', emoji: '🧑', color: '#c98a12', target: 'cerebro' },
-  note: { label: 'Nota', emoji: '📝', color: '#7a5cc0', target: null },
-  idea: { label: 'Idea', emoji: '💡', color: '#7a5cc0', target: null },
-  log: { label: 'Bitácora', emoji: '📓', color: '#5a6a86', target: null },
-}
-
-interface Result { kind: string; summary: string }
+// Enter captura, Esc cierra. Alimenta tu segundo cerebro (de ahí la mariposa). QoL #2. Se invoca con
+// Ctrl+Espacio (la versión chica del input del menú Inicio para captura desde cualquier lado).
 
 export default function CaptureBox({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [last, setLast] = useState<Result | null>(null)
+  const [last, setLast] = useState<CaptureResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -33,22 +22,12 @@ export default function CaptureBox({ onClose }: { onClose: () => void }) {
     const t = text.trim()
     if (!t || busy) return
     setBusy(true); setErr(null)
-    try {
-      const r = await fetch('/api/capture', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) })
-      const d = await r.json().catch(() => ({}))
-      if (!r.ok || d.error) { setErr(d.error ?? 'No se pudo capturar'); return }
-      const kind = String(d.kind ?? 'note')
-      const summary = String(d.summary ?? t)
-      const meta = KIND[kind] ?? KIND.note
-      setLast({ kind, summary })
-      setText('')
-      // notifica + refresca Tareas si aplica
-      pushNotification({ icon: meta.emoji, title: `Capturado · ${meta.label}`, body: summary, target: meta.target })
-      if (kind === 'task' || kind === 'reminder' || kind === 'event') window.dispatchEvent(new CustomEvent('capture:task'))
-    } catch (e) { setErr(String(e)) } finally { setBusy(false); inputRef.current?.focus() }
+    try { const res = await captureText(t); setLast(res); setText('') }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false); inputRef.current?.focus() }
   }
 
-  const meta = last ? (KIND[last.kind] ?? KIND.note) : null
+  const meta = last
 
   return (
     <div onMouseDown={onClose} style={{ position: 'absolute', inset: 0, zIndex: 11000, background: 'rgba(20,40,80,0.22)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '16vh' }}>

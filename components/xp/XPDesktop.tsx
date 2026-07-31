@@ -12,7 +12,7 @@ import CalendarioApp from './CalendarioApp'
 import XpNotifications from './XpNotifications'
 import LoloHeartbeat from './LoloHeartbeat'
 import CaptureBox from './CaptureBox'
-import { CerebroButterfly } from './CerebroButterfly'
+import StartCaptureInput from './StartCaptureInput'
 import MsnChat, { type ChatBuddy } from './MsnChat'
 import { useNotifications, markAllRead, clearAll, timeAgo, type NotifTarget } from '@/lib/notifications'
 import { XpSlider, XpCheckbox, XpContextMenu } from './xp-controls'
@@ -160,7 +160,6 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     } else if (target === 'calendario') openCalendario()
     else if (target === 'cerebro' || target === 'tareas') { const s = sections.find((x) => x.href === (target === 'cerebro' ? '/brain' : '/crm')); if (s) openSection(s) }
   }
-  const openCapture = () => { closeStart(); setCaptureOpen(true) }
   // Ejecutar — launcher por teclado ("finanzas" → abre). Buscar — consultar Cerebro desde cualquier
   // lado. Ambos renacen el capture global muerto del audit (P2), diegéticamente.
   const openRun = () => openWindow('run', 'Ejecutar', <RunDialog sections={launchable} onLaunch={(href) => { closeWindow('run'); const s = launchable.find((x) => x.href === href); if (s) openSection(s) }} />, { w: 360, h: 178, icon: 'ejecutar' })
@@ -331,7 +330,6 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             <div className="xp-sm-right" style={{ width: 156, padding: '6px 0', display: 'flex', flexDirection: 'column' }}>
               <button className="xp-startmenu-item" onClick={openMiPC} style={rightItem}><XpIcon name="mipc" size={22} /> Mi PC</button>
               <button className="xp-startmenu-item" onClick={openDisplayProps} style={rightItem}><XpIcon name="panel" size={22} /> Panel de control</button>
-              <button className="xp-startmenu-item" onClick={openCapture} style={rightItem}><span style={{ display: 'inline-flex', width: 22, justifyContent: 'center' }}><CerebroButterfly size={18} /></span> Capturar…</button>
               <button className="xp-startmenu-item" onClick={openBloc} style={rightItem}><XpIcon name="bloc" size={22} /> Bloc de notas</button>
               <button className="xp-startmenu-item" onClick={openCalendario} style={rightItem}><XpIcon name="calendario" size={22} /> Calendario</button>
               <div className="xp-sm-sep" />
@@ -339,6 +337,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
               <button className="xp-startmenu-item" onClick={openRun} style={rightItem}><XpIcon name="ejecutar" size={22} /> Ejecutar…</button>
             </div>
           </div>
+
+          {/* Captura rápida — dentro del menú, arriba del pie (estilo la barra de búsqueda de Vista/7). */}
+          <StartCaptureInput />
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '6px 10px', background: 'linear-gradient(180deg,#4282d6,#3a76c8)', borderTop: '1px solid #2f62b0' }}>
             <button className="xp-chrome-btn" onClick={logOff} style={footBtn} title="Volver al cascarón arcade">
@@ -361,14 +362,6 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           <RainbowFlag w={18} h={13} />
           Inicio
         </button>
-
-        {/* Quick Launch: captura rápida (alimenta tu segundo cerebro). Atajo Ctrl+Espacio. */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '0 5px', marginLeft: 2, borderLeft: '1px solid rgba(255,255,255,0.22)', borderRight: '1px solid rgba(0,0,0,0.28)' }}>
-          <button onClick={openCapture} title="Capturar  ·  Ctrl+Espacio" className="xp-chrome-btn"
-            style={{ display: 'flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', borderRadius: 3, color: '#fff', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textShadow: '1px 1px 1px rgba(0,0,0,0.35)', background: 'rgba(255,255,255,0.12)', border: 'none' }}>
-            <CerebroButterfly size={14} /> Capturar
-          </button>
-        </div>
 
         <div style={{ display: 'flex', gap: 4, marginLeft: 8, overflow: 'hidden', flex: 1 }}>
           {windows.map((w) => {
