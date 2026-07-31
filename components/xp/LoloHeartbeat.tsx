@@ -2,16 +2,27 @@
 
 import { useEffect, useRef } from 'react'
 import { pushNotification } from '@/lib/notifications'
+import { loloTimeContext } from '@/lib/lolo'
 
-// LOLO PROACTIVO — Lolo te escribe SOLO, sin que le hables primero (como un cuate que te manda un mensaje
-// de la nada). Cada ping: genera una línea (spontaneous), la muestra como TOAST (target 'lolo' → abre su
-// chat) y la PERSISTE en su buffer (para que al abrir el chat esté ahí). Throttle duro (90 min entre pings)
-// + horario despierto (8–23h) + probabilidad en los chequeos periódicos. Primer ping ~poco después de abrir.
+// LOLO PROACTIVO — Lolo te escribe SOLO, pero con TACTO:
+//  · PRESENCIA: solo cuando estás EN LÍNEA (pestaña visible + interacción reciente). Si estás fuera,
+//    NO manda nada → no regresas a mensajes "en visto" acumulados.
+//  · NO AL INSTANTE: hay un warmup tras conectarte y probabilidad en cada chequeo (no siempre).
+//  · NO NEEDY: si no le respondes, sube el back-off (el hueco entre pings crece y baja la probabilidad).
+//    Que le contestes (markLoloAnswered en el chat) resetea la insistencia.
+//  · CONSCIENTE DEL TIEMPO: cada ping lleva contexto de hora/día y cuánto hace que no hablan.
+// Cada ping: genera 1 línea (spontaneous) → TOAST (target 'lolo') + persiste al buffer (para que esté al abrir).
 
-const KEY = 'lolo-last-ping'
-const MIN_GAP = 90 * 60_000      // mínimo entre pings proactivos
-const INTERVAL = 10 * 60_000     // cada cuánto se evalúa
-const PROB = 0.3                 // probabilidad en chequeos periódicos (el primero es seguro)
+const KEY_PING = 'lolo-last-ping'
+const KEY_UNANS = 'lolo-unanswered'
+const BASE_GAP = 90 * 60_000          // hueco base entre pings
+const MAX_GAP = 8 * 60 * 60_000       // tope del back-off
+const CHECK = 90_000                  // cada cuánto se evalúa
+const WARMUP = 80_000                 // no escribe hasta llevar un rato presente ("no al instante")
+const ACTIVE_WINDOW = 4 * 60_000      // "en línea" = interacción hace <4 min
+
+const gapFor = (u: number) => Math.min(BASE_GAP * 2 ** u, MAX_GAP)                 // 90m · 3h · 6h · tope 8h
+const probFor = (u: number, firstOfSession: boolean) => (firstOfSession ? 0.5 : u === 0 ? 0.3 : u === 1 ? 0.14 : 0.07)
 
 const LOLO_PING_SYSTEM = [
   'Eres Lolo, el compañero de Alex — su amigo, no un asistente. Le escribes por Messenger.',
@@ -22,50 +33,67 @@ const LOLO_PING_SYSTEM = [
 ].join(' ')
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-// Colapsa roles iguales adyacentes (por si el buffer trae dos assistant seguidos tras un ping proactivo).
 function collapse(msgs: Msg[]): Msg[] {
   const out: Msg[] = []
   for (const m of msgs) { const last = out[out.length - 1]; if (last && last.role === m.role) last.content += '\n' + m.content; else out.push({ ...m }) }
   return out
 }
+const readNum = (k: string) => { try { return +(localStorage.getItem(k) || 0) } catch { return 0 } }
 
 export default function LoloHeartbeat() {
   const busy = useRef(false)
+  const lastActive = useRef(Date.now())
+  const presentSince = useRef(0)
+  const sessionPinged = useRef(false)
 
   useEffect(() => {
     let alive = true
+    const bump = () => { lastActive.current = Date.now() }
+    const evts: (keyof WindowEventMap)[] = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'focus']
+    evts.forEach((e) => window.addEventListener(e, bump, { passive: true }))
+
+    const online = () => document.visibilityState === 'visible' && Date.now() - lastActive.current < ACTIVE_WINDOW
 
     async function ping() {
       if (busy.current) return
-      const h = new Date().getHours()
-      if (h < 8 || h >= 24) return                                   // horario despierto
-      let last = 0; try { last = +(localStorage.getItem(KEY) || 0) } catch { /* ignore */ }
-      if (Date.now() - last < MIN_GAP) return                        // throttle duro
       busy.current = true
       try {
         const mem = await fetch('/api/companion/memory').then((r) => r.json()).catch(() => ({}))
         let ctx: Msg[] = (Array.isArray(mem?.buffer) ? mem.buffer : []).map((m: Msg) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
         while (ctx.length && ctx[0].role === 'assistant') ctx = ctx.slice(1)
         ctx = collapse(ctx).slice(-6)
-        const messages = [...ctx, { role: 'user' as const, content: '[Alex está en su OS. Escríbele tú, sin que te escriba primero.]' }]
+        const messages = [...ctx, { role: 'user' as const, content: `[Alex está en línea en su OS. Escríbele tú, sin que te escriba primero.] ${loloTimeContext()}` }]
         const d = await fetch('/api/companion/chat', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ spontaneous: true, system: LOLO_PING_SYSTEM, messages: collapse(messages) }),
         }).then((r) => r.json()).catch(() => ({}))
         const reply = (d?.text as string)?.trim()
         if (!alive || !reply) return
-        try { localStorage.setItem(KEY, String(Date.now())) } catch { /* ignore */ }
+        try {
+          localStorage.setItem(KEY_PING, String(Date.now()))
+          localStorage.setItem(KEY_UNANS, String(Math.min(readNum(KEY_UNANS) + 1, 4)))   // sube el back-off; que responda lo resetea
+        } catch { /* ignore */ }
+        sessionPinged.current = true
         pushNotification({ id: `lolo:${Date.now()}`, icon: '/Lolo/Idle/lolo_idle_2.png', title: 'Lolo', body: reply, target: 'lolo' })
-        // persiste al buffer para que al abrir el chat esté el mensaje
         const buffer = Array.isArray(mem?.buffer) ? mem.buffer : []
         fetch('/api/companion/memory', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer: [...buffer, { role: 'assistant', content: reply }] }) }).catch(() => {})
       } finally { busy.current = false }
     }
 
-    // primer ping poco después de abrir (se siente "Lolo notó que te conectaste"); luego chequeos periódicos.
-    const first = setTimeout(() => { if (alive) ping() }, 22_000 + Math.random() * 15_000)
-    const iv = setInterval(() => { if (alive && Math.random() < PROB) ping() }, INTERVAL)
-    return () => { alive = false; clearTimeout(first); clearInterval(iv) }
+    function tick() {
+      if (busy.current) return
+      const h = new Date().getHours(); if (h < 8 || h >= 24) return          // horario despierto
+      if (!online()) { presentSince.current = 0; sessionPinged.current = false; return }   // FUERA → no molesta
+      if (presentSince.current === 0) presentSince.current = Date.now()
+      if (Date.now() - presentSince.current < WARMUP) return                 // recién llegó ("no al instante")
+      const u = Math.min(readNum(KEY_UNANS), 4)
+      if (Date.now() - readNum(KEY_PING) < gapFor(u)) return                 // back-off
+      if (Math.random() > probFor(u, !sessionPinged.current)) return         // no siempre
+      ping()
+    }
+
+    const iv = setInterval(() => { if (alive) tick() }, CHECK)
+    return () => { alive = false; clearInterval(iv); evts.forEach((e) => window.removeEventListener(e, bump)) }
   }, [])
 
   return null

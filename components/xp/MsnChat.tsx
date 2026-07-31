@@ -5,6 +5,7 @@ import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { MOODS } from '@/components/sections/DiarioContent'
 import { renderEmoticons, EMOTICONS, emoSrc } from '@/lib/msnEmoticons'
 import { CerebroButterfly } from './CerebroButterfly'
+import { loloTimeContext, markLoloTalk, markLoloAnswered } from '@/lib/lolo'
 
 // Ventana de conversación MSN (canon MSN 6/7: cada chat es su propia ventana del WM). Cablea los 4
 // tipos de buddy (regla "no resta funcionalidad" — cada función de Cerebro tiene su puerta aquí):
@@ -64,9 +65,11 @@ function splitSegments(text: string): string[] {
 }
 // Latencia humana: piensa un poco + "teclea" proporcional al largo, con varianza. Ni 0.5s ni eterno.
 function typeDelay(seg: string, first: boolean): number {
-  const think = first ? 500 + Math.random() * 700 : 250 + Math.random() * 350
-  const type = Math.min(2200, seg.length * (28 + Math.random() * 22))
-  return think + Math.max(450, type)
+  const think = first ? 900 + Math.random() * 1600 : 300 + Math.random() * 450
+  const type = Math.min(2600, seg.length * (30 + Math.random() * 24))
+  // A veces Lolo anda en otra cosa y tarda unos segundos en contestar (no es una IA instantánea).
+  const distracted = first && Math.random() < 0.22 ? 2200 + Math.random() * 4000 : 0
+  return think + distracted + Math.max(500, type)
 }
 
 export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
@@ -168,6 +171,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
 
   async function askLolo(t: string) {
     setBusy(true)
+    markLoloAnswered()   // Alex escribió → resetea la insistencia proactiva (no needy)
     // `msgs` aquí = historial ANTES de este turno. Saneado: lo que ve el modelo debe empezar por 'user'
     // (un saludo espontáneo de Lolo pudo quedar de primero como 'them' → lo quitamos del contexto/persistencia).
     let prior = msgs.filter((m) => m.from !== 'sys').map((m) => ({ role: m.from === 'me' ? 'user' as const : 'assistant' as const, content: m.text }))
@@ -180,11 +184,13 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
       // /api/companion/chat: intacto — solo genera la respuesta (no persiste).
       const r = await fetch('/api/companion/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ system: LOLO_SYSTEM, messages: [...prior, { role: 'user', content: t }] }),
+        // + contexto temporal: que Lolo ubique hora/día y cuánto hace que no hablan.
+        body: JSON.stringify({ system: `${LOLO_SYSTEM}\n${loloTimeContext()}`, messages: [...prior, { role: 'user', content: t }] }),
       })
       const d = await r.json().catch(() => ({}))
       const reply = (d.text as string) || '…'
       await revealLolo(reply, typingId)   // llega con tempo humano, en 1–3 mensajes escalonados
+      markLoloTalk()   // marca la última conversación real (alimenta "no se escriben desde hace…")
       // Persistir el buffer COMPLETO en lolo_memory (igual que el arcade) → memoria compartida arcade↔MSN.
       const buffer = [...prior, { role: 'user', content: t }, { role: 'assistant', content: reply }]
       fetch('/api/companion/memory', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer }) }).catch(() => {})
@@ -232,7 +238,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
     try {
       const r = await fetch('/api/companion/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ spontaneous: true, system: LOLO_OPENER_SYSTEM, messages: [...ctx, { role: 'user', content: '[Alex acaba de abrir la ventana del chat contigo]' }] }),
+        body: JSON.stringify({ spontaneous: true, system: `${LOLO_OPENER_SYSTEM}\n${loloTimeContext()}`, messages: [...ctx, { role: 'user', content: '[Alex acaba de abrir la ventana del chat contigo]' }] }),
       })
       const d = await r.json().catch(() => ({}))
       const reply = (d.text as string)?.trim() || ''

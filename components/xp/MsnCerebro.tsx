@@ -6,6 +6,7 @@ import MsnChat, { type ChatBuddy } from './MsnChat'
 import { CerebroButterfly } from './CerebroButterfly'
 import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { XpDialogModal, XpField, XpLabel, XpSelect, XpContextMenu } from './xp-controls'
+import { useLoloStatus } from '@/lib/lolo'
 
 // ── Cumpleaños ────────────────────────────────────────────────────────────────
 const MONTHS_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -193,6 +194,7 @@ export default function MsnCerebro() {
   const [ctx, setCtx] = useState<{ x: number; y: number; contact: Contact } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)      // menú "Contactos" abierto
   const [catMgr, setCatMgr] = useState(false)          // gestor de categorías (heredado de la sección disuelta)
+  const loloStatus = useLoloStatus()                   // status personal rotativo de Lolo (como MSN real)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -301,7 +303,7 @@ export default function MsnCerebro() {
         {/* Buddies fijos: Cerebro, Lolo, Diario */}
         <GroupHeader label="Mi mundo" count={SPECIALS.length} open={!collapsed['__sys']} onToggle={() => toggle('__sys')} />
         {!collapsed['__sys'] && SPECIALS.map((s) => (
-          <BuddyRow key={s.id} id={s.id} name={s.name} status={s.status} avatar={s.avatar} onOpen={() => openChat({ id: s.id, name: s.name, kind: specialKind(s.id), avatar: s.avatar })} />
+          <BuddyRow key={s.id} id={s.id} name={s.name} status={s.id === 'sys:lolo' ? loloStatus : s.status} avatar={s.avatar} onOpen={() => openChat({ id: s.id, name: s.name, kind: specialKind(s.id), avatar: s.avatar })} />
         ))}
 
         {/* Contactos reales, ORDENADOS POR CUMPLEAÑOS próximo (el cumple visible en cada fila) */}
