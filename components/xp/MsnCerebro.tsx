@@ -123,6 +123,68 @@ function GroupHeader({ label, count, open, onToggle }: { label: string; count: n
   )
 }
 
+// MENSAJE PERSONAL EN VIVO — tu niño interior. NO es el supra del arcade (updates de vida): habla el
+// niño que fuiste, inspiracional y tierno (/api/supraconsciente mode:'nino'). Rota con fade cada ~5 min
+// y avanza al clic (como poner tu personal message en MSN, pero es tu supraconsciente el que lo escribe).
+const PM_CACHE = 'msn-personal-cache'
+const PM_HOLD_MS = 5 * 60_000
+type PmCache = { queue: string[]; shown: string[] }
+
+function MsnPersonalMessage() {
+  const [text, setText] = useState('')
+  const [vis, setVis] = useState(true)
+  const cacheRef = useRef<PmCache>({ queue: [], shown: [] })
+  const busyRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  const write = () => { try { localStorage.setItem(PM_CACHE, JSON.stringify(cacheRef.current)) } catch { /* private mode */ } }
+
+  const fetchBatch = useCallback(async () => {
+    if (busyRef.current) return
+    busyRef.current = true
+    try {
+      const r = await fetch('/api/supraconsciente', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ count: 8, mode: 'nino', exclude: cacheRef.current.shown.slice(-40) }),
+      })
+      const d = await r.json()
+      const msgs: string[] = Array.isArray(d.messages) ? d.messages.map((m: { text?: string }) => m.text).filter((t: unknown): t is string => typeof t === 'string' && t.length > 0) : []
+      cacheRef.current.queue.push(...msgs.filter((t) => !cacheRef.current.shown.includes(t)))
+      write()
+    } catch { /* red / sin contexto → reintenta luego */ } finally { busyRef.current = false }
+  }, [])
+
+  const next = useCallback(async () => {
+    const c = cacheRef.current
+    while (c.queue.length && c.shown.includes(c.queue[0])) c.queue.shift()
+    if (c.queue.length === 0) await fetchBatch()
+    const t = c.queue.shift()
+    if (!t || !mountedRef.current) return
+    c.shown.push(t); c.shown = c.shown.slice(-60); write()
+    if (c.queue.length <= 1) fetchBatch()   // rellena en segundo plano
+    setVis(false)
+    setTimeout(() => { if (mountedRef.current) { setText(t); setVis(true) } }, 260)
+  }, [fetchBatch])
+
+  useEffect(() => {
+    mountedRef.current = true
+    try { const raw = localStorage.getItem(PM_CACHE); if (raw) cacheRef.current = JSON.parse(raw) } catch { /* ignore */ }
+    next()
+    const iv = setInterval(next, PM_HOLD_MS)
+    return () => { mountedRef.current = false; clearInterval(iv) }
+  }, [next])
+
+  return (
+    <div
+      onClick={next}
+      title="tu niño interior — clic para otra"
+      style={{ fontSize: 11, fontStyle: 'italic', color: '#6a6a6a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', opacity: vis ? 1 : 0, transition: 'opacity .25s ease' }}
+    >
+      {text || '‹escuchando a tu niño interior…›'}
+    </div>
+  )
+}
+
 export default function MsnCerebro() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
@@ -193,10 +255,8 @@ export default function MsnCerebro() {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: '#111' }}>Alex</span>
             <span style={{ fontSize: 11, color: '#2f9a22' }}>(En línea ▾)</span>
           </div>
-          {/* Mensaje personal = el Supraconsciente (se cablea el feed real en un inc. posterior) */}
-          <div style={{ fontSize: 11, fontStyle: 'italic', color: '#6a6a6a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            ‹escribe un mensaje personal…›
-          </div>
+          {/* Mensaje personal EN VIVO = tu niño interior (Supraconsciente en voz de niño) */}
+          <MsnPersonalMessage />
         </div>
       </div>
 

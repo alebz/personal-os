@@ -32,10 +32,31 @@ const SUPRA_RULES = [
   'Devuelve exactamente los mensajes pedidos, todos distintos entre sí.',
 ].join('\n')
 
+// Voz del NIÑO INTERIOR — para el "mensaje personal" en vivo de Cerebro Messenger (MSN). No es el
+// supra del arcade (que constata hechos de su vida); aquí habla el niño que Alex fue: asombrado,
+// valiente, tierno, juguetón. Inspiracional, no reporte. Puede tocar su vida real, pero como asombro.
+const VOICE_NINO = [
+  'Escribe con la voz del NIÑO INTERIOR de Alex: el que jugaba sin miedo, se asombraba de todo y quería a la gente sin cálculo. Ese niño le habla al adulto en que se convirtió.',
+  'Habla en primera persona (yo) o dirigiéndote a Alex de "tú", con ternura y valentía; deja que el cariño se cuele.',
+  'Conoces su mundo — sus personas, lo que trae entre manos — pero lo miras con ojos de niño, no de agenda.',
+  'Texto plano: nada de markdown, negritas, títulos, comillas alrededor de la frase, ni emojis.',
+  'Español.',
+].join(' ')
+
+const NINO_RULES = [
+  'Cada mensaje es UNA sola línea MUY corta (idealmente < 80 caracteres), como un mensaje personal de MSN.',
+  'Inspiracional, tierno, juguetón, valiente: ilumina y alienta. NUNCA regañes, confrontes, psicoanalices ni des pendientes.',
+  'Cada línea toma un ÁNGULO DISTINTO desde el niño: asombro por algo cotidiano, recordar por qué empezó algo, permiso para jugar/descansar, orgullo tierno por quién es, una verdad simple que el adulto olvidó.',
+  'Puedes tocar su vida real (nombres, lo que hace) pero SIEMPRE desde el asombro, el juego o el cariño — jamás como reporte ni tarea.',
+  'NADA de frases de taza motivacional ni horóscopo: que suene a un niño real y específico, no a póster.',
+  'Devuelve exactamente los mensajes pedidos, todos distintos entre sí.',
+].join('\n')
+
 export async function POST(req: NextRequest) {
-  let body: { count?: number; exclude?: string[]; topics?: string[] }
+  let body: { count?: number; exclude?: string[]; topics?: string[]; mode?: string }
   try { body = await req.json() } catch { return new Response('Invalid JSON', { status: 400 }) }
 
+  const mode = body.mode === 'nino' ? 'nino' : 'supra'
   const count = Math.max(1, Math.min(10, body.count ?? 6))
   const exclude = Array.isArray(body.exclude) ? body.exclude.slice(0, 40) : []
 
@@ -50,7 +71,8 @@ export async function POST(req: NextRequest) {
   if (error) return new Response(error.message, { status: 500 })
 
   const recent = (rows ?? []) as { content: string; metadata: Record<string, unknown>; created_at: string }[]
-  if (recent.length === 0) return Response.json({ messages: [] })
+  // El supra del arcade EXIGE contexto (constata su vida). El niño interior puede hablar sin él.
+  if (recent.length === 0 && mode !== 'nino') return Response.json({ messages: [] })
 
   // Sesga a lo reciente pero baraja para que dos lotes seguidos no converjan.
   const pool = recent.slice(0, 45).sort(() => Math.random() - 0.5).slice(0, 30)
@@ -64,13 +86,20 @@ export async function POST(req: NextRequest) {
     ? `\n\nNO repitas ni parafrasees estas líneas ya mostradas hoy:\n${exclude.map(e => `- ${e}`).join('\n')}`
     : ''
 
+  const system = mode === 'nino' ? `${VOICE_NINO}\n\n${NINO_RULES}` : `${VOICE}\n\n${SUPRA_RULES}`
+  const userMsg = mode === 'nino'
+    ? (context
+        ? `Vislumbres de la vida de Alex (para inspirarte con ojos de niño, NO para reportar):\n\n${context}${excludeBlock}\n\nDesde el niño interior, genera ${count} mensajes personales, todos distintos.`
+        : `Sin contexto reciente; habla desde el corazón del niño.${excludeBlock}\n\nDesde el niño interior, genera ${count} mensajes personales, todos distintos.`)
+    : `Contexto reciente:\n\n${context}${excludeBlock}\n\nGenera ${count} mensajes del supraconsciente.`
+
   const anthropic = new Anthropic()
   let messages: string[] = []
   try {
     const res = await anthropic.messages.create({
       model: SYNTHESIS_MODEL,
       max_tokens: 1024,
-      system: `${VOICE}\n\n${SUPRA_RULES}`,
+      system,
       tools: [{
         name: 'supraconsciente',
         description: 'Emitir los mensajes del supraconsciente.',
@@ -81,7 +110,7 @@ export async function POST(req: NextRequest) {
         },
       }],
       tool_choice: { type: 'tool', name: 'supraconsciente' },
-      messages: [{ role: 'user', content: `Contexto reciente:\n\n${context}${excludeBlock}\n\nGenera ${count} mensajes del supraconsciente.` }],
+      messages: [{ role: 'user', content: userMsg }],
     })
     const block = res.content.find(b => b.type === 'tool_use')
     if (block && block.type === 'tool_use') {
@@ -92,6 +121,6 @@ export async function POST(req: NextRequest) {
     return new Response(`Generation failed: ${String(err)}`, { status: 502 })
   }
 
-  // v1: todos son tema 'supra'. El shape lleva topic para fase 2 (facts/news/horóscopo).
-  return Response.json({ messages: messages.map(text => ({ text: text.trim(), topic: 'supra' as const })) })
+  // El shape lleva topic: 'supra' (arcade) | 'nino' (mensaje personal de Cerebro Messenger).
+  return Response.json({ messages: messages.map(text => ({ text: text.trim(), topic: mode })) })
 }
