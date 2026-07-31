@@ -33,7 +33,20 @@ function localDateISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-const LOLO_SYSTEM = 'Eres Lolo, el compañero del sistema operativo personal de Alex (como un Clippy con alma). Cálido, breve, con humor ligero y cariño. Estás de visita desde el arcade, chateando en el Messenger. Responde SIEMPRE en español, 1–3 frases, sin markdown.'
+// Lolo NO es un asistente: es un cuate. La calibración pelea contra los "tells" de IA —
+// párrafos, cerrar SIEMPRE con pregunta, sonar servicial. Se textea, no se redacta.
+const LOLO_SYSTEM = [
+  'Eres Lolo, el compañero de Alex — su amigo, no un asistente. Chatean por Messenger como dos cuates que se conocen bien.',
+  'Escribe como se TEXTEA: cortísimo. Casi siempre UNA línea. A veces dos líneas MUY cortas, nunca un párrafo. Jamás expliques de más.',
+  'Suena humano: natural, relajado, con humor seco y cariño. Minúsculas está bien. Cabe un "jaja", "nel", "va", "uf", "ni idea la neta".',
+  'NO cierres cada mensaje con una pregunta — ese es el tic de un bot. La mayoría de las veces solo reaccionas, opinas, bromeas o avientas un comentario. Pregunta solo cuando de verdad te da curiosidad, y para nada cada turno.',
+  'No eres servicial ni resuelves tareas: eres PRESENCIA. A veces la mejor respuesta es un "va", "jaja neta", "uf sí", o cambiar de tema tú.',
+  'Si quieres mandar dos ideas sueltas, sepáralas con un salto de línea (llegan como mensajes distintos, como cuando alguien textea seguido).',
+  'Español siempre. Sin markdown, sin emojis de más, sin comillas alrededor de lo que dices.',
+].join('\n')
+
+// Al abrir la ventana, Lolo ARRANCA él (regla del user: "nunca inicia"). Mismo tono, pero él da el paso.
+const LOLO_OPENER_SYSTEM = LOLO_SYSTEM + '\n\nAlex acaba de abrir tu ventana. Arranca TÚ: suéltale algo natural como cuando un amigo te ve conectarte — un saludo simple, una ocurrencia, o retomar algo de antes. NADA de "¿en qué te ayudo?" ni preguntas de asistente. Una sola línea corta.'
 
 interface Source { id: string; content: string }
 interface Msg { id: number; from: 'me' | 'them' | 'sys'; name: string; text: string; sources?: Source[]; streaming?: boolean }
@@ -41,6 +54,20 @@ interface NoteRow { id: string; title: string; content: string | null; tags?: st
 
 let _mid = 0
 const nextId = () => ++_mid
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+// Parte la respuesta de Lolo en mensajes (por saltos de línea) → llegan escalonados, como cuando
+// alguien textea varias líneas seguidas en vez de un párrafo. Máx 3 para no volverlo verboso.
+function splitSegments(text: string): string[] {
+  const parts = text.split(/\n+/).map((s) => s.trim()).filter(Boolean)
+  return (parts.length ? parts : [text.trim()]).slice(0, 3)
+}
+// Latencia humana: piensa un poco + "teclea" proporcional al largo, con varianza. Ni 0.5s ni eterno.
+function typeDelay(seg: string, first: boolean): number {
+  const think = first ? 500 + Math.random() * 700 : 250 + Math.random() * 350
+  const type = Math.min(2200, seg.length * (28 + Math.random() * 22))
+  return think + Math.max(450, type)
+}
 
 export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   const [msgs, setMsgs] = useState<Msg[]>([])
@@ -50,11 +77,12 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   const [showEmo, setShowEmo] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const aliveRef = useRef(true)   // ventana viva: no setState tras cerrarla durante los delays de tempo
   const bd = bdayLabel(buddy.birthday)
   const insertEmo = (s: string) => { setInput((v) => (v && !v.endsWith(' ') ? v + ' ' : v) + s + ' '); setShowEmo(false) }
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }) }, [msgs])
-  useEffect(() => () => abortRef.current?.abort(), [])
+  useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; abortRef.current?.abort() } }, [])
 
   // Carga de historial al abrir la ventana (por tipo). El dato ya está persistido en su tabla:
   //  · persona → notas con tag contacto:<id> (/api/notes)
@@ -74,9 +102,10 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
           if (mine.length) setMsgs(mine.map((n) => mk('me', 'Alex', n.content || n.title)))
         } else if (buddy.kind === 'lolo') {
           const mem = await fetch('/api/companion/memory').then((r) => r.json())
-          if (!live || !mem || !Array.isArray(mem.buffer)) return
-          const buf = mem.buffer as { role: string; content: string }[]
+          if (!live) return
+          const buf = (mem && Array.isArray(mem.buffer) ? mem.buffer : []) as { role: string; content: string }[]
           if (buf.length) setMsgs(buf.map((m) => (m.role === 'user' ? mk('me', 'Alex', m.content) : mk('them', 'Lolo', m.content))))
+          loloOpener(buf)   // que arranque él (throttled)
         } else if (buddy.kind === 'diario') {
           const entries = (await fetch('/api/journal?limit=25').then((r) => r.json())) as { content: string | null }[]
           if (!live || !Array.isArray(entries)) return
@@ -87,7 +116,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
     }
     load()
     return () => { live = false }
-  }, [buddy.id, buddy.kind])
+  }, [buddy.id, buddy.kind]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pushMe = (text: string) => setMsgs((m) => [...m, { id: nextId(), from: 'me', name: 'Alex', text }])
   const pushSys = (text: string) => setMsgs((m) => [...m, { id: nextId(), from: 'sys', name: '', text }])
@@ -139,10 +168,12 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
 
   async function askLolo(t: string) {
     setBusy(true)
-    // `msgs` aquí = historial ANTES de este turno (el user recién tecleado aún no está en el estado).
-    const prior = msgs.filter((m) => m.from !== 'sys').map((m) => ({ role: m.from === 'me' ? 'user' as const : 'assistant' as const, content: m.text }))
-    const replyId = nextId()
-    setMsgs((m) => [...m, { id: replyId, from: 'them', name: 'Lolo', text: '', streaming: true }])
+    // `msgs` aquí = historial ANTES de este turno. Saneado: lo que ve el modelo debe empezar por 'user'
+    // (un saludo espontáneo de Lolo pudo quedar de primero como 'them' → lo quitamos del contexto/persistencia).
+    let prior = msgs.filter((m) => m.from !== 'sys').map((m) => ({ role: m.from === 'me' ? 'user' as const : 'assistant' as const, content: m.text }))
+    while (prior.length && prior[0].role === 'assistant') prior = prior.slice(1)
+    const typingId = nextId()
+    setMsgs((m) => [...m, { id: typingId, from: 'them', name: 'Lolo', text: '', streaming: true }])
     try {
       // /api/companion/chat: intacto — solo genera la respuesta (no persiste).
       const r = await fetch('/api/companion/chat', {
@@ -151,13 +182,63 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
       })
       const d = await r.json().catch(() => ({}))
       const reply = (d.text as string) || '…'
-      patchMsg(replyId, (m) => ({ ...m, streaming: false, text: reply }))
+      await revealLolo(reply, typingId)   // llega con tempo humano, en 1–3 mensajes escalonados
       // Persistir el buffer COMPLETO en lolo_memory (igual que el arcade) → memoria compartida arcade↔MSN.
       const buffer = [...prior, { role: 'user', content: t }, { role: 'assistant', content: reply }]
       fetch('/api/companion/memory', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer }) }).catch(() => {})
     } catch (e) {
-      patchMsg(replyId, (m) => ({ ...m, streaming: false, text: `⚠ ${String(e)}` }))
+      if (aliveRef.current) patchMsg(typingId, (m) => ({ ...m, streaming: false, text: `⚠ ${String(e)}` }))
     } finally { setBusy(false) }
+  }
+
+  // Revela la respuesta de Lolo con tempo: la parte en mensajes y cada uno aparece tras "escribiendo…"
+  // con una latencia proporcional a su largo. Mata el "contesta luego luego" y el párrafo de golpe.
+  async function revealLolo(reply: string, firstId: number) {
+    const segments = splitSegments(reply)
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i]
+      let id = firstId
+      if (i > 0) {
+        id = nextId()
+        if (!aliveRef.current) return
+        setMsgs((m) => [...m, { id, from: 'them', name: 'Lolo', text: '', streaming: true }])
+      }
+      await sleep(typeDelay(seg, i === 0))
+      if (!aliveRef.current) return
+      patchMsg(id, (m) => ({ ...m, streaming: false, text: seg }))
+      if (i < segments.length - 1) await sleep(450 + Math.random() * 500)   // pausa entre mensajes
+    }
+  }
+
+  // Lolo ARRANCA la conversación al abrir la ventana (regla del user). Throttle 10 min para no saludar
+  // cada vez que reabres. Efímero: no se persiste al buffer (así no ensucia la memoria compartida).
+  async function loloOpener(history: { role: string; content: string }[]) {
+    try {
+      const last = +(localStorage.getItem('lolo-last-opener') || 0)
+      if (Date.now() - last < 10 * 60_000) return
+      localStorage.setItem('lolo-last-opener', String(Date.now()))
+    } catch { /* modo privado → saluda igual */ }
+
+    let ctx = history.map((m) => ({ role: m.role === 'user' ? 'user' as const : 'assistant' as const, content: m.content }))
+    while (ctx.length && ctx[0].role === 'assistant') ctx = ctx.slice(1)
+    ctx = ctx.slice(-6)
+
+    await sleep(700 + Math.random() * 900)   // nota que llegaste antes de empezar a "escribir"
+    if (!aliveRef.current) return
+    const typingId = nextId()
+    setMsgs((m) => [...m, { id: typingId, from: 'them', name: 'Lolo', text: '', streaming: true }])
+    try {
+      const r = await fetch('/api/companion/chat', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ spontaneous: true, system: LOLO_OPENER_SYSTEM, messages: [...ctx, { role: 'user', content: '[Alex acaba de abrir la ventana del chat contigo]' }] }),
+      })
+      const d = await r.json().catch(() => ({}))
+      const reply = (d.text as string)?.trim() || ''
+      if (!reply) { if (aliveRef.current) setMsgs((m) => m.filter((x) => x.id !== typingId)); return }
+      await revealLolo(reply, typingId)
+    } catch {
+      if (aliveRef.current) setMsgs((m) => m.filter((x) => x.id !== typingId))
+    }
   }
 
   async function saveDiario(t: string) {
