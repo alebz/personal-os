@@ -11,6 +11,8 @@ import BlocDeNotas from './BlocDeNotas'
 import CalendarioApp from './CalendarioApp'
 import Calculadora from './Calculadora'
 import Solitario from './Solitario'
+import Buscaminas from './Buscaminas'
+import Sudoku from './Sudoku'
 import XpNotifications from './XpNotifications'
 import LoloHeartbeat from './LoloHeartbeat'
 import CaptureBox from './CaptureBox'
@@ -198,9 +200,17 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const openCalc = () => openWindow('calc', 'Calculadora', <Calculadora />, { w: 258, h: 300, icon: 'calc' })
   // Solitario (Klondike) — carpeta Juegos. Resizable (el tablero crece).
   const openSolitario = () => openWindow('solitario', 'Solitario', <Solitario />, { w: 640, h: 540, resizable: true, icon: 'solitario' })
+  // Buscaminas — clásico de XP. Resizable (el tablero cambia con la dificultad).
+  const openBuscaminas = () => openWindow('buscaminas', 'Buscaminas', <Buscaminas />, { w: 300, h: 400, resizable: true, icon: 'buscaminas' })
+  // Sudoku — pedido del usuario (no es de época pero cabe en Juegos).
+  const openSudoku = () => openWindow('sudoku', 'Sudoku', <Sudoku />, { w: 344, h: 470, resizable: true, icon: 'sudoku' })
   // Carpetas anidadas de "Todos los programas" (cascada canónica de XP).
   const FOLDERS = [
-    { id: 'juegos', label: 'Juegos', icon: 'juegos', items: [{ id: 'solitario', label: 'Solitario', icon: 'solitario', open: openSolitario }] },
+    { id: 'juegos', label: 'Juegos', icon: 'juegos', items: [
+      { id: 'solitario', label: 'Solitario', icon: 'solitario', open: openSolitario },
+      { id: 'buscaminas', label: 'Buscaminas', icon: 'buscaminas', open: openBuscaminas },
+      { id: 'sudoku', label: 'Sudoku', icon: 'sudoku', open: openSudoku },
+    ] },
   ]
   // Abre la app destino de una notificación (Lolo→su chat directo; el resto → sección/app).
   const openNotifTarget = (target: NotifTarget) => {

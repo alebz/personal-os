@@ -189,6 +189,59 @@
 }
 .xp-solitaire-menu:hover { background: #316ac5; color: #fff; }
 
+/* ── Buscaminas — look clásico plata #c0c0c0 con biseles (NO Luna) ── */
+.xp-ms-menu {
+  padding: 2px 8px; border: 0; background: none; font-family: inherit; font-size: 11px; color: #000; cursor: pointer;
+}
+.xp-ms-menu:hover { background: #316ac5; color: #fff; }
+.xp-ms-frame {
+  background: #c0c0c0;
+  padding: 6px;
+  border: 3px solid;
+  border-color: #fff #808080 #808080 #fff;   /* outset grueso */
+}
+.xp-ms-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 6px; margin-bottom: 6px;
+  background: #c0c0c0;
+  border: 2px solid; border-color: #808080 #fff #fff #808080;   /* inset */
+}
+.xp-ms-led {
+  background: #000; color: #ff2b2b;
+  font-family: 'Courier New', monospace; font-weight: 700; font-size: 20px; line-height: 1;
+  padding: 1px 4px; letter-spacing: 1px;
+  border: 1px solid; border-color: #808080 #fff #fff #808080;
+  min-width: 44px; text-align: center;
+}
+.xp-ms-face {
+  width: 26px; height: 26px; padding: 0; font-size: 15px; line-height: 1; cursor: pointer;
+  background: #c0c0c0;
+  border: 2px solid; border-color: #fff #808080 #808080 #fff;
+}
+.xp-ms-face:active { border-color: #808080 #fff #fff #808080; }
+.xp-ms-grid {
+  border: 3px solid; border-color: #808080 #fff #fff #808080;   /* inset */
+  background: #c0c0c0; width: max-content;
+}
+.xp-ms-cell {
+  padding: 0; margin: 0; cursor: pointer; font-weight: 700;
+  background: #c0c0c0;
+  border: 2px solid; border-color: #fff #808080 #808080 #fff;   /* elevada */
+  display: flex; align-items: center; justify-content: center;
+}
+.xp-ms-cell--open {
+  border: 1px solid #9a9a9a; border-width: 1px 0 0 1px;         /* plana hundida */
+  background: #c0c0c0; cursor: default;
+}
+
+/* ── Sudoku — tablero 9×9 (las líneas 3×3 gruesas las pintan los bordes de cada celda) ── */
+.xp-su-board {
+  display: grid;
+  grid-template-columns: repeat(9, 32px);
+  background: #fff;
+  font-family: 'XP Tahoma', Tahoma, 'Segoe UI', sans-serif;
+}
+
 /* ══ Vocabulario de DIÁLOGOS de sistema (XP nativo LITERAL — no tokens, colores XP hardcodeados) ══ */
 .xp-dialog {
   background: #ece9d8;

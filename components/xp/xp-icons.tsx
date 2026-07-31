@@ -25,6 +25,8 @@ export const XP_ICON: Record<string, string> = {
   calc: '/themes/xp/icons/calc.png',   // Calculadora (finanzas.png dejó de ser la calc)
   solitario: '/themes/xp/icons/solitario.png',
   juegos: '/themes/xp/icons/juegos.png',   // carpeta Juegos (Game Controller)
+  buscaminas: '/themes/xp/icons/buscaminas.png',
+  sudoku: '/themes/xp/icons/sudoku.png',   // generado (SVG rejilla)
 }
 
 // href de sección → nombre de ícono
