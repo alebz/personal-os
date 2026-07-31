@@ -5,6 +5,7 @@ import DrumModal from '@/components/DrumModal'
 import { dayColor, crtDayColor, lightDayInk } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { XpDialogModal, XpField, XpLabel, XpSelect } from '@/components/xp/xp-controls'
+import TareasOutlook from '@/components/xp/TareasOutlook'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -804,7 +805,14 @@ function TaskDrawer({
 
 // ── CRMPage ────────────────────────────────────────────────────────────────
 
+// Bajo XP, Tareas se re-presenta como Outlook 2003 Tasks (alma de época). Arcade = Kanban/Lista intacto.
 export default function TareasContent() {
+  const { shell } = useOSSettings()
+  if (shell === 'xp') return <TareasOutlook />
+  return <TareasArcade />
+}
+
+function TareasArcade() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
   const [loading, setLoading] = useState(true)
