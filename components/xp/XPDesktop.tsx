@@ -9,6 +9,7 @@ import DisplayProperties from './DisplayProperties'
 import DateTimeProperties from './DateTimeProperties'
 import BlocDeNotas from './BlocDeNotas'
 import CalendarioApp from './CalendarioApp'
+import Calculadora from './Calculadora'
 import XpNotifications from './XpNotifications'
 import LoloHeartbeat from './LoloHeartbeat'
 import CaptureBox from './CaptureBox'
@@ -166,6 +167,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   // Calendario — app propia bajo XP (Outlook 2003): eventos + iCal + cumpleaños, vistas Día/Semana/Mes/
   // Agenda. NO es cara del tambor (el arcade conserva el calendario de Inicio). Resizable.
   const openCalendario = () => openWindow('calendario', 'Calendario', <CalendarioApp />, { w: 720, h: 520, resizable: true, icon: 'calendario' })
+  // Calculadora — applet clásico (Estándar). Tamaño fijo, como en XP (no resizable).
+  const openCalc = () => openWindow('calc', 'Calculadora', <Calculadora />, { w: 258, h: 300, icon: 'calc' })
   // Abre la app destino de una notificación (Lolo→su chat directo; el resto → sección/app).
   const openNotifTarget = (target: NotifTarget) => {
     if (target === 'lolo') {
@@ -179,6 +182,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     ...launchable.map((s) => ({ id: s.href, label: s.label, icon: SECTION_ICON[s.href], open: () => openSection(s) })),
     { id: 'bloc', label: 'Bloc de notas', icon: 'bloc', open: openBloc },
     { id: 'calendario', label: 'Calendario', icon: 'calendario', open: openCalendario },
+    { id: 'calc', label: 'Calculadora', icon: 'calc', open: openCalc },
   ]
   const favApps = APPS.filter((a) => favorites.includes(a.id))
   // El cajón se ancla al ITEM clickeado (bottom alineado con su borde inferior) y abre SOBRE la 2ª columna.
@@ -353,6 +357,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
               <button className="xp-startmenu-item" onClick={openDisplayProps} style={rightItem}><XpIcon name="panel" size={22} /> Panel de control</button>
               <button className="xp-startmenu-item" onClick={openBloc} style={rightItem}><XpIcon name="bloc" size={22} /> Bloc de notas</button>
               <button className="xp-startmenu-item" onClick={openCalendario} style={rightItem}><XpIcon name="calendario" size={22} /> Calendario</button>
+              <button className="xp-startmenu-item" onClick={openCalc} style={rightItem}><XpIcon name="calc" size={22} /> Calculadora</button>
               <div className="xp-sm-sep" />
               <button className="xp-startmenu-item" onClick={openSearch} style={rightItem}><XpIcon name="buscar" size={22} /> Buscar</button>
               <button className="xp-startmenu-item" onClick={openRun} style={rightItem}><XpIcon name="ejecutar" size={22} /> Ejecutar…</button>
