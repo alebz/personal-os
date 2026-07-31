@@ -25,7 +25,10 @@ import './xp-theme.css'
 // INICIO no es una app en XP — es el ambiente de la cara del tambor. Aquí se DISUELVE: el reloj vive
 // en el tray, el calendario se invoca con doble-click al reloj (ventanita "Fecha y hora", nativo XP),
 // la quote no se porta. Por eso '/' no está en LAUNCHABLE ni aparece en el menú.
-const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/contactos', '/uptown', '/brain'])
+const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/uptown', '/brain'])
+// Secciones que se DISUELVEN bajo XP (no app propia): Inicio ('/') → reloj/tray; Contactos → viven
+// dentro de Cerebro Messenger (buddy list), así que aquí no hay Address Book aparte (sería redundante).
+const XP_DISSOLVED = new Set(['/', '/contactos'])
 
 // ── Escala del lienzo (emulación de monitor de época) ────────────────────────────────────────────
 // XP nació para ~1024×768@96dpi; sus proporciones son de esa pantalla y a px nativos se ve diminuto
@@ -88,8 +91,8 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const scale = vp.h / xpLogicalH           // f
   const logicalW = vp.w / scale             // ancho lógico (fluido)
 
-  // Inicio ('/') se disuelve en XP → fuera del menú por completo (ni launchable ni en "Todos").
-  const xpSections = sections.filter((s) => s.href !== '/')
+  // Secciones disueltas (Inicio, Contactos) → fuera del menú por completo (ni launchable ni en "Todos").
+  const xpSections = sections.filter((s) => !XP_DISSOLVED.has(s.href))
   const launchable = xpSections.filter((s) => LAUNCHABLE.has(s.href))
   const pending = xpSections.filter((s) => !LAUNCHABLE.has(s.href))
   const topZ = Math.max(0, ...windows.map((w) => w.z))

@@ -191,7 +191,16 @@ export default function MsnCerebro() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [dialog, setDialog] = useState<{ mode: 'create' } | { mode: 'edit'; contact: Contact } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; contact: Contact } | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)      // menú "Contactos" abierto
+  const [catMgr, setCatMgr] = useState(false)          // gestor de categorías (heredado de la sección disuelta)
   const rootRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [menuOpen])
 
   const loadContacts = useCallback(() => {
     fetch('/api/contacts')
@@ -235,9 +244,17 @@ export default function MsnCerebro() {
 
   return (
     <div ref={rootRef} style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
-      {/* Menú (decorativo, sabor MSN) */}
-      <div style={{ display: 'flex', gap: 13, padding: '2px 9px', background: '#f7f9fc', borderBottom: '1px solid #cdd6e2', fontSize: 11, color: '#333' }}>
-        {['Archivo', 'Contactos', 'Acciones', 'Herramientas', 'Ayuda'].map((m) => <span key={m}>{m}</span>)}
+      {/* Menú — "Contactos" abre un desplegable (agregar / gestionar categorías); el resto decorativo. */}
+      <div ref={menuRef} style={{ position: 'relative', display: 'flex', gap: 13, padding: '2px 9px', background: '#f7f9fc', borderBottom: '1px solid #cdd6e2', fontSize: 11, color: '#333' }}>
+        <span>Archivo</span>
+        <span role="button" tabIndex={0} onClick={() => setMenuOpen((v) => !v)} style={{ cursor: 'pointer', padding: '0 4px', margin: '0 -4px', borderRadius: 2, background: menuOpen ? '#d8e6fb' : 'transparent' }}>Contactos</span>
+        <span>Acciones</span><span>Herramientas</span><span>Ayuda</span>
+        {menuOpen && (
+          <div style={{ position: 'absolute', top: '100%', left: 44, zIndex: 40, marginTop: 1, minWidth: 178, background: '#fff', border: '1px solid #97948a', boxShadow: '2px 3px 6px rgba(0,0,0,0.28)', padding: 2 }}>
+            <button onClick={() => { setMenuOpen(false); setDialog({ mode: 'create' }) }} style={menuItem}>Agregar un contacto…</button>
+            <button onClick={() => { setMenuOpen(false); setCatMgr(true) }} style={menuItem}>Gestionar categorías…</button>
+          </div>
+        )}
       </div>
 
       {/* Banner con la marca: la mariposa de MSN reimaginada en el rainbow del OS */}
@@ -331,7 +348,44 @@ export default function MsnCerebro() {
           onSaved={loadContacts}
         />
       )}
+      {catMgr && <CategoryManager onClose={() => setCatMgr(false)} onChanged={loadContacts} />}
     </div>
+  )
+}
+
+const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', border: 0, background: 'none', cursor: 'pointer', padding: '4px 14px', fontSize: 11, fontFamily: 'inherit', color: '#1a1a1a', whiteSpace: 'nowrap' }
+
+// Gestión de categorías — heredada de la sección Contactos disuelta. Crear/borrar (mismas
+// /api/contact-categories); las que asignas al crear/editar un contacto salen de aquí.
+function CategoryManager({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+  const [cats, setCats] = useState<{ id: string; name: string }[]>([])
+  const [nw, setNw] = useState('')
+  const [arm, setArm] = useState<string | null>(null)
+  const load = useCallback(() => { fetch('/api/contact-categories').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setCats(d) }).catch(() => {}) }, [])
+  useEffect(() => { load() }, [load])
+  useEffect(() => { if (!arm) return; const t = setTimeout(() => setArm(null), 3000); return () => clearTimeout(t) }, [arm])
+  async function add() { const n = nw.trim(); if (!n) return; await fetch('/api/contact-categories', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: n }) }).catch(() => {}); setNw(''); load(); onChanged() }
+  async function del(id: string) { await fetch(`/api/contact-categories/${id}`, { method: 'DELETE' }).catch(() => {}); load(); onChanged() }
+  return (
+    <XpDialogModal open title="Gestionar categorías" width={320} onCancel={onClose} onOk={onClose} okLabel="Cerrar" okDisabled={false}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ border: '1px solid #7f9db9', borderRadius: 3, background: '#fff', maxHeight: 190, overflowY: 'auto' }}>
+          {cats.length === 0 && <div style={{ padding: '8px', color: '#8a867a', fontStyle: 'italic', fontSize: 11 }}>Sin categorías aún.</div>}
+          {cats.map((c) => (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderBottom: '1px solid #eef1f5' }}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+              <button onClick={() => { if (arm === c.id) { setArm(null); del(c.id) } else setArm(c.id) }} title="Eliminar categoría"
+                style={{ border: 0, background: 'none', cursor: 'pointer', color: arm === c.id ? '#c0271c' : '#a9b0be', fontWeight: arm === c.id ? 700 : 400, fontSize: arm === c.id ? 10 : 13, lineHeight: 1, fontFamily: 'inherit' }}>{arm === c.id ? '¿eliminar?' : '×'}</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <input value={nw} onChange={(e) => setNw(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }} placeholder="Nueva categoría…" className="xp-sunken" style={{ flex: 1, padding: '3px 5px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }} />
+          <button className="xp-raised" onClick={add} style={{ padding: '2px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }}>Agregar</button>
+        </div>
+        <p style={{ fontSize: 10, color: '#8a867a', margin: 0 }}>Borrar una categoría no borra a sus contactos; solo quedan sin categoría reconocida.</p>
+      </div>
+    </XpDialogModal>
   )
 }
 
