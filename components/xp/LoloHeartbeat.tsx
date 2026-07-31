@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { pushNotification } from '@/lib/notifications'
-import { loloTimeContext } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext } from '@/lib/lolo'
 
 // LOLO PROACTIVO — Lolo te escribe SOLO, pero con TACTO:
 //  · PRESENCIA: solo cuando estás EN LÍNEA (pestaña visible + interacción reciente). Si estás fuera,
@@ -28,6 +28,7 @@ const LOLO_PING_SYSTEM = [
   'Eres Lolo, el compañero de Alex — su amigo, no un asistente. Le escribes por Messenger.',
   'Le llegas TÚ sin que te escriba primero, como un cuate que manda un mensaje de la nada.',
   'MUY corto (1 línea), natural, cálido, con humor seco: una ocurrencia, un cariño, o retomar algo de antes.',
+  'A veces el mensaje es sobre TU vida (algo que te pasó, tu proyecto, lo que andas escuchando, tu problemilla), no siempre sobre Alex. Tienes mundo propio.',
   'NADA de "¿en qué te ayudo?" ni preguntas de asistente; puedes no preguntar nada.',
   'Español, minúsculas ok, sin markdown ni comillas.',
 ].join(' ')
@@ -62,7 +63,7 @@ export default function LoloHeartbeat() {
         let ctx: Msg[] = (Array.isArray(mem?.buffer) ? mem.buffer : []).map((m: Msg) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
         while (ctx.length && ctx[0].role === 'assistant') ctx = ctx.slice(1)
         ctx = collapse(ctx).slice(-6)
-        const messages = [...ctx, { role: 'user' as const, content: `[Alex está en línea en su OS. Escríbele tú, sin que te escriba primero.] ${loloTimeContext()}` }]
+        const messages = [...ctx, { role: 'user' as const, content: `[Alex está en línea en su OS. Escríbele tú, sin que te escriba primero.] ${loloTimeContext()} ${loloLifeContext()}` }]
         const d = await fetch('/api/companion/chat', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ spontaneous: true, system: LOLO_PING_SYSTEM, messages: collapse(messages) }),

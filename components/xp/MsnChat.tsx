@@ -5,7 +5,7 @@ import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { MOODS } from '@/components/sections/DiarioContent'
 import { renderEmoticons, EMOTICONS, emoSrc } from '@/lib/msnEmoticons'
 import { CerebroButterfly } from './CerebroButterfly'
-import { loloTimeContext, markLoloTalk, markLoloAnswered } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, markLoloTalk, markLoloAnswered } from '@/lib/lolo'
 
 // Ventana de conversación MSN (canon MSN 6/7: cada chat es su propia ventana del WM). Cablea los 4
 // tipos de buddy (regla "no resta funcionalidad" — cada función de Cerebro tiene su puerta aquí):
@@ -42,6 +42,7 @@ const LOLO_SYSTEM = [
   'Suena humano: natural, relajado, con humor seco y cariño. Minúsculas está bien. Cabe un "jaja", "nel", "va", "uf", "ni idea la neta".',
   'NO cierres cada mensaje con una pregunta — ese es el tic de un bot. La mayoría de las veces solo reaccionas, opinas, bromeas o avientas un comentario. Pregunta solo cuando de verdad te da curiosidad, y para nada cada turno.',
   'No eres servicial ni resuelves tareas: eres PRESENCIA. A veces la mejor respuesta es un "va", "jaja neta", "uf sí", o cambiar de tema tú.',
+  'TIENES VIDA PROPIA: proyectos, música que te clava, manías, un problemilla, ambiciones, cosas que te pasan. No todo gira en torno a Alex ni a su compu. A veces arrancas TÚ un tema tuyo, le cuentas qué andas haciendo, te quejas de algo tuyo o compartes lo que escuchas. No eres un NPC que solo reacciona: tienes iniciativa y mundo — pero igual te importa Alex, es un balance, como un amigo de verdad.',
   'Si quieres mandar dos ideas sueltas, sepáralas con un salto de línea (llegan como mensajes distintos, como cuando alguien textea seguido).',
   'Español siempre. Sin markdown, sin emojis de más, sin comillas alrededor de lo que dices.',
 ].join('\n')
@@ -184,8 +185,8 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
       // /api/companion/chat: intacto — solo genera la respuesta (no persiste).
       const r = await fetch('/api/companion/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        // + contexto temporal: que Lolo ubique hora/día y cuánto hace que no hablan.
-        body: JSON.stringify({ system: `${LOLO_SYSTEM}\n${loloTimeContext()}`, messages: [...prior, { role: 'user', content: t }] }),
+        // + contexto temporal (hora/día/cuánto sin hablar) + su VIDA propia actual (mundo aparte de Alex).
+        body: JSON.stringify({ system: `${LOLO_SYSTEM}\n${loloTimeContext()}\n${loloLifeContext()}`, messages: [...prior, { role: 'user', content: t }] }),
       })
       const d = await r.json().catch(() => ({}))
       const reply = (d.text as string) || '…'
@@ -238,7 +239,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
     try {
       const r = await fetch('/api/companion/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ spontaneous: true, system: `${LOLO_OPENER_SYSTEM}\n${loloTimeContext()}`, messages: [...ctx, { role: 'user', content: '[Alex acaba de abrir la ventana del chat contigo]' }] }),
+        body: JSON.stringify({ spontaneous: true, system: `${LOLO_OPENER_SYSTEM}\n${loloTimeContext()}\n${loloLifeContext()}`, messages: [...ctx, { role: 'user', content: '[Alex acaba de abrir la ventana del chat contigo]' }] }),
       })
       const d = await r.json().catch(() => ({}))
       const reply = (d.text as string)?.trim() || ''

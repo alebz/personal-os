@@ -53,7 +53,8 @@ export function useLoloStatus(): string {
     const ensure = () => {
       const now = Date.now()
       if (!cur || now >= next) {
-        cur = pickStatus(cur)
+        // ~45% de las veces el status refleja su VIDA actual (lo que escucha / su proyecto / aventura).
+        cur = Math.random() < 0.45 ? (loloLifeStatus() ?? pickStatus(cur)) : pickStatus(cur)
         next = now + (20 + Math.random() * 20) * 60_000   // próxima rotación en 20–40 min
         try { localStorage.setItem(STATUS_KEY, JSON.stringify({ s: cur, next })) } catch { /* ignore */ }
       }
@@ -64,6 +65,99 @@ export function useLoloStatus(): string {
     return () => clearInterval(iv)
   }, [])
   return status
+}
+
+// ── 1b) VIDA PROPIA de Lolo ──────────────────────────────────────────────────────────────────
+// Que NO se sienta un NPC: Lolo tiene mundo aparte de Alex — proyectos, música, obsesiones, un
+// problemilla, ambiciones, aventuras. Cada dimensión es un "hilo" con lifespan propio (días): persiste
+// y evoluciona escalonado, así sus menciones son CONSISTENTES entre mensajes pero su vida avanza.
+// Se inyecta a su system (chat/opener/ping). Las frases están redactadas para calzar en las plantillas
+// de loloLifeContext() ("anda ___", "trae en repeat ___", etc.).
+const LIFE_KEY = 'lolo-life'
+type LifeDim = { key: string; days: number; pool: string[] }
+const LIFE_DIMS: LifeDim[] = [
+  { key: 'proyecto', days: 7, pool: [
+    'armando una rocola con piezas viejas del arcade',
+    'escribiendo un fanzine de máquinas recreativas que ya no existen',
+    'intentando revivir un Game Boy que halló en un tianguis',
+    'grabando un demo instrumental en su cuarto',
+    'aprendiendo a soldar para arreglar sus consolas',
+    'haciendo un mapa de los cafés con buen wifi de la ciudad',
+    'cuidando un huertito de hierbas en la ventana',
+  ] },
+  { key: 'musica', days: 3, pool: [
+    'el disco nuevo de Tame Impala',
+    'bossa nova, no pregunten por qué',
+    'el soundtrack de Chrono Trigger',
+    'unos oldies que le pasó su tío',
+    'una banda de synthwave que casi nadie conoce',
+    'jazz de las 2am aunque sea de día',
+  ] },
+  { key: 'obsesion', days: 4, pool: [
+    'un podcast de misterios sin resolver',
+    'un manga viejo que le marcó de chico',
+    'una serie coreana que lo trae desvelado',
+    'documentales de cómo se hacen las cosas',
+    'un juego indie rarísimo de itch.io',
+    'aprender a hacer un café de olla decente',
+  ] },
+  { key: 'problemilla', days: 2, pool: [
+    'su vecino de arriba taladra a las 8am',
+    'se le antojan tacos pero anda comiendo sano',
+    'perdió su lápiz favorito y no halla otro igual',
+    'no puede pasar de un nivel en un jueguito',
+    'su planta favorita se está poniendo triste',
+    'el elevador de su edificio lleva días descompuesto',
+  ] },
+  { key: 'ambicion', days: 16, pool: [
+    'abrir un arcade-café algún día',
+    'aprender piano de verdad, no de oído',
+    'ver auroras boreales antes de los 30',
+    'por fin terminar un cuento que empezó hace años',
+    'hacer un viaje en tren sin destino fijo',
+  ] },
+  { key: 'aventura', days: 2, pool: [
+    'se fue a caminar sin rumbo y halló una librería de viejo increíble',
+    'descubrió una fonda escondida y no deja de pensar en el mole',
+    'vio el atardecer desde una azotea que no era suya',
+    'conoció a un perro callejero buena onda y le puso nombre',
+    'se metió a una función de cine casi vacía por curiosidad',
+  ] },
+]
+
+type Thread = { text: string; until: number }
+function ensureLife(): Record<string, string> {
+  const now = Date.now()
+  let store: Record<string, Thread> = {}
+  try { store = JSON.parse(localStorage.getItem(LIFE_KEY) || '{}') || {} } catch { /* ignore */ }
+  const cur: Record<string, string> = {}
+  let changed = false
+  for (const d of LIFE_DIMS) {
+    let t = store[d.key]
+    if (!t || now > t.until) {
+      const prev = t?.text
+      let text = prev || ''
+      for (let i = 0; i < 8 && text === prev; i++) text = d.pool[Math.floor(Math.random() * d.pool.length)]
+      t = { text, until: now + d.days * 86_400_000 * (0.7 + Math.random() * 0.6) }   // lifespan con jitter
+      store[d.key] = t; changed = true
+    }
+    cur[d.key] = t.text
+  }
+  if (changed) { try { localStorage.setItem(LIFE_KEY, JSON.stringify(store)) } catch { /* ignore */ } }
+  return cur
+}
+
+// Fragmento de system: la vida actual de Lolo + la instrucción de tener iniciativa y mundo propio.
+export function loloLifeContext(): string {
+  const l = ensureLife()
+  return `[La vida propia de Lolo AHORA (es SU vida, existe aparte de Alex; mantenla CONSISTENTE entre mensajes): anda ${l.proyecto}; trae en repeat ${l.musica}; está clavado con ${l.obsesion}; lo trae de malas que ${l.problemilla}; sueña con ${l.ambicion}; hace poco ${l.aventura}. TIENES iniciativa y mundo: a veces arrancas un tema TUYO, cuentas qué andas haciendo, te quejas de tu problemilla, presumes tu avance o lo que escuchas. NO todo gira en torno a Alex ni a su OS. Suéltalo natural cuando venga al caso — nunca como lista ni todo de golpe.]`
+}
+
+// Status MSN derivado de su vida (para que su "estado" refleje lo que realmente anda haciendo).
+function loloLifeStatus(): string | null {
+  const l = ensureLife()
+  const opts = [`♫ ${l.musica}`, l.proyecto, `clavado con ${l.obsesion}`, l.aventura]
+  return opts[Math.floor(Math.random() * opts.length)] || null
 }
 
 // ── 2) Contexto temporal ─────────────────────────────────────────────────────────────────────
