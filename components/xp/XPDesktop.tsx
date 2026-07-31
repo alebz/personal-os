@@ -97,7 +97,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   function closeStart() { setStartOpen(false); setAllOpen(false) }
 
   // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
-  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; resizable?: boolean; icon?: string }) {
+  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; icon?: string }) {
     closeStart()
     const existing = windows.find((w) => w.id === id)
     if (existing?.minimized) playXpSound('restore')
@@ -107,12 +107,21 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       if (prev.some((w) => w.id === id))
         return prev.map((w) => (w.id === id ? { ...w, minimized: false, z: top + 1 } : w))
       const n = prev.length
-      return [...prev, { id, title, content, x: 90 + n * 32, y: 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable, icon: opts?.icon }]
+      return [...prev, { id, title, content, x: opts?.x ?? 90 + n * 32, y: opts?.y ?? 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable, icon: opts?.icon }]
     })
   }
 
   // Las SECCIONES son resizables + maximizables (contenido denso, responden por container queries).
-  const openSection = (s: OSSection) => openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href] })
+  // Cerebro = MSN Messenger: por default abre ACOPLADO arriba-a-la-derecha, angosto y alto (como el
+  // Messenger real). Sigue siendo resizable/movible; solo cambia la geometría inicial.
+  const openSection = (s: OSSection) => {
+    if (s.href === '/brain') {
+      const lw = window.innerWidth / scale, lh = window.innerHeight / scale
+      const w = 340, h = Math.min(lh - 48, 600)
+      return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href], w, h, x: Math.max(8, lw - w - 12), y: 10 })
+    }
+    return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href] })
+  }
   const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 470, h: 344, icon: 'clock' })
   const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466, icon: 'display' }) }
   // Mi PC — STUB (su ventana real = Caja Fuerte como unidades de disco, futuro). El escritorio nace
