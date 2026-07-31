@@ -172,6 +172,8 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
     // (un saludo espontáneo de Lolo pudo quedar de primero como 'them' → lo quitamos del contexto/persistencia).
     let prior = msgs.filter((m) => m.from !== 'sys').map((m) => ({ role: m.from === 'me' ? 'user' as const : 'assistant' as const, content: m.text }))
     while (prior.length && prior[0].role === 'assistant') prior = prior.slice(1)
+    // Colapsa roles iguales adyacentes (un mensaje proactivo de Lolo pudo dejar dos 'assistant' seguidos).
+    prior = prior.reduce((acc, m) => { const last = acc[acc.length - 1]; if (last && last.role === m.role) last.content += '\n' + m.content; else acc.push({ ...m }); return acc }, [] as typeof prior)
     const typingId = nextId()
     setMsgs((m) => [...m, { id: typingId, from: 'them', name: 'Lolo', text: '', streaming: true }])
     try {

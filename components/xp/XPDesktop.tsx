@@ -10,6 +10,9 @@ import DateTimeProperties from './DateTimeProperties'
 import BlocDeNotas from './BlocDeNotas'
 import CalendarioApp from './CalendarioApp'
 import XpNotifications from './XpNotifications'
+import LoloHeartbeat from './LoloHeartbeat'
+import MsnChat, { type ChatBuddy } from './MsnChat'
+import { useNotifications, markAllRead, clearAll, timeAgo, type NotifTarget } from '@/lib/notifications'
 import { XpSlider, XpCheckbox, XpContextMenu } from './xp-controls'
 import { XpIcon, SECTION_ICON } from './xp-icons'
 import { RunDialog } from './RunDialog'
@@ -80,7 +83,10 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [windows, setWindows] = useState<WinState[]>([])
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)   // menú contextual (logical px)
   const [volOpen, setVolOpen] = useState(false)   // popup de volumen del tray
+  const [notifOpen, setNotifOpen] = useState(false)   // centro de notificaciones del tray
   const [deskSel, setDeskSel] = useState<string | null>(null)   // ícono de escritorio seleccionado
+  const notifs = useNotifications()
+  const unread = notifs.reduce((s, n) => s + (n.read ? 0 : 1), 0)
   const [iconPos, setIconPos] = useState<Record<string, { x: number; y: number }>>(() => {
     try { const s = localStorage.getItem('xp-desktop-icons'); if (s) return JSON.parse(s) } catch { /* */ }
     return {}
@@ -137,6 +143,14 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   // Calendario — app propia bajo XP (Outlook 2003): eventos + iCal + cumpleaños, vistas Día/Semana/Mes/
   // Agenda. NO es cara del tambor (el arcade conserva el calendario de Inicio). Resizable.
   const openCalendario = () => openWindow('calendario', 'Calendario', <CalendarioApp />, { w: 720, h: 520, resizable: true, icon: 'calendario' })
+  // Abre la app destino de una notificación (Lolo→su chat directo; el resto → sección/app).
+  const openNotifTarget = (target: NotifTarget) => {
+    if (target === 'lolo') {
+      const lolo: ChatBuddy = { id: 'sys:lolo', name: 'Lolo', kind: 'lolo', avatar: { img: '/Lolo/Idle/lolo_idle_2.png', bg: '#eef4fb' } }
+      openWindow('chat:sys:lolo', 'Lolo', <MsnChat buddy={lolo} />, { w: 404, h: 432, resizable: true, icon: 'cerebro' })
+    } else if (target === 'calendario') openCalendario()
+    else if (target === 'cerebro' || target === 'tareas') { const s = sections.find((x) => x.href === (target === 'cerebro' ? '/brain' : '/crm')); if (s) openSection(s) }
+  }
   // Ejecutar — launcher por teclado ("finanzas" → abre). Buscar — consultar Cerebro desde cualquier
   // lado. Ambos renacen el capture global muerto del audit (P2), diegéticamente.
   const openRun = () => openWindow('run', 'Ejecutar', <RunDialog sections={launchable} onLaunch={(href) => { closeWindow('run'); const s = launchable.find((x) => x.href === href); if (s) openSection(s) }} />, { w: 360, h: 178, icon: 'ejecutar' })
@@ -206,7 +220,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           contextual mínimo (coords en px LÓGICOS: clientX ÷ scale). */}
       <div
         style={{ position: 'absolute', inset: 0, bottom: 30 }}
-        onPointerDown={() => { closeStart(); setCtxMenu(null); setVolOpen(false); setDeskSel(null) }}
+        onPointerDown={() => { closeStart(); setCtxMenu(null); setVolOpen(false); setNotifOpen(false); setDeskSel(null) }}
         onContextMenu={(e) => { e.preventDefault(); closeStart(); setVolOpen(false); setCtxMenu({ x: e.clientX / scale, y: e.clientY / scale }) }}
       />
 
@@ -256,12 +270,9 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         <XPWindow key={w.id} win={w} active={!w.minimized && w.z === topZ} scale={scale} onFocus={focusWindow} onClose={closeWindow} onMinimize={minimizeWindow} onMove={moveWindow} onMaximize={maximizeWindow} onResize={resizeWindow} />
       ))}
 
-      {/* Globos de notificación del tray — vuelven proactivo al OS (cumpleaños/eventos/tareas de hoy). */}
-      <XpNotifications
-        onOpenCerebro={() => { const s = sections.find((x) => x.href === '/brain'); if (s) openSection(s) }}
-        onOpenCalendario={openCalendario}
-        onOpenTareas={() => { const s = sections.find((x) => x.href === '/crm'); if (s) openSection(s) }}
-      />
+      {/* Toasts apilados (cumpleaños/eventos/tareas + Lolo) + Lolo proactivo que te escribe solo. */}
+      <XpNotifications onOpen={openNotifTarget} />
+      <LoloHeartbeat />
 
       {/* ── Menú Inicio · dos columnas ── */}
       {startOpen && (
@@ -355,6 +366,16 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         {/* System tray: pozo hundido con bocina + reloj vivo (doble-click → Fecha y hora) */}
         <div className="xp-tray" style={{ height: 30, display: 'flex', alignItems: 'center', gap: 7, padding: '0 11px 0 9px' }}>
           <span className="xp-tray-grip" aria-hidden />
+          {/* Campanita de notificaciones — contador de no leídas; clic abre el centro (historial). */}
+          <button
+            className="xp-chrome-btn"
+            onClick={() => { const willOpen = !notifOpen; setNotifOpen(willOpen); setVolOpen(false); if (willOpen) markAllRead() }}
+            title="Notificaciones" aria-label="Notificaciones"
+            style={{ position: 'relative', border: 'none', background: 'none', padding: 0, fontSize: 13, cursor: 'pointer', lineHeight: 1, opacity: unread > 0 ? 1 : 0.6, filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }}
+          >
+            🔔
+            {unread > 0 && <span style={{ position: 'absolute', top: -5, right: -6, minWidth: 13, height: 13, borderRadius: 7, background: '#e0201c', color: '#fff', fontSize: 9, fontWeight: 700, lineHeight: '13px', textAlign: 'center', padding: '0 2px', boxShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{unread}</span>}
+          </button>
           <button
             className="xp-chrome-btn"
             onClick={() => setVolOpen((v) => !v)}
@@ -374,6 +395,31 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
             <span style={{ fontWeight: 400 }}>Volumen</span>
             <XpSlider value={xpSound.volume} min={0} max={1} step={0.05} vertical length={92} ticks={5} onChange={(v) => set('xpSound', { ...xpSound, volume: v })} />
             <XpCheckbox checked={!xpSound.on} label="Silenciar" onChange={(muted) => set('xpSound', { ...xpSound, on: !muted })} />
+          </div>
+        )}
+
+        {/* Centro de notificaciones — historial persistido; clic en una la abre. */}
+        {notifOpen && (
+          <div className="xp-dialog xp-raised" style={{ position: 'absolute', right: 12, bottom: 34, zIndex: 10002, width: 288, padding: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '5px 9px', borderBottom: '1px solid #b9c4d4', fontWeight: 700, color: '#1c3d6e', fontSize: 12 }}>
+              <span style={{ flex: 1 }}>Notificaciones</span>
+              {notifs.length > 0 && <button onClick={() => clearAll()} style={{ border: 0, background: 'none', cursor: 'pointer', color: '#1c4a86', fontSize: 11, fontFamily: 'inherit', textDecoration: 'underline' }}>Borrar todo</button>}
+            </div>
+            <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+              {notifs.length === 0 && <div style={{ padding: '16px 10px', color: '#8a867a', fontStyle: 'italic', fontSize: 11, textAlign: 'center' }}>Sin notificaciones.</div>}
+              {notifs.map((n) => (
+                <button key={n.id} onClick={() => { setNotifOpen(false); openNotifTarget(n.target) }}
+                  style={{ display: 'flex', gap: 8, alignItems: 'flex-start', width: '100%', textAlign: 'left', border: 0, borderBottom: '1px solid #eef1f5', background: 'none', cursor: n.target ? 'pointer' : 'default', padding: '6px 9px', fontFamily: 'inherit' }}>
+                  {n.icon.startsWith('/')
+                    ? <img src={n.icon} alt="" width={20} height={20} style={{ borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />
+                    : <span style={{ fontSize: 16, flexShrink: 0 }}>{n.icon}</span>}
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'block', fontWeight: 700, fontSize: 11, color: '#12386e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title} <span style={{ fontWeight: 400, color: '#9aa3b5' }}>· {timeAgo(n.ts)}</span></span>
+                    <span style={{ display: 'block', fontSize: 11, color: '#4a5468', lineHeight: 1.3 }}>{n.body}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
