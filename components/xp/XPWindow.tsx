@@ -1,7 +1,9 @@
 'use client'
 
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { XpIcon } from './xp-icons'
+
+const ANIM_MS = 200   // duración del zoom XP (minimizar/maximizar) — ~200ms como el efecto real
 
 // Una ventana XP con piel Luna. Modelo GENÉRICO: title + content. Arrastrable por la barra, z-order al
 // enfocar, minimizable. RESIZE (bordes/esquinas) + MAXIMIZAR solo si `resizable` (secciones); los
@@ -46,6 +48,14 @@ export default function XPWindow({
 }) {
   const drag = useRef<{ dx: number; dy: number } | null>(null)
   const rz = useRef<{ dir: Dir; px: number; py: number; g: { x: number; y: number; w: number; h: number } } | null>(null)
+  // Animación XP: `zoom` = transición de geometría al maximizar/restaurar; `tf` = transform hacia el
+  // botón de taskbar al minimizar/restaurar; `hidden` = display real (lag para animar la salida).
+  const [zoom, setZoom] = useState(false)
+  const [tf, setTf] = useState<React.CSSProperties | null>(null)
+  const [hidden, setHidden] = useState(win.minimized)
+  const prevMax = useRef(win.maximized)
+  const prevMin = useRef(win.minimized)
+  const animT = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const maximized = !!win.maximized
   const logicalW = window.innerWidth / scale
@@ -55,6 +65,44 @@ export default function XPWindow({
   const geom = maximized
     ? { x: 0, y: 0, w: logicalW, h: logicalH - TASKBAR_H }
     : { x: win.x, y: win.y, w: win.w ?? WIN_W, h: win.h ?? WIN_H }
+
+  // Zoom de maximizar/restaurar: al cambiar el flag, se anima la geometría (left/top/w/h) ~200ms.
+  useEffect(() => {
+    if (win.maximized === prevMax.current) return
+    prevMax.current = win.maximized
+    setZoom(true)
+    const t = setTimeout(() => setZoom(false), ANIM_MS)
+    return () => clearTimeout(t)
+  }, [win.maximized])
+
+  // Minimizar/restaurar: la ventana se encoge y vuela hacia (o desde) su botón de la barra de tareas.
+  useEffect(() => {
+    if (win.minimized === prevMin.current) return
+    const goingMin = win.minimized
+    prevMin.current = win.minimized
+    if (animT.current) clearTimeout(animT.current)
+
+    const btn = document.querySelector(`[data-taskbtn="${win.id}"]`)
+    const r = btn?.getBoundingClientRect()
+    if (!r || r.width === 0) { setHidden(goingMin); setTf(null); return }   // sin botón → sin animación
+    const bx = r.left / scale, by = r.top / scale, bw = r.width / scale, bh = r.height / scale
+    const toBtn: React.CSSProperties = { transformOrigin: '0 0', transform: `translate(${bx - geom.x}px, ${by - geom.y}px) scale(${bw / geom.w}, ${bh / geom.h})`, opacity: 0 }
+    const ease = `transform ${ANIM_MS}ms ease-out, opacity ${ANIM_MS}ms ease-out`
+
+    if (goingMin) {
+      setHidden(false)
+      setTf({ transition: 'none', transform: 'none', opacity: 1 })
+      requestAnimationFrame(() => requestAnimationFrame(() => setTf({ transition: ease, ...toBtn })))
+      animT.current = setTimeout(() => { setHidden(true); setTf(null) }, ANIM_MS)
+    } else {
+      setHidden(false)
+      setTf({ transition: 'none', ...toBtn })
+      requestAnimationFrame(() => requestAnimationFrame(() => setTf({ transition: ease, transformOrigin: '0 0', transform: 'none', opacity: 1 })))
+      animT.current = setTimeout(() => setTf(null), ANIM_MS)
+    }
+  }, [win.minimized]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => { if (animT.current) clearTimeout(animT.current) }, [])
 
   // ── Drag (barra de título) ──
   function onTitleDown(e: React.PointerEvent) {
@@ -106,8 +154,10 @@ export default function XPWindow({
       onPointerDown={() => onFocus(win.id)}
       style={{
         position: 'absolute', left: geom.x, top: geom.y, width: geom.w, height: geom.h, zIndex: win.z,
-        display: win.minimized ? 'none' : 'flex', flexDirection: 'column',
+        display: hidden ? 'none' : 'flex', flexDirection: 'column',
         background: '#0831d8', boxShadow: active ? '5px 6px 22px rgba(0,0,0,0.45)' : '2px 3px 12px rgba(0,0,0,0.28)',
+        transition: zoom ? `left ${ANIM_MS}ms ease-out, top ${ANIM_MS}ms ease-out, width ${ANIM_MS}ms ease-out, height ${ANIM_MS}ms ease-out` : (tf?.transition ?? 'none'),
+        transform: tf?.transform, transformOrigin: tf?.transformOrigin, opacity: tf?.opacity,
       }}
     >
       {/* Barra de título — doble-click maximiza/restaura (solo resizables) */}

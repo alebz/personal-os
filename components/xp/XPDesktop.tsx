@@ -204,13 +204,18 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         { id: 'bloc', icon: 'bloc', label: 'Bloc de notas', open: openBloc },
         { id: 'calendario', icon: 'calendario', label: 'Calendario', open: openCalendario },
         { id: 'papelera', icon: 'papelera', label: 'Papelera de reciclaje', open: openPapelera }].map((it, i) => {
-        const pos = iconPos[it.id] ?? { x: 8, y: 8 + i * 74 }
+        // Límites del lienzo lógico: los íconos NUNCA se van del borde derecho/inferior (bug: solo se
+        // clampeaba a ≥0). Clampear también AL RENDER auto-sana posiciones persistidas fuera de pantalla.
+        const vw = window.innerWidth / scale, vh = window.innerHeight / scale
+        const maxX = Math.max(0, vw - 76), maxY = Math.max(0, vh - 30 - 72)
+        const raw = iconPos[it.id] ?? { x: 8, y: 8 + i * 74 }
+        const pos = { x: Math.max(0, Math.min(raw.x, maxX)), y: Math.max(0, Math.min(raw.y, maxY)) }
         const sel = deskSel === it.id
         return (
           <button
             key={it.id}
-            onPointerDown={(e) => { e.stopPropagation(); setDeskSel(it.id); const p = iconPos[it.id] ?? { x: 8, y: 8 + i * 74 }; iconDrag.current = { id: it.id, gx: e.clientX / scale - p.x, gy: e.clientY / scale - p.y }; try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch {} }}
-            onPointerMove={(e) => { const d = iconDrag.current; if (!d) return; setIconPos((prev) => ({ ...prev, [d.id]: { x: Math.max(0, e.clientX / scale - d.gx), y: Math.max(0, e.clientY / scale - d.gy) } })) }}
+            onPointerDown={(e) => { e.stopPropagation(); setDeskSel(it.id); iconDrag.current = { id: it.id, gx: e.clientX / scale - pos.x, gy: e.clientY / scale - pos.y }; try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch {} }}
+            onPointerMove={(e) => { const d = iconDrag.current; if (!d) return; setIconPos((prev) => ({ ...prev, [d.id]: { x: Math.max(0, Math.min(maxX, e.clientX / scale - d.gx)), y: Math.max(0, Math.min(maxY, e.clientY / scale - d.gy)) } })) }}
             onPointerUp={(e) => { iconDrag.current = null; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch {} }}
             onDoubleClick={it.open}
             style={{ position: 'absolute', left: pos.x, top: pos.y, width: 76, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '3px 2px', border: 0, background: 'none', cursor: 'default', touchAction: 'none' }}
@@ -318,7 +323,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
           {windows.map((w) => {
             const isActive = !w.minimized && w.z === topZ
             return (
-              <button key={w.id} className={`xp-chrome-btn xp-tb-btn ${isActive ? 'xp-tb-btn--active' : ''}`} onClick={() => taskbarClick(w.id)}
+              <button key={w.id} data-taskbtn={w.id} className={`xp-chrome-btn xp-tb-btn ${isActive ? 'xp-tb-btn--active' : ''}`} onClick={() => taskbarClick(w.id)}
                 style={{ height: 22, maxWidth: 160, padding: '0 10px 0 6px', borderRadius: 3, color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 5, textShadow: '1px 1px 1px rgba(0,0,0,0.35)' }}>
                 <XpIcon name={w.icon} size={16} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.title}</span>
