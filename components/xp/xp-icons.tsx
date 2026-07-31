@@ -19,6 +19,7 @@ export const XP_ICON: Record<string, string> = {
   display: '/themes/xp/icons/display.png',
   cerebro: '/themes/xp/icons/cerebro.png',   // MSN Messenger (Cerebro ES Messenger bajo XP)
   bloc: '/themes/xp/icons/bloc.png',
+  calendario: '/themes/xp/icons/calendario.png',
 }
 
 // href de sección → nombre de ícono
