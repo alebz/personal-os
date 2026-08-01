@@ -32,23 +32,24 @@ const SUPRA_RULES = [
   'Devuelve exactamente los mensajes pedidos, todos distintos entre sí.',
 ].join('\n')
 
-// Voz del NIÑO INTERIOR — para el "mensaje personal" en vivo de Cerebro Messenger (MSN). No es el
-// supra del arcade (que constata hechos de su vida); aquí habla el niño que Alex fue: asombrado,
-// valiente, tierno, juguetón. Inspiracional, no reporte. Puede tocar su vida real, pero como asombro.
-const VOICE_NINO = [
-  'Escribe con la voz del NIÑO INTERIOR de Alex: el que jugaba sin miedo, se asombraba de todo y quería a la gente sin cálculo. Ese niño le habla al adulto en que se convirtió.',
-  'Habla en primera persona (yo) o dirigiéndote a Alex de "tú", con ternura y valentía; deja que el cariño se cuele.',
-  'Conoces su mundo — sus personas, lo que trae entre manos — pero lo miras con ojos de niño, no de agenda.',
-  'Texto plano: nada de markdown, negritas, títulos, comillas alrededor de la frase, ni emojis.',
+// Voz de ALEX (mode 'yo') — el MENSAJE PERSONAL de MSN: lo que ÉL pone bajo su nombre para el mundo,
+// en PRIMERA PERSONA, como si Alex mismo lo tecleara. NO le habla a Alex ni le aconseja: ES Alex hablando.
+// Usa su contexto real como materia de lo que él declararía (su mood, en qué anda, qué trae en la cabeza).
+const VOICE_YO = [
+  'Escribe el MENSAJE PERSONAL de Alex: su estado de MSN, en PRIMERA PERSONA, como si Alex mismo lo hubiera tecleado bajo su nombre. Es lo que ÉL le dice al mundo — NO un mensaje dirigido a él, NO un consejo hacia él.',
+  'El que habla ES Alex: su voz natural, casual, humana — un pensamiento, un ánimo, algo que trae en la cabeza, unas ganas, una queja ligera, un plan. Como los personal messages de MSN.',
+  'Usa su contexto real (proyectos, personas, tareas, diario) como MATERIA de lo que él declararía, siempre como afirmación SUYA en primera persona.',
+  'PROHIBIDO hablarle a Alex, usar su nombre, o dirigirte a él de "tú" ("oye Alex…", "tú deberías…", "la cafetera que tienes en la mira…"). El sujeto que habla es "yo" = Alex.',
+  'Texto plano: nada de markdown, negritas, títulos, comillas alrededor de la frase. Un emoji ocasional al estilo MSN está bien.',
   'Español.',
 ].join(' ')
 
-const NINO_RULES = [
-  'Cada mensaje es UNA sola línea MUY corta (idealmente < 80 caracteres), como un mensaje personal de MSN.',
-  'Inspiracional, tierno, juguetón, valiente: ilumina y alienta. NUNCA regañes, confrontes, psicoanalices ni des pendientes.',
-  'Cada línea toma un ÁNGULO DISTINTO desde el niño: asombro por algo cotidiano, recordar por qué empezó algo, permiso para jugar/descansar, orgullo tierno por quién es, una verdad simple que el adulto olvidó.',
-  'Puedes tocar su vida real (nombres, lo que hace) pero SIEMPRE desde el asombro, el juego o el cariño — jamás como reporte ni tarea.',
-  'NADA de frases de taza motivacional ni horóscopo: que suene a un niño real y específico, no a póster.',
+const YO_RULES = [
+  'Cada mensaje es UNA sola línea corta (idealmente < 90 caracteres), como un personal message de MSN.',
+  'PRIMERA PERSONA siempre: "hoy le entro a…", "ando…", "me late…", "tengo ganas de…", "pensando en…", "no me hallo sin…".',
+  'Cada línea toma un ÁNGULO DISTINTO: en qué anda hoy, un mood, algo que trae entre manos (proyecto/tarea), unas ganas o antojo, un guiño a alguien de su gente, un pensamiento suelto.',
+  'Aterrízalo en su contexto real (nombres/proyectos concretos) sin explicarlo — es SU status, ya sabe de qué habla.',
+  'NADA de frases de taza ni horóscopo: que suene a algo que Alex realmente pondría de estado.',
   'Devuelve exactamente los mensajes pedidos, todos distintos entre sí.',
 ].join('\n')
 
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
   let body: { count?: number; exclude?: string[]; topics?: string[]; mode?: string }
   try { body = await req.json() } catch { return new Response('Invalid JSON', { status: 400 }) }
 
-  const mode = body.mode === 'nino' ? 'nino' : 'supra'
+  const mode = body.mode === 'yo' ? 'yo' : 'supra'
   const count = Math.max(1, Math.min(10, body.count ?? 6))
   const exclude = Array.isArray(body.exclude) ? body.exclude.slice(0, 40) : []
 
@@ -71,8 +72,8 @@ export async function POST(req: NextRequest) {
   if (error) return new Response(error.message, { status: 500 })
 
   const recent = (rows ?? []) as { content: string; metadata: Record<string, unknown>; created_at: string }[]
-  // El supra del arcade EXIGE contexto (constata su vida). El niño interior puede hablar sin él.
-  if (recent.length === 0 && mode !== 'nino') return Response.json({ messages: [] })
+  // El supra del arcade EXIGE contexto (constata su vida). El status en 1ª persona puede hablar sin él.
+  if (recent.length === 0 && mode !== 'yo') return Response.json({ messages: [] })
 
   // Sesga a lo reciente pero baraja para que dos lotes seguidos no converjan.
   const pool = recent.slice(0, 45).sort(() => Math.random() - 0.5).slice(0, 30)
@@ -86,11 +87,11 @@ export async function POST(req: NextRequest) {
     ? `\n\nNO repitas ni parafrasees estas líneas ya mostradas hoy:\n${exclude.map(e => `- ${e}`).join('\n')}`
     : ''
 
-  const system = mode === 'nino' ? `${VOICE_NINO}\n\n${NINO_RULES}` : `${VOICE}\n\n${SUPRA_RULES}`
-  const userMsg = mode === 'nino'
+  const system = mode === 'yo' ? `${VOICE_YO}\n\n${YO_RULES}` : `${VOICE}\n\n${SUPRA_RULES}`
+  const userMsg = mode === 'yo'
     ? (context
-        ? `Vislumbres de la vida de Alex (para inspirarte con ojos de niño, NO para reportar):\n\n${context}${excludeBlock}\n\nDesde el niño interior, genera ${count} mensajes personales, todos distintos.`
-        : `Sin contexto reciente; habla desde el corazón del niño.${excludeBlock}\n\nDesde el niño interior, genera ${count} mensajes personales, todos distintos.`)
+        ? `Tu vida ahora (Alex), como materia para TU propio estado — es lo que tú declararías, NO algo que alguien te dice:\n\n${context}${excludeBlock}\n\nComo Alex, en primera persona, escribe ${count} mensajes personales de MSN, todos distintos.`
+        : `Sin contexto reciente; pon tu estado desde tu propio ánimo.${excludeBlock}\n\nComo Alex, en primera persona, escribe ${count} mensajes personales de MSN, todos distintos.`)
     : `Contexto reciente:\n\n${context}${excludeBlock}\n\nGenera ${count} mensajes del supraconsciente.`
 
   const anthropic = new Anthropic()

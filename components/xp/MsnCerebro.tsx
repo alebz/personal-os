@@ -124,10 +124,11 @@ function GroupHeader({ label, count, open, onToggle }: { label: string; count: n
   )
 }
 
-// MENSAJE PERSONAL EN VIVO — tu niño interior. NO es el supra del arcade (updates de vida): habla el
-// niño que fuiste, inspiracional y tierno (/api/supraconsciente mode:'nino'). Rota con fade cada ~5 min
-// y avanza al clic (como poner tu personal message en MSN, pero es tu supraconsciente el que lo escribe).
-const PM_CACHE = 'msn-personal-cache'
+// MENSAJE PERSONAL EN VIVO — tu STATUS de MSN: lo que TÚ pones bajo tu nombre, en primera persona
+// (/api/supraconsciente mode:'yo'). NO te habla a ti ni te aconseja — ERES tú declarándole algo al
+// mundo, con la materia de tu contexto real. Rota con fade cada ~5 min y avanza al clic. Si no cabe,
+// hace SCROLL (marquesina), como el personal message real — NO obliga a ensanchar la ventana.
+const PM_CACHE = 'msn-personal-cache-v2'   // v2: se rompió al pasar de 'niño interior' (te hablaba) a 'yo' (1ª persona) → tira la caché vieja
 const PM_HOLD_MS = 5 * 60_000
 type PmCache = { queue: string[]; shown: string[] }
 
@@ -146,7 +147,7 @@ function MsnPersonalMessage() {
     try {
       const r = await fetch('/api/supraconsciente', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ count: 8, mode: 'nino', exclude: cacheRef.current.shown.slice(-40) }),
+        body: JSON.stringify({ count: 8, mode: 'yo', exclude: cacheRef.current.shown.slice(-40) }),
       })
       const d = await r.json()
       const msgs: string[] = Array.isArray(d.messages) ? d.messages.map((m: { text?: string }) => m.text).filter((t: unknown): t is string => typeof t === 'string' && t.length > 0) : []
@@ -178,10 +179,31 @@ function MsnPersonalMessage() {
   return (
     <div
       onClick={next}
-      title="tu niño interior — clic para otra"
-      style={{ fontSize: 11, fontStyle: 'italic', color: '#6a6a6a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', opacity: vis ? 1 : 0, transition: 'opacity .25s ease' }}
+      title="tu estado — clic para otro"
+      style={{ cursor: 'pointer', opacity: vis ? 1 : 0, transition: 'opacity .25s ease' }}
     >
-      {text || '‹escuchando a tu niño interior…›'}
+      <StatusMarquee text={text || '‹poniendo tu estado…›'} />
+    </div>
+  )
+}
+
+// Marquesina del mensaje personal: si no cabe, se desliza (ida y vuelta, con pausa en extremos) como el
+// personal message real de MSN — no obliga a ensanchar la ventana. Reusa @keyframes wq-marquee.
+function StatusMarquee({ text }: { text: string }) {
+  const wrap = useRef<HTMLDivElement>(null)
+  const span = useRef<HTMLSpanElement>(null)
+  const [dist, setDist] = useState(0)
+  useEffect(() => {
+    const w = wrap.current, s = span.current
+    if (!w || !s) return
+    setDist(s.scrollWidth - w.clientWidth > 4 ? s.scrollWidth - w.clientWidth : 0)
+  }, [text])
+  return (
+    <div ref={wrap} style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      <span ref={span} style={{
+        display: 'inline-block', fontSize: 11, fontStyle: 'italic', color: '#6a6a6a',
+        ...(dist ? { ['--wq-scroll' as string]: `${dist}px`, animation: `wq-marquee ${Math.max(6, dist / 22)}s ease-in-out infinite alternate` } : {}),
+      }}>{text}</span>
     </div>
   )
 }
@@ -190,7 +212,6 @@ export default function MsnCerebro() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
-  const [dialog, setDialog] = useState<{ mode: 'create' } | { mode: 'edit'; contact: Contact } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; contact: Contact } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)      // menú "Contactos" abierto
   const [catMgr, setCatMgr] = useState(false)          // gestor de categorías (heredado de la sección disuelta)
@@ -224,6 +245,14 @@ export default function MsnCerebro() {
 
   const wm = useXpWM()
   const openChat = (b: ChatBuddy) => wm?.openWindow(`chat:${b.id}`, b.name, <MsnChat buddy={b} />, { w: 404, h: 432, resizable: true, icon: 'cerebro' })
+  // Agregar/editar contacto = ventana NORMAL del WM (draggable, como el resto), no un modal atrapado dentro del Messenger.
+  const openContactWindow = (contact: Contact | null) => {
+    if (!wm) return
+    const id = `contact:${contact?.id ?? 'new'}`
+    wm.openWindow(id, contact ? 'Editar contacto' : 'Agregar un contacto',
+      <ContactWindow contact={contact} onClose={() => wm.closeWindow(id)} onSaved={loadContacts} />,
+      { w: 372, h: 402, resizable: false, icon: 'cerebro' })
+  }
   const toggle = (k: string) => setCollapsed((p) => ({ ...p, [k]: !p[k] }))
 
   const specialKind = (id: string): ChatBuddy['kind'] => (id === 'sys:cerebro' ? 'cerebro' : id === 'sys:lolo' ? 'lolo' : 'diario')
@@ -253,7 +282,7 @@ export default function MsnCerebro() {
         <span>Acciones</span><span>Herramientas</span><span>Ayuda</span>
         {menuOpen && (
           <div style={{ position: 'absolute', top: '100%', left: 44, zIndex: 40, marginTop: 1, minWidth: 178, background: '#fff', border: '1px solid #97948a', boxShadow: '2px 3px 6px rgba(0,0,0,0.28)', padding: 2 }}>
-            <button onClick={() => { setMenuOpen(false); setDialog({ mode: 'create' }) }} style={menuItem}>Agregar un contacto…</button>
+            <button onClick={() => { setMenuOpen(false); openContactWindow(null) }} style={menuItem}>Agregar un contacto…</button>
             <button onClick={() => { setMenuOpen(false); setCatMgr(true) }} style={menuItem}>Gestionar categorías…</button>
           </div>
         )}
@@ -282,7 +311,7 @@ export default function MsnCerebro() {
       {/* Banda de info amarilla (icónica de MSN) */}
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: '#fbf8d8', borderBottom: '1px solid #e6dfa8', fontSize: 11, color: '#4a4632' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, flexShrink: 0, borderRadius: '50%', background: '#3163c8', color: '#fff', fontSize: 10, fontWeight: 700, fontStyle: 'italic' }}>i</span>
-        <span style={{ color: '#1c4a86', textDecoration: 'underline', cursor: 'pointer' }}>Tu segundo cerebro está en línea — pregúntale lo que sea.</span>
+        <span role="button" tabIndex={0} onClick={() => openChat({ id: 'sys:cerebro', name: 'Cerebro', kind: 'cerebro', avatar: SPECIALS[0].avatar })} style={{ color: '#1c4a86', textDecoration: 'underline', cursor: 'pointer' }}>Tu segundo cerebro está en línea — pregúntale lo que sea.</span>
       </div>
 
       {/* Toolbar (decorativo) */}
@@ -294,7 +323,7 @@ export default function MsnCerebro() {
           </span>
           <span style={{ position: 'absolute', right: -1, bottom: -1, fontSize: 9, fontWeight: 900, color: '#2f9a22' }}>+</span>
         </span>
-        <span role="button" tabIndex={0} onClick={() => setDialog({ mode: 'create' })} style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>Agregar un contacto</span>
+        <span role="button" tabIndex={0} onClick={() => openContactWindow(null)} style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>Agregar un contacto</span>
       </div>
 
       {/* Lista de contactos — backdrop del Messenger original al ~20% (velo blanco 0.8 encima, ya que los
@@ -339,15 +368,8 @@ export default function MsnCerebro() {
           x={ctx.x} y={ctx.y} onClose={() => setCtx(null)}
           items={[
             { label: 'Enviar un mensaje', onClick: () => openChat(contactBuddy(ctx.contact)) },
-            { label: 'Editar contacto…', onClick: () => setDialog({ mode: 'edit', contact: ctx.contact }) },
+            { label: 'Editar contacto…', onClick: () => openContactWindow(ctx.contact) },
           ]}
-        />
-      )}
-      {dialog && (
-        <ContactDialog
-          contact={dialog.mode === 'edit' ? dialog.contact : null}
-          onClose={() => setDialog(null)}
-          onSaved={loadContacts}
         />
       )}
       {catMgr && <CategoryManager onClose={() => setCatMgr(false)} onChanged={loadContacts} />}
@@ -391,10 +413,11 @@ function CategoryManager({ onClose, onChanged }: { onClose: () => void; onChange
   )
 }
 
-// Diálogo XP de contacto — crear (POST) o editar (PATCH) + eliminar (DELETE), como diálogo XP centrado
-// sobre la ventana. Misma funcionalidad que el arcade. Categorías de /api/contact-categories.
+// Contacto — crear (POST) o editar (PATCH) + eliminar (DELETE) como CONTENIDO de una ventana normal del
+// WM (draggable, no modal atrapado). El chrome (barra de título, cerrar) lo pone la ventana; aquí van los
+// campos + footer de botones. Misma funcionalidad que el arcade. Categorías de /api/contact-categories.
 interface ContactRow { id: string; name: string; category: string; company: string | null; birthday: string | null; notes: string | null }
-function ContactDialog({ contact, onClose, onSaved }: { contact: ContactRow | null; onClose: () => void; onSaved: () => void }) {
+function ContactWindow({ contact, onClose, onSaved }: { contact: ContactRow | null; onClose: () => void; onSaved: () => void }) {
   const editing = !!contact
   const [name, setName] = useState(contact?.name ?? '')
   const [category, setCategory] = useState(contact?.category ?? '')
@@ -433,14 +456,11 @@ function ContactDialog({ contact, onClose, onSaved }: { contact: ContactRow | nu
     catch (e) { setErr(String(e)); setBusy(false) }
   }
 
+  const okDisabled = busy || !name.trim() || !category
+  const btn = (dis: boolean): React.CSSProperties => ({ padding: '4px 14px', fontSize: 11, fontFamily: 'inherit', cursor: dis ? 'default' : 'pointer' })
   return (
-    <XpDialogModal
-      open title={editing ? 'Editar contacto' : 'Agregar un contacto'} width={384}
-      onCancel={onClose} onOk={save}
-      okLabel={busy ? 'Guardando…' : 'Aceptar'} okDisabled={busy || !name.trim() || !category}
-      onDelete={editing ? remove : undefined} deleteLabel="Eliminar"
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#ece9d8', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
         <div>
           <XpLabel>Nombre</XpLabel>
           <XpField autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del contacto" />
@@ -467,6 +487,13 @@ function ContactDialog({ contact, onClose, onSaved }: { contact: ContactRow | nu
         {cats.length === 0 && <p style={{ fontSize: 10.5, color: '#8a6a1a', margin: 0 }}>No hay categorías aún — créalas en la sección Contactos.</p>}
         {err && <p style={{ fontSize: 11, color: '#a0201a', margin: 0 }}>{err}</p>}
       </div>
-    </XpDialogModal>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderTop: '1px solid #c9c6ba' }}>
+        {editing && <button className="xp-raised" onClick={remove} disabled={busy} style={btn(busy)}>Eliminar</button>}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <button className="xp-raised" onClick={save} disabled={okDisabled} style={btn(okDisabled)}>{busy ? 'Guardando…' : 'Aceptar'}</button>
+          <button className="xp-raised" onClick={onClose} style={btn(false)}>Cancelar</button>
+        </div>
+      </div>
+    </div>
   )
 }
