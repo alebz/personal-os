@@ -73,17 +73,35 @@ function typeDelay(seg: string, first: boolean): number {
   return think + distracted + Math.max(500, type)
 }
 
+// #3 SELECTOR DE FUENTE Y COLOR (la "A" de MSN 7.5: "Cambiar la fuente del mensaje") — aplica a MIS
+// mensajes salientes y a lo que escribo. Persiste en localStorage. Fuentes clásicas de la época.
+const FONT_KEY = 'msn-my-font'
+type MyFont = { family: string; size: number; bold: boolean; italic: boolean; underline: boolean; color: string }
+const DEFAULT_FONT: MyFont = { family: 'Tahoma, sans-serif', size: 11, bold: false, italic: false, underline: false, color: '#000000' }
+const FONTS = [
+  { n: 'Tahoma', v: 'Tahoma, sans-serif' }, { n: 'Arial', v: 'Arial, sans-serif' },
+  { n: 'Verdana', v: 'Verdana, sans-serif' }, { n: 'Trebuchet MS', v: '"Trebuchet MS", sans-serif' },
+  { n: 'Comic Sans MS', v: '"Comic Sans MS", cursive' }, { n: 'Courier New', v: '"Courier New", monospace' },
+  { n: 'Georgia', v: 'Georgia, serif' }, { n: 'Times New Roman', v: '"Times New Roman", serif' },
+]
+
 export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [mood, setMood] = useState('')
   const [showEmo, setShowEmo] = useState(false)
+  const [showFont, setShowFont] = useState(false)
+  const [myFont, setMyFont] = useState<MyFont>(DEFAULT_FONT)
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const aliveRef = useRef(true)   // ventana viva: no setState tras cerrarla durante los delays de tempo
   const bd = bdayLabel(buddy.birthday)
   const insertEmo = (s: string) => { setInput((v) => (v && !v.endsWith(' ') ? v + ' ' : v) + s + ' '); setShowEmo(false) }
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(FONT_KEY) || 'null'); if (r) setMyFont((f) => ({ ...f, ...r })) } catch { /* ignore */ } }, [])
+  const setFont = (patch: Partial<MyFont>) => setMyFont((f) => { const n = { ...f, ...patch }; try { localStorage.setItem(FONT_KEY, JSON.stringify(n)) } catch { /* ignore */ }; return n })
+  const myFontCss = (): React.CSSProperties => ({ fontFamily: myFont.family, fontSize: myFont.size, fontWeight: myFont.bold ? 700 : 400, fontStyle: myFont.italic ? 'italic' : 'normal', textDecoration: myFont.underline ? 'underline' : 'none', color: myFont.color })
+  const fmtBtn = (on: boolean): React.CSSProperties => ({ width: 22, height: 20, border: '1px solid #a9b0be', borderRadius: 2, background: on ? '#dbe8fb' : '#fff', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', color: '#333', lineHeight: 1, padding: 0 })
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }) }, [msgs])
   useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; abortRef.current?.abort() } }, [])
@@ -319,7 +337,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
             ) : (
               <div key={m.id} style={{ marginBottom: 8 }}>
                 <span style={{ fontWeight: 700, color: m.from === 'me' ? '#c0271c' : '#1c4a86' }}>{m.name} dice:</span>
-                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, marginTop: 1 }}>
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, marginTop: 1, ...(m.from === 'me' ? myFontCss() : {}) }}>
                   {m.text ? renderEmoticons(m.text) : (m.streaming && <span style={{ fontStyle: 'italic', color: '#8a867a' }}>escribiendo un mensaje…</span>)}
                 </div>
                 {m.sources && m.sources.length > 0 && (
@@ -358,8 +376,9 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
 
       {/* Barra de formato: fuente + picker de emoticons */}
       <div style={{ flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: '2px 9px', background: '#f4f7fb', borderTop: '1px solid #dbe1ea' }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#333', cursor: 'default' }} title="Fuente">A</span>
-        <button onClick={() => setShowEmo((v) => !v)} title="Emoticons" style={{ border: 0, background: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex' }}>
+        <button onClick={() => { setShowFont((v) => !v); setShowEmo(false) }} title="Cambiar la fuente y el color de tus mensajes"
+          style={{ border: 0, background: showFont ? '#dbe8fb' : 'none', cursor: 'pointer', padding: '0 4px', borderRadius: 2, fontWeight: 700, fontSize: 14, lineHeight: 1, fontFamily: myFont.family, color: myFont.color }}>A</button>
+        <button onClick={() => { setShowEmo((v) => !v); setShowFont(false) }} title="Emoticons" style={{ border: 0, background: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex' }}>
           <img src={emoSrc(EMOTICONS[0])} alt="Emoticons" width={18} height={18} />
         </button>
         {showEmo && (
@@ -372,26 +391,40 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
             ))}
           </div>
         )}
+        {showFont && (
+          <div style={{ position: 'absolute', left: 8, bottom: '100%', marginBottom: 3, zIndex: 20, width: 236, background: '#fff', border: '1px solid #97948a', boxShadow: '2px 3px 6px rgba(0,0,0,0.28)', padding: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <select value={myFont.family} onChange={(e) => setFont({ family: e.target.value })} className="xp-sunken" style={{ padding: '2px 4px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }}>
+              {FONTS.map((f) => <option key={f.v} value={f.v} style={{ fontFamily: f.v }}>{f.n}</option>)}
+            </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <select value={myFont.size} onChange={(e) => setFont({ size: +e.target.value })} className="xp-sunken" style={{ padding: '2px 3px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }}>
+                {[8, 9, 10, 11, 12, 14, 16, 18].map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <button onClick={() => setFont({ bold: !myFont.bold })} title="Negrita" style={fmtBtn(myFont.bold)}><b>N</b></button>
+              <button onClick={() => setFont({ italic: !myFont.italic })} title="Cursiva" style={fmtBtn(myFont.italic)}><i>K</i></button>
+              <button onClick={() => setFont({ underline: !myFont.underline })} title="Subrayado" style={fmtBtn(myFont.underline)}><u>S</u></button>
+              <input type="color" value={myFont.color} onChange={(e) => setFont({ color: e.target.value })} title="Color del texto" style={{ width: 26, height: 20, padding: 0, border: '1px solid #a9b0be', borderRadius: 2, cursor: 'pointer', background: '#fff' }} />
+            </div>
+            <div style={{ borderTop: '1px solid #e6e6e6', paddingTop: 5, ...myFontCss() }}>Así se ven tus mensajes :)</div>
+          </div>
+        )}
       </div>
 
-      {/* Barra de entrada */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid #c9c6ba', background: '#ece9d8', padding: 6 }}>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+      {/* Barra de entrada — grounded a MSN 7.5 (layout_920): la entrada LLENA + botón Enviar de 37px.
+          Antes: textarea rows=2 estirado (se veía enorme) + botón beige sin diseño. */}
+      <div style={{ flexShrink: 0, borderTop: '1px solid #c9c6ba', background: '#ece9d8', padding: 5 }}>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'stretch' }}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             placeholder="Escribe un mensaje…"
-            rows={2}
-            className="xp-sunken"
-            style={{ flex: 1, resize: 'none', padding: '4px 6px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }}
+            rows={1}
+            // --os-font: globals.css fuerza input/textarea a `var(--os-font) !important`; redefinirla aquí
+            // hace que el !important resuelva a MI fuente elegida (si no, el input ignora el font-family).
+            style={{ flex: 1, resize: 'none', height: 37, boxSizing: 'border-box', padding: '4px 7px', border: '1px solid #7f9db9', borderRadius: 3, background: '#fff', outline: 'none', lineHeight: 1.35, ...myFontCss(), ['--os-font' as string]: myFont.family }}
           />
-          <button
-            className="xp-raised" onClick={send} disabled={busy || !input.trim()}
-            style={{ padding: '5px 16px', fontSize: 11, fontFamily: 'inherit', cursor: !busy && input.trim() ? 'pointer' : 'default', alignSelf: 'stretch' }}
-          >
-            {busy ? '…' : 'Enviar'}
-          </button>
+          <button className="msn-send" onClick={send} disabled={busy || !input.trim()}>{busy ? '…' : 'Enviar'}</button>
         </div>
       </div>
     </div>
