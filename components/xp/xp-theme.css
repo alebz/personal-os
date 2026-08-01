@@ -262,7 +262,9 @@
 .wq-pl-b { position: absolute; left: 0; bottom: 0; width: 100%; height: 9px; background: url(/themes/xp/wmp/pl-bottomtile.png) left top repeat-x; }
 /* Relleno = ItemColor real de base.wms (#556382); el brillo lo da Pl-Glass encima. */
 .wq-pl-body { position: absolute; left: 18px; right: 18px; top: 45px; bottom: 9px; overflow: hidden; display: flex; flex-direction: column; background: #556382; }
-.wq-pl-glass { position: absolute; left: 0; top: 0; right: 0; height: 62%; background: url(/themes/xp/wmp/pl-glass.png) center / 100% 100% no-repeat; opacity: .5; pointer-events: none; }
+/* Pl-Glass.png es un sheen SUTIL por diseño (alfa ~20% solo en el borde superior, cae a 0 en ~y44).
+   A opacidad PLENA y anclado arriba a su proporción natural = el brillo que el skin realmente da. */
+.wq-pl-glass { position: absolute; left: 0; top: 0; right: 0; height: 160px; background: url(/themes/xp/wmp/pl-glass.png) top center / 100% 100% no-repeat; opacity: 1; pointer-events: none; }
 .wq-plbtn { position: absolute; padding: 0; border: 0; width: 27px; height: 31px; background: var(--u) center/contain no-repeat; cursor: pointer; }
 .wq-plbtn:hover:not(:disabled) { background-image: var(--h); }
 .wq-plbtn:active:not(:disabled) { background-image: var(--d); }
