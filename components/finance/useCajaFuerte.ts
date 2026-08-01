@@ -33,10 +33,10 @@ export function useCajaFuerte(scope: 'personal' | 'uptown', month: string, after
   const refresh = useCallback(async () => { await load(); afterChange?.() }, [load, afterChange])
 
   const handlers: FundHandlers = {
-    onAportaRetira: async (id, flow, desc, amount) => {
+    onAportaRetira: async (id, flow, desc, amount, metodo) => {
       await post('/api/finance/movements', {
         month, date: todayStr(), description: desc, amount, flow, category: 'fondo',
-        commitment_id: null, envelope_id: id, metodo: null,
+        commitment_id: null, envelope_id: id, metodo,   // método = origen/destino → baja/sube esa wallet
       })
       await refresh()
     },

@@ -31,8 +31,11 @@ export default function MoneyCaja({ month, onChange, scope = 'personal', exclude
 
   const refresh = () => { load(); onChange() }
 
-  async function aportaRetira(id: string, flow: 'in' | 'out', description: string, amount: number) {
-    await post('/api/finance/movements', { month, date: todayStr(), description, amount, flow, category: 'fondo', commitment_id: null, envelope_id: id, metodo: null })
+  // Modelo A: la aportación/retiro ES la transferencia — UN movimiento de fondo que lleva el MÉTODO
+  // (origen/destino). Acredita el fondo (funds route) y debita/acredita la wallet (accountDelta lo
+  // enruta por método). category 'fondo' → NO cuenta como gasto/flujo. Sin origen no bajaba de la wallet.
+  async function aportaRetira(id: string, flow: 'in' | 'out', description: string, amount: number, metodo: 'efectivo' | 'tarjeta') {
+    await post('/api/finance/movements', { month, date: todayStr(), description, amount, flow, category: 'fondo', commitment_id: null, envelope_id: id, metodo })
     refresh()
   }
   async function createFund(label: string, target: number | null) { await post('/api/finance/envelopes', { label, target, scope }); setCreating(false); refresh() }
@@ -77,7 +80,7 @@ export default function MoneyCaja({ month, onChange, scope = 'personal', exclude
       )}
 
       {creating && <CreateFundModal placeholder={createPlaceholder} onClose={() => setCreating(false)} onCreate={createFund} />}
-      {openFund && <LibretaModal fund={openFund} onClose={() => setOpen(null)} onAporta={(d, a) => aportaRetira(openFund.id, 'out', d, a)} onRetira={(d, a) => aportaRetira(openFund.id, 'in', d, a)} onDelete={() => deleteFund(openFund.id)} />}
+      {openFund && <LibretaModal fund={openFund} onClose={() => setOpen(null)} onAporta={(d, a, mt) => aportaRetira(openFund.id, 'out', d, a, mt)} onRetira={(d, a, mt) => aportaRetira(openFund.id, 'in', d, a, mt)} onDelete={() => deleteFund(openFund.id)} />}
     </div>
   )
 }
@@ -156,16 +159,17 @@ function CreateFundModal({ onClose, onCreate, placeholder }: { onClose: () => vo
 const lbl: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#5a6a86' }
 
 function LibretaModal({ fund, onClose, onAporta, onRetira, onDelete }: {
-  fund: Fund; onClose: () => void; onAporta: (d: string, a: number) => void; onRetira: (d: string, a: number) => void; onDelete: () => void
+  fund: Fund; onClose: () => void; onAporta: (d: string, a: number, mt: 'efectivo' | 'tarjeta') => void; onRetira: (d: string, a: number, mt: 'efectivo' | 'tarjeta') => void; onDelete: () => void
 }) {
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
+  const [metodo, setMetodo] = useState<'efectivo' | 'tarjeta'>('efectivo')   // origen/destino de la transferencia (VISIBLE, default Efectivo)
   const [desc2, setDesc2] = useState(true)   // orden fecha desc
   const canDelete = fund.key == null && fund.movements.length === 0
 
-  function doMove(fn: (d: string, a: number) => void) {
+  function doMove(fn: (d: string, a: number, mt: 'efectivo' | 'tarjeta') => void) {
     const a = num(amount); if (a <= 0) return
-    fn(desc.trim() || (fn === onAporta ? 'Aportación' : 'Retiro'), a)
+    fn(desc.trim() || (fn === onAporta ? 'Aportación' : 'Retiro'), a, metodo)
     setDesc(''); setAmount('')
   }
 
@@ -178,6 +182,17 @@ function LibretaModal({ fund, onClose, onAporta, onRetira, onDelete }: {
   return (
     <MoneyModal title={`Libreta · ${fund.label}`} width={420} onClose={onClose}
       footer={canDelete ? <MoneyBtn danger onClick={onDelete}>Eliminar apartado</MoneyBtn> : undefined}>
+      {/* Origen/destino VISIBLE: de dónde sale (aportar) o a dónde entra (retirar) el dinero. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7, fontSize: 10.5, color: '#5a6a86' }}>
+        <span>Cuenta:</span>
+        {(['efectivo', 'tarjeta'] as const).map((w) => (
+          <button key={w} onClick={() => setMetodo(w)}
+            style={{ border: `1px solid ${metodo === w ? MONEY.blue : MONEY.rule}`, background: metodo === w ? '#dbe8fb' : '#fff', color: metodo === w ? MONEY.blue : '#5a6a86', borderRadius: 3, padding: '2px 9px', cursor: 'pointer', fontSize: 10.5, fontFamily: 'inherit', fontWeight: metodo === w ? 700 : 400 }}>
+            {w === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta'}
+          </button>
+        ))}
+        <span style={{ marginLeft: 'auto', fontStyle: 'italic', color: '#8a93a8' }}>Aportar sale de aquí · Retirar entra aquí</span>
+      </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9 }}>
         <label style={{ ...lbl, flex: 1 }}>Concepto<MoneyInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="opcional" /></label>
         <label style={{ ...lbl, width: 92 }}>Monto<MoneyInput type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" /></label>

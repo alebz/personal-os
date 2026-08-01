@@ -169,14 +169,17 @@ export default function MsnMoney() {
   const pagado = activeCosts.reduce((s, c) => s + (panel.checks[c.id] ? c.amount : 0), 0) + gxMovs.reduce((s, m) => s + m.amount, 0)
   const flujo = cobrado - pagado
   const guardado = funds.filter((f) => !f.archived).reduce((s, f) => s + f.saved, 0)
-  const patrimonio = liveEfectivo + liveTarjeta + (balance?.caja_fuerte ?? 0)
+  // Caja Fuerte = suma REAL de fondos (guardado), no el snapshot: así una transferencia conserva el
+  // patrimonio (Efectivo baja, fondo sube, total igual) en vez de restarlo. El snapshot queda solo como
+  // base de reconciliación.
+  const patrimonio = liveEfectivo + liveTarjeta + guardado
 
   const today = new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 
   return (
     <MoneyChrome tabs={TABS} active={active} onTab={setActive} right={<>Alex · {today}</>}
       modal={editMov && <EditMovementModal mov={editMov} onClose={() => setEditMov(null)} onSave={(d, a, mt) => { editMovement(editMov.id, d, a, mt); setEditMov(null) }} />}>
-      {active === 'resumen' && <Resumen month={month} setMonth={setMonth} patrimonio={patrimonio} neto={flujo} efectivo={liveEfectivo} tarjeta={liveTarjeta} caja={balance?.caja_fuerte ?? 0} entrado={cobrado} salido={pagado} funds={funds} />}
+      {active === 'resumen' && <Resumen month={month} setMonth={setMonth} patrimonio={patrimonio} neto={flujo} efectivo={liveEfectivo} tarjeta={liveTarjeta} caja={guardado} entrado={cobrado} salido={pagado} funds={funds} />}
       {active === 'panel' && (
         <PanelEditor
           month={month} setMonth={setMonth}
@@ -191,7 +194,7 @@ export default function MsnMoney() {
         />
       )}
       {active === 'caja' && <MoneyCaja month={month} onChange={() => { loadFunds(); loadMovements(month); loadBalance() }} />}
-      {active === 'historial' && <Historial month={month} setMonth={setMonth} moves={movements} onDelete={deleteMovement} />}
+      {active === 'historial' && <Historial month={month} setMonth={setMonth} moves={movements} funds={funds} onDelete={deleteMovement} />}
     </MoneyChrome>
   )
 }
@@ -525,9 +528,13 @@ function EditMovementModal({ mov, onClose, onSave }: { mov: Movement; onClose: (
 }
 
 // ── Historial ──
-function Historial({ month, setMonth, moves, onDelete }: { month: string; setMonth: (m: string) => void; moves: Movement[]; onDelete: (id: string) => void }) {
-  const entrado = moves.filter((m) => m.flow === 'in').reduce((s, m) => s + m.amount, 0)
-  const salido = moves.filter((m) => m.flow === 'out').reduce((s, m) => s + m.amount, 0)
+function Historial({ month, setMonth, moves, funds, onDelete }: { month: string; setMonth: (m: string) => void; moves: Movement[]; funds: Fund[]; onDelete: (id: string) => void }) {
+  // Las transferencias a/desde fondos (category 'fondo') son movimiento INTERNO — no son flujo, así que
+  // NO cuentan en Entrado/Salido/Neto (solo se listan, marcadas como transferencia).
+  const fundName = (id: string | null) => funds.find((f) => f.id === id)?.label ?? 'fondo'
+  const isTransfer = (m: Movement) => m.category === 'fondo'
+  const entrado = moves.filter((m) => m.flow === 'in' && !isTransfer(m)).reduce((s, m) => s + m.amount, 0)
+  const salido = moves.filter((m) => m.flow === 'out' && !isTransfer(m)).reduce((s, m) => s + m.amount, 0)
   const neto = entrado - salido
   const groups: { date: string; items: Movement[] }[] = []
   for (const m of moves) { const g = groups.find((x) => x.date === m.date); if (g) g.items.push(m); else groups.push({ date: m.date, items: [m] }) }
@@ -547,7 +554,18 @@ function Historial({ month, setMonth, moves, onDelete }: { month: string; setMon
         <div key={g.date} style={{ marginBottom: 9 }}>
           <MoneyBar>{new Date(g.date + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}</MoneyBar>
           <Table>
-            {g.items.map((m) => (
+            {g.items.map((m) => isTransfer(m) ? (
+              // Transferencia interna: neutro (no rojo/verde de flujo). flow 'out' = salió de la wallet
+              // hacia el fondo (→); flow 'in' = regresó del fondo a la wallet (←).
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 9px', borderBottom: '1px solid #eef2f8' }}>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#4a5a76' }}>
+                  Transferencia {m.flow === 'out' ? '→' : '←'} {fundName(m.envelope_id)}
+                  <span style={{ color: '#8a93a8', fontWeight: 400 }}> · {m.metodo === 'efectivo' ? 'efectivo' : m.metodo === 'tarjeta' ? 'tarjeta' : 'sin origen'}</span>
+                </span>
+                <span style={{ color: '#6a7690', fontVariantNumeric: 'tabular-nums' }}>⇄ {fmtMxn(m.amount)}</span>
+                <ConfirmX onConfirm={() => onDelete(m.id)} />
+              </div>
+            ) : (
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 9px', borderBottom: '1px solid #eef2f8' }}>
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.description}<span style={{ color: '#8a93a8', fontWeight: 400 }}> · {m.metodo === 'efectivo' ? 'efectivo' : m.metodo === 'tarjeta' ? 'tarjeta' : m.category}</span></span>
                 <span style={{ color: m.flow === 'in' ? MONEY.up : MONEY.down, fontVariantNumeric: 'tabular-nums' }}>{m.flow === 'in' ? '+' : '−'}{fmtMxn(m.amount)}</span>

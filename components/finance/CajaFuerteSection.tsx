@@ -19,7 +19,7 @@ export interface Fund {
 }
 
 export interface FundHandlers {
-  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number) => void
+  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number, metodo: 'efectivo' | 'tarjeta') => void
   onUpdateTarget: (id: string, target: number | null) => void
   onUpdateLabel:  (id: string, label: string) => void
   onArchive:      (id: string) => void
@@ -132,7 +132,7 @@ function FundCard({
           <p className={`text-heading font-black ${saved < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={saved} /></p>
         </div>
         <div className="mb-4">
-          <FundMovementControl onSubmit={(flow, desc, amount) => onAportaRetira(fund.id, flow, desc, amount)} />
+          <FundMovementControl onSubmit={(flow, desc, amount, metodo) => onAportaRetira(fund.id, flow, desc, amount, metodo)} />
         </div>
         {fund.movements.length > 0
           ? <FundLedger movements={fund.movements} />
