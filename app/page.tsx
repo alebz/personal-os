@@ -45,7 +45,7 @@ export default function HomePage() {
           Logo / Starfield), NO el tambor — antes montaba OSDrum aquí (fuga corregida). El escritorio
           XP nunca se desmonta → al despertar (cualquier actividad, detectada por el contexto) queda
           EXACTAMENTE como estaba. El protector es canvas limpio (sin CRT: eso es del arcade). */}
-      {screensaverActive && (
+      {screensaverActive && xpScreensaver !== 'none' && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
           <XpScreensaver variant={xpScreensaver} />
         </div>

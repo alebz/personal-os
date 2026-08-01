@@ -18,6 +18,7 @@ const TABS = ['Temas', 'Escritorio', 'Protector', 'Apariencia', 'Configuración'
 type Tab = (typeof TABS)[number]
 
 const SAVERS: { value: XpScreensaverKind; label: string }[] = [
+  { value: 'none',      label: '(Ninguno)' },   // desactiva el protector por completo (canon XP)
   { value: 'mystify',   label: 'Mystify' },
   { value: 'logo',      label: 'Logo flotante' },
   { value: 'starfield', label: 'Campo de estrellas' },
@@ -124,13 +125,13 @@ export default function DisplayProperties() {
                   options={SAVERS}
                 />
                 <button
-                  className="xp-raised" onClick={startScreensaver}
-                  style={{ padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }}
+                  className="xp-raised" onClick={startScreensaver} disabled={xpScreensaver === 'none'}
+                  style={{ padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: xpScreensaver === 'none' ? 'default' : 'pointer', opacity: xpScreensaver === 'none' ? 0.5 : 1 }}
                 >
                   Vista previa
                 </button>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: xpScreensaver === 'none' ? 0.5 : 1 }}>
                 <span style={{ fontSize: 11 }}>Esperar</span>
                 <XpSpinner value={screensaver.minutes} width={34} onStep={(dir) => setMinutes(screensaver.minutes + dir)} />
                 <span style={{ fontSize: 11 }}>minutos</span>

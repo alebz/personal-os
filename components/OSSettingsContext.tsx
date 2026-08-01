@@ -54,7 +54,7 @@ interface OSSettingsState {
 
 // Protectores de pantalla XP (canvas 2D). 'mystify' = líneas rebotando con estela; 'logo' = logo del OS
 // flotante; 'starfield' = campo de estrellas. POR TEMA: bajo XP se monta el elegido (no el tambor).
-export type XpScreensaverKind = 'mystify' | 'logo' | 'starfield'
+export type XpScreensaverKind = 'none' | 'mystify' | 'logo' | 'starfield'
 
 interface OSSettingsCtx extends OSSettingsState {
   set:            <K extends keyof OSSettingsState>(key: K, value: OSSettingsState[K]) => void
@@ -154,6 +154,8 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
   const [state, setState]       = useState<OSSettingsState>(DEFAULTS)
   const [settingsOpen, setOpen] = useState(false)
   const [screensaverActive, setScreensaverActive] = useState(false)
+  // "(Ninguno)" bajo XP: protector desactivado por completo → ni el idle ni "Apagar equipo" lo lanzan.
+  const noXpSaverRef = useRef(false); noXpSaverRef.current = state.shell === 'xp' && state.xpScreensaver === 'none'
   const initialized             = useRef(false)
 
   useEffect(() => {
@@ -198,7 +200,7 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
   const closeSettings  = useCallback(() => setOpen(false),    [])
   // Preview: entra al screensaver de inmediato (bypassa el timer/supresión). Solo tiene efecto con
   // el modo habilitado — ahí viven los listeners de actividad que lo despiertan.
-  const startScreensaver = useCallback(() => setScreensaverActive(true), [])
+  const startScreensaver = useCallback(() => { if (noXpSaverRef.current) return; setScreensaverActive(true) }, [])
 
   // Privacidad + atributo de screensaver. El body lleva `modo-discreto` si el usuario lo activó O si
   // el screensaver está activo (censura transitoria); al salir vuelve al estado guardado. `data-
@@ -226,7 +228,7 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
       if (document.querySelector('[aria-modal="true"], [role="dialog"]')) return true
       return false
     }
-    const enter = () => { if (suppressed()) arm(); else setScreensaverActive(true) }
+    const enter = () => { if (noXpSaverRef.current) { arm(); return } if (suppressed()) arm(); else setScreensaverActive(true) }
     const arm   = () => { clearTimeout(timer); timer = setTimeout(enter, IDLE_MS) }
     const onActivity = () => { if (ssActiveRef.current) { setScreensaverActive(false); lastWakeT = performance.now() } arm() }
     const onClickCapture = (e: MouseEvent) => { if (performance.now() - lastWakeT < 500) { e.stopPropagation(); e.preventDefault(); lastWakeT = 0 } }
