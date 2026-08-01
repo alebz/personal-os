@@ -260,24 +260,36 @@
 .wq-pl-l { position: absolute; left: 0; top: 45px; bottom: 9px; width: 18px; background: url(/themes/xp/wmp/pl-lefttile.png) top left repeat-y; }
 .wq-pl-r { position: absolute; right: 0; top: 45px; bottom: 9px; width: 18px; background: url(/themes/xp/wmp/pl-righttile.png) top left repeat-y; }
 .wq-pl-b { position: absolute; left: 0; bottom: 0; width: 100%; height: 9px; background: url(/themes/xp/wmp/pl-bottomtile.png) left top repeat-x; }
-.wq-pl-body { position: absolute; left: 18px; right: 18px; top: 45px; bottom: 9px; overflow: hidden; display: flex; flex-direction: column;
-  background: linear-gradient(180deg, #4a5f88, #37486a); }
+/* Relleno = ItemColor real de base.wms (#556382); el brillo lo da Pl-Glass encima. */
+.wq-pl-body { position: absolute; left: 18px; right: 18px; top: 45px; bottom: 9px; overflow: hidden; display: flex; flex-direction: column; background: #556382; }
 .wq-pl-glass { position: absolute; left: 0; top: 0; right: 0; height: 62%; background: url(/themes/xp/wmp/pl-glass.png) center / 100% 100% no-repeat; opacity: .5; pointer-events: none; }
 .wq-plbtn { position: absolute; padding: 0; border: 0; width: 27px; height: 31px; background: var(--u) center/contain no-repeat; cursor: pointer; }
 .wq-plbtn:hover:not(:disabled) { background-image: var(--h); }
 .wq-plbtn:active:not(:disabled) { background-image: var(--d); }
-.wq-search { position: relative; z-index: 1; display: flex; gap: 5px; padding: 6px; }
-.wq-search input { flex: 1; min-width: 0; border: 1px solid #24304a; border-radius: 3px; padding: 3px 6px; font: inherit; font-size: 11px; background: rgba(12,22,38,.7); color: #dcebfb; outline: none; }
-.wq-search button { border: 1px solid #12283c; border-radius: 3px; background: linear-gradient(#e8eff6,#aeb9c4); color: #16324f; font: inherit; font-size: 11px; padding: 2px 10px; cursor: pointer; }
-.wq-list { position: relative; z-index: 1; flex: 1; min-height: 0; overflow: auto; }
-.wq-grp { font-size: 9.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: #7fa6d0; padding: 6px 9px 2px; }
+.wq-plbtn:disabled { background-image: var(--x); cursor: default; }
+/* Buscador — adaptación en familia METÁLICA/acero (QuickSilver no traía búsqueda) */
+.wq-search { position: relative; z-index: 1; display: flex; gap: 5px; padding: 6px 7px; }
+.wq-search input { flex: 1; min-width: 0; border: 1px solid #2b3a56; border-top-color: #1a2740; border-radius: 3px; padding: 3px 7px; font: inherit; font-size: 11px;
+  background: linear-gradient(180deg, #34435f, #46577a); color: #eaf2ff; outline: none; box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }
+.wq-search input::placeholder { color: #a9bcd8; }
+.wq-search button { border: 1px solid #2a3c5a; border-radius: 3px; background: linear-gradient(180deg, #e9eff6, #b6c3d6 55%, #93a2ba); color: #1a3355; font: inherit; font-size: 11px; font-weight: 700; padding: 2px 10px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
+.wq-search button:active { background: linear-gradient(180deg, #93a2ba, #cdd8e6); }
+.wq-list { position: relative; z-index: 1; flex: 1; min-height: 0; overflow-y: auto; }
+.wq-list::-webkit-scrollbar { width: 12px; }
+.wq-list::-webkit-scrollbar-track { background: rgba(20,32,52,.5); }
+.wq-list::-webkit-scrollbar-thumb { background: linear-gradient(90deg, #6b7d9e, #46587c); border: 1px solid #2a3a56; border-radius: 6px; }
+.wq-grp { font-size: 9.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #cdddf2; padding: 6px 9px 3px; text-shadow: 0 1px 1px rgba(0,0,0,.45); }
 .wq-row { display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,.05); }
-.wq-row--on { background: rgba(90,150,220,.22); }
-.wq-row-b { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 4px 9px; border: 0; background: none; color: #d7e6f7; font: inherit; font-size: 11.5px; text-align: left; cursor: pointer; }
+.wq-row--on { background: rgba(120,175,240,.28); }
+.wq-row--na { opacity: .5; }
+/* Fuente REAL de base.wms para esta ventana: blanca, bold, Tahoma/Verdana. */
+.wq-row-b { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 4px 9px; border: 0; background: none;
+  color: #ffffff; font-family: 'XP Tahoma', Tahoma, Verdana, sans-serif; font-weight: 700; font-size: 11.5px; text-align: left; cursor: pointer;
+  text-shadow: 0 1px 1px rgba(0,0,0,.45); }
 .wq-row-b .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wq-row-b .mt { font-size: 9.5px; color: #7f9ec2; }
+.wq-row-b .mt { font-size: 9.5px; font-weight: 400; color: #c3d3ea; }
 .wq-fav { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 8px; }
-.wq-empty { padding: 14px; font-size: 11.5px; color: #8fabce; font-style: italic; line-height: 1.5; }
+.wq-empty { padding: 14px; font-size: 11.5px; color: #dbe6f5; font-style: italic; line-height: 1.5; }
 
 /* ── Reproductor de Windows Media (skin WMP 9, ventana BARE con chrome propio) ────────────────── */
 .wmp {

@@ -20,26 +20,54 @@ const plbtn = (name: string): React.CSSProperties => ({
   ['--u' as string]: `url(${A}${name}.png)`, ['--h' as string]: `url(${A}${name}-ho.png)`, ['--d' as string]: `url(${A}${name}-dn.png)`,
 })
 
-interface Station { uuid: string; name: string; url: string; codec: string; bitrate: number; country?: string; tags?: string; genre?: string }
+interface Station { uuid: string; name: string; url: string; codec?: string; bitrate?: number; country?: string; tags?: string; genre?: string }
 
+// Catálogo COMPLETO de SomaFM (42 canales de música, sin ads, en inglés, fundada 2000 — period-correct),
+// ORDEN ALFABÉTICO. Stream MP3 128 uniforme (evita el HE-AAC/aacp que Chrome/FF no decodifican). Los que
+// no resuelvan su 128-mp3 se marcan "no disponible" en runtime (ver estado `unavailable`).
 const CURATED: Station[] = [
-  { uuid: 'cur-secretagent', name: 'SomaFM · Secret Agent', url: 'https://ice6.somafm.com/secretagent-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
-  { uuid: 'cur-smoothjazz', name: 'SmoothJazz.com', url: 'https://smoothjazz.cdnstream1.com/2585_128.mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
-  { uuid: 'cur-sonicuniverse', name: 'SomaFM · Sonic Universe', url: 'https://ice6.somafm.com/sonicuniverse-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
-  { uuid: 'cur-groovesalad', name: 'SomaFM · Groove Salad', url: 'https://ice6.somafm.com/groovesalad-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
-  { uuid: 'cur-0nsmoothjazz', name: '0N · Smooth Jazz', url: 'https://0n-smoothjazz.radionetz.de/0n-smoothjazz.aac', codec: 'AAC', bitrate: 128, genre: 'Jazz / Lounge' },
-  { uuid: 'cur-7soul', name: 'SomaFM · Seven Inch Soul', url: 'https://ice6.somafm.com/7soul-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
-  { uuid: 'cur-fluid', name: 'SomaFM · Fluid', url: 'https://ice6.somafm.com/fluid-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
-  { uuid: 'cur-funky', name: 'Funky Radio · Only Funk', url: 'https://funkyradio.streamingmedia.it/play.mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
-  { uuid: 'cur-discofunk', name: 'Disco Funk & Modern Soul Boogie', url: 'https://discofunk.streamingmedia.it/usa', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
-  { uuid: 'cur-0ndisco', name: '0N · Disco', url: 'https://0n-disco.radionetz.de/0n-disco.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
-  { uuid: 'cur-0n70s', name: '0N · 70s', url: 'https://0n-70s.radionetz.de/0n-70s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
-  { uuid: 'cur-0n80s', name: '0N · 80s', url: 'https://0n-80s.radionetz.de/0n-80s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
-  { uuid: 'cur-u80s', name: 'SomaFM · Underground 80s', url: 'https://ice6.somafm.com/u80s-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
-  { uuid: 'cur-lebowski', name: 'Classic Hits · 70s 80s Disco Funk', url: 'https://radiopanther.radiolebowski.com/play', codec: 'AAC', bitrate: 128, genre: 'Disco / 70s / 80s' },
-  { uuid: 'cur-80sexitos', name: '80 Éxitos (en español)', url: 'https://80sexitos.stream.laut.fm/80sexitos', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
-  { uuid: 'cur-classique', name: 'Radio Classique', url: 'https://radioclassique.ice.infomaniak.ch/radioclassique-high.mp3', codec: 'MP3', bitrate: 128, genre: 'Clásica' },
-  { uuid: 'cur-francemusique', name: 'France Musique', url: 'https://icecast.radiofrance.fr/francemusique-hifi.aac', codec: 'AAC', bitrate: 128, genre: 'Clásica' },
+  { uuid: 'soma-beatblender', name: 'Beat Blender', url: 'https://ice6.somafm.com/beatblender-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-brfm', name: 'Black Rock FM', url: 'https://ice6.somafm.com/brfm-128-mp3', genre: 'eclectic' },
+  { uuid: 'soma-bootliquor', name: 'Boot Liquor', url: 'https://ice6.somafm.com/bootliquor-128-mp3', genre: 'americana' },
+  { uuid: 'soma-bossa', name: 'Bossa Beyond', url: 'https://ice6.somafm.com/bossa-128-mp3', genre: 'bossanova' },
+  { uuid: 'soma-chillits', name: 'Chillits Radio', url: 'https://ice6.somafm.com/chillits-128-mp3', genre: 'chill' },
+  { uuid: 'soma-cliqhop', name: 'cliqhop idm', url: 'https://ice6.somafm.com/cliqhop-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-covers', name: 'Covers', url: 'https://ice6.somafm.com/covers-128-mp3', genre: 'eclectic' },
+  { uuid: 'soma-deepspaceone', name: 'Deep Space One', url: 'https://ice6.somafm.com/deepspaceone-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-defcon', name: 'DEF CON Radio', url: 'https://ice6.somafm.com/defcon-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-digitalis', name: 'Digitalis', url: 'https://ice6.somafm.com/digitalis-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-doomed', name: 'Doomed', url: 'https://ice6.somafm.com/doomed-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-dronezone', name: 'Drone Zone', url: 'https://ice6.somafm.com/dronezone-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-dz2', name: 'Drone Zone 2', url: 'https://ice6.somafm.com/dz2-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-dubstep', name: 'Dub Step Beyond', url: 'https://ice6.somafm.com/dubstep-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-fluid', name: 'Fluid', url: 'https://ice6.somafm.com/fluid-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-folkfwd', name: 'Folk Forward', url: 'https://ice6.somafm.com/folkfwd-128-mp3', genre: 'folk' },
+  { uuid: 'soma-groovesalad', name: 'Groove Salad', url: 'https://ice6.somafm.com/groovesalad-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-groovesalad2', name: 'Groove Salad 2', url: 'https://ice6.somafm.com/groovesalad2-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-gsclassic', name: 'Groove Salad Classic', url: 'https://ice6.somafm.com/gsclassic-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-reggae', name: 'Heavyweight Reggae', url: 'https://ice6.somafm.com/reggae-128-mp3', genre: 'reggae' },
+  { uuid: 'soma-illstreet', name: 'Illinois Street Lounge', url: 'https://ice6.somafm.com/illstreet-128-mp3', genre: 'lounge' },
+  { uuid: 'soma-indiepop', name: 'Indie Pop Rocks!', url: 'https://ice6.somafm.com/indiepop-128-mp3', genre: 'alternative' },
+  { uuid: 'soma-seventies', name: 'Left Coast 70s', url: 'https://ice6.somafm.com/seventies-128-mp3', genre: '70s' },
+  { uuid: 'soma-lush', name: 'Lush', url: 'https://ice6.somafm.com/lush-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-metal', name: 'Metal Detector', url: 'https://ice6.somafm.com/metal-128-mp3', genre: 'metal' },
+  { uuid: 'soma-missioncontrol', name: 'Mission Control', url: 'https://ice6.somafm.com/missioncontrol-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-n5md', name: 'n5MD Radio', url: 'https://ice6.somafm.com/n5md-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-poptron', name: 'PopTron', url: 'https://ice6.somafm.com/poptron-128-mp3', genre: 'alternative' },
+  { uuid: 'soma-secretagent', name: 'Secret Agent', url: 'https://ice6.somafm.com/secretagent-128-mp3', genre: 'lounge' },
+  { uuid: 'soma-7soul', name: 'Seven Inch Soul', url: 'https://ice6.somafm.com/7soul-128-mp3', genre: 'oldies' },
+  { uuid: 'soma-sf1033', name: 'SF 10-33', url: 'https://ice6.somafm.com/sf1033-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-sonicuniverse', name: 'Sonic Universe', url: 'https://ice6.somafm.com/sonicuniverse-128-mp3', genre: 'jazz' },
+  { uuid: 'soma-spacestation', name: 'Space Station Soma', url: 'https://ice6.somafm.com/spacestation-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-suburbsofgoa', name: 'Suburbs of Goa', url: 'https://ice6.somafm.com/suburbsofgoa-128-mp3', genre: 'world' },
+  { uuid: 'soma-synphaera', name: 'Synphaera Radio', url: 'https://ice6.somafm.com/synphaera-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-darkzone', name: 'The Dark Zone', url: 'https://ice6.somafm.com/darkzone-128-mp3', genre: 'ambient' },
+  { uuid: 'soma-insound', name: 'The In-Sound', url: 'https://ice6.somafm.com/insound-128-mp3', genre: 'pop' },
+  { uuid: 'soma-thetrip', name: 'The Trip', url: 'https://ice6.somafm.com/thetrip-128-mp3', genre: 'electronic' },
+  { uuid: 'soma-thistle', name: 'ThistleRadio', url: 'https://ice6.somafm.com/thistle-128-mp3', genre: 'celtic' },
+  { uuid: 'soma-tikitime', name: 'Tiki Time', url: 'https://ice6.somafm.com/tikitime-128-mp3', genre: 'tiki' },
+  { uuid: 'soma-u80s', name: 'Underground 80s', url: 'https://ice6.somafm.com/u80s-128-mp3', genre: 'alternative' },
+  { uuid: 'soma-vaporwaves', name: 'Vaporwaves', url: 'https://ice6.somafm.com/vaporwaves-128-mp3', genre: 'electronic' },
 ]
 
 const FAV_KEY = 'xp-radio-favs'
@@ -57,9 +85,12 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   const [results, setResults] = useState<Station[]>([])
   const [searching, setSearching] = useState(false)
   const [queue, setQueue] = useState<Station[]>(CURATED)
+  const [unavailable, setUnavailable] = useState<Set<string>>(new Set())   // streams que fallaron en runtime
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const curUrl = useRef<string>('')   // url en curso, para atribuir el fallo a la estación correcta
   const clearLoadTimer = () => { if (loadTimer.current) { clearTimeout(loadTimer.current); loadTimer.current = null } }
+  const markUnavailable = () => { const u = curUrl.current; if (u) setUnavailable((s) => new Set(s).add(u)) }
 
   useEffect(() => { try { const r = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); if (Array.isArray(r)) setFavs(r) } catch { /* */ } }, [])
   const saveFavs = (l: Station[]) => { setFavs(l); try { localStorage.setItem(FAV_KEY, JSON.stringify(l)) } catch { /* */ } }
@@ -68,10 +99,10 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
 
   useEffect(() => {
     const a = audioRef.current; if (!a) return
-    const onPlaying = () => { clearLoadTimer(); setStatus('live'); setPlaying(true) }
+    const onPlaying = () => { clearLoadTimer(); setStatus('live'); setPlaying(true); const u = curUrl.current; setUnavailable((s) => { if (!s.has(u)) return s; const n = new Set(s); n.delete(u); return n }) }
     const onWaiting = () => setStatus((s) => (s === 'live' ? 'live' : 'loading'))
     const onPause = () => setPlaying(false)
-    const onErr = () => { clearLoadTimer(); setStatus('error'); setPlaying(false) }
+    const onErr = () => { clearLoadTimer(); setStatus('error'); setPlaying(false); markUnavailable() }
     a.addEventListener('playing', onPlaying); a.addEventListener('waiting', onWaiting); a.addEventListener('pause', onPause); a.addEventListener('error', onErr); a.addEventListener('stalled', onWaiting)
     return () => { clearLoadTimer(); a.removeEventListener('playing', onPlaying); a.removeEventListener('waiting', onWaiting); a.removeEventListener('pause', onPause); a.removeEventListener('error', onErr); a.removeEventListener('stalled', onWaiting) }
   }, [])
@@ -80,9 +111,10 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   function play(s: Station, q?: Station[]) {
     const a = audioRef.current; if (!a) return
     if (q) setQueue(q)
+    curUrl.current = s.url
     setCurrent(s); setStatus('loading'); a.src = s.url; a.volume = vol
-    a.play().then(() => setPlaying(true)).catch(() => { clearLoadTimer(); setStatus('error') })
-    clearLoadTimer(); loadTimer.current = setTimeout(() => setStatus((c) => (c === 'loading' ? 'error' : c)), 13_000)
+    a.play().then(() => setPlaying(true)).catch(() => { clearLoadTimer(); setStatus('error'); markUnavailable() })
+    clearLoadTimer(); loadTimer.current = setTimeout(() => setStatus((c) => { if (c === 'loading') { markUnavailable(); return 'error' } return c }), 13_000)
   }
   function togglePlay() {
     const a = audioRef.current; if (!a || !current) { if (queue[0]) play(queue[0], queue); return }
@@ -98,8 +130,8 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   // volumen: clic/arrastre sobre el riel real (92px). stopPropagation → no arrastra la ventana.
   function volFromEvent(e: React.PointerEvent) { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setVol(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))) }
 
-  const statusText = status === 'live' ? '● EN VIVO' : status === 'loading' ? 'Cargando…' : status === 'error' ? '⚠ Sin señal' : 'Detenido'
-  const listShown = tab === 'favs' ? favs : (results.length ? results : CURATED)
+  const statusText = current && unavailable.has(current.url) ? '⚠ No disponible'
+    : status === 'live' ? '● EN VIVO' : status === 'loading' ? 'Cargando…' : status === 'error' ? '⚠ Sin señal' : 'Detenido'
 
   return (
     <div style={{ position: 'relative', width: 500, height: 194 }}>
@@ -114,7 +146,7 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
         <div style={{ position: 'absolute', left: 154, top: 64, width: 262, height: 49, display: 'flex', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', gap: 6 }}>
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#0f2c49', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 0 rgba(255,255,255,.5)' }}>{current ? current.name : 'Reproductor de Windows Media'}</div>
-            <div style={{ fontSize: 9.5, color: status === 'error' ? '#a11' : status === 'live' ? '#1a7a34' : '#3a5a7a', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{current ? `${statusText} · ${current.codec}${current.bitrate ? ' ' + current.bitrate + 'k' : ''}` : 'elige una estación abajo'}</div>
+            <div style={{ fontSize: 9.5, color: status === 'error' ? '#a11' : status === 'live' ? '#1a7a34' : '#3a5a7a', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{current ? (unavailable.has(current.url) ? statusText : `${statusText} · ${current.codec ?? 'MP3'}${current.bitrate ? ' ' + current.bitrate + 'k' : ''}`) : 'elige una estación abajo'}</div>
           </div>
           <Viz active={playing && status === 'live'} />
         </div>
@@ -178,16 +210,21 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
               <button onClick={() => setTab((t) => (t === 'favs' ? 'curated' : 'favs'))} title="Favoritos" style={{ fontSize: 13, color: tab === 'favs' ? '#ffcf3f' : '#16324f' }}>{tab === 'favs' ? '★' : '☆'}</button>
             </div>
             <div className="wq-list">
-              {tab === 'favs' && favs.length === 0 && <div className="wq-empty">Sin favoritos todavía. Marca estaciones con ☆.</div>}
-              {tab === 'curated' && results.length > 0 && <div className="wq-grp">Resultados de “{query}”</div>}
-              {tab === 'curated' && results.length === 0
-                ? Array.from(new Set(CURATED.map((s) => s.genre))).map((g) => (
-                    <div key={g}>
-                      <div className="wq-grp">{g}</div>
-                      {CURATED.filter((s) => s.genre === g).map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, CURATED)} onFav={() => toggleFav(s)} />)}
-                    </div>
-                  ))
-                : listShown.map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, listShown)} onFav={() => toggleFav(s)} />)}
+              {tab === 'favs' && (favs.length === 0
+                ? <div className="wq-empty">Sin favoritos todavía. Marca estaciones con ☆.</div>
+                : favs.map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav unavail={unavailable.has(s.url)} onPlay={() => play(s, favs)} onFav={() => toggleFav(s)} />))}
+              {tab === 'curated' && results.length > 0 && <>
+                <div className="wq-grp">Resultados de “{query}”</div>
+                {results.map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} unavail={unavailable.has(s.url)} onPlay={() => play(s, results)} onFav={() => toggleFav(s)} />)}
+              </>}
+              {tab === 'curated' && results.length === 0 && <>
+                {favs.length > 0 && <>
+                  <div className="wq-grp">★ Favoritos</div>
+                  {favs.map((s) => <Row key={'f-' + s.uuid} s={s} on={current?.url === s.url} fav unavail={unavailable.has(s.url)} onPlay={() => play(s, favs)} onFav={() => toggleFav(s)} />)}
+                </>}
+                <div className="wq-grp">SomaFM · {CURATED.length} canales</div>
+                {CURATED.map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} unavail={unavailable.has(s.url)} onPlay={() => play(s, CURATED)} onFav={() => toggleFav(s)} />)}
+              </>}
             </div>
           </div>
         </div>
@@ -196,10 +233,14 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   )
 }
 
-function Row({ s, on, fav, onPlay, onFav }: { s: Station; on: boolean; fav: boolean; onPlay: () => void; onFav: () => void }) {
+function Row({ s, on, fav, unavail, onPlay, onFav }: { s: Station; on: boolean; fav: boolean; unavail?: boolean; onPlay: () => void; onFav: () => void }) {
   return (
-    <div className={`wq-row ${on ? 'wq-row--on' : ''}`}>
-      <button className="wq-row-b" onClick={onPlay}><span style={{ width: 12, color: '#7fd0ff' }}>{on ? '▶' : '♪'}</span><span className="nm">{s.name}</span><span className="mt">{s.codec}{s.country ? ' · ' + s.country : ''}</span></button>
+    <div className={`wq-row ${on ? 'wq-row--on' : ''} ${unavail ? 'wq-row--na' : ''}`}>
+      <button className="wq-row-b" onClick={onPlay} title={unavail ? 'No disponible — clic para reintentar' : undefined}>
+        <span style={{ width: 12, color: unavail ? '#d99' : '#7fd0ff' }}>{on ? '▶' : unavail ? '×' : '♪'}</span>
+        <span className="nm">{s.name}</span>
+        <span className="mt">{unavail ? 'no disponible' : (s.genre || s.codec || '')}{s.country ? ' · ' + s.country : ''}</span>
+      </button>
       <button className="wq-fav" onClick={onFav} title={fav ? 'Quitar' : 'Favorito'} style={{ color: fav ? '#ffcf3f' : '#5f7fa6' }}>{fav ? '★' : '☆'}</button>
     </div>
   )
