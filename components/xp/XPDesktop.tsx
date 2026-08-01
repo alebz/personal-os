@@ -207,7 +207,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const openSudoku = () => openWindow('sudoku', 'Sudoku', <Sudoku />, { w: 344, h: 470, resizable: true, icon: 'sudoku' })
   // Reproductor de Windows Media (radio) — ventana BARE: la app dibuja su chrome WMP; sus botones
   // min/cerrar se cablean aquí al WM. Tamaño fijo (no resizable).
-  const openReproductor = () => openWindow('radio', 'Reproductor de Windows Media', <RadioPlayer onClose={() => closeWindow('radio')} onMinimize={() => minimizeWindow('radio')} />, { w: 500, h: 470, bare: true, resizeY: true, icon: 'wmp' })
+  const openReproductor = () => openWindow('radio', 'Reproductor de Windows Media', <RadioPlayer onClose={() => closeWindow('radio')} onMinimize={() => minimizeWindow('radio')} />, { w: 500, h: 194, bare: true, icon: 'wmp' })
   // Carpetas anidadas de "Todos los programas" (cascada canónica de XP).
   const FOLDERS = [
     { id: 'juegos', label: 'Juegos', icon: 'juegos', items: [
