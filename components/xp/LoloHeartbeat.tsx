@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { pushNotification } from '@/lib/notifications'
-import { loloTimeContext, loloLifeContext } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage } from '@/lib/lolo'
 
 // LOLO PROACTIVO — Lolo te escribe SOLO, pero con TACTO:
 //  · PRESENCIA: solo cuando estás EN LÍNEA (pestaña visible + interacción reciente). Si estás fuera,
@@ -75,9 +75,11 @@ export default function LoloHeartbeat() {
           localStorage.setItem(KEY_UNANS, String(Math.min(readNum(KEY_UNANS) + 1, 4)))   // sube el back-off; que responda lo resetea
         } catch { /* ignore */ }
         sessionPinged.current = true
+        // El mensaje es UNO: (a) queda en el hilo (append atómico, no reescribe lo que leyó → no clobbea
+        // al chat), (b) aparece en la ventana abierta si la hay (bus), (c) el toast es solo el aviso.
+        appendLoloMemory([{ role: 'assistant', content: reply }])
+        emitLoloMessage({ role: 'assistant', content: reply })
         pushNotification({ id: `lolo:${Date.now()}`, icon: '/Lolo/Idle/lolo_idle_2.png', title: 'Lolo', body: reply, target: 'lolo' })
-        const buffer = Array.isArray(mem?.buffer) ? mem.buffer : []
-        fetch('/api/companion/memory', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer: [...buffer, { role: 'assistant', content: reply }] }) }).catch(() => {})
       } finally { busy.current = false }
     }
 

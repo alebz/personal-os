@@ -195,3 +195,32 @@ const REPLY_KEY = 'lolo-last-reply', UNANS_KEY = 'lolo-unanswered'
 export function markLoloAnswered() {
   try { localStorage.setItem(REPLY_KEY, String(Date.now())); localStorage.setItem(UNANS_KEY, '0') } catch { /* ignore */ }
 }
+
+// ── 4) Memoria compartida: APPEND atómico + bus de eventos ──────────────────────────────────────
+// lolo_memory es la ÚNICA fuente de verdad del hilo. TODOS los escritores (chat XP, heartbeat proactivo,
+// Lolo del arcade) AGREGAN su delta — nunca reescriben el buffer completo — así no se pisan (el clobber
+// que hacía dos conversaciones paralelas). El bus avisa a una ventana de chat ABIERTA para pintar el
+// mensaje proactivo en el hilo en vivo; la notificación (toast) es solo el AVISO de que llegó.
+export type LoloMsg = { role: 'user' | 'assistant'; content: string }
+interface LoloMem { buffer: LoloMsg[]; summary: string; facts: string }
+
+export async function appendLoloMemory(delta: LoloMsg[]): Promise<LoloMem | null> {
+  if (!delta.length) return null
+  try {
+    const r = await fetch('/api/companion/memory', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ append: delta }),
+    })
+    return (await r.json()) as LoloMem
+  } catch { return null }   // red caída → el próximo mensaje reintenta (server es la verdad)
+}
+
+const LOLO_MSG_EVENT = 'lolo:message'
+export function emitLoloMessage(msg: LoloMsg): void {
+  try { window.dispatchEvent(new CustomEvent(LOLO_MSG_EVENT, { detail: msg })) } catch { /* ignore */ }
+}
+export function onLoloMessage(cb: (msg: LoloMsg) => void): () => void {
+  const h = (e: Event) => { const d = (e as CustomEvent).detail; if (d && typeof d.content === 'string') cb(d as LoloMsg) }
+  window.addEventListener(LOLO_MSG_EVENT, h)
+  return () => window.removeEventListener(LOLO_MSG_EVENT, h)
+}

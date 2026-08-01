@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { appendLoloMemory } from '@/lib/lolo'
 
 // Single-canvas glitter: 400 particles, one rAF loop, pauses when hidden/off-screen
 function GlitterCanvas({ colors, variant }: { colors: string[]; variant: string }) {
@@ -625,15 +626,16 @@ Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}${
 
   // ── Chat input ────────────────────────────────────────────────────────────────
 
-  const persistChat = useCallback(()=>{
+  const persistChat = useCallback((delta:Array<{role:'user'|'assistant';content:string}>)=>{
     try { localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) } catch {}
-    fetch('/api/companion/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buffer:chatHistoryRef.current})})
-      .then(r=>r.json()).then((m:{buffer?:unknown;summary?:string;facts?:string})=>{
-        if(Array.isArray(m.buffer)) chatHistoryRef.current=m.buffer as typeof chatHistoryRef.current
-        if(typeof m.summary==='string') memSummaryRef.current=m.summary
-        if(typeof m.facts==='string') memFactsRef.current=m.facts
-        try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) }catch{}
-      }).catch(()=>{})
+    // Append-only compartido (no reescribe el buffer → no clobbea al chat XP ni al heartbeat proactivo).
+    // El buffer local ya lo mantienen los updates optimistas; de la respuesta solo sincronizamos resumen/hechos.
+    appendLoloMemory(delta).then((m)=>{
+      if(!m) return
+      if(typeof m.summary==='string') memSummaryRef.current=m.summary
+      if(typeof m.facts==='string') memFactsRef.current=m.facts
+      try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) }catch{}
+    })
   },[])
 
   const chatAsk = useCallback((msg:string)=>{
@@ -644,9 +646,10 @@ Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}${
     setBusy(true); setPose(randItem(ALL_LOLO_IMAGES)); setBubble({visible:true,text:'',typing:false})
     setMode('chat')
     const spont = spontMsgRef.current; spontMsgRef.current = ''
-    const base = spont ? [...chatHistoryRef.current, {role:'assistant' as const, content:spont}] : chatHistoryRef.current
-    chatHistoryRef.current = [...base, {role:'user' as const, content:msg}].slice(-20)
-    persistChat()
+    // delta = (el espontáneo pendiente, si lo hubo) + tu mensaje → se AGREGA al hilo compartido
+    const delta = spont ? [{role:'assistant' as const, content:spont}, {role:'user' as const, content:msg}] : [{role:'user' as const, content:msg}]
+    chatHistoryRef.current = [...chatHistoryRef.current, ...delta].slice(-20)
+    persistChat(delta)
     setChatMessages(prev=>[...prev,{role:'user',content:msg}])
     fetch('/api/companion/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -657,7 +660,7 @@ Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}${
         if(id!==reqId.current) return; setNetOk(true)
         const t=(d.text||'').slice(0,1000)
         if(t){
-          chatHistoryRef.current=[...chatHistoryRef.current,{role:'assistant' as const,content:t}]; persistChat(); setChatMessages(prev=>[...prev,{role:'assistant',content:t}]); say(t,{settlePose:randItem(ALL_LOLO_IMAGES),hold:12000})
+          chatHistoryRef.current=[...chatHistoryRef.current,{role:'assistant' as const,content:t}]; persistChat([{role:'assistant' as const,content:t}]); setChatMessages(prev=>[...prev,{role:'assistant',content:t}]); say(t,{settlePose:randItem(ALL_LOLO_IMAGES),hold:12000})
           // #5: salir de chat solo tras leer con calma (tiempo de tecleo + 35s generosos)
           if(chatExitTimer.current) clearTimeout(chatExitTimer.current)
           chatExitTimer.current = setTimeout(()=>{

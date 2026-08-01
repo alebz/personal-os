@@ -5,7 +5,7 @@ import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { MOODS } from '@/components/sections/DiarioContent'
 import { renderEmoticons, EMOTICONS, emoSrc } from '@/lib/msnEmoticons'
 import { CerebroButterfly } from './CerebroButterfly'
-import { loloTimeContext, loloLifeContext, markLoloTalk, markLoloAnswered } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, markLoloTalk, markLoloAnswered, appendLoloMemory, onLoloMessage } from '@/lib/lolo'
 
 // Ventana de conversación MSN (canon MSN 6/7: cada chat es su propia ventana del WM). Cablea los 4
 // tipos de buddy (regla "no resta funcionalidad" — cada función de Cerebro tiene su puerta aquí):
@@ -87,6 +87,16 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }) }, [msgs])
   useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; abortRef.current?.abort() } }, [])
+
+  // Sincronía viva: si Lolo manda un proactivo (heartbeat) con ESTA ventana abierta, aparece en el hilo
+  // en vivo (ya quedó en memoria vía append; el toast es solo el aviso). Sin recargar → sin duplicar.
+  useEffect(() => {
+    if (buddy.kind !== 'lolo') return
+    return onLoloMessage((m) => {
+      if (m.role !== 'assistant' || !aliveRef.current) return
+      setMsgs((cur) => [...cur, { id: nextId(), from: 'them', name: 'Lolo', text: m.content }])
+    })
+  }, [buddy.kind])
 
   // Carga de historial al abrir la ventana (por tipo). El dato ya está persistido en su tabla:
   //  · persona → notas con tag contacto:<id> (/api/notes)
@@ -192,9 +202,9 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
       const reply = (d.text as string) || '…'
       await revealLolo(reply, typingId)   // llega con tempo humano, en 1–3 mensajes escalonados
       markLoloTalk()   // marca la última conversación real (alimenta "no se escriben desde hace…")
-      // Persistir el buffer COMPLETO en lolo_memory (igual que el arcade) → memoria compartida arcade↔MSN.
-      const buffer = [...prior, { role: 'user', content: t }, { role: 'assistant', content: reply }]
-      fetch('/api/companion/memory', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer }) }).catch(() => {})
+      // Append-only: agrega SOLO este intercambio al hilo compartido (no reescribe → no clobbea al
+      // heartbeat proactivo ni al arcade). La memoria es la única fuente de verdad.
+      appendLoloMemory([{ role: 'user', content: t }, { role: 'assistant', content: reply }])
     } catch (e) {
       if (aliveRef.current) patchMsg(typingId, (m) => ({ ...m, streaming: false, text: `⚠ ${String(e)}` }))
     } finally { setBusy(false) }
@@ -220,7 +230,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   }
 
   // Lolo ARRANCA la conversación al abrir la ventana (regla del user). Throttle 10 min para no saludar
-  // cada vez que reabres. Efímero: no se persiste al buffer (así no ensucia la memoria compartida).
+  // cada vez que reabres. Se PERSISTE al hilo (append) — el saludo es parte de la conversación, no un canal aparte.
   async function loloOpener(history: { role: string; content: string }[]) {
     try {
       const last = +(localStorage.getItem('lolo-last-opener') || 0)
@@ -245,6 +255,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
       const reply = (d.text as string)?.trim() || ''
       if (!reply) { if (aliveRef.current) setMsgs((m) => m.filter((x) => x.id !== typingId)); return }
       await revealLolo(reply, typingId)
+      appendLoloMemory([{ role: 'assistant', content: reply }])   // el saludo queda en el hilo
     } catch {
       if (aliveRef.current) setMsgs((m) => m.filter((x) => x.id !== typingId))
     }

@@ -87,17 +87,18 @@ export async function GET() {
   return NextResponse.json(mem)
 }
 
-// POST { buffer } → guarda el buffer; si se desbordó, comprime lo viejo al resumen/hechos
+const validMsgs = (arr: unknown): Msg[] =>
+  Array.isArray(arr) ? arr.filter((m): m is Msg => !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string') : []
+
+// POST { append } → AGREGA su delta al buffer actual (atómico server-side: dos voces —chat + heartbeat
+// proactivo, o arcade↔XP— no se pisan; la memoria es la única fuente de verdad del hilo).
+// POST { buffer } → (legacy) reemplaza el buffer completo. En ambos casos: si se desbordó, comprime.
 export async function POST(req: NextRequest) {
-  let body: { buffer?: Msg[] }
+  let body: { buffer?: Msg[]; append?: Msg[] }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
-  const incoming = Array.isArray(body.buffer)
-    ? body.buffer.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-    : []
-
   const current = await loadMemory()
-  let buffer  = incoming
+  let buffer  = Array.isArray(body.append) ? [...current.buffer, ...validMsgs(body.append)] : validMsgs(body.buffer)
   let summary = current.summary
   let facts   = current.facts
 
