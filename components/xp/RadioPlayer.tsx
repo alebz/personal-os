@@ -12,13 +12,29 @@ import { useEffect, useRef, useState } from 'react'
 
 interface Station { uuid: string; name: string; url: string; codec: string; bitrate: number; country?: string; tags?: string; genre?: string; favicon?: string }
 
+// Estaciones curadas — VERIFICADAS alcanzables (GET 200 + audio) y de proveedores GLOBALES (SomaFM,
+// red 0N/onlineradio, streamingmedia.it, laut.fm, cdnstream1). Se evitan las UK (musicradio/Global
+// Player) que geo-bloquean fuera de UK. El buscador cubre todo lo demás.
 const CURATED: Station[] = [
+  // Jazz / Lounge
   { uuid: 'cur-secretagent', name: 'SomaFM · Secret Agent', url: 'https://ice6.somafm.com/secretagent-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'jazz, lounge, spy' },
   { uuid: 'cur-smoothjazz', name: 'SmoothJazz.com', url: 'https://smoothjazz.cdnstream1.com/2585_128.mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'smooth jazz' },
   { uuid: 'cur-sonicuniverse', name: 'SomaFM · Sonic Universe', url: 'https://ice6.somafm.com/sonicuniverse-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'jazz, avant' },
+  { uuid: 'cur-groovesalad', name: 'SomaFM · Groove Salad', url: 'https://ice6.somafm.com/groovesalad-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'chill, downtempo, lounge' },
+  { uuid: 'cur-0nsmoothjazz', name: '0N · Smooth Jazz', url: 'https://0n-smoothjazz.radionetz.de/0n-smoothjazz.aac', codec: 'AAC', bitrate: 128, genre: 'Jazz / Lounge', tags: 'smooth jazz' },
+  // Soul / Funk
   { uuid: 'cur-7soul', name: 'SomaFM · Seven Inch Soul', url: 'https://ice6.somafm.com/7soul-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'soul, funk, 45s' },
   { uuid: 'cur-fluid', name: 'SomaFM · Fluid', url: 'https://ice6.somafm.com/fluid-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'instrumental, jazz, soul' },
-  { uuid: 'cur-funky', name: 'Funky Radio', url: 'https://funkyradio.streamingmedia.it/play.mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'funk, soul' },
+  { uuid: 'cur-funky', name: 'Funky Radio · Only Funk', url: 'https://funkyradio.streamingmedia.it/play.mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'funk, soul, 60s, 70s' },
+  { uuid: 'cur-discofunk', name: 'Disco Funk & Modern Soul Boogie', url: 'https://discofunk.streamingmedia.it/usa', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'disco, funk, soul, boogie' },
+  // Disco / 70s / 80s
+  { uuid: 'cur-0ndisco', name: '0N · Disco', url: 'https://0n-disco.radionetz.de/0n-disco.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: 'disco' },
+  { uuid: 'cur-0n70s', name: '0N · 70s', url: 'https://0n-70s.radionetz.de/0n-70s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '70s, oldies' },
+  { uuid: 'cur-0n80s', name: '0N · 80s', url: 'https://0n-80s.radionetz.de/0n-80s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '80s' },
+  { uuid: 'cur-u80s', name: 'SomaFM · Underground 80s', url: 'https://ice6.somafm.com/u80s-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '80s, new wave, synth' },
+  { uuid: 'cur-lebowski', name: 'Classic Hits · 70s 80s Disco Funk', url: 'https://radiopanther.radiolebowski.com/play', codec: 'AAC', bitrate: 128, genre: 'Disco / 70s / 80s', tags: 'disco, funk, 70s, 80s' },
+  { uuid: 'cur-80sexitos', name: '80 Éxitos (en español)', url: 'https://80sexitos.stream.laut.fm/80sexitos', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '80s, español, pop' },
+  // Clásica
   { uuid: 'cur-classique', name: 'Radio Classique', url: 'https://radioclassique.ice.infomaniak.ch/radioclassique-high.mp3', codec: 'MP3', bitrate: 128, genre: 'Clásica', tags: 'classical' },
   { uuid: 'cur-francemusique', name: 'France Musique', url: 'https://icecast.radiofrance.fr/francemusique-hifi.aac', codec: 'AAC', bitrate: 128, genre: 'Clásica', tags: 'classical, orchestra' },
 ]
@@ -39,6 +55,8 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   const [searching, setSearching] = useState(false)
   const [queue, setQueue] = useState<Station[]>(CURATED)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearLoadTimer = () => { if (loadTimer.current) { clearTimeout(loadTimer.current); loadTimer.current = null } }
 
   // Favoritos (localStorage)
   useEffect(() => { try { const r = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); if (Array.isArray(r)) setFavs(r) } catch { /* ignore */ } }, [])
@@ -50,13 +68,13 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   useEffect(() => {
     const a = audioRef.current
     if (!a) return
-    const onPlaying = () => { setStatus('live'); setPlaying(true) }
-    const onWaiting = () => setStatus('loading')
+    const onPlaying = () => { clearLoadTimer(); setStatus('live'); setPlaying(true) }
+    const onWaiting = () => setStatus((s) => (s === 'live' ? 'live' : 'loading'))
     const onPause = () => setPlaying(false)
-    const onErr = () => { setStatus('error'); setPlaying(false) }
+    const onErr = () => { clearLoadTimer(); setStatus('error'); setPlaying(false) }
     a.addEventListener('playing', onPlaying); a.addEventListener('waiting', onWaiting)
     a.addEventListener('pause', onPause); a.addEventListener('error', onErr); a.addEventListener('stalled', onWaiting)
-    return () => { a.removeEventListener('playing', onPlaying); a.removeEventListener('waiting', onWaiting); a.removeEventListener('pause', onPause); a.removeEventListener('error', onErr); a.removeEventListener('stalled', onWaiting) }
+    return () => { clearLoadTimer(); a.removeEventListener('playing', onPlaying); a.removeEventListener('waiting', onWaiting); a.removeEventListener('pause', onPause); a.removeEventListener('error', onErr); a.removeEventListener('stalled', onWaiting) }
   }, [])
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = vol }, [vol])
@@ -68,14 +86,17 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
     setCurrent(s); setStatus('loading'); setNav('now')
     a.src = s.url
     a.volume = vol
-    a.play().then(() => setPlaying(true)).catch(() => setStatus('error'))
+    a.play().then(() => setPlaying(true)).catch(() => { clearLoadTimer(); setStatus('error') })
+    // Si en ~13s no arrancó (stream atorado/caído en este entorno), marca error en vez de girar infinito.
+    clearLoadTimer()
+    loadTimer.current = setTimeout(() => setStatus((cur) => (cur === 'loading' ? 'error' : cur)), 13_000)
   }
   function togglePlay() {
     const a = audioRef.current
     if (!a || !current) { if (queue[0]) play(queue[0], queue); return }
     if (playing) { a.pause() } else { setStatus('loading'); a.play().then(() => setPlaying(true)).catch(() => setStatus('error')) }
   }
-  function stop() { const a = audioRef.current; if (a) { a.pause(); a.removeAttribute('src'); a.load() } setPlaying(false); setStatus('idle') }
+  function stop() { clearLoadTimer(); const a = audioRef.current; if (a) { a.pause(); a.removeAttribute('src'); a.load() } setPlaying(false); setStatus('idle') }
   function step(dir: 1 | -1) {
     if (!queue.length) return
     const i = current ? queue.findIndex((s) => s.url === current.url) : -1
