@@ -124,11 +124,11 @@ function GroupHeader({ label, count, open, onToggle }: { label: string; count: n
   )
 }
 
-// MENSAJE PERSONAL EN VIVO — tu STATUS de MSN: lo que TÚ pones bajo tu nombre, en primera persona
-// (/api/supraconsciente mode:'yo'). NO te habla a ti ni te aconseja — ERES tú declarándole algo al
-// mundo, con la materia de tu contexto real. Rota con fade cada ~5 min y avanza al clic. Si no cabe,
-// hace SCROLL (marquesina), como el personal message real — NO obliga a ensanchar la ventana.
-const PM_CACHE = 'msn-personal-cache-v2'   // v2: se rompió al pasar de 'niño interior' (te hablaba) a 'yo' (1ª persona) → tira la caché vieja
+// MENSAJE PERSONAL EN VIVO — tu SANKALPA: una INTENCIÓN que TÚ eliges para guiarte, en primera persona
+// (/api/supraconsciente mode:'sankalpa'). NO es Cerebro: NO lee tus datos (tareas/notas/diario) — sale
+// de tu ser, no de tu sistema. Es dirección, no reporte. Rota con fade cada ~5 min y avanza al clic. Si
+// no cabe, hace SCROLL (marquesina), como el personal message real — NO obliga a ensanchar la ventana.
+const PM_CACHE = 'msn-personal-cache-v3'   // v3: pasó de 'yo' (leía tus datos) a 'sankalpa' (intención sin RAG) → tira la caché vieja
 const PM_HOLD_MS = 5 * 60_000
 type PmCache = { queue: string[]; shown: string[] }
 
@@ -147,7 +147,7 @@ function MsnPersonalMessage() {
     try {
       const r = await fetch('/api/supraconsciente', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ count: 8, mode: 'yo', exclude: cacheRef.current.shown.slice(-40) }),
+        body: JSON.stringify({ count: 8, mode: 'sankalpa', exclude: cacheRef.current.shown.slice(-40) }),
       })
       const d = await r.json()
       const msgs: string[] = Array.isArray(d.messages) ? d.messages.map((m: { text?: string }) => m.text).filter((t: unknown): t is string => typeof t === 'string' && t.length > 0) : []
@@ -179,10 +179,10 @@ function MsnPersonalMessage() {
   return (
     <div
       onClick={next}
-      title="tu estado — clic para otro"
+      title="tu intención — clic para otra"
       style={{ cursor: 'pointer', opacity: vis ? 1 : 0, transition: 'opacity .25s ease' }}
     >
-      <StatusMarquee text={text || '‹poniendo tu estado…›'} />
+      <StatusMarquee text={text || '‹poniendo tu intención…›'} />
     </div>
   )
 }

@@ -32,67 +32,65 @@ const SUPRA_RULES = [
   'Devuelve exactamente los mensajes pedidos, todos distintos entre sí.',
 ].join('\n')
 
-// Voz de ALEX (mode 'yo') — el MENSAJE PERSONAL de MSN: lo que ÉL pone bajo su nombre para el mundo,
-// en PRIMERA PERSONA, como si Alex mismo lo tecleara. NO le habla a Alex ni le aconseja: ES Alex hablando.
-// Usa su contexto real como materia de lo que él declararía (su mood, en qué anda, qué trae en la cabeza).
-const VOICE_YO = [
-  'Escribe el MENSAJE PERSONAL de Alex: su estado de MSN, en PRIMERA PERSONA, como si Alex mismo lo hubiera tecleado bajo su nombre. Es lo que ÉL le dice al mundo — NO un mensaje dirigido a él, NO un consejo hacia él.',
-  'El que habla ES Alex: su voz natural, casual, humana — un pensamiento, un ánimo, algo que trae en la cabeza, unas ganas, una queja ligera, un plan. Como los personal messages de MSN.',
-  'Usa su contexto real (proyectos, personas, tareas, diario) como MATERIA de lo que él declararía, siempre como afirmación SUYA en primera persona.',
-  'PROHIBIDO hablarle a Alex, usar su nombre, o dirigirte a él de "tú" ("oye Alex…", "tú deberías…", "la cafetera que tienes en la mira…"). El sujeto que habla es "yo" = Alex.',
-  'Texto plano: nada de markdown, negritas, títulos, comillas alrededor de la frase. Un emoji ocasional al estilo MSN está bien.',
-  'Español.',
+// SANKALPA (mode 'sankalpa') — el MENSAJE PERSONAL de MSN como INTENCIÓN que Alex ELIGE para guiarse,
+// en primera persona. NO es reporte de su vida ni recuento de pendientes: NO lee sus datos
+// (tareas/notas/diario) — sale de su ser, no de su sistema. Es dirección, no reporte. NO es Cerebro.
+const VOICE_SANKALPA = [
+  'Escribes el SANKALPA de Alex: su mensaje personal, pero como una INTENCIÓN que él ELIGE para guiarse, en primera persona. No es reporte de lo que hizo ni de sus pendientes; es una dirección que se pone a sí mismo.',
+  'PROHIBIDO usar datos de su vida (proyectos, personas, negocios, tareas, lugares, nombres). No sale de su sistema ni de su agenda: sale de su ser.',
+  'Tono intencional e inspirador PERO ATERRIZADO, con el registro real de Alex (mexicano, cálido, sencillo, nada solemne ni etéreo); cabe una imagen linda ocasional, pero nunca etérea.',
+  'Primera persona. VARÍA LA ESTRUCTURA: NO todas empiezan con "Hoy"; algunas sí, otras arrancan con el verbo o la imagen, otras ni marcan el día. Que en un lote no se repita el mismo arranque.',
+  'Español. Texto plano, sin comillas, sin markdown, sin emojis.',
 ].join(' ')
 
-const YO_RULES = [
-  'Cada mensaje es UNA sola línea corta (idealmente < 90 caracteres), como un personal message de MSN.',
-  'PRIMERA PERSONA siempre: "hoy le entro a…", "ando…", "me late…", "tengo ganas de…", "pensando en…", "no me hallo sin…".',
-  'Cada línea toma un ÁNGULO DISTINTO: en qué anda hoy, un mood, algo que trae entre manos (proyecto/tarea), unas ganas o antojo, un guiño a alguien de su gente, un pensamiento suelto.',
-  'Aterrízalo en su contexto real (nombres/proyectos concretos) sin explicarlo — es SU status, ya sabe de qué habla.',
-  'NADA de frases de taza ni horóscopo: que suene a algo que Alex realmente pondría de estado.',
-  'Devuelve exactamente los mensajes pedidos, todos distintos entre sí.',
+const SANKALPA_RULES = [
+  'Cada mensaje es UNA línea corta (idealmente < 82 caracteres).',
+  'Es una INTENCIÓN/dirección, no un logro cumplido ni un recordatorio de tareas.',
+  'REGLA DE ORO (lo que separa intención de póster): CADA sankalpa DEBE llevar O una IMAGEN CONCRETA (algo que se pueda ver o sentir: manos que se abren, un paso, los hombros que se sueltan, un respiro) O una VULNERABILIDAD ADMITIDA (aunque tiemble, aunque salga chueco, aunque no sepa, aunque adentro traiga tormenta). PROHIBIDA la nobleza abstracta sin cuerpo ("compañera fiel de mi jornada", "el ritmo de las cosas", "la luz de mi ser").',
+  'Prohibidas las palabras de retiro espiritual: jornada, sendero, universo, esencia, ser interior.',
+  'Evita el cliché de taza ("cree en ti", "todo es posible"). Que suene a algo que Alex de verdad se diría.',
+  'Ángulos variados: presencia, valentía, ternura consigo mismo, enfoque, soltar, paciencia, paso firme.',
+  'Devuelve exactamente los pedidos, todos distintos, con ARRANQUES distintos entre sí.',
 ].join('\n')
 
 export async function POST(req: NextRequest) {
   let body: { count?: number; exclude?: string[]; topics?: string[]; mode?: string }
   try { body = await req.json() } catch { return new Response('Invalid JSON', { status: 400 }) }
 
-  const mode = body.mode === 'yo' ? 'yo' : 'supra'
+  const mode = body.mode === 'sankalpa' ? 'sankalpa' : 'supra'
   const count = Math.max(1, Math.min(10, body.count ?? 6))
   const exclude = Array.isArray(body.exclude) ? body.exclude.slice(0, 40) : []
-
-  // Contexto por RECENCIA (sin query): los chunks más nuevos, con muestreo aleatorio para variar el
-  // lote. memory_chunks cubre notas/diario/perfil/capturas (tareas incluidas).
-  const supabase = createServerClient()
-  const { data: rows, error } = await supabase
-    .from('memory_chunks')
-    .select('content, metadata, created_at')
-    .order('created_at', { ascending: false })
-    .limit(60)
-  if (error) return new Response(error.message, { status: 500 })
-
-  const recent = (rows ?? []) as { content: string; metadata: Record<string, unknown>; created_at: string }[]
-  // El supra del arcade EXIGE contexto (constata su vida). El status en 1ª persona puede hablar sin él.
-  if (recent.length === 0 && mode !== 'yo') return Response.json({ messages: [] })
-
-  // Sesga a lo reciente pero baraja para que dos lotes seguidos no converjan.
-  const pool = recent.slice(0, 45).sort(() => Math.random() - 0.5).slice(0, 30)
-  const context = pool.map((c, i) => {
-    const kind = String(c.metadata?.kind ?? 'nota')
-    const date = c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '?'
-    return `[${i + 1}] [${kind} · ${date}]: ${c.content}`
-  }).join('\n\n')
-
   const excludeBlock = exclude.length
-    ? `\n\nNO repitas ni parafrasees estas líneas ya mostradas hoy:\n${exclude.map(e => `- ${e}`).join('\n')}`
+    ? `\n\nNO repitas ni parafrasees estas líneas ya mostradas:\n${exclude.map(e => `- ${e}`).join('\n')}`
     : ''
 
-  const system = mode === 'yo' ? `${VOICE_YO}\n\n${YO_RULES}` : `${VOICE}\n\n${SUPRA_RULES}`
-  const userMsg = mode === 'yo'
-    ? (context
-        ? `Tu vida ahora (Alex), como materia para TU propio estado — es lo que tú declararías, NO algo que alguien te dice:\n\n${context}${excludeBlock}\n\nComo Alex, en primera persona, escribe ${count} mensajes personales de MSN, todos distintos.`
-        : `Sin contexto reciente; pon tu estado desde tu propio ánimo.${excludeBlock}\n\nComo Alex, en primera persona, escribe ${count} mensajes personales de MSN, todos distintos.`)
-    : `Contexto reciente:\n\n${context}${excludeBlock}\n\nGenera ${count} mensajes del supraconsciente.`
+  let system: string
+  let userMsg: string
+  if (mode === 'sankalpa') {
+    // SANKALPA: intención pura, SIN RAG — jamás lee tareas/notas/diario. Sale de su ser, no del sistema.
+    system = `${VOICE_SANKALPA}\n\n${SANKALPA_RULES}`
+    userMsg = `Sin ningún contexto de su vida. Como Alex, en primera persona, escribe ${count} sankalpas (intenciones con imagen concreta o vulnerabilidad admitida), con arranques VARIADOS, todos distintos.${excludeBlock}`
+  } else {
+    // SUPRA (arcade): constata su vida real → EXIGE contexto por recencia (memory_chunks: notas/diario/
+    // perfil/capturas). Muestreo aleatorio para que dos lotes seguidos no converjan.
+    const supabase = createServerClient()
+    const { data: rows, error } = await supabase
+      .from('memory_chunks')
+      .select('content, metadata, created_at')
+      .order('created_at', { ascending: false })
+      .limit(60)
+    if (error) return new Response(error.message, { status: 500 })
+    const recent = (rows ?? []) as { content: string; metadata: Record<string, unknown>; created_at: string }[]
+    if (recent.length === 0) return Response.json({ messages: [] })
+    const pool = recent.slice(0, 45).sort(() => Math.random() - 0.5).slice(0, 30)
+    const context = pool.map((c, i) => {
+      const kind = String(c.metadata?.kind ?? 'nota')
+      const date = c.created_at ? new Date(c.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '?'
+      return `[${i + 1}] [${kind} · ${date}]: ${c.content}`
+    }).join('\n\n')
+    system = `${VOICE}\n\n${SUPRA_RULES}`
+    userMsg = `Contexto reciente:\n\n${context}${excludeBlock}\n\nGenera ${count} mensajes del supraconsciente.`
+  }
 
   const anthropic = new Anthropic()
   let messages: string[] = []
