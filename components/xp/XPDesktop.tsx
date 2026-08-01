@@ -131,11 +131,14 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const [deskSel, setDeskSel] = useState<string | null>(null)   // ícono de escritorio seleccionado
   const notifs = useNotifications()
   const unread = notifs.reduce((s, n) => s + (n.read ? 0 : 1), 0)
-  // Atajo global de captura rápida (Ctrl+Espacio, mientras la pestaña tiene foco).
+  // Atajo global de captura rápida (Ctrl+Espacio, mientras la pestaña tiene foco) + evento
+  // 'xp:capture-open' (lo dispara el menú Acciones→Capturar de Cerebro Messenger, p.ej.).
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'Space') { e.preventDefault(); setCaptureOpen(true) } }
+    const openCap = () => setCaptureOpen(true)
     window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
+    window.addEventListener('xp:capture-open', openCap)
+    return () => { window.removeEventListener('keydown', h); window.removeEventListener('xp:capture-open', openCap) }
   }, [])
   const [iconPos, setIconPos] = useState<Record<string, { x: number; y: number }>>(() => {
     try { const s = localStorage.getItem('xp-desktop-icons'); if (s) return JSON.parse(s) } catch { /* */ }

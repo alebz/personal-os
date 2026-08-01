@@ -7,6 +7,8 @@ import { CerebroButterfly } from './CerebroButterfly'
 import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { XpDialogModal, XpField, XpLabel, XpSelect, XpContextMenu } from './xp-controls'
 import { useLoloStatus } from '@/lib/lolo'
+import { useOSSettings } from '@/components/OSSettingsContext'
+import { playXpSound } from './xpSounds'
 
 // ── Cumpleaños ────────────────────────────────────────────────────────────────
 const MONTHS_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -175,6 +177,12 @@ function MsnPersonalMessage() {
     const iv = setInterval(next, PM_HOLD_MS)
     return () => { mountedRef.current = false; clearInterval(iv) }
   }, [next])
+  // Menú Archivo → "Cambiar mi mensaje (intención)…" dispara este evento para avanzar el sankalpa.
+  useEffect(() => {
+    const h = () => next()
+    window.addEventListener('msn:next-status', h)
+    return () => window.removeEventListener('msn:next-status', h)
+  }, [next])
 
   return (
     <div
@@ -213,17 +221,18 @@ export default function MsnCerebro() {
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [ctx, setCtx] = useState<{ x: number; y: number; contact: Contact } | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)      // menú "Contactos" abierto
+  const [openMenu, setOpenMenu] = useState<string | null>(null)   // menú de la barra abierto (Archivo/Contactos/…)
   const [catMgr, setCatMgr] = useState(false)          // gestor de categorías (heredado de la sección disuelta)
   const loloStatus = useLoloStatus()                   // status personal rotativo de Lolo (como MSN real)
+  const { set } = useOSSettings()                      // para "Cerrar sesión" (volver al arcade)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!menuOpen) return
-    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false) }
+    if (!openMenu) return
+    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenu(null) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
-  }, [menuOpen])
+  }, [openMenu])
 
   const loadContacts = useCallback(() => {
     fetch('/api/contacts')
@@ -253,6 +262,11 @@ export default function MsnCerebro() {
       <ContactWindow contact={contact} onClose={() => wm.closeWindow(id)} onSaved={loadContacts} />,
       { w: 372, h: 402, resizable: false, icon: 'cerebro' })
   }
+  // Ayuda → "Acerca de…" (diálogo icónico de la época; el único lugar del OS donde va la marca de Alex).
+  const openAbout = () => {
+    if (!wm) return
+    wm.openWindow('about-cerebro', 'Acerca de Cerebro Messenger', <AboutCerebro onClose={() => wm.closeWindow('about-cerebro')} />, { w: 340, h: 318, icon: 'cerebro' })
+  }
   const toggle = (k: string) => setCollapsed((p) => ({ ...p, [k]: !p[k] }))
 
   const specialKind = (id: string): ChatBuddy['kind'] => (id === 'sys:cerebro' ? 'cerebro' : id === 'sys:lolo' ? 'lolo' : 'diario')
@@ -275,17 +289,53 @@ export default function MsnCerebro() {
 
   return (
     <div ref={rootRef} style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
-      {/* Menú — "Contactos" abre un desplegable (agregar / gestionar categorías); el resto decorativo. */}
-      <div ref={menuRef} style={{ position: 'relative', display: 'flex', gap: 13, padding: '2px 9px', background: '#f7f9fc', borderBottom: '1px solid #cdd6e2', fontSize: 11, color: '#333' }}>
-        <span>Archivo</span>
-        <span role="button" tabIndex={0} onClick={() => setMenuOpen((v) => !v)} style={{ cursor: 'pointer', padding: '0 4px', margin: '0 -4px', borderRadius: 2, background: menuOpen ? '#d8e6fb' : 'transparent' }}>Contactos</span>
-        <span>Acciones</span><span>Herramientas</span><span>Ayuda</span>
-        {menuOpen && (
-          <div style={{ position: 'absolute', top: '100%', left: 44, zIndex: 40, marginTop: 1, minWidth: 178, background: '#fff', border: '1px solid #97948a', boxShadow: '2px 3px 6px rgba(0,0,0,0.28)', padding: 2 }}>
-            <button onClick={() => { setMenuOpen(false); openContactWindow(null) }} style={menuItem}>Agregar un contacto…</button>
-            <button onClick={() => { setMenuOpen(false); setCatMgr(true) }} style={menuItem}>Gestionar categorías…</button>
+      {/* Barra de menú — cada menú abre su desplegable con lo que YA existe (política del OS: un elemento
+          de XP gana función con el tiempo, no queda de adorno). Herramientas: VACÍO honesto por ahora
+          (Opciones del Messenger no existen aún; mejor vacío que mandar a algo que miente). */}
+      <div ref={menuRef} style={{ position: 'relative', display: 'flex', gap: 2, padding: '2px 6px', background: '#f7f9fc', borderBottom: '1px solid #cdd6e2', fontSize: 11, color: '#333', zIndex: 41 }}>
+        {([
+          { name: 'Archivo', items: [
+            { label: 'Cambiar mi imagen…', onClick: () => changeAvatar('me') },
+            { label: 'Cambiar mi mensaje (intención)…', onClick: () => window.dispatchEvent(new CustomEvent('msn:next-status')) },
+            { sep: true },
+            { label: 'Cerrar sesión', onClick: () => { playXpSound('logoff'); set('shell', 'arcade') } },
+            { label: 'Cerrar', onClick: () => wm?.closeWindow('/brain') },
+          ] },
+          { name: 'Contactos', items: [
+            { label: 'Agregar un contacto…', onClick: () => openContactWindow(null) },
+            { label: 'Gestionar categorías…', onClick: () => setCatMgr(true) },
+          ] },
+          { name: 'Acciones', items: [
+            { label: 'Enviar un mensaje a Cerebro', onClick: () => openChat({ id: 'sys:cerebro', name: 'Cerebro', kind: 'cerebro', avatar: SPECIALS[0].avatar }) },
+            { label: 'Capturar algo…', onClick: () => window.dispatchEvent(new CustomEvent('xp:capture-open')) },
+          ] },
+          { name: 'Herramientas', items: [
+            { label: '(Sin opciones por ahora)', disabled: true },
+          ] },
+          { name: 'Ayuda', items: [
+            { label: 'Acerca de Cerebro Messenger…', onClick: () => openAbout() },
+          ] },
+        ] as { name: string; items: { label: string; onClick?: () => void; sep?: boolean; disabled?: boolean }[] }[]).map((m, mi, arr) => (
+          <div key={m.name} style={{ position: 'relative' }}>
+            <span role="button" tabIndex={0}
+              onClick={() => setOpenMenu((v) => (v === m.name ? null : m.name))}
+              style={{ cursor: 'pointer', padding: '1px 6px', borderRadius: 2, background: openMenu === m.name ? '#d8e6fb' : 'transparent', display: 'inline-block' }}>
+              {m.name}
+            </span>
+            {openMenu === m.name && (
+              // los menús de la derecha (Ayuda/Herramientas) abren alineados a la derecha → no se recortan
+              // cuando la ventana está pegada al borde de la pantalla.
+              <div style={{ position: 'absolute', top: '100%', ...(mi >= arr.length - 2 ? { right: 0 } : { left: 0 }), marginTop: 1, minWidth: 196, background: '#fff', border: '1px solid #97948a', boxShadow: '2px 3px 6px rgba(0,0,0,0.28)', padding: 2, zIndex: 42 }}>
+                {m.items.map((it, i) => it.sep
+                  ? <div key={i} style={{ height: 1, background: '#e2e0d8', margin: '3px 6px' }} />
+                  : <button key={i} disabled={it.disabled} onClick={() => { setOpenMenu(null); it.onClick?.() }}
+                      style={{ ...menuItem, color: it.disabled ? '#9a978d' : '#1a1a1a', cursor: it.disabled ? 'default' : 'pointer', fontStyle: it.disabled ? 'italic' : 'normal' }}>
+                      {it.label}
+                    </button>)}
+              </div>
+            )}
           </div>
-        )}
+        ))}
       </div>
 
       {/* Banner con la marca: la mariposa de MSN reimaginada en el rainbow del OS */}
@@ -493,6 +543,32 @@ function ContactWindow({ contact, onClose, onSaved }: { contact: ContactRow | nu
           <button className="xp-raised" onClick={save} disabled={okDisabled} style={btn(okDisabled)}>{busy ? 'Guardando…' : 'Aceptar'}</button>
           <button className="xp-raised" onClick={onClose} style={btn(false)}>Cancelar</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// "Acerca de Cerebro Messenger" — el diálogo icónico de la época. Es el ÚNICO lugar del OS donde la
+// marca de Alex aparece a propósito (sin romper la regla de "sin logo visible" en el resto).
+function AboutCerebro({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#ece9d8', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <CerebroButterfly size={44} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Alex Mateo" width={42} height={42} style={{ objectFit: 'contain' }} draggable={false} />
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: '#15559e', letterSpacing: -0.3 }}>Cerebro Messenger</div>
+        <div style={{ fontSize: 11, color: '#5f6b7a' }}>Versión 7.5 · edición Alex</div>
+        <div style={{ height: 1, alignSelf: 'stretch', background: '#c9c6ba', margin: '4px 0' }} />
+        <div style={{ fontSize: 11, color: '#4a4632', lineHeight: 1.55, maxWidth: 262 }}>
+          Tu segundo cerebro, con alma de 2003. Memoria, gente y compañía en una sola ventana — hecho a mano por Alex Mateo.
+        </div>
+        <div style={{ fontSize: 10.5, color: '#8a867a' }}>© 2003–2026 · alexmateo.mx</div>
+      </div>
+      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', borderTop: '1px solid #c9c6ba' }}>
+        <button className="xp-raised" onClick={onClose} style={{ padding: '4px 18px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }}>Aceptar</button>
       </div>
     </div>
   )
