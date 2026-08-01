@@ -2,54 +2,53 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-// REPRODUCTOR DE MÚSICA bajo XP — skin Windows Media Player 9 (alma de época). Ventana BARE (sin barra
-// Luna: dibuja su propio chrome azul-plata redondeado, se arrastra por `data-xp-drag`, botones min/cerrar
-// cableados al WM vía props). v1 = RADIO real vía Radio Browser (proxy /api/radio, ya filtrado a HTTPS
-// reproducible). Visualizador GENÉRICO animado (decisión de diseño: real-FFT rompe el audio en streams
-// sin CORS → esto garantiza que TODA estación suene; fiel a los visualizadores estilizados de 2003).
-// Sin Web Audio → el <audio> toca el stream directo. Metadata ICY de pista no es legible desde <audio>,
-// así que mostramos estación + codec + EN VIVO. Favoritos en localStorage. Spotify = proyecto aparte.
+// REPRODUCTOR DE MÚSICA — skin Windows Media Player 9 "QuickSilver" (2002), CHROME REAL: los bitmaps
+// del zip (public/themes/xp/wmp/, sliceados/keyed a alfa) renderizados LITERALMENTE en las posiciones
+// exactas de base.wms (mainView, Base.png en top=26 → resto ajustado −26). Cada botón usa su .png real
+// por estado (up/-ho/-dn/-dis) vía var() en CSS. Ventana BARE (sin barra Luna): Base.png ES el chrome;
+// se arrastra por [data-xp-drag]; min/cerrar cableados al WM. v1 = RADIO real (Radio Browser, proxy
+// /api/radio ya filtrado). Visualizador genérico animado (real-FFT rompe audio sin CORS). Spotify después.
 
-interface Station { uuid: string; name: string; url: string; codec: string; bitrate: number; country?: string; tags?: string; genre?: string; favicon?: string }
+const A = '/themes/xp/wmp/'
+const btn = (name: string, dis = true): React.CSSProperties => ({
+  ['--u' as string]: `url(${A}${name}.png)`,
+  ['--h' as string]: `url(${A}${name}-ho.png)`,
+  ['--d' as string]: `url(${A}${name}-dn.png)`,
+  ...(dis ? { ['--x' as string]: `url(${A}${name}-dis.png)` } : {}),
+})
 
-// Estaciones curadas — VERIFICADAS alcanzables (GET 200 + audio) y de proveedores GLOBALES (SomaFM,
-// red 0N/onlineradio, streamingmedia.it, laut.fm, cdnstream1). Se evitan las UK (musicradio/Global
-// Player) que geo-bloquean fuera de UK. El buscador cubre todo lo demás.
+interface Station { uuid: string; name: string; url: string; codec: string; bitrate: number; country?: string; tags?: string; genre?: string }
+
 const CURATED: Station[] = [
-  // Jazz / Lounge
-  { uuid: 'cur-secretagent', name: 'SomaFM · Secret Agent', url: 'https://ice6.somafm.com/secretagent-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'jazz, lounge, spy' },
-  { uuid: 'cur-smoothjazz', name: 'SmoothJazz.com', url: 'https://smoothjazz.cdnstream1.com/2585_128.mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'smooth jazz' },
-  { uuid: 'cur-sonicuniverse', name: 'SomaFM · Sonic Universe', url: 'https://ice6.somafm.com/sonicuniverse-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'jazz, avant' },
-  { uuid: 'cur-groovesalad', name: 'SomaFM · Groove Salad', url: 'https://ice6.somafm.com/groovesalad-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge', tags: 'chill, downtempo, lounge' },
-  { uuid: 'cur-0nsmoothjazz', name: '0N · Smooth Jazz', url: 'https://0n-smoothjazz.radionetz.de/0n-smoothjazz.aac', codec: 'AAC', bitrate: 128, genre: 'Jazz / Lounge', tags: 'smooth jazz' },
-  // Soul / Funk
-  { uuid: 'cur-7soul', name: 'SomaFM · Seven Inch Soul', url: 'https://ice6.somafm.com/7soul-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'soul, funk, 45s' },
-  { uuid: 'cur-fluid', name: 'SomaFM · Fluid', url: 'https://ice6.somafm.com/fluid-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'instrumental, jazz, soul' },
-  { uuid: 'cur-funky', name: 'Funky Radio · Only Funk', url: 'https://funkyradio.streamingmedia.it/play.mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'funk, soul, 60s, 70s' },
-  { uuid: 'cur-discofunk', name: 'Disco Funk & Modern Soul Boogie', url: 'https://discofunk.streamingmedia.it/usa', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk', tags: 'disco, funk, soul, boogie' },
-  // Disco / 70s / 80s
-  { uuid: 'cur-0ndisco', name: '0N · Disco', url: 'https://0n-disco.radionetz.de/0n-disco.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: 'disco' },
-  { uuid: 'cur-0n70s', name: '0N · 70s', url: 'https://0n-70s.radionetz.de/0n-70s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '70s, oldies' },
-  { uuid: 'cur-0n80s', name: '0N · 80s', url: 'https://0n-80s.radionetz.de/0n-80s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '80s' },
-  { uuid: 'cur-u80s', name: 'SomaFM · Underground 80s', url: 'https://ice6.somafm.com/u80s-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '80s, new wave, synth' },
-  { uuid: 'cur-lebowski', name: 'Classic Hits · 70s 80s Disco Funk', url: 'https://radiopanther.radiolebowski.com/play', codec: 'AAC', bitrate: 128, genre: 'Disco / 70s / 80s', tags: 'disco, funk, 70s, 80s' },
-  { uuid: 'cur-80sexitos', name: '80 Éxitos (en español)', url: 'https://80sexitos.stream.laut.fm/80sexitos', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s', tags: '80s, español, pop' },
-  // Clásica
-  { uuid: 'cur-classique', name: 'Radio Classique', url: 'https://radioclassique.ice.infomaniak.ch/radioclassique-high.mp3', codec: 'MP3', bitrate: 128, genre: 'Clásica', tags: 'classical' },
-  { uuid: 'cur-francemusique', name: 'France Musique', url: 'https://icecast.radiofrance.fr/francemusique-hifi.aac', codec: 'AAC', bitrate: 128, genre: 'Clásica', tags: 'classical, orchestra' },
+  { uuid: 'cur-secretagent', name: 'SomaFM · Secret Agent', url: 'https://ice6.somafm.com/secretagent-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
+  { uuid: 'cur-smoothjazz', name: 'SmoothJazz.com', url: 'https://smoothjazz.cdnstream1.com/2585_128.mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
+  { uuid: 'cur-sonicuniverse', name: 'SomaFM · Sonic Universe', url: 'https://ice6.somafm.com/sonicuniverse-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
+  { uuid: 'cur-groovesalad', name: 'SomaFM · Groove Salad', url: 'https://ice6.somafm.com/groovesalad-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Jazz / Lounge' },
+  { uuid: 'cur-0nsmoothjazz', name: '0N · Smooth Jazz', url: 'https://0n-smoothjazz.radionetz.de/0n-smoothjazz.aac', codec: 'AAC', bitrate: 128, genre: 'Jazz / Lounge' },
+  { uuid: 'cur-7soul', name: 'SomaFM · Seven Inch Soul', url: 'https://ice6.somafm.com/7soul-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
+  { uuid: 'cur-fluid', name: 'SomaFM · Fluid', url: 'https://ice6.somafm.com/fluid-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
+  { uuid: 'cur-funky', name: 'Funky Radio · Only Funk', url: 'https://funkyradio.streamingmedia.it/play.mp3', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
+  { uuid: 'cur-discofunk', name: 'Disco Funk & Modern Soul Boogie', url: 'https://discofunk.streamingmedia.it/usa', codec: 'MP3', bitrate: 128, genre: 'Soul / Funk' },
+  { uuid: 'cur-0ndisco', name: '0N · Disco', url: 'https://0n-disco.radionetz.de/0n-disco.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
+  { uuid: 'cur-0n70s', name: '0N · 70s', url: 'https://0n-70s.radionetz.de/0n-70s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
+  { uuid: 'cur-0n80s', name: '0N · 80s', url: 'https://0n-80s.radionetz.de/0n-80s.mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
+  { uuid: 'cur-u80s', name: 'SomaFM · Underground 80s', url: 'https://ice6.somafm.com/u80s-128-mp3', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
+  { uuid: 'cur-lebowski', name: 'Classic Hits · 70s 80s Disco Funk', url: 'https://radiopanther.radiolebowski.com/play', codec: 'AAC', bitrate: 128, genre: 'Disco / 70s / 80s' },
+  { uuid: 'cur-80sexitos', name: '80 Éxitos (en español)', url: 'https://80sexitos.stream.laut.fm/80sexitos', codec: 'MP3', bitrate: 128, genre: 'Disco / 70s / 80s' },
+  { uuid: 'cur-classique', name: 'Radio Classique', url: 'https://radioclassique.ice.infomaniak.ch/radioclassique-high.mp3', codec: 'MP3', bitrate: 128, genre: 'Clásica' },
+  { uuid: 'cur-francemusique', name: 'France Musique', url: 'https://icecast.radiofrance.fr/francemusique-hifi.aac', codec: 'AAC', bitrate: 128, genre: 'Clásica' },
 ]
 
 const FAV_KEY = 'xp-radio-favs'
 type Status = 'idle' | 'loading' | 'live' | 'error'
-type Nav = 'now' | 'tuner' | 'favs'
 
 export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => void; onMinimize?: () => void }) {
-  const [nav, setNav] = useState<Nav>('tuner')
   const [current, setCurrent] = useState<Station | null>(null)
   const [playing, setPlaying] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [vol, setVol] = useState(0.7)
   const [favs, setFavs] = useState<Station[]>([])
+  const [tab, setTab] = useState<'curated' | 'favs'>('curated')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Station[]>([])
   const [searching, setSearching] = useState(false)
@@ -58,234 +57,153 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clearLoadTimer = () => { if (loadTimer.current) { clearTimeout(loadTimer.current); loadTimer.current = null } }
 
-  // Favoritos (localStorage)
-  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); if (Array.isArray(r)) setFavs(r) } catch { /* ignore */ } }, [])
-  const saveFavs = (list: Station[]) => { setFavs(list); try { localStorage.setItem(FAV_KEY, JSON.stringify(list)) } catch { /* ignore */ } }
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); if (Array.isArray(r)) setFavs(r) } catch { /* */ } }, [])
+  const saveFavs = (l: Station[]) => { setFavs(l); try { localStorage.setItem(FAV_KEY, JSON.stringify(l)) } catch { /* */ } }
   const isFav = (s: Station) => favs.some((f) => f.url === s.url)
   const toggleFav = (s: Station) => saveFavs(isFav(s) ? favs.filter((f) => f.url !== s.url) : [...favs, s])
 
-  // Eventos del <audio> → estado de reproducción/carga/error.
   useEffect(() => {
-    const a = audioRef.current
-    if (!a) return
+    const a = audioRef.current; if (!a) return
     const onPlaying = () => { clearLoadTimer(); setStatus('live'); setPlaying(true) }
     const onWaiting = () => setStatus((s) => (s === 'live' ? 'live' : 'loading'))
     const onPause = () => setPlaying(false)
     const onErr = () => { clearLoadTimer(); setStatus('error'); setPlaying(false) }
-    a.addEventListener('playing', onPlaying); a.addEventListener('waiting', onWaiting)
-    a.addEventListener('pause', onPause); a.addEventListener('error', onErr); a.addEventListener('stalled', onWaiting)
+    a.addEventListener('playing', onPlaying); a.addEventListener('waiting', onWaiting); a.addEventListener('pause', onPause); a.addEventListener('error', onErr); a.addEventListener('stalled', onWaiting)
     return () => { clearLoadTimer(); a.removeEventListener('playing', onPlaying); a.removeEventListener('waiting', onWaiting); a.removeEventListener('pause', onPause); a.removeEventListener('error', onErr); a.removeEventListener('stalled', onWaiting) }
   }, [])
-
   useEffect(() => { if (audioRef.current) audioRef.current.volume = vol }, [vol])
 
   function play(s: Station, q?: Station[]) {
-    const a = audioRef.current
-    if (!a) return
+    const a = audioRef.current; if (!a) return
     if (q) setQueue(q)
-    setCurrent(s); setStatus('loading'); setNav('now')
-    a.src = s.url
-    a.volume = vol
+    setCurrent(s); setStatus('loading'); a.src = s.url; a.volume = vol
     a.play().then(() => setPlaying(true)).catch(() => { clearLoadTimer(); setStatus('error') })
-    // Si en ~13s no arrancó (stream atorado/caído en este entorno), marca error en vez de girar infinito.
-    clearLoadTimer()
-    loadTimer.current = setTimeout(() => setStatus((cur) => (cur === 'loading' ? 'error' : cur)), 13_000)
+    clearLoadTimer(); loadTimer.current = setTimeout(() => setStatus((c) => (c === 'loading' ? 'error' : c)), 13_000)
   }
   function togglePlay() {
-    const a = audioRef.current
-    if (!a || !current) { if (queue[0]) play(queue[0], queue); return }
-    if (playing) { a.pause() } else { setStatus('loading'); a.play().then(() => setPlaying(true)).catch(() => setStatus('error')) }
+    const a = audioRef.current; if (!a || !current) { if (queue[0]) play(queue[0], queue); return }
+    if (playing) a.pause(); else { setStatus('loading'); a.play().then(() => setPlaying(true)).catch(() => setStatus('error')) }
   }
   function stop() { clearLoadTimer(); const a = audioRef.current; if (a) { a.pause(); a.removeAttribute('src'); a.load() } setPlaying(false); setStatus('idle') }
-  function step(dir: 1 | -1) {
-    if (!queue.length) return
-    const i = current ? queue.findIndex((s) => s.url === current.url) : -1
-    const n = ((i < 0 ? 0 : i + dir) + queue.length) % queue.length
-    play(queue[n], queue)
-  }
-
+  function step(d: 1 | -1) { if (!queue.length) return; const i = current ? queue.findIndex((s) => s.url === current.url) : -1; play(queue[((i < 0 ? 0 : i + d) + queue.length) % queue.length], queue) }
   async function search() {
-    const q = query.trim()
-    if (!q) return
-    setSearching(true)
-    try {
-      const d = await fetch(`/api/radio?q=${encodeURIComponent(q)}&limit=40`).then((r) => r.json())
-      setResults(Array.isArray(d?.stations) ? d.stations : [])
-    } catch { setResults([]) } finally { setSearching(false) }
+    const q = query.trim(); if (!q) return; setSearching(true)
+    try { const d = await fetch(`/api/radio?q=${encodeURIComponent(q)}&limit=40`).then((r) => r.json()); setResults(Array.isArray(d?.stations) ? d.stations : []); setTab('curated') } catch { setResults([]) } finally { setSearching(false) }
   }
+  // volumen: clic/arrastre sobre el riel real (92px). stopPropagation → no arrastra la ventana.
+  function volFromEvent(e: React.PointerEvent) { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setVol(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))) }
 
-  const statusText = status === 'live' ? '● EN VIVO' : status === 'loading' ? 'Cargando…' : status === 'error' ? '⚠ No se pudo conectar' : 'Detenido'
+  const statusText = status === 'live' ? '● EN VIVO' : status === 'loading' ? 'Cargando…' : status === 'error' ? '⚠ Sin señal' : 'Detenido'
+  const listShown = tab === 'favs' ? favs : (results.length ? results : CURATED)
 
   return (
-    <div className="wmp">
-      <audio ref={audioRef} crossOrigin={undefined} />
+    <div style={{ width: 500, height: 420, display: 'flex', flexDirection: 'column' }}>
+      <audio ref={audioRef} />
 
-      {/* ── Chrome propio: barra de título (arrastrable) + botones de ventana ── */}
-      <div className="wmp-titlebar" data-xp-drag>
+      {/* ── Cápsula QuickSilver (chrome real) ── */}
+      <div className="wq" data-xp-drag>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/themes/xp/icons/wmp.png" alt="" width={16} height={16} draggable={false} style={{ display: 'block' }} />
-        <span className="wmp-title">Reproductor de Windows Media</span>
-        <button className="wmp-winbtn" onClick={onMinimize} title="Minimizar">–</button>
-        <button className="wmp-winbtn wmp-winbtn--close" onClick={onClose} title="Cerrar">✕</button>
-      </div>
+        <img className="wq-base" src={`${A}base.png`} alt="" draggable={false} />
 
-      {/* ── Cuerpo: nav izquierda + panel ── */}
-      <div className="wmp-body">
-        <nav className="wmp-nav">
-          {([['now', 'Reproducción'], ['tuner', 'Sintonizador'], ['favs', 'Favoritos']] as [Nav, string][]).map(([k, label]) => (
-            <button key={k} className={`wmp-navitem ${nav === k ? 'wmp-navitem--on' : ''}`} onClick={() => setNav(k)}>{label}</button>
-          ))}
-          <div style={{ flex: 1 }} />
-          <div className="wmp-nav-logo">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/themes/xp/icons/wmp.png" alt="" width={26} height={26} draggable={false} />
+        {/* display real (Base.png trae el hueco) — now-playing + mini viz, en Meta (154,64) 262×49 */}
+        <div style={{ position: 'absolute', left: 154, top: 64, width: 262, height: 49, display: 'flex', alignItems: 'center', padding: '0 8px', boxSizing: 'border-box', gap: 6 }}>
+          <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f2c49', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 0 rgba(255,255,255,.5)' }}>{current ? current.name : 'Reproductor de Windows Media'}</div>
+            <div style={{ fontSize: 9.5, color: status === 'error' ? '#a11' : status === 'live' ? '#1a7a34' : '#3a5a7a', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{current ? `${statusText} · ${current.codec}${current.bitrate ? ' ' + current.bitrate + 'k' : ''}` : 'elige una estación abajo'}</div>
           </div>
-        </nav>
-
-        <section className="wmp-panel">
-          {nav === 'now' && <NowPlaying station={current} status={status} playing={playing} vol={vol} statusText={statusText} isFav={current ? isFav(current) : false} onFav={() => current && toggleFav(current)} />}
-
-          {nav === 'tuner' && (
-            <div className="wmp-list-wrap">
-              <div className="wmp-search">
-                <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') search() }} placeholder="Buscar estación (nombre, género, país)…" />
-                <button onClick={search} disabled={searching}>{searching ? '…' : 'Buscar'}</button>
-              </div>
-              {results.length > 0 ? (
-                <>
-                  <div className="wmp-group">Resultados de “{query}”</div>
-                  {results.map((s) => <StationRow key={s.uuid} s={s} current={current} fav={isFav(s)} onPlay={() => play(s, results)} onFav={() => toggleFav(s)} />)}
-                </>
-              ) : (
-                <Curated current={current} isFav={isFav} onPlay={(s) => play(s, CURATED)} onFav={toggleFav} />
-              )}
-            </div>
-          )}
-
-          {nav === 'favs' && (
-            <div className="wmp-list-wrap">
-              {favs.length === 0
-                ? <div className="wmp-empty">Aún no tienes favoritos. Marca una estación con ☆ desde el Sintonizador.</div>
-                : favs.map((s) => <StationRow key={s.uuid} s={s} current={current} fav onPlay={() => play(s, favs)} onFav={() => toggleFav(s)} />)}
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* ── Barra de transporte curva ── */}
-      <div className="wmp-transport">
-        <div className="wmp-nowtext">{current ? current.name : 'Sin estación'}<span className="wmp-nowsub">{current ? `${current.codec}${current.bitrate ? ' · ' + current.bitrate + 'k' : ''} · ${statusText}` : ' '}</span></div>
-        <div className="wmp-controls">
-          <button className="wmp-tbtn" onClick={() => step(-1)} title="Anterior">⏮</button>
-          <button className="wmp-tbtn wmp-play" onClick={togglePlay} title={playing ? 'Pausa' : 'Reproducir'}>{playing ? '❚❚' : '▶'}</button>
-          <button className="wmp-tbtn" onClick={stop} title="Detener">■</button>
-          <button className="wmp-tbtn" onClick={() => step(1)} title="Siguiente">⏭</button>
+          <Viz active={playing && status === 'live'} />
         </div>
-        <div className="wmp-vol">
-          <span style={{ fontSize: 12 }}>🔊</span>
-          <input type="range" min={0} max={100} value={Math.round(vol * 100)} onChange={(e) => setVol(Number(e.target.value) / 100)} />
+
+        {/* logo Windows (bitmap real, decorativo) */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={`${A}winlogo.png`} alt="" draggable={false} style={{ position: 'absolute', left: 104, top: 11, width: 25, height: 24 }} />
+
+        {/* transporte (bitmaps reales por estado) */}
+        <button className="wq-btn" title={playing ? 'Pausa' : 'Reproducir'} onClick={togglePlay} style={{ left: 43, top: 47, width: 90, height: 90, ...btn(playing ? 'pause' : 'play', !playing) }} />
+        <button className="wq-btn" title="Anterior" onClick={() => step(-1)} style={{ left: 27, top: 74, width: 23, height: 35, ...btn('prev') }} />
+        <button className="wq-btn" title="Siguiente" onClick={() => step(1)} style={{ left: 127, top: 73, width: 23, height: 36, ...btn('next') }} />
+        <button className="wq-btn" title="Abrir estaciones" onClick={() => setTab('curated')} style={{ left: 71, top: 29, width: 35, height: 25, ...btn('open') }} />
+        <button className="wq-btn" title="Detener" onClick={stop} style={{ left: 71, top: 130, width: 35, height: 24, ...btn('stop') }} />
+        <button className="wq-btn" title="Opciones" onClick={() => setTab((t) => (t === 'favs' ? 'curated' : 'favs'))} style={{ left: 96, top: 155, width: 29, height: 18, ...btn('opts') }} />
+
+        {/* mute + volumen (riel real Slider.gif + Knob.gif), sobre Coverbottom */}
+        <button className="wq-btn" title="Silenciar" onClick={() => setVol((v) => (v > 0 ? 0 : 0.7))} style={{ left: 149, top: 120, width: 21, height: 19, ...btn('mute') }} />
+        <div title="Volumen" onPointerDown={(e) => { e.stopPropagation(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); volFromEvent(e) }} onPointerMove={(e) => { if (e.buttons) volFromEvent(e) }}
+          style={{ position: 'absolute', left: 174, top: 124, width: 92, height: 10, cursor: 'pointer' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${A}slider.png`} alt="" draggable={false} style={{ position: 'absolute', left: 0, top: 2, width: 92, height: 10 }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${A}knob.png`} alt="" draggable={false} style={{ position: 'absolute', left: `calc(${vol * 100}% - 5px)`, top: 1, width: 10, height: 9 }} />
+        </div>
+
+        {/* fullminclose (43×13): map full[0-14]/min[15-28]/cerrar[29-42] */}
+        <div style={{ position: 'absolute', left: 350, top: 40, width: 43, height: 13 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${A}fmc.png`} alt="" draggable={false} style={{ width: 43, height: 13, display: 'block' }} />
+          <button className="wq-hit" title="Modo completo" style={{ left: 0, top: 0, width: 15, height: 13 }} />
+          <button className="wq-hit" title="Minimizar" onClick={onMinimize} style={{ left: 15, top: 0, width: 14, height: 13 }} />
+          <button className="wq-hit" title="Cerrar" onClick={onClose} style={{ left: 29, top: 0, width: 14, height: 13 }} />
+        </div>
+
+        {/* pleqvis (26×41): PL[0-13]/EQ[14-26]/VIS[27-40] */}
+        <div style={{ position: 'absolute', left: 422, top: 65, width: 26, height: 41 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${A}pev.png`} alt="" draggable={false} style={{ width: 26, height: 41, display: 'block' }} />
+          <button className="wq-hit" title="Lista de estaciones" onClick={() => setTab('curated')} style={{ left: 0, top: 0, width: 26, height: 13 }} />
+          <button className="wq-hit" title="Ecualizador" style={{ left: 0, top: 14, width: 26, height: 13 }} />
+          <button className="wq-hit" title="Favoritos" onClick={() => setTab('favs')} style={{ left: 0, top: 27, width: 26, height: 14 }} />
         </div>
       </div>
-    </div>
-  )
-}
 
-function Curated({ current, isFav, onPlay, onFav }: { current: Station | null; isFav: (s: Station) => boolean; onPlay: (s: Station) => void; onFav: (s: Station) => void }) {
-  const genres = Array.from(new Set(CURATED.map((s) => s.genre)))
-  return (
-    <>
-      {genres.map((g) => (
-        <div key={g}>
-          <div className="wmp-group">{g}</div>
-          {CURATED.filter((s) => s.genre === g).map((s) => (
-            <StationRow key={s.uuid} s={s} current={current} fav={isFav(s)} onPlay={() => onPlay(s)} onFav={() => onFav(s)} />
-          ))}
+      {/* ── Drawer de estaciones (UI funcional; la Playlist real Pl-* es otro incremento) ── */}
+      <div className="wq-drawer" style={{ flex: 1, minHeight: 0, margin: '2px 6px 6px' }}>
+        <div className="wq-search">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') search() }} placeholder="Buscar estación (nombre, género, país)…" />
+          <button onClick={search} disabled={searching}>{searching ? '…' : 'Buscar'}</button>
+          <button onClick={() => setTab((t) => (t === 'favs' ? 'curated' : 'favs'))} title="Favoritos" style={{ fontSize: 13 }}>{tab === 'favs' ? '★' : '☆'}</button>
         </div>
-      ))}
-    </>
-  )
-}
-
-function StationRow({ s, current, fav, onPlay, onFav }: { s: Station; current: Station | null; fav: boolean; onPlay: () => void; onFav: () => void }) {
-  const on = current?.url === s.url
-  return (
-    <div className={`wmp-row ${on ? 'wmp-row--on' : ''}`}>
-      <button className="wmp-row-play" onDoubleClick={onPlay} onClick={onPlay} title="Reproducir">
-        <span className="wmp-row-icon">{on ? '▶' : '♪'}</span>
-        <span className="wmp-row-name">{s.name}</span>
-        <span className="wmp-row-meta">{s.codec}{s.country ? ' · ' + s.country : ''}</span>
-      </button>
-      <button className="wmp-row-fav" onClick={onFav} title={fav ? 'Quitar de favoritos' : 'Agregar a favoritos'} style={{ color: fav ? '#ffcf3f' : '#6f8fbf' }}>{fav ? '★' : '☆'}</button>
-    </div>
-  )
-}
-
-function NowPlaying({ station, status, playing, vol, statusText, isFav, onFav }: { station: Station | null; status: Status; playing: boolean; vol: number; statusText: string; isFav: boolean; onFav: () => void }) {
-  return (
-    <div className="wmp-now">
-      <Visualizer active={playing && status === 'live'} vol={vol} />
-      <div className="wmp-now-info">
-        {station ? (
-          <>
-            <div className="wmp-now-name">{station.name}</div>
-            <div className="wmp-now-meta">{station.genre || station.tags || 'Radio en internet'}</div>
-            <div className="wmp-now-status" style={{ color: status === 'error' ? '#ff8a8a' : status === 'live' ? '#8effb0' : '#cfe0ff' }}>{statusText} · {station.codec}{station.bitrate ? ' ' + station.bitrate + 'k' : ''}</div>
-            <button className="wmp-now-fav" onClick={onFav}>{isFav ? '★ En favoritos' : '☆ Agregar a favoritos'}</button>
-          </>
-        ) : (
-          <div className="wmp-now-meta">Elige una estación en el Sintonizador.</div>
-        )}
+        <div className="wq-list">
+          {tab === 'favs' && favs.length === 0 && <div className="wq-empty">Sin favoritos todavía. Marca estaciones con ☆.</div>}
+          {tab === 'curated' && results.length > 0 && <div className="wq-grp">Resultados de “{query}”</div>}
+          {tab === 'curated' && results.length === 0
+            ? Array.from(new Set(CURATED.map((s) => s.genre))).map((g) => (
+                <div key={g}>
+                  <div className="wq-grp">{g}</div>
+                  {CURATED.filter((s) => s.genre === g).map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, CURATED)} onFav={() => toggleFav(s)} />)}
+                </div>
+              ))
+            : listShown.map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, listShown)} onFav={() => toggleFav(s)} />)}
+        </div>
       </div>
     </div>
   )
 }
 
-// Visualizador GENÉRICO animado (barras + reflejo, estilo "Barras y ondas" de WMP). No lee el audio real
-// (ver nota de cabecera); anima con ondas sinusoidales + ruido, escaladas por play/volumen. Honesto y de época.
-function Visualizer({ active, vol }: { active: boolean; vol: number }) {
-  const ref = useRef<HTMLCanvasElement | null>(null)
-  const raf = useRef<number>(0)
-  const phase = useRef(0)
-  const levels = useRef<number[]>(Array.from({ length: 40 }, () => 0))
+function Row({ s, on, fav, onPlay, onFav }: { s: Station; on: boolean; fav: boolean; onPlay: () => void; onFav: () => void }) {
+  return (
+    <div className={`wq-row ${on ? 'wq-row--on' : ''}`}>
+      <button className="wq-row-b" onClick={onPlay}><span style={{ width: 12, color: '#7fd0ff' }}>{on ? '▶' : '♪'}</span><span className="nm">{s.name}</span><span className="mt">{s.codec}{s.country ? ' · ' + s.country : ''}</span></button>
+      <button className="wq-fav" onClick={onFav} title={fav ? 'Quitar' : 'Favorito'} style={{ color: fav ? '#ffcf3f' : '#5f7fa6' }}>{fav ? '★' : '☆'}</button>
+    </div>
+  )
+}
 
+// Mini visualizador genérico (barras) para el display. No lee el audio real (real-FFT rompe streams
+// sin CORS); anima por play/estado — honesto y de época.
+function Viz({ active }: { active: boolean }) {
+  const ref = useRef<HTMLCanvasElement | null>(null); const raf = useRef(0); const ph = useRef(0); const lv = useRef<number[]>(Array(20).fill(0))
   useEffect(() => {
-    const cv = ref.current
-    if (!cv) return
-    const ctx = cv.getContext('2d')
-    if (!ctx) return
-    const N = levels.current.length
-
-    function frame() {
-      const c = ref.current, x = c?.getContext('2d')
-      if (!c || !x) { raf.current = requestAnimationFrame(frame); return }
-      const w = c.width, h = c.height
-      phase.current += active ? 0.14 : 0.02
-      x.clearRect(0, 0, w, h)
-      const bw = w / N
+    function f() {
+      const c = ref.current, x = c?.getContext('2d'); if (!c || !x) { raf.current = requestAnimationFrame(f); return }
+      const w = c.width, h = c.height, N = lv.current.length, bw = w / N; ph.current += active ? 0.16 : 0.02; x.clearRect(0, 0, w, h)
       for (let i = 0; i < N; i++) {
-        // objetivo por barra: mezcla de senoidales (da un patrón "musical") + ruido, o casi-plano en pausa
-        const t = phase.current
-        let target = active
-          ? (0.5 + 0.5 * Math.sin(t + i * 0.5) * Math.sin(t * 0.6 + i * 0.22)) * (0.35 + 0.65 * Math.abs(Math.sin(t * 1.7 + i))) * (0.55 + 0.45 * vol)
-          : 0.04 + 0.02 * Math.sin(t + i)
-        target = Math.max(0.02, Math.min(1, target))
-        levels.current[i] += (target - levels.current[i]) * 0.35   // suavizado
-        const lv = levels.current[i]
-        const bh = lv * h * 0.5
-        const bx = i * bw
-        const grad = x.createLinearGradient(0, h * 0.5 - bh, 0, h * 0.5)
-        grad.addColorStop(0, '#8fe6ff'); grad.addColorStop(1, '#1f6fd6')
-        x.fillStyle = grad
-        x.fillRect(bx + 1, h * 0.5 - bh, bw - 2, bh)
-        // reflejo inferior atenuado
-        x.fillStyle = 'rgba(90,170,255,0.28)'
-        x.fillRect(bx + 1, h * 0.5, bw - 2, bh * 0.7)
+        let t = active ? (0.5 + 0.5 * Math.sin(ph.current + i * 0.5) * Math.sin(ph.current * 0.6 + i * 0.3)) * (0.4 + 0.6 * Math.abs(Math.sin(ph.current * 1.6 + i))) : 0.05
+        t = Math.max(0.04, Math.min(1, t)); lv.current[i] += (t - lv.current[i]) * 0.35
+        const bh = lv.current[i] * h; const g = x.createLinearGradient(0, h - bh, 0, h); g.addColorStop(0, '#eaf6ff'); g.addColorStop(1, '#2f7bbf'); x.fillStyle = g; x.fillRect(i * bw + 0.5, h - bh, bw - 1, bh)
       }
-      raf.current = requestAnimationFrame(frame)
+      raf.current = requestAnimationFrame(f)
     }
-    raf.current = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(raf.current)
-  }, [active, vol])
-
-  return <canvas ref={ref} width={360} height={150} className="wmp-viz" />
+    raf.current = requestAnimationFrame(f); return () => cancelAnimationFrame(raf.current)
+  }, [active])
+  return <canvas ref={ref} width={78} height={30} style={{ width: 78, height: 30, opacity: 0.85 }} />
 }

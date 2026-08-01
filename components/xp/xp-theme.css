@@ -242,6 +242,32 @@
   font-family: 'XP Tahoma', Tahoma, 'Segoe UI', sans-serif;
 }
 
+/* ── WMP QuickSilver (skin REAL: bitmaps del zip, posiciones de base.wms) ────────────────────── */
+.wq { position: relative; width: 500px; height: 194px; user-select: none; }
+.wq-base { position: absolute; left: 0; top: 0; width: 500px; height: 194px; }   /* Base.png = todo el chrome */
+/* Botón = bitmap real por estado (up/-ho/-dn/-dis) vía var(); el píxel es el del archivo */
+.wq-btn { position: absolute; padding: 0; border: 0; background: var(--u) center/contain no-repeat; cursor: pointer; }
+.wq-btn:hover:not(:disabled) { background-image: var(--h); }
+.wq-btn:active:not(:disabled) { background-image: var(--d); }
+.wq-btn:disabled { background-image: var(--x); cursor: default; }
+/* zonas de clic invisibles para los grupos (fullminclose / pleqvis) por su -map */
+.wq-hit { position: absolute; border: 0; background: transparent; cursor: pointer; padding: 0; }
+/* drawer de estaciones bajo la cápsula (UI funcional, armonizada en acero — la Playlist real Pl-* es
+   otro incremento) */
+.wq-drawer { background: linear-gradient(180deg,#243a52,#16273a); border: 1px solid #0a1622; border-radius: 0 0 10px 10px; overflow: hidden; display: flex; flex-direction: column; color: #cfe0f2; }
+.wq-search { display: flex; gap: 5px; padding: 6px; background: linear-gradient(180deg,#2c445e,#22374e); border-bottom: 1px solid #0d1c2b; }
+.wq-search input { flex: 1; min-width: 0; border: 1px solid #0d2033; border-radius: 3px; padding: 3px 6px; font: inherit; font-size: 11px; background: #0c1a29; color: #dcebfb; outline: none; }
+.wq-search button { border: 1px solid #12283c; border-radius: 3px; background: linear-gradient(#e8eff6,#aeb9c4); color: #16324f; font: inherit; font-size: 11px; padding: 2px 10px; cursor: pointer; }
+.wq-list { flex: 1; min-height: 0; overflow: auto; }
+.wq-grp { font-size: 9.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: #7fa6d0; padding: 6px 9px 2px; }
+.wq-row { display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,.05); }
+.wq-row--on { background: rgba(90,150,220,.22); }
+.wq-row-b { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 4px 9px; border: 0; background: none; color: #d7e6f7; font: inherit; font-size: 11.5px; text-align: left; cursor: pointer; }
+.wq-row-b .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wq-row-b .mt { font-size: 9.5px; color: #7f9ec2; }
+.wq-fav { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 8px; }
+.wq-empty { padding: 14px; font-size: 11.5px; color: #8fabce; font-style: italic; line-height: 1.5; }
+
 /* ── Reproductor de Windows Media (skin WMP 9, ventana BARE con chrome propio) ────────────────── */
 .wmp {
   height: 100%; display: flex; flex-direction: column; overflow: hidden;
