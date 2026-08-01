@@ -81,6 +81,9 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   const [favs, setFavs] = useState<Station[]>([])
   const [tab, setTab] = useState<'curated' | 'favs'>('curated')
   const [collapsed, setCollapsed] = useState(false)   // shutter: muestra/oculta la Playlist
+  const [repeat, setRepeat] = useState(false)         // botón Repeat = reconexión automática al caer el stream
+  const repeatRef = useRef(false); repeatRef.current = repeat
+  const retried = useRef<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Station[]>([])
   const [searching, setSearching] = useState(false)
@@ -99,10 +102,15 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
 
   useEffect(() => {
     const a = audioRef.current; if (!a) return
-    const onPlaying = () => { clearLoadTimer(); setStatus('live'); setPlaying(true); const u = curUrl.current; setUnavailable((s) => { if (!s.has(u)) return s; const n = new Set(s); n.delete(u); return n }) }
+    const onPlaying = () => { clearLoadTimer(); setStatus('live'); setPlaying(true); const u = curUrl.current; retried.current.delete(u); setUnavailable((s) => { if (!s.has(u)) return s; const n = new Set(s); n.delete(u); return n }) }
     const onWaiting = () => setStatus((s) => (s === 'live' ? 'live' : 'loading'))
     const onPause = () => setPlaying(false)
-    const onErr = () => { clearLoadTimer(); setStatus('error'); setPlaying(false); markUnavailable() }
+    const onErr = () => {
+      clearLoadTimer(); setStatus('error'); setPlaying(false); markUnavailable()
+      // Reconexión automática (botón Repeat): reintenta UNA vez el mismo stream tras caerse.
+      const u = curUrl.current
+      if (repeatRef.current && u && !retried.current.has(u)) { retried.current.add(u); setTimeout(() => { const a2 = audioRef.current; if (a2 && curUrl.current === u) { setStatus('loading'); a2.load(); a2.play().catch(() => {}) } }, 4000) }
+    }
     a.addEventListener('playing', onPlaying); a.addEventListener('waiting', onWaiting); a.addEventListener('pause', onPause); a.addEventListener('error', onErr); a.addEventListener('stalled', onWaiting)
     return () => { clearLoadTimer(); a.removeEventListener('playing', onPlaying); a.removeEventListener('waiting', onWaiting); a.removeEventListener('pause', onPause); a.removeEventListener('error', onErr); a.removeEventListener('stalled', onWaiting) }
   }, [])
@@ -134,7 +142,7 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
     : status === 'live' ? '● EN VIVO' : status === 'loading' ? 'Cargando…' : status === 'error' ? '⚠ Sin señal' : 'Detenido'
 
   return (
-    <div style={{ position: 'relative', width: 500, height: 194 }}>
+    <div style={{ width: 500, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <audio ref={audioRef} />
 
       {/* ── Cápsula QuickSilver (chrome real) ── */}
@@ -197,9 +205,9 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
       {!collapsed && (
         <div className="wq-pl">
           <div className="wq-pl-top">
-            {/* aleatorio / repetir reales del skin, en la barra "PLAYLIST" */}
-            <button className="wq-plbtn" title="Aleatorio" onClick={shuffle} style={{ right: 54, top: 7, ...plbtn('pl-shuffle') }} />
-            <button className="wq-plbtn" title="Repetir" style={{ right: 24, top: 7, ...plbtn('pl-repeat') }} />
+            {/* aleatorio / reconexión — bitmaps reales del skin, centrados en la franja azul (no en el borde negro) */}
+            <button className="wq-plbtn" title="Reproducir una al azar" onClick={shuffle} style={{ right: 52, top: 9, ...plbtn('pl-shuffle') }} />
+            <button className={`wq-plbtn ${repeat ? 'wq-plbtn--on' : ''}`} title={repeat ? 'Reconexión automática: activada' : 'Reconexión automática'} onClick={() => setRepeat((r) => !r)} style={{ right: 20, top: 9, ...plbtn('pl-repeat') }} />
           </div>
           <div className="wq-pl-l" /><div className="wq-pl-r" /><div className="wq-pl-b" />
           <div className="wq-pl-body">

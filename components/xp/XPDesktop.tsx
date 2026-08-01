@@ -161,7 +161,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const closeFlySoon = () => { if (flyTimer.current) clearTimeout(flyTimer.current); flyTimer.current = setTimeout(() => setFlyout(null), 320) }
 
   // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
-  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; icon?: string; bare?: boolean }) {
+  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; resizeY?: boolean; icon?: string; bare?: boolean }) {
     closeStart()
     const existing = windows.find((w) => w.id === id)
     if (existing?.minimized) playXpSound('restore')
@@ -171,7 +171,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       if (prev.some((w) => w.id === id))
         return prev.map((w) => (w.id === id ? { ...w, minimized: false, z: top + 1 } : w))
       const n = prev.length
-      return [...prev, { id, title, content, x: opts?.x ?? 90 + n * 32, y: opts?.y ?? 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable, icon: opts?.icon, bare: opts?.bare }]
+      return [...prev, { id, title, content, x: opts?.x ?? 90 + n * 32, y: opts?.y ?? 52 + n * 32, z: top + 1, minimized: false, w: opts?.w, h: opts?.h, resizable: opts?.resizable, resizeY: opts?.resizeY, icon: opts?.icon, bare: opts?.bare }]
     })
   }
 
@@ -207,7 +207,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const openSudoku = () => openWindow('sudoku', 'Sudoku', <Sudoku />, { w: 344, h: 470, resizable: true, icon: 'sudoku' })
   // Reproductor de Windows Media (radio) — ventana BARE: la app dibuja su chrome WMP; sus botones
   // min/cerrar se cablean aquí al WM. Tamaño fijo (no resizable).
-  const openReproductor = () => openWindow('radio', 'Reproductor de Windows Media', <RadioPlayer onClose={() => closeWindow('radio')} onMinimize={() => minimizeWindow('radio')} />, { w: 500, h: 194, bare: true, icon: 'wmp' })
+  const openReproductor = () => openWindow('radio', 'Reproductor de Windows Media', <RadioPlayer onClose={() => closeWindow('radio')} onMinimize={() => minimizeWindow('radio')} />, { w: 500, h: 470, bare: true, resizeY: true, icon: 'wmp' })
   // Carpetas anidadas de "Todos los programas" (cascada canónica de XP).
   const FOLDERS = [
     { id: 'juegos', label: 'Juegos', icon: 'juegos', items: [

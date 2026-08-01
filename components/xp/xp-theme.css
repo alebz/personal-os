@@ -243,7 +243,7 @@
 }
 
 /* ── WMP QuickSilver (skin REAL: bitmaps del zip, posiciones de base.wms) ────────────────────── */
-.wq { position: relative; width: 500px; height: 194px; user-select: none; }
+.wq { position: relative; width: 500px; height: 194px; flex-shrink: 0; user-select: none; }
 .wq-base { position: absolute; left: 0; top: 0; width: 500px; height: 194px; }   /* Base.png = todo el chrome */
 /* Botón = bitmap real por estado (up/-ho/-dn/-dis) vía var(); el píxel es el del archivo */
 .wq-btn { position: absolute; padding: 0; border: 0; background: var(--u) center/contain no-repeat; cursor: pointer; }
@@ -254,18 +254,23 @@
 .wq-hit { position: absolute; border: 0; background: transparent; cursor: pointer; padding: 0; }
 /* Playlist QuickSilver — marco REAL con los bitmaps Pl-* (9-slice), coords de base.wms.
    Sobresale bajo la cápsula (la ventana bare mide solo la cápsula; overflow visible). */
-.wq-pl { position: absolute; left: 0; top: 190px; width: 500px; height: 226px; }
+/* Playlist: rellena el alto restante de la ventana (resize vertical la agranda). */
+.wq-pl { position: relative; flex: 1; min-height: 120px; width: 500px; margin-top: -4px; }
 .wq-pl-top { position: absolute; left: 0; top: 0; width: 100%; height: 45px;
   background: url(/themes/xp/wmp/pl-topbg.png) left top no-repeat, url(/themes/xp/wmp/pl-topbgtile.png) left top repeat-x; }
 .wq-pl-l { position: absolute; left: 0; top: 45px; bottom: 9px; width: 18px; background: url(/themes/xp/wmp/pl-lefttile.png) top left repeat-y; }
 .wq-pl-r { position: absolute; right: 0; top: 45px; bottom: 9px; width: 18px; background: url(/themes/xp/wmp/pl-righttile.png) top left repeat-y; }
 .wq-pl-b { position: absolute; left: 0; bottom: 0; width: 100%; height: 9px; background: url(/themes/xp/wmp/pl-bottomtile.png) left top repeat-x; }
 /* Relleno = ItemColor real de base.wms (#556382); el brillo lo da Pl-Glass encima. */
-.wq-pl-body { position: absolute; left: 18px; right: 18px; top: 45px; bottom: 9px; overflow: hidden; display: flex; flex-direction: column; background: #556382; }
+/* Cuerpo: ItemColor real #556382 + scanlines sutiles para MATCH con la textura de los tiles del marco
+   (los bordes Pl-* traen scanlines; un fondo plano no casaba). */
+.wq-pl-body { position: absolute; left: 18px; right: 18px; top: 45px; bottom: 9px; overflow: hidden; display: flex; flex-direction: column;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 1px, rgba(0,0,0,.05) 1px 2px), #556382; }
 /* Pl-Glass.png es un sheen SUTIL por diseño (alfa ~20% solo en el borde superior, cae a 0 en ~y44).
    A opacidad PLENA y anclado arriba a su proporción natural = el brillo que el skin realmente da. */
 .wq-pl-glass { position: absolute; left: 0; top: 0; right: 0; height: 160px; background: url(/themes/xp/wmp/pl-glass.png) top center / 100% 100% no-repeat; opacity: 1; pointer-events: none; }
-.wq-plbtn { position: absolute; padding: 0; border: 0; width: 27px; height: 31px; background: var(--u) center/contain no-repeat; cursor: pointer; }
+.wq-plbtn { position: absolute; z-index: 3; padding: 0; border: 0; width: 27px; height: 31px; background: var(--u) center/contain no-repeat; cursor: pointer; }
+.wq-plbtn--on { filter: brightness(1.15) drop-shadow(0 0 2px rgba(150,200,255,.8)); }
 .wq-plbtn:hover:not(:disabled) { background-image: var(--h); }
 .wq-plbtn:active:not(:disabled) { background-image: var(--d); }
 .wq-plbtn:disabled { background-image: var(--x); cursor: default; }
@@ -277,9 +282,15 @@
 .wq-search button { border: 1px solid #2a3c5a; border-radius: 3px; background: linear-gradient(180deg, #e9eff6, #b6c3d6 55%, #93a2ba); color: #1a3355; font: inherit; font-size: 11px; font-weight: 700; padding: 2px 10px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
 .wq-search button:active { background: linear-gradient(180deg, #93a2ba, #cdd8e6); }
 .wq-list { position: relative; z-index: 1; flex: 1; min-height: 0; overflow-y: auto; }
-.wq-list::-webkit-scrollbar { width: 12px; }
-.wq-list::-webkit-scrollbar-track { background: rgba(20,32,52,.5); }
-.wq-list::-webkit-scrollbar-thumb { background: linear-gradient(90deg, #6b7d9e, #46587c); border: 1px solid #2a3a56; border-radius: 6px; }
+/* Scrollbar recreada en familia Luna/acero (el zip NO trae asset de scrollbar de la playlist) */
+.wq-list::-webkit-scrollbar { width: 15px; }
+.wq-list::-webkit-scrollbar-track { background: linear-gradient(90deg, #3a496a, #4b5c7e); border-left: 1px solid #2a3a56; }
+.wq-list::-webkit-scrollbar-thumb { background: linear-gradient(90deg, #9fb2d2, #64789e 45%, #4a5c80); border: 1px solid #26364f; border-radius: 3px; box-shadow: inset 1px 0 0 rgba(255,255,255,.35); }
+.wq-list::-webkit-scrollbar-thumb:hover { background: linear-gradient(90deg, #b3c4df, #7488ac 45%, #566a8e); }
+.wq-list::-webkit-scrollbar-button:vertical:decrement { height: 15px; background: linear-gradient(180deg, #9fb2d2, #5a6f96) center / 8px no-repeat, linear-gradient(180deg, #7f93b7, #4a5c80); border: 1px solid #26364f;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M4 0L8 6H0z' fill='%231d2c46'/%3E%3C/svg%3E"), linear-gradient(180deg,#9fb2d2,#5a6f96); background-repeat: no-repeat, no-repeat; background-position: center, center; }
+.wq-list::-webkit-scrollbar-button:vertical:increment { height: 15px; border: 1px solid #26364f;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0L8 0L4 6z' fill='%231d2c46'/%3E%3C/svg%3E"), linear-gradient(180deg,#9fb2d2,#5a6f96); background-repeat: no-repeat, no-repeat; background-position: center, center; }
 .wq-grp { font-size: 9.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #cdddf2; padding: 6px 9px 3px; text-shadow: 0 1px 1px rgba(0,0,0,.45); }
 .wq-row { display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,.05); }
 .wq-row--on { background: rgba(120,175,240,.28); }

@@ -22,6 +22,7 @@ export interface WinState {
   w?: number
   h?: number
   resizable?: boolean    // secciones sí; diálogos de sistema no
+  resizeY?: boolean      // solo resize VERTICAL (n/s), ancho fijo — p.ej. la ventana WMP (cápsula 500px fija)
   maximized?: boolean    // llena el lienzo menos taskbar; x/y/w/h guardan el tamaño de RESTAURAR
   bare?: boolean         // sin chrome Luna: la app dibuja su propia ventana (WMP). Drag por [data-xp-drag].
 }
@@ -215,8 +216,8 @@ export default function XPWindow({
         <div data-theme="xp" className="relative min-h-0 flex-1 overflow-auto bg-surface-base">{win.content}</div>
       )}
 
-      {/* Handles de resize — solo secciones, y no cuando está maximizada */}
-      {win.resizable && !maximized && DIRS.map((d) => (
+      {/* Handles de resize — secciones (8 lados) o solo vertical (n/s, p.ej. WMP), no si maximizada */}
+      {!maximized && (win.resizable ? DIRS : win.resizeY ? (['n', 's'] as Dir[]) : []).map((d) => (
         <div key={d} className={`xp-rz xp-rz-${d}`} onPointerDown={onRzDown(d)} onPointerMove={onRzMove} onPointerUp={onRzUp} />
       ))}
     </div>
