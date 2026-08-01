@@ -171,8 +171,11 @@ export default function XPWindow({
       style={{
         position: 'absolute', left: geom.x, top: geom.y, width: geom.w, height: geom.h, zIndex: win.z,
         display: hidden ? 'none' : 'flex', flexDirection: 'column',
-        ...(bare ? { background: 'transparent', borderRadius: 9 } : { background: '#0831d8' }),
-        boxShadow: active ? '5px 6px 22px rgba(0,0,0,0.45)' : '2px 3px 12px rgba(0,0,0,0.28)',
+        // Bare: sombra por drop-shadow (sigue el canal alfa real del bitmap keyado — silueta angulosa/
+        // redondeada del skin), NO box-shadow (que seguiría el rectángulo/border-radius).
+        ...(bare
+          ? { background: 'transparent', filter: active ? 'drop-shadow(4px 6px 8px rgba(0,0,0,0.5))' : 'drop-shadow(2px 4px 6px rgba(0,0,0,0.38))' }
+          : { background: '#0831d8', boxShadow: active ? '5px 6px 22px rgba(0,0,0,0.45)' : '2px 3px 12px rgba(0,0,0,0.28)' }),
         transition: zoom ? `left ${ANIM_MS}ms ease-out, top ${ANIM_MS}ms ease-out, width ${ANIM_MS}ms ease-out, height ${ANIM_MS}ms ease-out` : (tf?.transition ?? 'none'),
         transform: tf?.transform, transformOrigin: tf?.transformOrigin, opacity: tf?.opacity,
       }}
@@ -205,7 +208,9 @@ export default function XPWindow({
 
       {/* Cuerpo. Bare: la app llena todo con su propio chrome (sin fondo claro ni scroll del WM). */}
       {bare ? (
-        <div className="relative min-h-0 flex-1" style={{ overflow: 'hidden', borderRadius: 9 }}>{win.content}</div>
+        // overflow visible: la app puede sobresalir del rect (p.ej. el drawer de la Playlist bajo la
+        // cápsula) y el drop-shadow sigue la silueta real sin recortarla.
+        <div className="relative min-h-0 flex-1" style={{ overflow: 'visible' }}>{win.content}</div>
       ) : (
         <div data-theme="xp" className="relative min-h-0 flex-1 overflow-auto bg-surface-base">{win.content}</div>
       )}

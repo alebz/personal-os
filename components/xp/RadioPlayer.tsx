@@ -16,6 +16,9 @@ const btn = (name: string, dis = true): React.CSSProperties => ({
   ['--d' as string]: `url(${A}${name}-dn.png)`,
   ...(dis ? { ['--x' as string]: `url(${A}${name}-dis.png)` } : {}),
 })
+const plbtn = (name: string): React.CSSProperties => ({
+  ['--u' as string]: `url(${A}${name}.png)`, ['--h' as string]: `url(${A}${name}-ho.png)`, ['--d' as string]: `url(${A}${name}-dn.png)`,
+})
 
 interface Station { uuid: string; name: string; url: string; codec: string; bitrate: number; country?: string; tags?: string; genre?: string }
 
@@ -49,6 +52,7 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   const [vol, setVol] = useState(0.7)
   const [favs, setFavs] = useState<Station[]>([])
   const [tab, setTab] = useState<'curated' | 'favs'>('curated')
+  const [collapsed, setCollapsed] = useState(false)   // shutter: muestra/oculta la Playlist
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Station[]>([])
   const [searching, setSearching] = useState(false)
@@ -86,6 +90,7 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   }
   function stop() { clearLoadTimer(); const a = audioRef.current; if (a) { a.pause(); a.removeAttribute('src'); a.load() } setPlaying(false); setStatus('idle') }
   function step(d: 1 | -1) { if (!queue.length) return; const i = current ? queue.findIndex((s) => s.url === current.url) : -1; play(queue[((i < 0 ? 0 : i + d) + queue.length) % queue.length], queue) }
+  function shuffle() { const l = tab === 'favs' ? favs : (results.length ? results : CURATED); if (l.length) play(l[Math.floor(Math.random() * l.length)], l) }
   async function search() {
     const q = query.trim(); if (!q) return; setSearching(true)
     try { const d = await fetch(`/api/radio?q=${encodeURIComponent(q)}&limit=40`).then((r) => r.json()); setResults(Array.isArray(d?.stations) ? d.stations : []); setTab('curated') } catch { setResults([]) } finally { setSearching(false) }
@@ -97,7 +102,7 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
   const listShown = tab === 'favs' ? favs : (results.length ? results : CURATED)
 
   return (
-    <div style={{ width: 500, height: 420, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'relative', width: 500, height: 194 }}>
       <audio ref={audioRef} />
 
       {/* ── Cápsula QuickSilver (chrome real) ── */}
@@ -124,7 +129,8 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
         <button className="wq-btn" title="Siguiente" onClick={() => step(1)} style={{ left: 127, top: 73, width: 23, height: 36, ...btn('next') }} />
         <button className="wq-btn" title="Abrir estaciones" onClick={() => setTab('curated')} style={{ left: 71, top: 29, width: 35, height: 25, ...btn('open') }} />
         <button className="wq-btn" title="Detener" onClick={stop} style={{ left: 71, top: 130, width: 35, height: 24, ...btn('stop') }} />
-        <button className="wq-btn" title="Opciones" onClick={() => setTab((t) => (t === 'favs' ? 'curated' : 'favs'))} style={{ left: 96, top: 155, width: 29, height: 18, ...btn('opts') }} />
+        {/* SHUTTER real (shutterbutton.gif → opts.png): muestra/oculta la Playlist */}
+        <button className="wq-btn" title={collapsed ? 'Mostrar lista' : 'Ocultar lista'} onClick={() => setCollapsed((c) => !c)} style={{ left: 96, top: 155, width: 29, height: 18, ...btn('opts') }} />
 
         {/* mute + volumen (riel real Slider.gif + Knob.gif), sobre Coverbottom */}
         <button className="wq-btn" title="Silenciar" onClick={() => setVol((v) => (v > 0 ? 0 : 0.7))} style={{ left: 149, top: 120, width: 21, height: 19, ...btn('mute') }} />
@@ -155,26 +161,37 @@ export default function RadioPlayer({ onClose, onMinimize }: { onClose?: () => v
         </div>
       </div>
 
-      {/* ── Drawer de estaciones (UI funcional; la Playlist real Pl-* es otro incremento) ── */}
-      <div className="wq-drawer" style={{ flex: 1, minHeight: 0, margin: '2px 6px 6px' }}>
-        <div className="wq-search">
-          <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') search() }} placeholder="Buscar estación (nombre, género, país)…" />
-          <button onClick={search} disabled={searching}>{searching ? '…' : 'Buscar'}</button>
-          <button onClick={() => setTab((t) => (t === 'favs' ? 'curated' : 'favs'))} title="Favoritos" style={{ fontSize: 13 }}>{tab === 'favs' ? '★' : '☆'}</button>
+      {/* ── Playlist — marco REAL Pl-* (9-slice). Sobresale bajo la cápsula; el shutter la colapsa. ── */}
+      {!collapsed && (
+        <div className="wq-pl">
+          <div className="wq-pl-top">
+            {/* aleatorio / repetir reales del skin, en la barra "PLAYLIST" */}
+            <button className="wq-plbtn" title="Aleatorio" onClick={shuffle} style={{ right: 54, top: 7, ...plbtn('pl-shuffle') }} />
+            <button className="wq-plbtn" title="Repetir" style={{ right: 24, top: 7, ...plbtn('pl-repeat') }} />
+          </div>
+          <div className="wq-pl-l" /><div className="wq-pl-r" /><div className="wq-pl-b" />
+          <div className="wq-pl-body">
+            <div className="wq-pl-glass" />
+            <div className="wq-search">
+              <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') search() }} placeholder="Buscar estación (nombre, género, país)…" />
+              <button onClick={search} disabled={searching}>{searching ? '…' : 'Buscar'}</button>
+              <button onClick={() => setTab((t) => (t === 'favs' ? 'curated' : 'favs'))} title="Favoritos" style={{ fontSize: 13, color: tab === 'favs' ? '#ffcf3f' : '#16324f' }}>{tab === 'favs' ? '★' : '☆'}</button>
+            </div>
+            <div className="wq-list">
+              {tab === 'favs' && favs.length === 0 && <div className="wq-empty">Sin favoritos todavía. Marca estaciones con ☆.</div>}
+              {tab === 'curated' && results.length > 0 && <div className="wq-grp">Resultados de “{query}”</div>}
+              {tab === 'curated' && results.length === 0
+                ? Array.from(new Set(CURATED.map((s) => s.genre))).map((g) => (
+                    <div key={g}>
+                      <div className="wq-grp">{g}</div>
+                      {CURATED.filter((s) => s.genre === g).map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, CURATED)} onFav={() => toggleFav(s)} />)}
+                    </div>
+                  ))
+                : listShown.map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, listShown)} onFav={() => toggleFav(s)} />)}
+            </div>
+          </div>
         </div>
-        <div className="wq-list">
-          {tab === 'favs' && favs.length === 0 && <div className="wq-empty">Sin favoritos todavía. Marca estaciones con ☆.</div>}
-          {tab === 'curated' && results.length > 0 && <div className="wq-grp">Resultados de “{query}”</div>}
-          {tab === 'curated' && results.length === 0
-            ? Array.from(new Set(CURATED.map((s) => s.genre))).map((g) => (
-                <div key={g}>
-                  <div className="wq-grp">{g}</div>
-                  {CURATED.filter((s) => s.genre === g).map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, CURATED)} onFav={() => toggleFav(s)} />)}
-                </div>
-              ))
-            : listShown.map((s) => <Row key={s.uuid} s={s} on={current?.url === s.url} fav={isFav(s)} onPlay={() => play(s, listShown)} onFav={() => toggleFav(s)} />)}
-        </div>
-      </div>
+      )}
     </div>
   )
 }
