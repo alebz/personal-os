@@ -34,3 +34,10 @@ next-env.d.ts
 # XP theme sources (heavy; runtime lives in public/themes/xp)
 /WinXp.zip
 /design/xp-src/
+# MSN 7.5 reference pack (3.4M; solo referencia para emoticones/layout — NO deployar)
+/public/themes/xp/MSN Messenger/
+/public/themes/xp/msn_messenger_logo.jpg
+# scratch / evidencia de sesión
+/_ic.mjs
+/_iconcrop.mjs
+/_wmp_evidencia/
