@@ -32,25 +32,25 @@ const SUPRA_RULES = [
   'Devuelve exactamente los mensajes pedidos, todos distintos entre sí.',
 ].join('\n')
 
-// SANKALPA (mode 'sankalpa') — el MENSAJE PERSONAL de MSN como INTENCIÓN que Alex ELIGE para guiarse,
-// en primera persona. NO es reporte de su vida ni recuento de pendientes: NO lee sus datos
-// (tareas/notas/diario) — sale de su ser, no de su sistema. Es dirección, no reporte. NO es Cerebro.
+// SANKALPA (mode 'sankalpa') — el MENSAJE PERSONAL de MSN entendido como en el YOGA NIDRA: una
+// resolución breve que Alex sostiene como YA VERDADERA (primera persona, presente, afirmativa, digna).
+// NO es reporte, consejo ni anécdota; NO lee sus datos (cero RAG) — es intención pura. NO es Cerebro.
 const VOICE_SANKALPA = [
-  'Escribes el SANKALPA de Alex: su mensaje personal, pero como una INTENCIÓN que él ELIGE para guiarse, en primera persona. No es reporte de lo que hizo ni de sus pendientes; es una dirección que se pone a sí mismo.',
-  'PROHIBIDO usar datos de su vida (proyectos, personas, negocios, tareas, lugares, nombres). No sale de su sistema ni de su agenda: sale de su ser.',
-  'Tono intencional e inspirador PERO ATERRIZADO, con el registro real de Alex (mexicano, cálido, sencillo, nada solemne ni etéreo); cabe una imagen linda ocasional, pero nunca etérea.',
-  'Primera persona. VARÍA LA ESTRUCTURA: NO todas empiezan con "Hoy"; algunas sí, otras arrancan con el verbo o la imagen, otras ni marcan el día. Que en un lote no se repita el mismo arranque.',
-  'Español. Texto plano, sin comillas, sin markdown, sin emojis.',
+  'Escribes el SANKALPA de Alex: su mensaje personal, entendido como en el yoga nidra — una RESOLUCIÓN breve que él sostiene como YA VERDADERA. No es reporte, ni consejo, ni anécdota: es una intención declarada como hecho presente.',
+  'Ejemplos de la forma correcta: "Estoy en el camino correcto", "Atraigo y soy abundancia", "Confío en mi intuición", "Habito mi cuerpo con calma", "Mi trabajo florece".',
+  'Español. Texto plano, una línea cada uno, sin comillas, sin markdown, sin emojis, sin punto final.',
 ].join(' ')
 
 const SANKALPA_RULES = [
-  'Cada mensaje es UNA línea corta (idealmente < 82 caracteres).',
-  'Es una INTENCIÓN/dirección, no un logro cumplido ni un recordatorio de tareas.',
-  'REGLA DE ORO (lo que separa intención de póster): CADA sankalpa DEBE llevar O una IMAGEN CONCRETA (algo que se pueda ver o sentir: manos que se abren, un paso, los hombros que se sueltan, un respiro) O una VULNERABILIDAD ADMITIDA (aunque tiemble, aunque salga chueco, aunque no sepa, aunque adentro traiga tormenta). PROHIBIDA la nobleza abstracta sin cuerpo ("compañera fiel de mi jornada", "el ritmo de las cosas", "la luz de mi ser").',
-  'Prohibidas las palabras de retiro espiritual: jornada, sendero, universo, esencia, ser interior.',
-  'Evita el cliché de taza ("cree en ti", "todo es posible"). Que suene a algo que Alex de verdad se diría.',
-  'Ángulos variados: presencia, valentía, ternura consigo mismo, enfoque, soltar, paciencia, paso firme.',
-  'Devuelve exactamente los pedidos, todos distintos, con ARRANQUES distintos entre sí.',
+  'FORMA — cada sankalpa cumple las CINCO reglas, sin excepción:',
+  '1. Primera persona, tiempo PRESENTE, declarado como ya cierto. Nunca futuro ("voy a…"), nunca condicional, nunca imperativo ("cree…", "recuerda…").',
+  '2. Afirmativo. Cero negaciones. La palabra "sin" está PROHIBIDA (di lo que SÍ es, no la ausencia de lo malo): "Mi creatividad fluye libre", nunca "sin límites"; "Estoy en calma", nunca "No me estreso".',
+  '3. Breve: 3 a 8 palabras. UNA sola frase. Sin comas encadenadas, sin anécdota, sin explicación.',
+  '4. Universal y atemporal: una verdad que sostengo, no algo de hoy. Nunca "Hoy…"; cero contexto de su día, tareas, proyectos, datos ni personas.',
+  '5. Digno, no coloquial: sin slang, sin chiste, sin guiño. Es una intención, no un chat.',
+  'PROHIBIDO: anécdotas u observaciones; consejos o imperativos dirigidos a él; cualquier "imagen concreta" o "vulnerabilidad admitida"; datos de su vida o sistema (cero RAG).',
+  'TEMAS (rota entre ellos, no repitas en un lote): confianza/intuición, abundancia, calma/presencia, propósito y camino, apertura a recibir, fuerza, gratitud, creatividad, amor propio, salud.',
+  'Devuelve exactamente los pedidos, todos distintos, con arranques variados entre sí.',
 ].join('\n')
 
 export async function POST(req: NextRequest) {
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   if (mode === 'sankalpa') {
     // SANKALPA: intención pura, SIN RAG — jamás lee tareas/notas/diario. Sale de su ser, no del sistema.
     system = `${VOICE_SANKALPA}\n\n${SANKALPA_RULES}`
-    userMsg = `Sin ningún contexto de su vida. Como Alex, en primera persona, escribe ${count} sankalpas (intenciones con imagen concreta o vulnerabilidad admitida), con arranques VARIADOS, todos distintos.${excludeBlock}`
+    userMsg = `Sin ningún contexto de su vida ni de su sistema. Como Alex, en primera persona, escribe ${count} sankalpas que cumplan las CINCO reglas de forma, con arranques VARIADOS, todos distintos.${excludeBlock}`
   } else {
     // SUPRA (arcade): constata su vida real → EXIGE contexto por recencia (memory_chunks: notas/diario/
     // perfil/capturas). Muestreo aleatorio para que dos lotes seguidos no converjan.
@@ -118,6 +118,15 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     return new Response(`Generation failed: ${String(err)}`, { status: 502 })
+  }
+
+  // SANKALPA: red de seguridad server-side para las reglas MECÁNICAS de forma (el modelo resbala ~1/10,
+  // p.ej. "sin límites"). Auto-quita el punto final y descarta las que violen: coma, negación/"sin", o
+  // largo fuera de 3–8 palabras. Así JAMÁS llega una malformada a la UI (las reglas sutiles —presente,
+  // digno— las cubre el prompt). Puede devolver <count; el caller rota/reabastece, no pasa nada.
+  if (mode === 'sankalpa') {
+    const badForm = (s: string) => /,/.test(s) || /\b(no|sin|nunca|jamás|tampoco)\b/i.test(s) || s.split(/\s+/).length < 3 || s.split(/\s+/).length > 8
+    messages = messages.map(t => t.trim().replace(/[.]+$/, '')).filter(s => s.length > 0 && !badForm(s))
   }
 
   // El shape lleva topic: 'supra' (arcade) | 'nino' (mensaje personal de Cerebro Messenger).

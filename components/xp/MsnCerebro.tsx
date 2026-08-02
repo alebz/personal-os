@@ -130,7 +130,7 @@ function GroupHeader({ label, count, open, onToggle }: { label: string; count: n
 // (/api/supraconsciente mode:'sankalpa'). NO es Cerebro: NO lee tus datos (tareas/notas/diario) — sale
 // de tu ser, no de tu sistema. Es dirección, no reporte. Rota con fade cada ~5 min y avanza al clic. Si
 // no cabe, hace SCROLL (marquesina), como el personal message real — NO obliga a ensanchar la ventana.
-const PM_CACHE = 'msn-personal-cache-v3'   // v3: pasó de 'yo' (leía tus datos) a 'sankalpa' (intención sin RAG) → tira la caché vieja
+const PM_CACHE = 'msn-personal-cache-v4'   // v4: sankalpa REDEFINIDO (yoga nidra: resolución presente/afirmativa/digna, 3-8 palabras) → tira lo viejo (anécdotas/imágenes)
 const PM_HOLD_MS = 5 * 60_000
 type PmCache = { queue: string[]; shown: string[] }
 
