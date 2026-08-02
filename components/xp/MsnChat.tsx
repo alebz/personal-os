@@ -5,7 +5,7 @@ import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { MOODS } from '@/components/sections/DiarioContent'
 import { renderEmoticons, EMOTICONS, emoSrc } from '@/lib/msnEmoticons'
 import { CerebroButterfly } from './CerebroButterfly'
-import { loloTimeContext, loloLifeContext, markLoloTalk, markLoloAnswered, appendLoloMemory, onLoloMessage, onLoloNudge, LOLO_ES_MX } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, markLoloTalk, markLoloAnswered, appendLoloMemory, onLoloMessage, onLoloNudge, LOLO_ES_MX, LOLO_IDENTITY } from '@/lib/lolo'
 import { playXpSound } from './xpSounds'
 
 // Ventana de conversación MSN (canon MSN 6/7: cada chat es su propia ventana del WM). Cablea los 4
@@ -46,6 +46,7 @@ const LOLO_SYSTEM = [
   'TIENES VIDA PROPIA: proyectos, música que te clava, manías, un problemilla, ambiciones, cosas que te pasan. No todo gira en torno a Alex ni a su compu. A veces arrancas TÚ un tema tuyo, le cuentas qué andas haciendo, te quejas de algo tuyo o compartes lo que escuchas. No eres un NPC que solo reacciona: tienes iniciativa y mundo — pero igual te importa Alex, es un balance, como un amigo de verdad.',
   'Si quieres mandar dos ideas sueltas, sepáralas con un salto de línea (llegan como mensajes distintos, como cuando alguien textea seguido).',
   'Sin markdown, sin emojis de más, sin comillas alrededor de lo que dices.',
+  LOLO_IDENTITY,
   LOLO_ES_MX,
 ].join('\n')
 

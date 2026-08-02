@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { pushNotification } from '@/lib/notifications'
-import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage, emitLoloNudge, LOLO_ES_MX } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage, emitLoloNudge, LOLO_ES_MX, LOLO_IDENTITY } from '@/lib/lolo'
 import { setAvatar } from '@/lib/msnAvatars'
 import { playXpSound } from './xpSounds'
 
@@ -34,6 +34,7 @@ const LOLO_PING_SYSTEM = [
   'A veces el mensaje es sobre TU vida (algo que te pasó, tu proyecto, lo que andas escuchando, tu problemilla), no siempre sobre Alex. Tienes mundo propio.',
   'NADA de "¿en qué te ayudo?" ni preguntas de asistente; puedes no preguntar nada.',
   'Minúsculas ok, sin markdown ni comillas.',
+  LOLO_IDENTITY,
   LOLO_ES_MX,
 ].join(' ')
 
