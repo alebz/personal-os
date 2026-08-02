@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { pushNotification } from '@/lib/notifications'
 import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage } from '@/lib/lolo'
+import { setAvatar } from '@/lib/msnAvatars'
 
 // LOLO PROACTIVO — Lolo te escribe SOLO, pero con TACTO:
 //  · PRESENCIA: solo cuando estás EN LÍNEA (pestaña visible + interacción reciente). Si estás fuera,
@@ -41,11 +42,37 @@ function collapse(msgs: Msg[]): Msg[] {
 }
 const readNum = (k: string) => { try { return +(localStorage.getItem(k) || 0) } catch { return 0 } }
 
+// FOTO DE PERFIL DE LOLO — Lolo cambia su propia foto solo, ~1 vez al día (jitter 20–28h), solo cuando
+// estás en línea (misma presencia del ping). Silencioso (sin notificación). Persiste entre recargas
+// (la guardada se re-aplica al abrir; no cambia cada vez). Solo MSN/XP — el Lolo del arcade no tiene foto.
+const KEY_PIC = 'lolo-pic'
+const KEY_PIC_NEXT = 'lolo-pic-next'
+const PICS = Array.from({ length: 9 }, (_, i) => `/Lolo/profile-pics/${String(i + 1).padStart(2, '0')}.png`)
+const picGapMs = () => (20 + Math.random() * 8) * 3_600_000   // próximo cambio en 20–28h
+function rotatePic() {
+  let cur = ''
+  try { cur = localStorage.getItem(KEY_PIC) || '' } catch { /* */ }
+  const pool = PICS.filter((p) => p !== cur)   // nunca repite la anterior
+  const pick = pool[Math.floor(Math.random() * pool.length)] || PICS[0]
+  setAvatar('sys:lolo', pick)
+  try { localStorage.setItem(KEY_PIC, pick); localStorage.setItem(KEY_PIC_NEXT, String(Date.now() + picGapMs())) } catch { /* */ }
+}
+
 export default function LoloHeartbeat() {
   const busy = useRef(false)
   const lastActive = useRef(Date.now())
   const presentSince = useRef(0)
   const sessionPinged = useRef(false)
+
+  // Foto de perfil: al abrir, re-aplica la persistida (misma foto entre recargas, no cambia al reabrir);
+  // si nunca se ha elegido una, elige la primera y agenda el próximo cambio.
+  useEffect(() => {
+    try {
+      const cur = localStorage.getItem(KEY_PIC)
+      if (cur) { setAvatar('sys:lolo', cur); if (!localStorage.getItem(KEY_PIC_NEXT)) localStorage.setItem(KEY_PIC_NEXT, String(Date.now() + picGapMs())) }
+      else rotatePic()
+    } catch { /* */ }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -84,6 +111,9 @@ export default function LoloHeartbeat() {
     }
 
     function tick() {
+      // Foto de perfil: cambia sola cuando estás en línea y pasó el intervalo (~diario). Independiente
+      // del ping (no la limita el back-off/horario/probabilidad); silenciosa.
+      if (online() && Date.now() >= readNum(KEY_PIC_NEXT)) rotatePic()
       if (busy.current) return
       const h = new Date().getHours(); if (h < 8 || h >= 24) return          // horario despierto
       if (!online()) { presentSince.current = 0; sessionPinged.current = false; return }   // FUERA → no molesta
