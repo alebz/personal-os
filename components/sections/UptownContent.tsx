@@ -1449,8 +1449,17 @@ function UptownArcade() {
   // El apartado sale de la cuenta que marcó el usuario (default efectivo; movimientos viejos sin
   // método → efectivo). Se resta SOLO de esa cuenta.
   const apartadoMethod: 'cash' | 'card' = fondoMovThisMonth?.metodo === 'card' ? 'card' : 'cash'
-  const bankApartado = apartadoMethod === 'card' ? fondoAportado : 0
-  const cashApartado = apartadoMethod === 'card' ? 0 : fondoAportado
+  // Apartado NETO de TODOS los fondos no-reconcile ESTE mes, por método (out=aparta → resta de la
+  // wallet; in=retira → suma). Incluye Mantenimiento (cash/card) + apartados genéricos (obra/reserva).
+  // metodo 'card'=Banorte; resto (cash/null) = Efectivo (conserva fallback histórico null→efectivo).
+  // Reemplaza el cálculo viejo que SOLO contaba Mantenimiento (los genéricos no debitaban la wallet).
+  const apartadoNet = (toBank: boolean) => apartados
+    .filter(f => !f.archived)
+    .flatMap(f => f.movements)
+    .filter(m => (m.date ?? '').slice(0, 7) === month && ((m.metodo === 'card') === toBank))
+    .reduce((s, m) => s + (m.flow === 'out' ? Number(m.amount) : -Number(m.amount)), 0)
+  const bankApartado = apartadoNet(true)
+  const cashApartado = apartadoNet(false)
 
   // Saldo por cuenta, DERIVADO de los checks reales separados por `method` (card = Banorte, cash =
   // Efectivo) + los ajustes de conciliación del mes. El apartado (mantenimiento) se atribuye a Banorte
@@ -1544,7 +1553,7 @@ function UptownArcade() {
 
         <div className="flex-1 min-h-0 overflow-y-auto pb-8">
         {pageTab === 'cajafuerte' ? (
-          <CajaFuerteSection funds={apartados} {...cajaFuerte.handlers} createPlaceholder="Nuevo fondo (obra, reserva, depósito…)" />
+          <CajaFuerteSection funds={apartados} {...cajaFuerte.handlers} createPlaceholder="Nuevo fondo (obra, reserva, depósito…)" accounts={[{ value: 'cash', label: '💵 Efectivo' }, { value: 'card', label: '💳 Banorte' }]} />
         ) : pageTab === 'valet' ? (
           <ValetTab month={month} nuFund={nuFund} onLedgerChange={cajaFuerte.refresh} />
         ) : pageTab === 'historial' && !loading && !error ? (

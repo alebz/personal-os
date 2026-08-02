@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Mxn from '@/components/Mxn'
 import DrumModal from '@/components/DrumModal'
 import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
-import { FundMovementControl } from '@/components/finance/FundMovementControl'
+import { FundMovementControl, type WalletOption } from '@/components/finance/FundMovementControl'
 
 // A fund = a finance_envelopes row with its flow-aware balance + ledger, from /api/finance/funds.
 // Shared by both scopes (Finanzas Alex 'personal', Uptown 'uptown').
@@ -19,7 +19,7 @@ export interface Fund {
 }
 
 export interface FundHandlers {
-  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number, metodo: 'efectivo' | 'tarjeta') => void
+  onAportaRetira: (id: string, flow: 'in' | 'out', desc: string, amount: number, metodo: string) => void
   onUpdateTarget: (id: string, target: number | null) => void
   onUpdateLabel:  (id: string, label: string) => void
   onArchive:      (id: string) => void
@@ -32,8 +32,8 @@ export interface FundHandlers {
 // One apartado. target=null → colchón/asset (no meta, no bar); target=number → savings goal with bar.
 // Libreta + aportar/retirar live in a DrumModal. The card stays compact.
 function FundCard({
-  fund, onAportaRetira, onUpdateTarget, onUpdateLabel, onArchive, onDelete,
-}: { fund: Fund } & Pick<FundHandlers, 'onAportaRetira' | 'onUpdateTarget' | 'onUpdateLabel' | 'onArchive' | 'onDelete'>) {
+  fund, accounts, onAportaRetira, onUpdateTarget, onUpdateLabel, onArchive, onDelete,
+}: { fund: Fund; accounts: WalletOption[] } & Pick<FundHandlers, 'onAportaRetira' | 'onUpdateTarget' | 'onUpdateLabel' | 'onArchive' | 'onDelete'>) {
   const saved  = Number(fund.saved)
   const target = fund.target != null ? Number(fund.target) : null
   const pct    = target && target > 0 ? Math.min((saved / target) * 100, 100) : 0
@@ -132,7 +132,7 @@ function FundCard({
           <p className={`text-heading font-black ${saved < 0 ? 'text-danger' : 'text-ok'}`}><Mxn v={saved} /></p>
         </div>
         <div className="mb-4">
-          <FundMovementControl onSubmit={(flow, desc, amount, metodo) => onAportaRetira(fund.id, flow, desc, amount, metodo)} />
+          <FundMovementControl accounts={accounts} onSubmit={(flow, desc, amount, metodo) => onAportaRetira(fund.id, flow, desc, amount, metodo)} />
         </div>
         {fund.movements.length > 0
           ? <FundLedger movements={fund.movements} />
@@ -145,10 +145,11 @@ function FundCard({
 // ─── CajaFuerteSection ─────────────────────────────────────────────────────────
 // The section where every apartado/asset of a scope lives. `funds` arrives already scoped (the
 // endpoint filters by scope) — no by-key blacklist here. Includes the create input + archived list.
+const PERSONAL_ACCOUNTS: WalletOption[] = [{ value: 'efectivo', label: '💵 Efectivo' }, { value: 'tarjeta', label: '💳 Tarjeta' }]
 export function CajaFuerteSection({
-  funds, createPlaceholder = 'Nuevo apartado (retiro, joya, obra…)',
+  funds, createPlaceholder = 'Nuevo apartado (retiro, joya, obra…)', accounts = PERSONAL_ACCOUNTS,
   onAportaRetira, onUpdateTarget, onUpdateLabel, onArchive, onRestore, onDelete, onCreate,
-}: { funds: Fund[]; createPlaceholder?: string } & FundHandlers) {
+}: { funds: Fund[]; createPlaceholder?: string; accounts?: WalletOption[] } & FundHandlers) {
   const [name, setName] = useState('')
   const [meta, setMeta] = useState('')
   const [showArchived, setShowArchived] = useState(false)
@@ -192,7 +193,7 @@ export function CajaFuerteSection({
       ) : (
         <div className="grid gap-5 lg:grid-cols-2">
           {section.map(f => (
-            <FundCard key={f.id} fund={f} onAportaRetira={onAportaRetira} onUpdateTarget={onUpdateTarget} onUpdateLabel={onUpdateLabel} onArchive={onArchive} onDelete={onDelete} />
+            <FundCard key={f.id} fund={f} accounts={accounts} onAportaRetira={onAportaRetira} onUpdateTarget={onUpdateTarget} onUpdateLabel={onUpdateLabel} onArchive={onArchive} onDelete={onDelete} />
           ))}
         </div>
       )}

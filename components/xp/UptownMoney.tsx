@@ -139,8 +139,17 @@ export default function UptownMoney() {
   const cashCobrado = byM(rents, 'cash', true) + byM(extraIn, 'cash', false)
   const bankPagado = byM(expenses, 'card', true) + byM(nomina, 'card', true) + byM(extraOut, 'card', false)
   const cashPagado = byM(expenses, 'cash', true) + byM(nomina, 'cash', true) + byM(extraOut, 'cash', false)
-  const bankApartado = apartadoMethod === 'card' ? fondoAportado : 0
-  const cashApartado = apartadoMethod === 'cash' ? fondoAportado : 0
+  // Apartado NETO de TODOS los fondos uptown no-reconcile ESTE mes, por método (out=aparta → resta de
+  // la wallet; in=retira → suma). Incluye Mantenimiento (cash/card) + apartados genéricos (Obra/reserva).
+  // metodo 'card'=Banorte; el resto (cash/null) = Efectivo (conserva el fallback histórico null→efectivo).
+  // Reemplaza el cálculo viejo que SOLO contaba Mantenimiento (por eso los genéricos no debitaban).
+  const apartadoNet = (toBank: boolean) => funds
+    .filter((f) => !f.archived && !(f.key && RECONCILE_KEYS.includes(f.key)))
+    .flatMap((f) => f.movements)
+    .filter((m) => (m.date ?? '').startsWith(month) && ((m.metodo === 'card') === toBank))
+    .reduce((s, m) => s + (m.flow === 'out' ? m.amount : -m.amount), 0)
+  const bankApartado = apartadoNet(true)
+  const cashApartado = apartadoNet(false)
   const saldoBanorte = apertura.banco + bankCobrado - bankPagado - bankApartado + ajusteMes('uptown_banorte')
   const saldoEfectivo = apertura.cash + cashCobrado - cashPagado - cashApartado + ajusteMes('uptown_efectivo')
 
@@ -199,7 +208,7 @@ export default function UptownMoney() {
       {tab === 'caja' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 9 }}><span style={{ fontSize: 14, fontWeight: 700, color: MONEY.blue }}>Caja Fuerte Uptown</span></div>
-          <MoneyCaja month={month} scope="uptown" excludeKeys={RECONCILE_KEYS} createPlaceholder="Obra, reserva, depósito…" onChange={refresh} />
+          <MoneyCaja month={month} scope="uptown" excludeKeys={RECONCILE_KEYS} createPlaceholder="Obra, reserva, depósito…" accounts={[{ value: 'cash', label: '💵 Efectivo' }, { value: 'card', label: '💳 Banorte' }]} onChange={refresh} />
         </div>
       )}
       {tab === 'valet' && <MoneyValet month={month} onLedgerChange={refresh} />}

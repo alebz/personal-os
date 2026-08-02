@@ -4,13 +4,17 @@ import { useState } from 'react'
 
 // Aportar (out, money set aside → saved up) / Retirar (in → saved down) for any fund. Manual, no
 // source_key. Es una TRANSFERENCIA: lleva el MÉTODO (origen/destino) para que baje/suba de esa wallet.
-// Shared across the Caja Fuerte sections of Finanzas Alex and Uptown.
-export function FundMovementControl({ onSubmit }: {
-  onSubmit: (flow: 'in' | 'out', desc: string, amount: number, metodo: 'efectivo' | 'tarjeta') => void
+// Shared across the Caja Fuerte sections of Finanzas Alex y Uptown. Las cuentas (`accounts`) vienen por
+// scope: personal = Efectivo/Tarjeta (default); Uptown pasa Efectivo(cash)/Banorte(card).
+export type WalletOption = { value: string; label: string }
+const PERSONAL_ACCOUNTS: WalletOption[] = [{ value: 'efectivo', label: '💵 Efectivo' }, { value: 'tarjeta', label: '💳 Tarjeta' }]
+export function FundMovementControl({ onSubmit, accounts = PERSONAL_ACCOUNTS }: {
+  onSubmit: (flow: 'in' | 'out', desc: string, amount: number, metodo: string) => void
+  accounts?: WalletOption[]
 }) {
   const [desc, setDesc] = useState('')
   const [amt,  setAmt]  = useState('')
-  const [metodo, setMetodo] = useState<'efectivo' | 'tarjeta'>('efectivo')   // origen/destino VISIBLE
+  const [metodo, setMetodo] = useState<string>(accounts[0].value)   // origen/destino VISIBLE (default 1ª cuenta)
   const ready = !!desc.trim() && !!amt
 
   function submit(flow: 'in' | 'out') {
@@ -24,10 +28,10 @@ export function FundMovementControl({ onSubmit }: {
       {/* Origen/destino VISIBLE: de dónde sale (aportar) o a dónde entra (retirar) el dinero. */}
       <div className="flex items-center gap-2 text-body text-fg-faint">
         <span>Cuenta:</span>
-        {(['efectivo', 'tarjeta'] as const).map(w => (
-          <button key={w} onClick={() => setMetodo(w)}
-            className={`rounded-card border px-2.5 py-1 ${metodo === w ? 'border-accent bg-accent/15 text-accent font-medium' : 'border-border bg-surface-2 text-fg-faint'}`}>
-            {w === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta'}
+        {accounts.map(w => (
+          <button key={w.value} onClick={() => setMetodo(w.value)}
+            className={`rounded-card border px-2.5 py-1 ${metodo === w.value ? 'border-accent bg-accent/15 text-accent font-medium' : 'border-border bg-surface-2 text-fg-faint'}`}>
+            {w.label}
           </button>
         ))}
         <span className="ml-auto italic opacity-70">Aportar sale · Retirar entra</span>

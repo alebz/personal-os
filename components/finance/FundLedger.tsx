@@ -11,7 +11,7 @@ export type FundMovement = {
   flow: 'in' | 'out'     // 'out' = aportación (money INTO the fund), 'in' = retiro (money OUT)
   source_key?: string | null   // toggle-managed movements carry one (e.g. 'uptown_fondo:2026-07'); manual ones don't
   month?: string               // 'YYYY-MM' (denormalised); present on fund movements from /api/finance/funds
-  metodo?: 'cash' | 'card' | null   // cuenta de origen del movimiento (p.ej. el apartado mantenimiento): card = banco, cash = efectivo
+  metodo?: string | null   // cuenta de origen: card/tarjeta = banco, cash/efectivo/null = efectivo
 }
 
 function fmtDate(iso: string): string {

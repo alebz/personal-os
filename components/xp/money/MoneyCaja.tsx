@@ -8,6 +8,10 @@ import { MONEY, MoneyBar, MoneyModal, MoneyBtn, MoneyInput, fmtMxn } from './Mon
 // restaurar, eliminar, libreta). onChange refresca los movimientos del padre (Historial + saldos vivos).
 
 const num = (v: unknown) => Number(v ?? 0) || 0
+// Cuentas de origen/destino de la transferencia, POR SCOPE: personal = Efectivo/Tarjeta;
+// Uptown pasa Efectivo(cash)/Banorte(card). El `value` es el `metodo` que se guarda.
+export type WalletOption = { value: string; label: string }
+const PERSONAL_ACCOUNTS: WalletOption[] = [{ value: 'efectivo', label: '💵 Efectivo' }, { value: 'tarjeta', label: '💳 Tarjeta' }]
 const todayStr = () => { const d = new Date(); return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-') }
 
 interface Move { id: string; date: string; description: string; amount: number; flow: 'in' | 'out'; category: string; metodo: string | null }
@@ -16,7 +20,7 @@ interface Fund { id: string; key: string | null; label: string; target: number |
 async function post(url: string, body: unknown) { const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error(await r.text()); return r.json() }
 async function patch(url: string, body: unknown) { const r = await fetch(url, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error(await r.text()); return r.json() }
 
-export default function MoneyCaja({ month, onChange, scope = 'personal', excludeKeys = [], createPlaceholder = 'Vacaciones, colchón…' }: { month: string; onChange: () => void; scope?: string; excludeKeys?: string[]; createPlaceholder?: string }) {
+export default function MoneyCaja({ month, onChange, scope = 'personal', excludeKeys = [], createPlaceholder = 'Vacaciones, colchón…', accounts = PERSONAL_ACCOUNTS }: { month: string; onChange: () => void; scope?: string; excludeKeys?: string[]; createPlaceholder?: string; accounts?: WalletOption[] }) {
   const [funds, setFunds] = useState<Fund[]>([])
   const [showArchived, setShowArchived] = useState(false)
   const [open, setOpen] = useState<string | null>(null)   // fund id cuya libreta está abierta
@@ -34,7 +38,7 @@ export default function MoneyCaja({ month, onChange, scope = 'personal', exclude
   // Modelo A: la aportación/retiro ES la transferencia — UN movimiento de fondo que lleva el MÉTODO
   // (origen/destino). Acredita el fondo (funds route) y debita/acredita la wallet (accountDelta lo
   // enruta por método). category 'fondo' → NO cuenta como gasto/flujo. Sin origen no bajaba de la wallet.
-  async function aportaRetira(id: string, flow: 'in' | 'out', description: string, amount: number, metodo: 'efectivo' | 'tarjeta') {
+  async function aportaRetira(id: string, flow: 'in' | 'out', description: string, amount: number, metodo: string) {
     await post('/api/finance/movements', { month, date: todayStr(), description, amount, flow, category: 'fondo', commitment_id: null, envelope_id: id, metodo })
     refresh()
   }
@@ -80,7 +84,7 @@ export default function MoneyCaja({ month, onChange, scope = 'personal', exclude
       )}
 
       {creating && <CreateFundModal placeholder={createPlaceholder} onClose={() => setCreating(false)} onCreate={createFund} />}
-      {openFund && <LibretaModal fund={openFund} onClose={() => setOpen(null)} onAporta={(d, a, mt) => aportaRetira(openFund.id, 'out', d, a, mt)} onRetira={(d, a, mt) => aportaRetira(openFund.id, 'in', d, a, mt)} onDelete={() => deleteFund(openFund.id)} />}
+      {openFund && <LibretaModal fund={openFund} accounts={accounts} onClose={() => setOpen(null)} onAporta={(d, a, mt) => aportaRetira(openFund.id, 'out', d, a, mt)} onRetira={(d, a, mt) => aportaRetira(openFund.id, 'in', d, a, mt)} onDelete={() => deleteFund(openFund.id)} />}
     </div>
   )
 }
@@ -158,16 +162,16 @@ function CreateFundModal({ onClose, onCreate, placeholder }: { onClose: () => vo
 }
 const lbl: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#5a6a86' }
 
-function LibretaModal({ fund, onClose, onAporta, onRetira, onDelete }: {
-  fund: Fund; onClose: () => void; onAporta: (d: string, a: number, mt: 'efectivo' | 'tarjeta') => void; onRetira: (d: string, a: number, mt: 'efectivo' | 'tarjeta') => void; onDelete: () => void
+function LibretaModal({ fund, accounts, onClose, onAporta, onRetira, onDelete }: {
+  fund: Fund; accounts: WalletOption[]; onClose: () => void; onAporta: (d: string, a: number, mt: string) => void; onRetira: (d: string, a: number, mt: string) => void; onDelete: () => void
 }) {
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
-  const [metodo, setMetodo] = useState<'efectivo' | 'tarjeta'>('efectivo')   // origen/destino de la transferencia (VISIBLE, default Efectivo)
+  const [metodo, setMetodo] = useState<string>(accounts[0].value)   // origen/destino de la transferencia (VISIBLE, default 1ª cuenta)
   const [desc2, setDesc2] = useState(true)   // orden fecha desc
   const canDelete = fund.key == null && fund.movements.length === 0
 
-  function doMove(fn: (d: string, a: number, mt: 'efectivo' | 'tarjeta') => void) {
+  function doMove(fn: (d: string, a: number, mt: string) => void) {
     const a = num(amount); if (a <= 0) return
     fn(desc.trim() || (fn === onAporta ? 'Aportación' : 'Retiro'), a, metodo)
     setDesc(''); setAmount('')
@@ -185,10 +189,10 @@ function LibretaModal({ fund, onClose, onAporta, onRetira, onDelete }: {
       {/* Origen/destino VISIBLE: de dónde sale (aportar) o a dónde entra (retirar) el dinero. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7, fontSize: 10.5, color: '#5a6a86' }}>
         <span>Cuenta:</span>
-        {(['efectivo', 'tarjeta'] as const).map((w) => (
-          <button key={w} onClick={() => setMetodo(w)}
-            style={{ border: `1px solid ${metodo === w ? MONEY.blue : MONEY.rule}`, background: metodo === w ? '#dbe8fb' : '#fff', color: metodo === w ? MONEY.blue : '#5a6a86', borderRadius: 3, padding: '2px 9px', cursor: 'pointer', fontSize: 10.5, fontFamily: 'inherit', fontWeight: metodo === w ? 700 : 400 }}>
-            {w === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta'}
+        {accounts.map((w) => (
+          <button key={w.value} onClick={() => setMetodo(w.value)}
+            style={{ border: `1px solid ${metodo === w.value ? MONEY.blue : MONEY.rule}`, background: metodo === w.value ? '#dbe8fb' : '#fff', color: metodo === w.value ? MONEY.blue : '#5a6a86', borderRadius: 3, padding: '2px 9px', cursor: 'pointer', fontSize: 10.5, fontFamily: 'inherit', fontWeight: metodo === w.value ? 700 : 400 }}>
+            {w.label}
           </button>
         ))}
         <span style={{ marginLeft: 'auto', fontStyle: 'italic', color: '#8a93a8' }}>Aportar sale de aquí · Retirar entra aquí</span>
