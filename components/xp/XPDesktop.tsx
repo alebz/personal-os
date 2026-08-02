@@ -211,6 +211,14 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   // Reproductor de Windows Media (radio) — ventana BARE: la app dibuja su chrome WMP; sus botones
   // min/cerrar se cablean aquí al WM. Tamaño fijo (no resizable).
   const openReproductor = () => openWindow('radio', 'Reproductor de Windows Media', <RadioPlayer onClose={() => closeWindow('radio')} onMinimize={() => minimizeWindow('radio')} />, { w: 500, h: 194, bare: true, icon: 'wmp' })
+  // Poolsuite — MARCADOR: ventana normal del WM con un iframe a su sitio REAL (poolsuite.net permite
+  // embedding, verificado). No replicamos su servicio; es visitar su página como un bookmark.
+  // Geometría FIJA al abrir (la que Alex dejó a mano): retrato angosto, alto, centrado horizontalmente
+  // y pegado arriba — no la posición staggered del WM. Sigue siendo resizable después.
+  const POOLSUITE_W = 384, POOLSUITE_H = 648, POOLSUITE_Y = 92
+  const openPoolsuite = () => openWindow('poolsuite', 'Poolsuite', (
+    <iframe src="https://poolsuite.net/" title="Poolsuite" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0, display: 'block' }} />
+  ), { w: POOLSUITE_W, h: POOLSUITE_H, x: Math.round((logicalW - POOLSUITE_W) / 2), y: POOLSUITE_Y, resizable: true, icon: 'poolsuite' })
   // Carpetas anidadas de "Todos los programas" (cascada canónica de XP).
   const FOLDERS = [
     { id: 'juegos', label: 'Juegos', icon: 'juegos', items: [
@@ -319,6 +327,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
         { id: 'bloc', icon: 'bloc', label: 'Bloc de notas', open: openBloc },
         { id: 'calendario', icon: 'calendario', label: 'Calendario', open: openCalendario },
         { id: 'radio', icon: 'wmp', label: 'Reproductor', open: openReproductor },
+        { id: 'poolsuite', icon: 'poolsuite', label: 'Poolsuite', open: openPoolsuite },
         { id: 'papelera', icon: 'papelera', label: 'Papelera de reciclaje', open: openPapelera }].map((it, i) => {
         // Límites del lienzo lógico: los íconos NUNCA se van del borde derecho/inferior (bug: solo se
         // clampeaba a ≥0). Clampear también AL RENDER auto-sana posiciones persistidas fuera de pantalla.
