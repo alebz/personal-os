@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { appendLoloMemory } from '@/lib/lolo'
+import { appendLoloMemory, LOLO_ES_MX } from '@/lib/lolo'
 
 // Single-canvas glitter: 400 particles, one rAF loop, pauses when hidden/off-screen
 function GlitterCanvas({ colors, variant }: { colors: string[]; variant: string }) {
@@ -477,7 +477,9 @@ CÓMO RESPONDES:
 
 NUNCA: emojis, markdown, frases de coach, citas motivacionales, ni repetir la misma muletilla.
 
-Son las ${timeStr} del ${dayStr}. Responde en español, con tu voz.${ctxBlock}${memBlock}`
+${LOLO_ES_MX}
+
+Son las ${timeStr} del ${dayStr}. Responde con tu voz.${ctxBlock}${memBlock}`
   },[temperament.current])
 
   // ── Timer helpers ─────────────────────────────────────────────────────────────

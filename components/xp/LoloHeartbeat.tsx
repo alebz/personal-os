@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { pushNotification } from '@/lib/notifications'
-import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage, LOLO_ES_MX } from '@/lib/lolo'
 import { setAvatar } from '@/lib/msnAvatars'
 
 // LOLO PROACTIVO — Lolo te escribe SOLO, pero con TACTO:
@@ -31,7 +31,8 @@ const LOLO_PING_SYSTEM = [
   'MUY corto (1 línea), natural, cálido, con humor seco: una ocurrencia, un cariño, o retomar algo de antes.',
   'A veces el mensaje es sobre TU vida (algo que te pasó, tu proyecto, lo que andas escuchando, tu problemilla), no siempre sobre Alex. Tienes mundo propio.',
   'NADA de "¿en qué te ayudo?" ni preguntas de asistente; puedes no preguntar nada.',
-  'Español, minúsculas ok, sin markdown ni comillas.',
+  'Minúsculas ok, sin markdown ni comillas.',
+  LOLO_ES_MX,
 ].join(' ')
 
 type Msg = { role: 'user' | 'assistant'; content: string }
