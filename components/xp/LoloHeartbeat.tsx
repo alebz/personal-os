@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from 'react'
 import { pushNotification } from '@/lib/notifications'
-import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage, LOLO_ES_MX } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, appendLoloMemory, emitLoloMessage, emitLoloNudge, LOLO_ES_MX } from '@/lib/lolo'
 import { setAvatar } from '@/lib/msnAvatars'
+import { playXpSound } from './xpSounds'
 
 // LOLO PROACTIVO — Lolo te escribe SOLO, pero con TACTO:
 //  · PRESENCIA: solo cuando estás EN LÍNEA (pestaña visible + interacción reciente). Si estás fuera,
@@ -21,6 +22,7 @@ const MAX_GAP = 8 * 60 * 60_000       // tope del back-off
 const CHECK = 90_000                  // cada cuánto se evalúa
 const WARMUP = 80_000                 // no escribe hasta llevar un rato presente ("no al instante")
 const ACTIVE_WINDOW = 4 * 60_000      // "en línea" = interacción hace <4 min
+const NUDGE_PROB = 0.12               // de los pings que SÍ salen, ~1 de cada 8 es zumbido en vez de texto (raro)
 
 const gapFor = (u: number) => Math.min(BASE_GAP * 2 ** u, MAX_GAP)                 // 90m · 3h · 6h · tope 8h
 const probFor = (u: number, firstOfSession: boolean) => (firstOfSession ? 0.5 : u === 0 ? 0.3 : u === 1 ? 0.14 : 0.07)
@@ -87,6 +89,16 @@ export default function LoloHeartbeat() {
       if (busy.current) return
       busy.current = true
       try {
+        // ZUMBIDO (raro): a veces, en vez de escribir, Lolo te ZUMBA — sonido real + shake de su ventana
+        // (si está abierta) + toast. Cuenta como que te buscó (mismo back-off que un ping normal).
+        if (Math.random() < NUDGE_PROB) {
+          try { localStorage.setItem(KEY_PING, String(Date.now())); localStorage.setItem(KEY_UNANS, String(Math.min(readNum(KEY_UNANS) + 1, 4))) } catch { /* ignore */ }
+          sessionPinged.current = true
+          playXpSound('msnNudge')
+          emitLoloNudge()
+          pushNotification({ id: `lolo:nudge:${Date.now()}`, icon: '/Lolo/Idle/lolo_idle_2.png', title: 'Lolo', body: 'te mandó un zumbido ⚡', target: 'lolo' })
+          return
+        }
         const mem = await fetch('/api/companion/memory').then((r) => r.json()).catch(() => ({}))
         let ctx: Msg[] = (Array.isArray(mem?.buffer) ? mem.buffer : []).map((m: Msg) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
         while (ctx.length && ctx[0].role === 'assistant') ctx = ctx.slice(1)
@@ -103,8 +115,9 @@ export default function LoloHeartbeat() {
           localStorage.setItem(KEY_UNANS, String(Math.min(readNum(KEY_UNANS) + 1, 4)))   // sube el back-off; que responda lo resetea
         } catch { /* ignore */ }
         sessionPinged.current = true
+        playXpSound('msnMessage')   // sonido real de "mensaje entrante" MSN (obedece bocina/mute del tray)
         // El mensaje es UNO: (a) queda en el hilo (append atómico, no reescribe lo que leyó → no clobbea
-        // al chat), (b) aparece en la ventana abierta si la hay (bus), (c) el toast es solo el aviso.
+        // al chat), (b) aparece en la ventana abierta si la hay (bus, sin re-sonar), (c) el toast es el aviso.
         appendLoloMemory([{ role: 'assistant', content: reply }])
         emitLoloMessage({ role: 'assistant', content: reply })
         pushNotification({ id: `lolo:${Date.now()}`, icon: '/Lolo/Idle/lolo_idle_2.png', title: 'Lolo', body: reply, target: 'lolo' })

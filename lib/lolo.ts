@@ -237,3 +237,15 @@ export function onLoloMessage(cb: (msg: LoloMsg) => void): () => void {
   window.addEventListener(LOLO_MSG_EVENT, h)
   return () => window.removeEventListener(LOLO_MSG_EVENT, h)
 }
+
+// NUDGE (zumbido) — Lolo te zumba raro desde el heartbeat: la ventana de su chat (si está abierta)
+// tiembla y suena el zumbido real. Bus propio para que el heartbeat avise a la ventana abierta.
+const LOLO_NUDGE_EVENT = 'lolo:nudge'
+export function emitLoloNudge(): void {
+  try { window.dispatchEvent(new CustomEvent(LOLO_NUDGE_EVENT)) } catch { /* ignore */ }
+}
+export function onLoloNudge(cb: () => void): () => void {
+  const h = () => cb()
+  window.addEventListener(LOLO_NUDGE_EVENT, h)
+  return () => window.removeEventListener(LOLO_NUDGE_EVENT, h)
+}

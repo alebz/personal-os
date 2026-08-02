@@ -29,6 +29,15 @@
   border-radius: 8px 8px 0 0;
   overflow: hidden;
 }
+
+/* ZUMBIDO (nudge MSN): la ventana tiembla ~0.6s cuando Lolo te zumba. Canónico del Messenger. */
+.xp-shake { animation: xp-shake 0.6s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes xp-shake {
+  10%, 90% { transform: translate(-2px, 1px); }
+  20%, 80% { transform: translate(4px, -2px); }
+  30%, 50%, 70% { transform: translate(-7px, 3px); }
+  40%, 60% { transform: translate(7px, -3px); }
+}
 .xp-titlebar {
   height: 29px;
   background: linear-gradient(180deg, #2c8cff 0%, #015ff0 8%, #0043d4 16%, #0039d5 46%, #0052f2 88%, #0140dd 100%);

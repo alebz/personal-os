@@ -5,7 +5,8 @@ import { useAvatar, changeAvatar } from '@/lib/msnAvatars'
 import { MOODS } from '@/components/sections/DiarioContent'
 import { renderEmoticons, EMOTICONS, emoSrc } from '@/lib/msnEmoticons'
 import { CerebroButterfly } from './CerebroButterfly'
-import { loloTimeContext, loloLifeContext, markLoloTalk, markLoloAnswered, appendLoloMemory, onLoloMessage, LOLO_ES_MX } from '@/lib/lolo'
+import { loloTimeContext, loloLifeContext, markLoloTalk, markLoloAnswered, appendLoloMemory, onLoloMessage, onLoloNudge, LOLO_ES_MX } from '@/lib/lolo'
+import { playXpSound } from './xpSounds'
 
 // Ventana de conversación MSN (canon MSN 6/7: cada chat es su propia ventana del WM). Cablea los 4
 // tipos de buddy (regla "no resta funcionalidad" — cada función de Cerebro tiene su puerta aquí):
@@ -95,6 +96,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   const [showFont, setShowFont] = useState(false)
   const [myFont, setMyFont] = useState<MyFont>(DEFAULT_FONT)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)   // para alcanzar la ventana WM (.xp-window) al zumbar
   const abortRef = useRef<AbortController | null>(null)
   const aliveRef = useRef(true)   // ventana viva: no setState tras cerrarla durante los delays de tempo
   const bd = bdayLabel(buddy.birthday)
@@ -114,6 +116,18 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
     return onLoloMessage((m) => {
       if (m.role !== 'assistant' || !aliveRef.current) return
       setMsgs((cur) => [...cur, { id: nextId(), from: 'them', name: 'Lolo', text: m.content }])
+    })
+  }, [buddy.kind])
+
+  // ZUMBIDO: si Lolo te zumba (heartbeat) con esta ventana abierta, la ventana WM tiembla y aparece la
+  // línea "te mandó un zumbido". El sonido ya lo tocó el heartbeat (una vez) — aquí NO re-suena.
+  useEffect(() => {
+    if (buddy.kind !== 'lolo') return
+    return onLoloNudge(() => {
+      if (!aliveRef.current) return
+      const win = rootRef.current?.closest('.xp-window') as HTMLElement | null
+      if (win) { win.classList.remove('xp-shake'); void win.offsetWidth; win.classList.add('xp-shake'); setTimeout(() => win.classList.remove('xp-shake'), 600) }
+      setMsgs((cur) => [...cur, { id: nextId(), from: 'sys', name: '', text: 'Lolo te mandó un zumbido ⚡' }])
     })
   }, [buddy.kind])
 
@@ -175,7 +189,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
     try {
       const r = await fetch('/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q }), signal: ctrl.signal })
       if (!r.ok || !r.body) throw new Error(await r.text().catch(() => 'error'))
-      const reader = r.body.getReader(); const decoder = new TextDecoder(); let buffer = ''
+      const reader = r.body.getReader(); const decoder = new TextDecoder(); let buffer = ''; let dinged = false
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -188,7 +202,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
           try {
             const ev = JSON.parse(raw) as { type: string; text?: string; sources?: Source[]; message?: string }
             if (ev.type === 'sources') patchMsg(replyId, (m) => ({ ...m, sources: ev.sources ?? [] }))
-            else if (ev.type === 'text') patchMsg(replyId, (m) => ({ ...m, text: m.text + (ev.text ?? '') }))
+            else if (ev.type === 'text') { if (!dinged && (ev.text ?? '')) { dinged = true; playXpSound('msnMessage') } patchMsg(replyId, (m) => ({ ...m, text: m.text + (ev.text ?? '') })) }
             else if (ev.type === 'error') patchMsg(replyId, (m) => ({ ...m, text: m.text || `⚠ ${ev.message ?? 'Error'}` }))
           } catch { /* skip */ }
         }
@@ -244,6 +258,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
       await sleep(typeDelay(seg, i === 0))
       if (!aliveRef.current) return
       patchMsg(id, (m) => ({ ...m, streaming: false, text: seg }))
+      if (i === 0) playXpSound('msnMessage')   // sonido de mensaje entrante MSN (una vez por respuesta)
       if (i < segments.length - 1) await sleep(450 + Math.random() * 500)   // pausa entre mensajes
     }
   }
@@ -306,7 +321,7 @@ export default function MsnChat({ buddy }: { buddy: ChatBuddy }) {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
+    <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: '#000' }}>
       {/* Toolbar MSN (decorativo) + mariposa */}
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '3px 10px', background: 'linear-gradient(#fbfcfe,#eaeef4)', borderBottom: '1px solid #cdd6e2', fontSize: 10.5, color: '#2a4d8f' }}>
         {['Invitar', 'Enviar archivos', 'Voz', 'Actividades', 'Juegos'].map((x) => <span key={x} style={{ cursor: 'default' }}>{x}</span>)}

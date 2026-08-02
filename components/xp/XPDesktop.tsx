@@ -25,7 +25,7 @@ import { XpIcon, SECTION_ICON } from './xp-icons'
 import { RunDialog } from './RunDialog'
 import { SearchDialog } from './SearchDialog'
 import XPWindow, { type WinState } from './XPWindow'
-import { playXpSound } from './xpSounds'
+import { playXpSound, type XpSoundName } from './xpSounds'
 import './xp-theme.css'
 
 // Escritorio Windows XP — el cascarón alterno. Window manager de Fase 1 (modelo de ventana genérico:
@@ -164,11 +164,11 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
   const closeFlySoon = () => { if (flyTimer.current) clearTimeout(flyTimer.current); flyTimer.current = setTimeout(() => setFlyout(null), 320) }
 
   // Abre/enfoca una ventana genérica (sección o ventanita propia del tema). Sonido según el caso.
-  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; resizeY?: boolean; icon?: string; bare?: boolean }) {
+  function openWindow(id: string, title: string, content: ReactNode, opts?: { w?: number; h?: number; x?: number; y?: number; resizable?: boolean; resizeY?: boolean; icon?: string; bare?: boolean; openSound?: XpSoundName }) {
     closeStart()
     const existing = windows.find((w) => w.id === id)
     if (existing?.minimized) playXpSound('restore')
-    else if (!existing) playXpSound('open')
+    else if (!existing) playXpSound(opts?.openSound ?? 'open')   // Messenger reemplaza el chime por su "contacto conectado"
     setWindows((prev) => {
       const top = Math.max(0, ...prev.map((w) => w.z))
       if (prev.some((w) => w.id === id))
@@ -185,7 +185,7 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     if (s.href === '/brain') {
       const lw = window.innerWidth / scale, lh = window.innerHeight / scale
       const w = 340, h = Math.min(lh - 48, 600)
-      return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href], w, h, x: Math.max(8, lw - w - 12), y: 10 })
+      return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href], w, h, x: Math.max(8, lw - w - 12), y: 10, openSound: 'msnOnline' })
     }
     return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href] })
   }
