@@ -16,6 +16,8 @@ export const XP_WALLPAPERS: XpWallpaper[] = [
   { key: 'Autumn',                  label: 'Autumn',                   src: `${P}/Autumn.jpg` },
   { key: 'Azul',                    label: 'Azul',                     src: `${P}/Azul.jpg` },
   { key: 'bliss',                   label: 'Bliss (clásico)',          src: `${P}/bliss.jpg` },
+  { key: 'bliss_night',             label: 'Bliss (noche)',            src: `${P}/bliss_night.jpg` },
+  { key: 'bliss_sunset',            label: 'Bliss (atardecer)',        src: `${P}/bliss_sunset.jpg` },
   { key: 'Crystal',                 label: 'Crystal',                  src: `${P}/Crystal.jpg` },
   { key: 'Follow',                  label: 'Follow',                   src: `${P}/Follow.jpg` },
   { key: 'Friend',                  label: 'Friend',                   src: `${P}/Friend.jpg` },
