@@ -8,9 +8,13 @@ import { useState } from 'react'
 // scope: personal = Efectivo/Tarjeta (default); Uptown pasa Efectivo(cash)/Banorte(card).
 export type WalletOption = { value: string; label: string }
 const PERSONAL_ACCOUNTS: WalletOption[] = [{ value: 'efectivo', label: '💵 Efectivo' }, { value: 'tarjeta', label: '💳 Tarjeta' }]
-export function FundMovementControl({ onSubmit, accounts = PERSONAL_ACCOUNTS }: {
+export function FundMovementControl({ onSubmit, accounts = PERSONAL_ACCOUNTS, hint = 'Aportar sale · Retirar entra' }: {
   onSubmit: (flow: 'in' | 'out', desc: string, amount: number, metodo: string) => void
   accounts?: WalletOption[]
+  // Pista de dirección sobre la CUENTA seleccionada. Default = caja fuerte personal/Uptown (aportar
+  // drena tu wallet). Socios lo invierten: la aportación ENTRA al contenedor (sale de tu bolsillo
+  // PERSONAL, que no es una de estas cuentas), el retiro/distribución SALE del contenedor.
+  hint?: string
 }) {
   const [desc, setDesc] = useState('')
   const [amt,  setAmt]  = useState('')
@@ -34,7 +38,7 @@ export function FundMovementControl({ onSubmit, accounts = PERSONAL_ACCOUNTS }: 
             {w.label}
           </button>
         ))}
-        <span className="ml-auto italic opacity-70">Aportar sale · Retirar entra</span>
+        <span className="ml-auto italic opacity-70">{hint}</span>
       </div>
       <div className="flex gap-2">
         <input

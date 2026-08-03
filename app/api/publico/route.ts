@@ -9,14 +9,16 @@ export async function GET(req: NextRequest) {
   const today = req.nextUrl.searchParams.get('today') ?? new Date().toISOString().slice(0, 10)
   const supabase = createServerClient()
 
-  const [ventasRes, costosRes] = await Promise.all([
+  const [ventasRes, costosRes, ingresosRes] = await Promise.all([
     supabase.from('publico_ventas').select('*').eq('scope', 'publico').eq('month', month).order('date'),
     supabase.from('publico_costos').select('*').eq('scope', 'publico').eq('month', month).order('date'),
+    supabase.from('publico_ingresos').select('*').eq('scope', 'publico').eq('month', month).order('date'),
   ])
   if (ventasRes.error) return NextResponse.json({ error: ventasRes.error.message }, { status: 500 })
   if (costosRes.error) return NextResponse.json({ error: costosRes.error.message }, { status: 500 })
+  if (ingresosRes.error) return NextResponse.json({ error: ingresosRes.error.message }, { status: 500 })
 
   const ventas = ventasRes.data ?? []
   const hoy = ventas.find((v: { date: string }) => v.date === today) ?? null
-  return NextResponse.json({ ventas, costos: costosRes.data ?? [], hoy })
+  return NextResponse.json({ ventas, costos: costosRes.data ?? [], ingresos: ingresosRes.data ?? [], hoy })
 }

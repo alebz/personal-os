@@ -7,8 +7,8 @@ import { FundLedger } from '@/components/finance/FundLedger'
 import { FundMovementControl, type WalletOption } from '@/components/finance/FundMovementControl'
 import type { Fund } from '@/components/finance/CajaFuerteSection'
 import {
-  COST_CATEGORIES, catDefaults, containerLabel, CONTAINERS, OPERATING_CATEGORIES,
-  type CostCategory, type ContainerKey, type CostKind,
+  COST_CATEGORIES, catDefaults, originLabel, ORIGIN_OPTIONS, CONTAINERS, OPERATING_CATEGORIES,
+  type CostCategory, type OriginKey, type CostKind,
 } from '@/lib/publico'
 
 // Los 3 contenedores como cuentas para aportar/retirar de socios → captura el ORIGEN (metodo) desde el
@@ -31,7 +31,8 @@ const dayLabel = (iso: string) => {
 }
 
 interface Venta { id: string; date: string; efectivo: number; tarjeta: number; note: string | null }
-interface Costo { id: string; date: string; category: CostCategory; cost_kind: CostKind | null; origin: ContainerKey; amount: number; note: string | null }
+interface Costo { id: string; date: string; category: CostCategory; cost_kind: CostKind | null; origin: OriginKey; amount: number; note: string | null }
+interface Ingreso { id: string; date: string; concepto: string; amount: number; origin: OriginKey; note: string | null }
 
 export default function PublicoContent() {
   const today = localDate()
@@ -39,6 +40,7 @@ export default function PublicoContent() {
   const month = capDate.slice(0, 7)
   const [ventas, setVentas] = useState<Venta[]>([])
   const [costos, setCostos] = useState<Costo[]>([])
+  const [ingresos, setIngresos] = useState<Ingreso[]>([])
   const [tab, setTab] = useState<'captura' | 'socios'>('captura')
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
@@ -61,16 +63,23 @@ export default function PublicoContent() {
   // ── Costo (adder burst) ──
   const [cAmt, setCAmt] = useState('')
   const [cCat, setCCat] = useState<CostCategory>('insumo')          // sticky
-  const [cOrigin, setCOrigin] = useState<ContainerKey>(catDefaults('insumo').defaultOrigin)
+  const [cOrigin, setCOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
   const [cKind, setCKind] = useState<CostKind>(catDefaults('insumo').defaultKind ?? 'variable')
   const [cNote, setCNote] = useState('')
   const cAmtRef = useRef<HTMLInputElement>(null)
+
+  // ── Otros ingresos (no-POS: subarriendo Ameno, etc.) ──
+  const [iConcepto, setIConcepto] = useState('')
+  const [iAmt, setIAmt] = useState('')
+  const [iOrigin, setIOrigin] = useState<OriginKey>('clip')
+  const iAmtRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/publico?month=${month}&today=${capDate}`).then((r) => r.json()).catch(() => null)
     if (!r) return
     setVentas(r.ventas ?? [])
     setCostos(r.costos ?? [])
+    setIngresos(r.ingresos ?? [])
     const hoy: Venta | null = r.ventas?.find((v: Venta) => v.date === capDate) ?? null
     setEfectivo(hoy && hoy.efectivo ? String(hoy.efectivo) : '')
     setTarjeta(hoy && hoy.tarjeta ? String(hoy.tarjeta) : '')
@@ -104,7 +113,7 @@ export default function PublicoContent() {
     setCAmt(''); setCNote('')            // limpia YA (antes del await): tecleo rápido en burst NO concatena montos
     await fetch('/api/publico/costo', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ date: capDate, category: cCat, cost_kind: cCat === 'reinversion' ? null : cKind, origin: cOrigin, amount: a, note: note || null }),
+      body: JSON.stringify({ date: capDate, category: cCat, cost_kind: catDefaults(cCat).defaultKind === null ? null : cKind, origin: cOrigin, amount: a, note: note || null }),
     })
     await load()
     cAmtRef.current?.focus()             // burst: listo para el siguiente (categoría/origen quedan sticky)
@@ -114,12 +123,32 @@ export default function PublicoContent() {
     await fetch(`/api/publico/costo?id=${id}`, { method: 'DELETE' }); await load()
   }
 
+  async function addIngreso() {
+    const a = parseFloat(iAmt)
+    if (!iConcepto.trim() || !a || a <= 0) return
+    const concepto = iConcepto.trim()
+    setIConcepto(''); setIAmt('')         // limpia YA (antes del await): burst no concatena
+    await fetch('/api/publico/ingreso', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ date: capDate, concepto, amount: a, origin: iOrigin }),
+    })
+    await load()
+    iAmtRef.current?.focus()
+  }
+  async function delIngreso(id: string) {
+    await fetch(`/api/publico/ingreso?id=${id}`, { method: 'DELETE' }); await load()
+  }
+
   // ── Totales del mes ──
   const ventasMes = ventas.reduce((s, v) => s + Number(v.efectivo) + Number(v.tarjeta), 0)
   const costosOper = costos.filter((c) => OPERATING_CATEGORIES.includes(c.category)).reduce((s, c) => s + Number(c.amount), 0)
   const reinversionMes = costos.filter((c) => c.category === 'reinversion').reduce((s, c) => s + Number(c.amount), 0)
-  const utilidadOper = ventasMes - costosOper
+  const rentaCondonadaMes = costos.filter((c) => c.category === 'renta_condonada').reduce((s, c) => s + Number(c.amount), 0)
+  const otrosIngresosMes = ingresos.reduce((s, i) => s + Number(i.amount), 0)
+  const utilidadOper = ventasMes - costosOper                            // limpia (food business); food cost % intacto
+  const utilidadTotal = utilidadOper + otrosIngresosMes - rentaCondonadaMes  // no-operativos (arreglo Ameno netea 0)
   const costosHoy = costos.filter((c) => c.date === capDate)
+  const ingresosHoy = ingresos.filter((i) => i.date === capDate)
 
   const chip = (on: boolean): React.CSSProperties => ({
     padding: '3px 9px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid',
@@ -193,10 +222,10 @@ export default function PublicoContent() {
             inputMode="decimal" placeholder="$ monto" style={{ ...numInput, width: 120, fontSize: 16 }}
           />
           <span className="text-label text-fg-muted">desde</span>
-          {CONTAINERS.map((ct) => (
-            <button key={ct.key} onClick={() => setCOrigin(ct.key)} style={chip(cOrigin === ct.key)}>{ct.label}</button>
+          {ORIGIN_OPTIONS.map((ct) => (
+            <button key={ct.label} onClick={() => setCOrigin(ct.key)} style={chip(cOrigin === ct.key)}>{ct.label}</button>
           ))}
-          {cCat !== 'reinversion' && (
+          {catDefaults(cCat).defaultKind !== null && (
             <button
               onClick={() => setCKind((k) => (k === 'fijo' ? 'variable' : 'fijo'))}
               className="text-label text-fg-muted underline decoration-dotted"
@@ -212,15 +241,46 @@ export default function PublicoContent() {
         </div>
       </section>
 
+      {/* ── OTROS INGRESOS (no-POS: subarriendo, etc.) — NUNCA cuentan como venta (food cost intacto) ── */}
+      <section className="rounded-card border border-border bg-surface-2 p-3">
+        <div className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS)</span></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={iConcepto} onChange={(e) => setIConcepto(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }}
+            placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }}
+          />
+          <input
+            ref={iAmtRef} value={iAmt} onChange={(e) => setIAmt(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }}
+            inputMode="decimal" placeholder="$ monto" style={{ ...numInput, width: 120, fontSize: 16 }}
+          />
+          <span className="text-label text-fg-muted">a</span>
+          {ORIGIN_OPTIONS.map((ct) => (
+            <button key={ct.label} onClick={() => setIOrigin(ct.key)} style={chip(iOrigin === ct.key)}>{ct.label}</button>
+          ))}
+          <button onClick={() => void addIngreso()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
+        </div>
+        <div className="mt-1 text-label text-fg-muted">Suman a la utilidad, nunca a las ventas. El subarriendo que cubre la renta va con origen <b>Sin caja</b>.</div>
+      </section>
+
       {/* ── HOY: lo capturado ── */}
       <section className="rounded-card border border-border p-3">
         <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">{capDate === today ? 'Hoy' : dayLabel(capDate)}</h2>
-        {costosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos capturados este día.</p>}
+        {costosHoy.length === 0 && ingresosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos ni otros ingresos este día.</p>}
         <div className="space-y-1">
+          {ingresosHoy.map((i) => (
+            <div key={i.id} className="group flex items-center gap-2 text-secondary">
+              <span className="w-24 text-fg-muted">Otro ingreso</span>
+              <span className="flex-1 truncate">{i.concepto} <span className="text-fg-muted">· {originLabel(i.origin)}</span></span>
+              <span className="tabular-nums text-ok">+{mxn(Number(i.amount))}</span>
+              <button onClick={() => void delIngreso(i.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
+            </div>
+          ))}
           {costosHoy.map((c) => (
             <div key={c.id} className="group flex items-center gap-2 text-secondary">
               <span className="w-24 text-fg-muted">{catDefaults(c.category).label}</span>
-              <span className="flex-1 truncate">{c.note || <span className="text-fg-muted">—</span>} <span className="text-fg-muted">· {containerLabel(c.origin)}</span></span>
+              <span className="flex-1 truncate">{c.note || <span className="text-fg-muted">—</span>} <span className="text-fg-muted">· {originLabel(c.origin)}</span></span>
               <span className="tabular-nums text-danger">−{mxn(Number(c.amount))}</span>
               <button onClick={() => void delCosto(c.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
             </div>
@@ -234,7 +294,12 @@ export default function PublicoContent() {
         <div className="grid grid-cols-2 gap-y-1 text-secondary">
           <span className="text-fg-muted">Ventas</span><span className="text-right tabular-nums text-ok">{mxn(ventasMes)}</span>
           <span className="text-fg-muted">Costos operativos</span><span className="text-right tabular-nums text-danger">−{mxn(costosOper)}</span>
-          <span className="font-bold text-fg">Utilidad operativa</span><span className={`text-right font-bold tabular-nums ${utilidadOper >= 0 ? 'text-ok' : 'text-danger'}`}>{mxn(utilidadOper)}</span>
+          <span className="font-medium text-fg">Utilidad operativa</span><span className={`text-right font-medium tabular-nums ${utilidadOper >= 0 ? 'text-ok' : 'text-danger'}`}>{mxn(utilidadOper)}</span>
+          {(otrosIngresosMes > 0 || rentaCondonadaMes > 0) && (<>
+            {otrosIngresosMes > 0 && <><span className="text-fg-muted">+ Otros ingresos</span><span className="text-right tabular-nums text-ok">+{mxn(otrosIngresosMes)}</span></>}
+            {rentaCondonadaMes > 0 && <><span className="text-fg-muted">− Renta condonada</span><span className="text-right tabular-nums text-danger">−{mxn(rentaCondonadaMes)}</span></>}
+            <span className="font-bold text-fg">Utilidad</span><span className={`text-right font-bold tabular-nums ${utilidadTotal >= 0 ? 'text-ok' : 'text-danger'}`}>{mxn(utilidadTotal)}</span>
+          </>)}
         </div>
         {reinversionMes > 0 && (
           <div className="mt-2 flex justify-between border-t border-border pt-2 text-label text-fg-muted">
@@ -273,7 +338,7 @@ function Socios({ funds, handlers, splitAlex, onSplit, utilidadOper }: {
               <h2 className="text-base font-bold">{f.label}</h2>
               <span className="text-secondary text-fg-muted">saldo <span className="font-bold tabular-nums text-fg">{mxn(f.saved)}</span></span>
             </div>
-            <FundMovementControl accounts={SOCIO_ACCOUNTS} onSubmit={(flow, desc, amount, metodo) => handlers.onAportaRetira(f.id, flow, desc, amount, metodo)} />
+            <FundMovementControl accounts={SOCIO_ACCOUNTS} hint="Aportar entra · Retirar sale" onSubmit={(flow, desc, amount, metodo) => handlers.onAportaRetira(f.id, flow, desc, amount, metodo)} />
             <div className="mt-3"><FundLedger movements={f.movements} /></div>
           </section>
         )
