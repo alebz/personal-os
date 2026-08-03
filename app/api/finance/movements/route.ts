@@ -4,8 +4,11 @@ import { createServerClient } from '@/lib/supabase'
 
 // GET /api/finance/movements?month=YYYY-MM
 // GET /api/finance/movements?category=vacaciones  (all-time, for envelope history)
-// PERSONAL scope only: movements linked to an 'uptown'-scoped fund (mantenimiento, obra, reserva…)
-// are Uptown's history, not Alex's — excluded here so they never surface in the Finanzas Historial.
+// PERSONAL scope only: movements linked to a NON-personal fund (uptown: mantenimiento/obra/reserva…;
+// publico: socios; y cualquier isla futura) son historia de esa isla, no de Alex — excluidos aquí para
+// que nunca aparezcan en el Historial de Finanzas. A prueba de fugas por DISEÑO (excluye todo lo
+// no-personal), no por lista negra. Los movimientos SIN envelope (envelope_id=null) SIEMPRE se
+// conservan — ahí vive el cruce de la nómina de Uptown a mi Efectivo personal.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
@@ -21,14 +24,14 @@ export async function GET(req: NextRequest) {
   if (month) q = q.eq('month', month)
   if (category) q = q.eq('category', category)
 
-  const [{ data: uptownEnvs }, { data, error }] = await Promise.all([
-    supabase.from('finance_envelopes').select('id').eq('scope', 'uptown'),
+  const [{ data: nonPersonalEnvs }, { data, error }] = await Promise.all([
+    supabase.from('finance_envelopes').select('id').neq('scope', 'personal'),
     q,
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const uptownIds = new Set((uptownEnvs ?? []).map((e: { id: string }) => e.id))
-  const personal = (data ?? []).filter((m: { envelope_id: string | null }) => !m.envelope_id || !uptownIds.has(m.envelope_id))
+  const nonPersonalIds = new Set((nonPersonalEnvs ?? []).map((e: { id: string }) => e.id))
+  const personal = (data ?? []).filter((m: { envelope_id: string | null }) => !m.envelope_id || !nonPersonalIds.has(m.envelope_id))
   return NextResponse.json(personal)
 }
 
