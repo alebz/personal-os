@@ -8,6 +8,7 @@ import TareasContent from '@/components/sections/TareasContent'
 import ContactosContent from '@/components/sections/ContactosContent'
 import FinanzasContent from '@/components/sections/FinanzasContent'
 import UptownContent from '@/components/sections/UptownContent'
+import PublicoContent from '@/components/sections/PublicoContent'
 import InicioContent from '@/components/sections/InicioContent'
 import XPDesktop from '@/components/xp/XPDesktop'
 import XpScreensaver from '@/components/xp/XpScreensaver'
@@ -25,6 +26,7 @@ const SECTIONS: OSSection[] = [
   { label: 'Hábitos',   color: SECTION_COLORS['/habits'],    href: '/habits',    content: <HabitTrackerContent /> },
   { label: 'Finanzas Alex', color: SECTION_COLORS['/finance'], href: '/finance', content: <FinanzasContent /> },
   { label: 'Uptown',    color: SECTION_COLORS['/uptown'],    href: '/uptown',    content: <UptownContent /> },
+  { label: 'Público',   color: SECTION_COLORS['/publico'],   href: '/publico',   content: <PublicoContent /> },
   { label: 'Tareas',    color: SECTION_COLORS['/crm'],       href: '/crm',       content: <TareasContent /> },
   { label: 'Cerebro',   color: SECTION_COLORS['/brain'],     href: '/brain',     content: <CerebroContent /> },
 ]

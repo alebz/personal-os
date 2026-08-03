@@ -16,6 +16,7 @@ const TABS = [
   { label: 'Cerebro',   href: '/brain' },
   { label: 'Finanzas',  href: '/finance' },
   { label: 'Uptown',    href: '/uptown' },
+  { label: 'Público',   href: '/publico' },
   { label: 'Diario',    href: '/journal' },
 ]
 

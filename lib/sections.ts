@@ -9,6 +9,7 @@ export const SECTION_COLORS: Record<string, string> = {
   '/habits':    '#F6821E',  // Hábitos
   '/finance':   '#FBBC05',  // Finanzas Alex
   '/uptown':    '#34A853',  // Uptown
+  '/publico':   '#C0392B',  // Público Gourmet (tomate/rojo restaurante)
   '/crm':       '#4285F4',  // Tareas
   '/brain':     '#9B59B6',  // Cerebro
 }

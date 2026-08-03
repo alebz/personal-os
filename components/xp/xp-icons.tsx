@@ -38,6 +38,7 @@ export const SECTION_ICON: Record<string, string> = {
   '/habits': 'habitos',
   '/contactos': 'contactos',
   '/uptown': 'uptown',
+  '/publico': 'panel',   // Público Gourmet — ícono PLACEHOLDER (reusa panel); un ícono propio de restaurante es polish futuro
   '/brain': 'cerebro',
 }
 

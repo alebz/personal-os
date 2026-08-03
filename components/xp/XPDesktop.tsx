@@ -35,7 +35,7 @@ import './xp-theme.css'
 // INICIO no es una app en XP — es el ambiente de la cara del tambor. Aquí se DISUELVE: el reloj vive
 // en el tray, el calendario se invoca con doble-click al reloj (ventanita "Fecha y hora", nativo XP),
 // la quote no se porta. Por eso '/' no está en LAUNCHABLE ni aparece en el menú.
-const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/uptown', '/brain'])
+const LAUNCHABLE = new Set(['/crm', '/finance', '/habits', '/uptown', '/publico', '/brain'])
 // Secciones que se DISUELVEN bajo XP (no app propia): Inicio ('/') → reloj/tray; Contactos → viven
 // dentro de Cerebro Messenger (buddy list), así que aquí no hay Address Book aparte (sería redundante).
 const XP_DISSOLVED = new Set(['/', '/contactos'])
