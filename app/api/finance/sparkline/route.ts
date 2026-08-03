@@ -27,7 +27,7 @@ export async function GET() {
       .maybeSingle(),
     supabase
       .from('finance_movements')
-      .select('date, amount, flow')
+      .select('date, amount, flow, envelope_id')
       .gte('date', days[0])
       .lte('date', days[days.length - 1])
       .order('date', { ascending: false })
@@ -47,9 +47,12 @@ export async function GET() {
     Number(balRes.data?.efectivo ?? 0) +
     guardado
 
-  // Group movements by date
+  // Group movements by date. SOLO personales: un movimiento ligado a un fondo NO-personal (uptown/
+  // publico/…) no toca las wallets personales, así que no puede mover el saldo del sparkline ALX
+  // (mismo `excluded` que 'guardado'). Los envelope_id=null son movimientos de wallet personal → sí.
   const byDate: Record<string, Array<{ amount: number; flow: string }>> = {}
-  for (const m of (movsRes.data ?? []) as Array<{ date: string; amount: number; flow: string }>) {
+  for (const m of (movsRes.data ?? []) as Array<{ date: string; amount: number; flow: string; envelope_id: string | null }>) {
+    if (m.envelope_id && excluded.has(m.envelope_id)) continue
     const key = String(m.date)
     ;(byDate[key] ??= []).push({ amount: Number(m.amount), flow: m.flow })
   }

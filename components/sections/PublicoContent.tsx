@@ -2,10 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { mxn } from '@/components/Mxn'
+import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
+import { FundLedger } from '@/components/finance/FundLedger'
+import { FundMovementControl, type WalletOption } from '@/components/finance/FundMovementControl'
+import type { Fund } from '@/components/finance/CajaFuerteSection'
 import {
   COST_CATEGORIES, catDefaults, containerLabel, CONTAINERS, OPERATING_CATEGORIES,
   type CostCategory, type ContainerKey, type CostKind,
 } from '@/lib/publico'
+
+// Los 3 contenedores como cuentas para aportar/retirar de socios → captura el ORIGEN (metodo) desde el
+// día 1, para que F5 (cuadre) pueda conciliar de dónde entró/salió cada aportación/distribución.
+const SOCIO_ACCOUNTS: WalletOption[] = CONTAINERS.map((c) => ({ value: c.key, label: c.label }))
 
 // ── Público Gourmet · FASE 1 ────────────────────────────────────────────────────────────────────
 // Capa ejecutiva sobre el POS. El corazón NO son gráficas: es un formulario de captura <30s. Bloque
@@ -31,6 +39,17 @@ export default function PublicoContent() {
   const month = capDate.slice(0, 7)
   const [ventas, setVentas] = useState<Venta[]>([])
   const [costos, setCostos] = useState<Costo[]>([])
+  const [tab, setTab] = useState<'captura' | 'socios'>('captura')
+
+  // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
+  const { funds: socioFunds, handlers: socioHandlers } = useCajaFuerte('publico', month)
+  const [splitAlex, setSplitAlex] = useState(50)
+  useEffect(() => { fetch('/api/publico/config').then((r) => r.json()).then((d) => setSplitAlex(Number(d.split_alex ?? 50))).catch(() => {}) }, [])
+  async function saveSplit(v: number) {
+    const s = Math.max(0, Math.min(100, Math.round(v)))
+    setSplitAlex(s)
+    await fetch('/api/publico/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ split_alex: s }) })
+  }
 
   // ── Ventas (cierre del día) ──
   const [efectivo, setEfectivo] = useState('')
@@ -116,9 +135,13 @@ export default function PublicoContent() {
     <div data-theme-scope="publico" className="mx-auto flex max-w-2xl flex-col gap-4 p-4 text-fg">
       <header className="flex items-baseline justify-between">
         <h1 className="text-xl font-bold">Público Gourmet</h1>
-        <span className="text-label uppercase tracking-widest text-fg-muted">Fase 1 · captura</span>
+        <div className="flex gap-1">
+          <button onClick={() => setTab('captura')} style={chip(tab === 'captura')}>Captura</button>
+          <button onClick={() => setTab('socios')} style={chip(tab === 'socios')}>Socios</button>
+        </div>
       </header>
 
+      {tab === 'captura' && (<>
       {/* ── CIERRE DE HOY ── */}
       <section className="rounded-card border border-border bg-surface-2 p-3">
         <div className="mb-2 flex items-center justify-between">
@@ -219,6 +242,59 @@ export default function PublicoContent() {
           </div>
         )}
       </section>
+      </>)}
+
+      {tab === 'socios' && (
+        <Socios funds={socioFunds} handlers={socioHandlers} splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
+      )}
     </div>
+  )
+}
+
+// ── Socios (F2): las dos libretas (reusan FundLedger/FundMovementControl) + % de reparto configurable
+// + reparto sugerido de la utilidad (SOLO LECTURA — guía, no crea asientos; el % es provisional). El
+// origen (contenedor) se captura en cada aportación/retiro para el cuadre de F5. ──
+function Socios({ funds, handlers, splitAlex, onSplit, utilidadOper }: {
+  funds: Fund[]
+  handlers: ReturnType<typeof useCajaFuerte>['handlers']
+  splitAlex: number
+  onSplit: (v: number) => void
+  utilidadOper: number
+}) {
+  const socios = [{ key: 'socio_alex', pct: splitAlex }, { key: 'socio_andres', pct: 100 - splitAlex }]
+  return (
+    <>
+      {socios.map(({ key }) => {
+        const f = funds.find((x) => x.key === key)
+        if (!f) return <p key={key} className="text-secondary italic text-fg-muted">Falta el fondo {key} — ¿corriste la migración 0053?</p>
+        return (
+          <section key={key} className="rounded-card border border-border bg-surface-2 p-3">
+            <div className="mb-2 flex items-baseline justify-between">
+              <h2 className="text-base font-bold">{f.label}</h2>
+              <span className="text-secondary text-fg-muted">saldo <span className="font-bold tabular-nums text-fg">{mxn(f.saved)}</span></span>
+            </div>
+            <FundMovementControl accounts={SOCIO_ACCOUNTS} onSubmit={(flow, desc, amount, metodo) => handlers.onAportaRetira(f.id, flow, desc, amount, metodo)} />
+            <div className="mt-3"><FundLedger movements={f.movements} /></div>
+          </section>
+        )
+      })}
+
+      <section className="rounded-card border border-border p-3">
+        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Reparto</h2>
+        <div className="flex items-center gap-2 text-secondary">
+          <span>Alex</span>
+          <input
+            type="number" min={0} max={100} value={splitAlex} onChange={(e) => onSplit(Number(e.target.value))}
+            className="w-16 rounded border border-border bg-surface-base px-2 py-1 text-right tabular-nums"
+          />
+          <span className="text-fg-muted">% · Andrés {100 - splitAlex}%</span>
+        </div>
+        <div className="mt-2 border-t border-border pt-2 text-secondary">
+          <div className="text-label text-fg-muted">Reparto sugerido de la utilidad del mes ({mxn(utilidadOper)}) — guía, no crea asientos:</div>
+          <div className="mt-1 flex justify-between"><span>Alex ({splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * splitAlex / 100)}</span></div>
+          <div className="flex justify-between"><span>Andrés ({100 - splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * (100 - splitAlex) / 100)}</span></div>
+        </div>
+      </section>
+    </>
   )
 }

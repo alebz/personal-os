@@ -15,7 +15,7 @@ async function del(url: string) { await fetch(url, { method: 'DELETE' }) }
 // Uptown ('uptown') use it — same endpoints, different scope, no duplicated logic. `month` stamps the
 // aportar/retirar movements; `afterChange` (optional) lets a consumer refresh its own derived state
 // (e.g. Finanzas' Historial + wallet deltas) after any fund mutation.
-export function useCajaFuerte(scope: 'personal' | 'uptown', month: string, afterChange?: () => void) {
+export function useCajaFuerte(scope: 'personal' | 'uptown' | 'publico', month: string, afterChange?: () => void) {
   const [funds, setFunds] = useState<Fund[]>([])
 
   // load() only depends on scope → the mount effect never re-fires on month/afterChange changes.
