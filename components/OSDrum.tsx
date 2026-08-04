@@ -219,6 +219,15 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
       if (e.key === 'ArrowUp')   target.current = (Math.round(rot.current / PITCH_DEG) + 1) * PITCH_DEG
     }
 
+    // os-scene NUNCA debe scrollearse: es la escena FIJA y —por su `perspective`— el containing block
+    // de los overlays fixed (rueda de navegación, engrane, viñeta). Las CARAS se montan TODAS a la vez;
+    // si una autofocusea su input (Tareas, Público, etc.), el navegador scrollea os-scene para revelarlo
+    // → arrastra los overlays hacia arriba (rueda descentrada, engrane fuera de pantalla). Las caras
+    // scrollean solas (os-cface, overflow-y:auto); la escena se PINEA a 0 → a prueba de cualquier cara
+    // que autofocusee, presente o futura.
+    const pinScroll = () => { if (scene.scrollTop !== 0 || scene.scrollLeft !== 0) { scene.scrollTop = 0; scene.scrollLeft = 0 } }
+    pinScroll()
+    scene.addEventListener('scroll', pinScroll, { passive: true })
     window.addEventListener('resize', onResize)
     scene.addEventListener('wheel', onWheel, { passive: false })
     scene.addEventListener('pointerdown', onDown)
@@ -230,6 +239,7 @@ export default function OSDrum({ sections }: { sections: OSSection[] }) {
 
     return () => {
       cancelAnimationFrame(raf)
+      scene.removeEventListener('scroll', pinScroll)
       window.removeEventListener('resize', onResize)
       scene.removeEventListener('wheel', onWheel)
       scene.removeEventListener('pointerdown', onDown)
