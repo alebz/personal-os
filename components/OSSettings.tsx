@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { useOSSettings, CRT_PHOSPHORS } from './OSSettingsContext'
 import type { CrtColor, Shell } from './OSSettingsContext'
 import { playXpSound } from './xp/xpSounds'
@@ -112,9 +113,11 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default function OSSettings() {
   const {
-    settingsOpen, closeSettings, set, setCrt,
+    settingsOpen, closeSettings, set, setCrt, setPendingXpWindow,
     showStars, showShips, showPlanes, discreto, showLolo, crt, screensaver, startScreensaver, supraconsciente, shell, xpSound,
   } = useOSSettings()
+  const router   = useRouter()
+  const pathname = usePathname()
 
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -159,10 +162,21 @@ export default function OSSettings() {
               options={[{ value: 'arcade', label: 'Arcade' }, { value: 'xp', label: 'Windows XP' }]}
               value={shell}
               onChange={v => {
-                // El startup de XP es ceremonia de LLEGADA: suena solo en la transición arcade→XP,
-                // desde este click (gesto = autoplay permitido). Nunca en reloads ya estando en XP.
-                if (v === 'xp' && shell !== 'xp') playXpSound('startup')
-                set('shell', v)
+                if (v === shell) return
+                if (v === 'xp') {
+                  // El startup de XP es ceremonia de LLEGADA: suena solo en la transición arcade→XP,
+                  // desde este click (gesto = autoplay permitido). Nunca en reloads ya estando en XP.
+                  playXpSound('startup')
+                  // El escritorio XP solo vive en la raíz. Desde una sección: navega a '/' para montarlo
+                  // y deja la ruta de origen como señal one-shot para que XPDesktop abra su ventana
+                  // (Contactos→Messenger, Inicio→sin ventana). Navegar ANTES de set evita pintar la
+                  // sección bajo el shell equivocado.
+                  router.push('/')
+                  setPendingXpWindow(pathname)
+                  set('shell', 'xp')
+                } else {
+                  set('shell', v)
+                }
               }}
             />
           </Row>

@@ -64,6 +64,11 @@ interface OSSettingsCtx extends OSSettingsState {
   closeSettings:  () => void
   screensaverActive: boolean   // runtime (no persistido): el OS está en modo screensaver ahora
   startScreensaver: () => void // dispara el screensaver ahora (preview); cualquier actividad lo despierta
+  // Al cruzar arcade→XP desde una sección: la ruta de origen que XPDesktop debe abrir como ventana al
+  // montar. EFÍMERO y one-shot (NO persistido, NO en localStorage) — un reload deja el escritorio
+  // limpio, sin ventana fantasma. XPDesktop lo lee al montar y lo limpia a null.
+  pendingXpWindow: string | null
+  setPendingXpWindow: (href: string | null) => void
 }
 
 // Valores por defecto del CRT — calibrados con el usuario (2026-07-23).
@@ -154,6 +159,7 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
   const [state, setState]       = useState<OSSettingsState>(DEFAULTS)
   const [settingsOpen, setOpen] = useState(false)
   const [screensaverActive, setScreensaverActive] = useState(false)
+  const [pendingXpWindow, setPendingXpWindow] = useState<string | null>(null)   // efímero, one-shot (ver interface)
   // "(Ninguno)" bajo XP: protector desactivado por completo → ni el idle ni "Apagar equipo" lo lanzan.
   const noXpSaverRef = useRef(false); noXpSaverRef.current = state.shell === 'xp' && state.xpScreensaver === 'none'
   const initialized             = useRef(false)
@@ -254,6 +260,7 @@ export function OSSettingsProvider({ children }: { children: React.ReactNode }) 
       // equipo") el CRT del usuario vuelve a regir — la excursión se ve arcade completo.
       crt: state.shell === 'xp' && !screensaverActive ? { ...state.crt, on: false } : state.crt,
       set, setCrt, settingsOpen, toggleSettings, closeSettings, screensaverActive, startScreensaver,
+      pendingXpWindow, setPendingXpWindow,
     }}>
       {children}
     </Ctx.Provider>

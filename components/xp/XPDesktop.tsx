@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { wallpaperSrc } from '@/lib/xpWallpapers'
 import { XpWMContext, type XpWM } from './wm-context'
@@ -109,7 +110,8 @@ function XPClock({ onOpen }: { onOpen: () => void }) {
 }
 
 export default function XPDesktop({ sections }: { sections: OSSection[] }) {
-  const { set, xpSound, xpLogicalH, startScreensaver, xpWallpaper } = useOSSettings()
+  const { set, xpSound, xpLogicalH, startScreensaver, xpWallpaper, pendingXpWindow, setPendingXpWindow } = useOSSettings()
+  const router = useRouter()
   const [startOpen, setStartOpen] = useState(false)
   const [flyout, setFlyout] = useState<'fav' | 'all' | null>(null)   // cajón cascada (canon XP)
   const flyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -189,6 +191,21 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     }
     return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href] })
   }
+  // Cruzando arcade→XP desde una sección: abre su ventana equivalente UNA vez al montar. Contactos →
+  // Cerebro Messenger (la buddy list encarnó ahí); Inicio → sin ventana (disuelto en reloj/tray). Como
+  // pendingXpWindow es efímero y se limpia aquí, un reload deja el escritorio limpio (sin fantasma).
+  const didOpenPending = useRef(false)
+  useEffect(() => {
+    if (didOpenPending.current) return
+    didOpenPending.current = true
+    const origin = pendingXpWindow
+    setPendingXpWindow(null)
+    if (!origin) return
+    const href = origin === '/contactos' ? '/brain' : (LAUNCHABLE.has(origin) ? origin : null)
+    const s = href ? sections.find((x) => x.href === href) : null
+    if (s) openSection(s)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const openDateTime = () => openWindow('date-time', 'Propiedades de Fecha y hora', <DateTimeProperties />, { w: 470, h: 344, icon: 'clock' })
   const openDisplayProps = () => { setCtxMenu(null); openWindow('display-props', 'Propiedades de Pantalla', <DisplayProperties />, { w: 400, h: 466, icon: 'display' }) }
   // Mi PC — STUB (su ventana real = Caja Fuerte como unidades de disco, futuro). El escritorio nace
@@ -285,7 +302,17 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
     })
   }
 
-  function logOff() { playXpSound('logoff'); set('shell', 'arcade') }
+  // Inverso XP→arcade ("Apagar equipo"): si hay una ventana de SECCIÓN enfocada (topmost, no
+  // minimizada), vuelve a SU ruta en arcade — el mismo trabajo cambió de mundo. Si no (escritorio
+  // pelón, o una app sin ruta: Solitario/Calc/Bloc/Radio…), cae en Inicio. La ventana del Messenger
+  // es id '/brain' → Cerebro en arcade (simétrico con Contactos→Messenger a la ida).
+  function logOff() {
+    playXpSound('logoff')
+    const focused = windows.find((w) => w.z === topZ && !w.minimized)
+    const sectionHref = focused && sections.some((s) => s.href === focused.id) ? focused.id : null
+    set('shell', 'arcade')
+    if (sectionHref) router.push(sectionHref)
+  }
   function shutDown() { closeStart(); playXpSound('shutdown'); startScreensaver() }
 
   // Valor ESTABLE del WM para las secciones (refs → siempre llaman a la última versión de open/closeWindow;
