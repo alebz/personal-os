@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { MONEY, MoneyBar, MoneyModal, MoneyBtn, MoneyInput, fmtMxn } from './MoneyChrome'
+import { valetSaturdays } from '@/lib/valet'
 
 // VALET en estilo MSN Money. Autocontenido: config (/api/uptown/valet), pagos de inquilinos
 // (/api/uptown/valet/payment → cobro al fondo valet_nu), proveedor (movimiento valet_prov en valet_nu),
@@ -20,19 +21,11 @@ const VALET_TOTAL_PTS = VALET_TENANTS.reduce((s, t) => s + t.pts, 0)   // 17
 const VALET_PROVIDER_WEEK = 2800
 const num = (v: unknown) => Number(v ?? 0) || 0
 
-function saturdayDatesInMonth(month: string): string[] {
-  const [y, mo] = month.split('-').map(Number)
-  const d = new Date(y, mo - 1, 1)
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1)
-  const out: string[] = []
-  while (d.getMonth() === mo - 1) { out.push([d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')); d.setDate(d.getDate() + 7) }
-  return out
-}
 const dLabel = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
 
 interface Payment { week_date: string; tenant_id: string; status: 'pending' | 'paid' }
 interface Move { id: string; date: string; description: string; amount: number; flow: 'in' | 'out'; source_key: string | null }
-interface Config { num_weeks: number; week1_date: string | null; price_per_point: number }
+interface Config { num_weeks: number; price_per_point: number }
 
 async function post(url: string, b: unknown) { const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); if (!r.ok) throw new Error(await r.text()); return r.json().catch(() => ({})) }
 async function del(url: string) { await fetch(url, { method: 'DELETE' }) }
@@ -42,7 +35,7 @@ function Check({ on, onClick }: { on: boolean; onClick: () => void }) {
 }
 
 export default function MoneyValet({ month, onLedgerChange }: { month: string; onLedgerChange: () => void }) {
-  const [config, setConfig] = useState<Config>({ num_weeks: 4, week1_date: null, price_per_point: 176 })
+  const [config, setConfig] = useState<Config>({ num_weeks: 4, price_per_point: 176 })
   const [payments, setPayments] = useState<Payment[]>([])
   const [nu, setNu] = useState<{ saved: number; movements: Move[] }>({ saved: 0, movements: [] })
   const [nuOpen, setNuOpen] = useState(false)
@@ -51,14 +44,14 @@ export default function MoneyValet({ month, onLedgerChange }: { month: string; o
   // check registra ESE monto (no el default). Efímero: si no marcas pagado, no hubo pago que persistir.
   const [provDraft, setProvDraft] = useState<Record<string, number>>({})
 
-  const loadValet = useCallback(() => fetch(`/api/uptown/valet?month=${month}`).then((r) => r.json()).then((d) => { if (d) { if (d.config) setConfig({ num_weeks: num(d.config.num_weeks) || 4, week1_date: d.config.week1_date ?? null, price_per_point: num(d.config.price_per_point) || 176 }); if (Array.isArray(d.payments)) setPayments(d.payments) } }).catch(() => {}), [month])
+  const loadValet = useCallback(() => fetch(`/api/uptown/valet?month=${month}`).then((r) => r.json()).then((d) => { if (d) { if (d.config) setConfig({ num_weeks: num(d.config.num_weeks) || 4, price_per_point: num(d.config.price_per_point) || 176 }); if (Array.isArray(d.payments)) setPayments(d.payments) } }).catch(() => {}), [month])
   const loadNu = useCallback(() => fetch('/api/finance/funds?scope=uptown&archived=1').then((r) => r.json()).then((d) => { if (Array.isArray(d)) { const f = d.find((x) => x.key === 'valet_nu'); if (f) setNu({ saved: num(f.saved), movements: (f.movements ?? []).map((m: Move) => ({ ...m, amount: num(m.amount) })) }) } }).catch(() => {}), [])
   useEffect(() => { loadValet() }, [loadValet])
   useEffect(() => { loadNu() }, [loadNu])
   const refresh = () => { loadValet(); loadNu(); onLedgerChange() }
 
   const ppt = config.price_per_point
-  const weeks = saturdayDatesInMonth(month)
+  const weeks = valetSaturdays(month)
   const numWeeks = weeks.length
   const isPaid = (date: string, tid: string) => payments.some((p) => p.week_date === date && p.tenant_id === tid && p.status === 'paid')
   const providerMov = (date: string) => nu.movements.find((m) => m.source_key === `valet_prov:${date}`)
@@ -99,7 +92,6 @@ export default function MoneyValet({ month, onLedgerChange }: { month: string; o
         </div>
         <div style={{ flex: 1, minWidth: 190, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '7px 10px', background: 'linear-gradient(#fff,#f2f7fd)', display: 'flex', flexDirection: 'column', gap: 5 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#5a6a86' }}>Semanas<span style={{ marginLeft: 'auto', fontWeight: 700, color: MONEY.ink }}>{numWeeks}</span></div>
-          <ConfigRow label="1er sábado" type="date" value={config.week1_date ?? weeks[0] ?? ''} onSave={(v) => saveConfig({ week1_date: v })} />
           <ConfigRow label="Monto / punto" type="number" value={String(ppt)} onSave={(v) => saveConfig({ price_per_point: num(v) })} />
         </div>
       </div>

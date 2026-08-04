@@ -10,6 +10,7 @@ import { FundLedger } from '@/components/finance/FundLedger'
 import DrumModal from '@/components/DrumModal'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { useUptownRenters, type Renter } from '@/components/uptown/useUptownRenters'
+import { valetSaturdays } from '@/lib/valet'
 import UptownMoney from '@/components/xp/UptownMoney'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 
 interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
 
 type ValetStatus = 'pending' | 'paid'
-interface ValetConfig  { num_weeks: number; week1_date: string | null; price_per_point: number }
+interface ValetConfig  { num_weeks: number; price_per_point: number }
 interface ValetPayment { week_date: string; tenant_id: string; status: ValetStatus }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -74,13 +75,6 @@ function todayStr() {
   return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-')
 }
 todayStr // suppress unused warning — used indirectly through new Date() in the page
-
-function firstSaturdayOfMonth(month: string): string {
-  const [y, mo] = month.split('-').map(Number)
-  const d = new Date(y, mo - 1, 1)
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1)
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
-}
 
 function saturdaysInMonth(month: string): { num: number; label: string }[] {
   const [y, mo] = month.split('-').map(Number)
@@ -989,7 +983,7 @@ function ValetWeekCard({
 // ─── ValetTab ─────────────────────────────────────────────────────────────────
 
 function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: Fund; onLedgerChange: () => void }) {
-  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, week1_date: null, price_per_point: 176 })
+  const [config,   setConfig]   = useState<ValetConfig>({ num_weeks: 4, price_per_point: 176 })
   const [payments, setPayments] = useState<ValetPayment[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
@@ -1006,7 +1000,6 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
         if (data.error) throw new Error(data.error)
         const cfg: ValetConfig = {
           num_weeks:        data.config?.num_weeks ?? 4,
-          week1_date:       data.config?.week1_date ?? firstSaturdayOfMonth(month),
           price_per_point:  Number(data.config?.price_per_point ?? 176),
         }
         setConfig(cfg)
@@ -1081,24 +1074,17 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
     onLedgerChange()
   }
 
+  // Fuente ÚNICA de las fechas del valet: los sábados reales del mes (lib/valet). weekDateOf(w) es el
+  // w-ésimo sábado; weekLabel(w) su día. XP usa el mismo helper → la misma semana llava a la misma
+  // fecha en ambos shells. (Los pagos guardados ya están en estos sábados: sin migración de datos.)
+  const saturdays       = valetSaturdays(month)
+  function weekDateOf(w: number): string { return saturdays[w - 1] ?? '' }
   function weekLabel(w: number): string {
-    if (!config.week1_date) return `Sem. ${w}`
-    const d = new Date(config.week1_date + 'T12:00:00')
-    d.setDate(d.getDate() + (w - 1) * 7)
-    return `Sáb ${d.getDate()}`
+    const iso = saturdays[w - 1]
+    return iso ? `Sáb ${Number(iso.slice(8, 10))}` : `Sem. ${w}`
   }
 
-  // Absolute Saturday (ISO) for week w — SAME formula the 0046 backfill used, so it matches the
-  // stored week_date exactly and the grid shows every existing mark. week1_date is always present
-  // (defaulted to firstSaturdayOfMonth on load), mirroring the migration's COALESCE.
-  function weekDateOf(w: number): string {
-    const base = config.week1_date ?? firstSaturdayOfMonth(month)
-    const d = new Date(base + 'T12:00:00')
-    d.setDate(d.getDate() + (w - 1) * 7)
-    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
-  }
-
-  const numWeeks        = saturdaysInMonth(month).length
+  const numWeeks        = saturdays.length
   const ppt             = config.price_per_point
   // payments is now global (continuous grid); scope the month's reconciliation to THIS month's weeks.
   const monthWeekDates  = new Set(Array.from({ length: numWeeks }, (_, i) => weekDateOf(i + 1)))
@@ -1155,13 +1141,6 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
           <span className="text-secondary text-fg-muted">Semanas:</span>
           <span className="text-body font-bold text-fg">{numWeeks}</span>
           <span className="text-label text-fg-muted/50">· auto</span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-secondary text-fg-muted">1er sáb:</span>
-          <input type="date" value={config.week1_date ?? ''}
-            onChange={e => void saveConfig({ week1_date: e.target.value || null })}
-            className="rounded border border-border bg-surface-2 px-2 py-0.5 text-secondary text-fg outline-none focus:border-accent/50" />
         </div>
 
         <div className="flex items-center gap-1.5">

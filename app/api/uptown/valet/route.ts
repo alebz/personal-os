@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const [configRes, paymentsRes] = await Promise.all([
     supabase
       .from('uptown_valet_config')
-      .select('num_weeks,week1_date,price_per_point')
+      .select('num_weeks,price_per_point')
       .eq('month', month)
       .maybeSingle(),
     // ALL payments, keyed by absolute week_date — the grid is continuous (not month-scoped), so
