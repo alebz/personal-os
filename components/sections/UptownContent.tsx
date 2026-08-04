@@ -1053,11 +1053,15 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
   // Provider state IS the ledger: a valet_prov:<week_date> movement exists ⇔ that week's provider is
   // paid (same source_key toggle pattern as the mantenimiento fondo — no dual source).
   const provMovOf = (weekDate: string) => nuFund?.movements.find(m => m.source_key === `valet_prov:${weekDate}`)
+  // Monto del proveedor ANTES de marcar pagado: el movimiento (= registro del pago) solo existe una vez
+  // pagado, así que el monto pre-pago vive aquí. Flujo real: pones el monto → marcas pagado, y el check
+  // registra ESE monto (no el default 2,800). Efímero: sin pagar no hay pago que persistir.
+  const [provDraft, setProvDraft] = useState<Record<string, number>>({})
 
   async function toggleProvider(weekDate: string, paid: boolean) {
     if (paid) {
       await post('/api/finance/funds/movement', {
-        key: 'valet_nu', flow: 'in', amount: Number(provMovOf(weekDate)?.amount ?? VALET_PROVIDER_WEEK),
+        key: 'valet_nu', flow: 'in', amount: Number(provMovOf(weekDate)?.amount ?? provDraft[weekDate] ?? VALET_PROVIDER_WEEK),
         description: `Pago proveedor · ${weekDate}`, month: weekDate.slice(0, 7), date: weekDate,
         source_key: `valet_prov:${weekDate}`,
       })
@@ -1068,7 +1072,8 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
   }
 
   async function setProviderAmount(weekDate: string, amount: number) {
-    if (!provMovOf(weekDate)) return   // amount only applies to a paid week (a movement to re-amount)
+    // Sin pagar aún: guarda el monto en el draft (lo usará el check). Ya pagado: re-montea el movimiento.
+    if (!provMovOf(weekDate)) { setProvDraft(d => ({ ...d, [weekDate]: amount })); return }
     await post('/api/finance/funds/movement', {
       key: 'valet_nu', flow: 'in', amount, description: `Pago proveedor · ${weekDate}`,
       month: weekDate.slice(0, 7), date: weekDate, source_key: `valet_prov:${weekDate}`,
@@ -1100,7 +1105,7 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
   const cobrado         = payments.filter(p => p.status !== 'pending' && monthWeekDates.has(p.week_date)).reduce((s, p) => s + Math.round((VALET_TENANTS.find(t => t.id === p.tenant_id)?.pts ?? 0) * ppt), 0)
   const esperado        = numWeeks * VALET_TOTAL_PTS * ppt
   const provPaidOf      = (w: number) => !!provMovOf(weekDateOf(w))
-  const provAmtOf       = (w: number) => Number(provMovOf(weekDateOf(w))?.amount ?? VALET_PROVIDER_WEEK)
+  const provAmtOf       = (w: number) => Number(provMovOf(weekDateOf(w))?.amount ?? provDraft[weekDateOf(w)] ?? VALET_PROVIDER_WEEK)
   const proveedorPagado = Array.from({ length: numWeeks }, (_, i) => provPaidOf(i + 1) ? provAmtOf(i + 1) : 0).reduce((s, v) => s + v, 0)
   const proveedorTotal  = Array.from({ length: numWeeks }, (_, i) => provAmtOf(i + 1)).reduce((s, v) => s + v, 0)
 

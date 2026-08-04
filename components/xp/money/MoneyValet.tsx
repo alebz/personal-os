@@ -46,6 +46,10 @@ export default function MoneyValet({ month, onLedgerChange }: { month: string; o
   const [payments, setPayments] = useState<Payment[]>([])
   const [nu, setNu] = useState<{ saved: number; movements: Move[] }>({ saved: 0, movements: [] })
   const [nuOpen, setNuOpen] = useState(false)
+  // Monto del proveedor ANTES de marcar pagado: el movimiento (= registro del pago) solo existe una
+  // vez pagado, así que el monto pre-pago vive aquí. Flujo real: pones el monto → marcas pagado, y el
+  // check registra ESE monto (no el default). Efímero: si no marcas pagado, no hubo pago que persistir.
+  const [provDraft, setProvDraft] = useState<Record<string, number>>({})
 
   const loadValet = useCallback(() => fetch(`/api/uptown/valet?month=${month}`).then((r) => r.json()).then((d) => { if (d) { if (d.config) setConfig({ num_weeks: num(d.config.num_weeks) || 4, week1_date: d.config.week1_date ?? null, price_per_point: num(d.config.price_per_point) || 176 }); if (Array.isArray(d.payments)) setPayments(d.payments) } }).catch(() => {}), [month])
   const loadNu = useCallback(() => fetch('/api/finance/funds?scope=uptown&archived=1').then((r) => r.json()).then((d) => { if (Array.isArray(d)) { const f = d.find((x) => x.key === 'valet_nu'); if (f) setNu({ saved: num(f.saved), movements: (f.movements ?? []).map((m: Move) => ({ ...m, amount: num(m.amount) })) }) } }).catch(() => {}), [])
@@ -70,7 +74,7 @@ export default function MoneyValet({ month, onLedgerChange }: { month: string; o
     refresh()
   }
   async function toggleProvider(date: string, paid: boolean) {
-    if (paid) { const ex = providerMov(date); await post('/api/finance/funds/movement', { key: 'valet_nu', flow: 'in', amount: ex ? num(ex.amount) : VALET_PROVIDER_WEEK, description: `Pago proveedor · ${date}`, month: date.slice(0, 7), date, source_key: `valet_prov:${date}` }) }
+    if (paid) { const ex = providerMov(date); await post('/api/finance/funds/movement', { key: 'valet_nu', flow: 'in', amount: ex ? num(ex.amount) : (provDraft[date] ?? VALET_PROVIDER_WEEK), description: `Pago proveedor · ${date}`, month: date.slice(0, 7), date, source_key: `valet_prov:${date}` }) }
     else { await del(`/api/finance/funds/movement?source_key=valet_prov:${date}`) }
     refresh()
   }
@@ -130,11 +134,12 @@ export default function MoneyValet({ month, onLedgerChange }: { month: string; o
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 9px', background: '#f7f9fc' }}>
                   <Check on={provPaid} onClick={() => toggleProvider(wk, !provPaid)} />
                   <span style={{ flex: 1 }}>Proveedor</span>
-                  {provPaid ? (
-                    <ProviderAmount value={num(pMov!.amount)} onSave={(v) => setProviderAmount(wk, v)} />
-                  ) : (
-                    <span style={{ color: MONEY.down }}>−{fmtMxn(VALET_PROVIDER_WEEK)}</span>
-                  )}
+                  {/* Monto SIEMPRE editable (con o sin check). Pagado → edita el movimiento; sin pagar
+                      → guarda el draft que usará el check. */}
+                  <ProviderAmount
+                    value={pMov ? num(pMov.amount) : (provDraft[wk] ?? VALET_PROVIDER_WEEK)}
+                    onSave={(v) => (provPaid ? setProviderAmount(wk, v) : setProvDraft((d) => ({ ...d, [wk]: v })))}
+                  />
                 </div>
               </div>
             </div>
