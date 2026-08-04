@@ -1,16 +1,16 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import Clock from '@/components/Clock'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import OSSettings from '@/components/OSSettings'
 import { sectionColor } from '@/lib/sections'
 import { crtDayColor } from '@/lib/weekdayColors'
 
-// Color por tab NO se define aquí — se lee de la fuente canónica (lib/sections, el tambor manda).
-// Cubre las 8 secciones del OS (paridad con SECTIONS de app/page.tsx). Color por tab = fuente canónica
-// lib/sections. (Diario salió: ya no es sección; su ruta /journal sigue viva para el buddy de Cerebro.)
+// Color por tab NO se define aquí — se lee de la fuente canónica (lib/sections). Cubre las 8 secciones
+// del OS (paridad con SECTIONS de app/page.tsx). (Diario salió: ya no es sección; su ruta /journal
+// sigue viva para el buddy de Cerebro.)
 const TABS = [
   { label: 'Inicio',    href: '/' },
   { label: 'Tareas',    href: '/crm' },
@@ -21,37 +21,77 @@ const TABS = [
   { label: 'Uptown',    href: '/uptown' },
   { label: 'Público',   href: '/publico' },
 ]
+const DEFAULT_ORDER = TABS.map(t => t.href)
+const ORDER_KEY = 'toprail-order'
 
 export default function TopRail() {
   const pathname   = usePathname()
   const { toggleSettings, settingsOpen, crt } = useOSSettings()
-  const clockColor = crtDayColor(sectionColor(pathname), crt)   // fósforo en mono, color de sección en multi
+
+  // Orden de las tabs REACOMODABLE por drag-and-drop, persistente en localStorage (mismo patrón que
+  // los íconos del escritorio XP y los inquilinos de Uptown). `order === null` hasta montar → render
+  // server = DEFAULT (sin mismatch de hidratación); el efecto aplica el guardado tras el primer paint.
+  const [order, setOrder] = useState<string[] | null>(null)
+  const dragHref = useRef<string | null>(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ORDER_KEY)
+      const saved: string[] = raw ? JSON.parse(raw) : []
+      // Reconciliar con los hrefs conocidos: conserva el orden guardado para los que existen y
+      // agrega al final cualquier sección nueva (y descarta rutas viejas). Robusto ante cambios del menú.
+      const merged = [...saved.filter(h => DEFAULT_ORDER.includes(h)), ...DEFAULT_ORDER.filter(h => !saved.includes(h))]
+      setOrder(merged)
+    } catch { setOrder(DEFAULT_ORDER) }
+  }, [])
+
+  function drop(targetHref: string) {
+    const from = dragHref.current; dragHref.current = null
+    const base = order ?? DEFAULT_ORDER
+    if (!from || from === targetHref) return
+    const ids = [...base]
+    const fi = ids.indexOf(from), ti = ids.indexOf(targetHref)
+    if (fi < 0 || ti < 0) return
+    ids.splice(ti, 0, ids.splice(fi, 1)[0])
+    setOrder(ids)
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)) } catch { /* */ }
+  }
+
+  const tabs = (order ?? DEFAULT_ORDER)
+    .map(h => TABS.find(t => t.href === h))
+    .filter((t): t is (typeof TABS)[number] => Boolean(t))
 
   return (
     <header className="sticky top-0 z-[10000]" style={{ viewTransitionName: 'toprail' }}>
-      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-5 px-6" style={{ minHeight: '7rem' }}>
+      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-5 px-6" style={{ minHeight: '7rem', paddingTop: '4.5rem', paddingBottom: '4.5rem' }}>
 
-        {/* Col 1 — vacío: el logo se retiró (no visible dentro del OS). Spacer para mantener el nav centrado. */}
+        {/* Col 1 — spacer izquierdo (el logo se retiró; mantiene el nav centrado). */}
         <div className="col-span-3" aria-hidden />
 
         {/* Col 2 — nav + gear */}
         <div className="col-span-6 hidden items-center justify-center gap-3 md:flex">
           <nav className="flex items-center gap-1 rounded-control border border-border bg-surface-1 p-1.5 backdrop-blur-xl">
-            {TABS.map(({ label, href }) => {
+            {tabs.map(({ label, href }) => {
               const active = pathname === href
               const color  = crtDayColor(sectionColor(href), crt)
+              // Inactivo = token fg-muted (respeta MONOCOLOR: en mono se remapea a fósforo, no gris
+              // hardcodeado). Activo/hover = color de sección (o fósforo en mono, vía crtDayColor).
               const baseStyle: React.CSSProperties = {
                 transition: 'color 200ms ease, background 200ms ease, text-shadow 200ms ease',
-                color: active ? color : 'rgba(255,255,255,0.45)',
+                color: active ? color : 'var(--color-fg-muted)',
                 background: active ? `${color}18` : 'transparent',
                 textShadow: active ? `0 0 12px ${color}66` : 'none',
               }
               return (
                 <Link
-                  key={label}
+                  key={href}
                   href={href}
+                  draggable
+                  onDragStart={e => { dragHref.current = href; e.dataTransfer.effectAllowed = 'move' }}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); drop(href) }}
                   className="rounded-control px-5 py-2 text-body font-medium"
                   style={baseStyle}
+                  title="Arrastra para reordenar"
                   onMouseEnter={e => {
                     if (active) return
                     const el = e.currentTarget as HTMLElement
@@ -60,7 +100,7 @@ export default function TopRail() {
                   onMouseLeave={e => {
                     if (active) return
                     const el = e.currentTarget as HTMLElement
-                    el.style.color = 'rgba(255,255,255,0.45)'
+                    el.style.color = 'var(--color-fg-muted)'
                     el.style.background = 'transparent'
                   }}
                 >
@@ -93,10 +133,9 @@ export default function TopRail() {
           </button>
         </div>
 
-        {/* Col 3 — clock */}
-        <div className="col-span-3 flex items-center justify-end">
-          <Clock color={clockColor} />
-        </div>
+        {/* Col 3 — spacer derecho. El reloj se retiró: Inicio ya tiene el reloj sobre el calendario,
+            dos en pantalla era redundante. Spacer para mantener el nav centrado. */}
+        <div className="col-span-3" aria-hidden />
 
       </div>
 
