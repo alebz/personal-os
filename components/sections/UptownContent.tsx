@@ -9,19 +9,13 @@ import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { FundLedger } from '@/components/finance/FundLedger'
 import DrumModal from '@/components/DrumModal'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import { useUptownRenters, type Renter } from '@/components/uptown/useUptownRenters'
 import UptownMoney from '@/components/xp/UptownMoney'
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
-const RENTER_DEFS: { id: string; name: string; location: string; startMonth: string | null; defaultAmount?: number }[] = [
-  { id: 'maison_zozoaga',  name: 'Maison Zozoaga',  location: 'PB',          startMonth: null,       defaultAmount: 10_208 },
-  { id: 'arko',            name: 'Arko',             location: 'Planta alta', startMonth: null,       defaultAmount: 10_000 },
-  { id: 'maricel',         name: "Maricel's Room",   location: 'Planta alta', startMonth: null,       defaultAmount: 10_000 },
-  { id: 'connect',         name: 'Connect',          location: 'Planta alta', startMonth: null,       defaultAmount:  7_800 },
-  { id: 'barbajan',        name: 'Barbaján',         location: 'Sótano',      startMonth: '2026-07',  defaultAmount: 17_000 },
-  { id: 'publico_gourmet', name: 'Público Gourmet',  location: 'PB',          startMonth: '2026-08'  },
-  { id: 'naran_853',       name: 'Narán 853',        location: 'Torre Narán', startMonth: null,       defaultAmount: 11_500 },
-]
+// Inquilinos ahora viven en la tabla uptown_renters (CRUD del usuario, hook useUptownRenters). Los
+// gastos fijos (EXPENSE_DEFS) siguen en código por ahora — mismo patrón cuando Alex lo pida.
 
 const EXPENSE_DEFS: { id: string; name: string; note: string | null; startMonth: string | null; defaultAmount?: number }[] = [
   { id: 'cfe',        name: 'CFE',             note: 'bimestral', startMonth: null      },
@@ -102,15 +96,14 @@ function saturdaysInMonth(month: string): { num: number; label: string }[] {
   return result
 }
 
-function activeRenters(month: string) {
-  return RENTER_DEFS.filter(r => !r.startMonth || month >= r.startMonth)
-}
 function activeExpenses(month: string) {
   return EXPENSE_DEFS.filter(e => !e.startMonth || month >= e.startMonth)
 }
 
-function mergeRents(db: RentRow[], month: string): RentRow[] {
-  return activeRenters(month).map(r => db.find(d => d.renter === r.id) ?? { renter: r.id, amount: r.defaultAmount ?? 0, paid: false, method: 'cash' as const })
+// El monto de cada renta sale de su fila en uptown_rents (snapshot del mes); si no hay fila, cae al
+// `rent` del inquilino (semilla). Editar la semilla NO reescribe filas existentes → pasado intacto.
+function mergeRents(db: RentRow[], active: Renter[]): RentRow[] {
+  return active.map(r => db.find(d => d.renter === r.id) ?? { renter: r.id, amount: r.rent ?? 0, paid: false, method: 'cash' as const })
 }
 function mergeExpenses(db: ExpenseRow[], month: string): ExpenseRow[] {
   const sats = saturdaysInMonth(month)
@@ -284,36 +277,80 @@ function PaidCountInput({ paid, total, onSave }: { paid: number; total: number; 
 
 // ─── RentasSection ────────────────────────────────────────────────────────────
 
-function RentasSection({ rents, month, onToggle, onAmount, onMethod, paidCounts, onCount }: {
+function RentasSection({ renters, rents, onToggle, onAmount, onMethod, paidCounts, onCount, onAddRenter, onEditRenter, onDeleteRenter, onReorder }: {
+  renters: Renter[]
   rents: RentRow[]
-  month: string
   onToggle: (renter: string, paid: boolean) => void
   onAmount: (renter: string, amount: number) => void
   onMethod: (renter: string, method: 'cash' | 'card') => void
   paidCounts: Record<string, { paid: number; total: number }>
   onCount: (renter: string, paid: number, total: number) => void
+  onAddRenter: (name: string, rent: number) => void
+  onEditRenter: (id: string, patch: Partial<Renter>) => void
+  onDeleteRenter: (id: string) => void
+  onReorder: (ids: string[]) => void
 }) {
-  const defs = activeRenters(month)
   const total = rents.reduce((s, r) => s + r.amount, 0)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [eName, setEName] = useState(''); const [eLoc, setELoc] = useState(''); const [eRent, setERent] = useState('')
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [nName, setNName] = useState(''); const [nRent, setNRent] = useState('')
+  const dragId = useRef<string | null>(null)
+
+  function startEdit(r: Renter) { setEditId(r.id); setEName(r.name); setELoc(r.location ?? ''); setERent(String(r.rent)) }
+  function saveEdit() { if (editId && eName.trim()) onEditRenter(editId, { name: eName.trim(), location: eLoc.trim() || null, rent: Number(eRent) || 0 }); setEditId(null) }
+  function addNew() { if (!nName.trim()) return; onAddRenter(nName.trim(), Number(nRent) || 0); setNName(''); setNRent('') }
+  function drop(targetId: string) {
+    const from = dragId.current; dragId.current = null
+    if (!from || from === targetId) return
+    const ids = renters.map(r => r.id)
+    const fi = ids.indexOf(from), ti = ids.indexOf(targetId)
+    if (fi < 0 || ti < 0) return
+    ids.splice(ti, 0, ids.splice(fi, 1)[0]); onReorder(ids)
+  }
+  const inp = 'rounded border border-border bg-surface-2 px-1.5 py-0.5 text-body text-fg outline-none focus:border-accent/50'
 
   return (
     <SectionCard title="Rentas" total={total} colorClass="text-ok">
-      {defs.map(def => {
-        const row = rents.find(r => r.renter === def.id) ?? { renter: def.id, amount: 0, paid: false, method: 'cash' as const }
-        const counts = paidCounts[def.id] ?? { paid: 0, total: 12 }
+      {renters.map(r => {
+        const row = rents.find(x => x.renter === r.id) ?? { renter: r.id, amount: 0, paid: false, method: 'cash' as const }
+        const counts = paidCounts[r.id] ?? { paid: 0, total: 12 }
+        if (editId === r.id) return (
+          <div key={r.id} className="flex items-center gap-2 border-t border-border py-1.5 first:border-0">
+            <input value={eName} onChange={e => setEName(e.target.value)} placeholder="nombre" className={`flex-1 ${inp}`} autoFocus />
+            <input value={eLoc} onChange={e => setELoc(e.target.value)} placeholder="ubicación" className={`w-28 ${inp} text-label`} />
+            <span className="text-label text-fg-muted">renta</span>
+            <input value={eRent} onChange={e => setERent(e.target.value)} inputMode="decimal" onKeyDown={e => e.key === 'Enter' && saveEdit()} className={`w-24 ${inp} text-right tabular-nums`} />
+            <button onClick={saveEdit} className="px-1 text-ok" title="Guardar">✓</button>
+            <button onClick={() => setEditId(null)} className="px-1 text-fg-muted" title="Cancelar">✕</button>
+          </div>
+        )
         return (
-          <div key={def.id} className="group flex items-center gap-2 border-t border-border py-1.5 first:border-0">
-            <PaidToggle paid={row.paid} onChange={v => onToggle(def.id, v)} />
-            <span className={`flex-1 truncate text-body ${row.paid ? 'text-fg-muted/60 line-through' : 'text-fg'}`}>
-              {def.name}
-            </span>
-            <PaidCountInput paid={counts.paid} total={counts.total} onSave={(p, t) => onCount(def.id, p, t)} />
-            <span className="text-label text-fg-muted/50">{def.location}</span>
-            <MethodToggle method={row.method} onChange={m => onMethod(def.id, m)} />
-            <AmountInput value={row.amount} onSave={n => onAmount(def.id, n)} />
+          <div key={r.id} draggable onDragStart={() => { dragId.current = r.id }} onDragOver={e => e.preventDefault()} onDrop={() => drop(r.id)}
+            className="group flex items-center gap-2 border-t border-border py-1.5 first:border-0">
+            <span className="cursor-grab select-none text-fg-muted/40" title="Arrastra para reordenar">⠿</span>
+            <PaidToggle paid={row.paid} onChange={v => onToggle(r.id, v)} />
+            <span className={`flex-1 truncate text-body ${row.paid ? 'text-fg-muted/60 line-through' : 'text-fg'}`}>{r.name}</span>
+            <PaidCountInput paid={counts.paid} total={counts.total} onSave={(p, t) => onCount(r.id, p, t)} />
+            <span className="text-label text-fg-muted/50">{r.location}</span>
+            <MethodToggle method={row.method} onChange={m => onMethod(r.id, m)} />
+            <AmountInput value={row.amount} onSave={n => onAmount(r.id, n)} />
+            {confirmDel === r.id ? (
+              <button onClick={() => { onDeleteRenter(r.id); setConfirmDel(null) }} className="text-label font-medium text-danger" title="Confirmar (archiva si tiene historial)">¿borrar?</button>
+            ) : (
+              <>
+                <button onClick={() => startEdit(r)} className="px-0.5 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-fg" title="Editar">✎</button>
+                <button onClick={() => setConfirmDel(r.id)} className="px-0.5 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" title="Eliminar">✕</button>
+              </>
+            )}
           </div>
         )
       })}
+      <div className="mt-1 flex items-center gap-2 border-t border-border pt-2">
+        <input value={nName} onChange={e => setNName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNew()} placeholder="+ Nuevo inquilino" className={`flex-1 ${inp} py-1`} />
+        <input value={nRent} onChange={e => setNRent(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNew()} inputMode="decimal" placeholder="renta" className={`w-24 ${inp} py-1 text-right tabular-nums`} />
+        <button onClick={addNew} className="rounded border border-border px-3 py-1 text-body font-medium text-fg hover:border-accent/50">Añadir</button>
+      </div>
     </SectionCard>
   )
 }
@@ -779,19 +816,20 @@ const UPTOWN_METHOD_STYLE: Record<string, string> = {
 }
 const UPTOWN_METHOD_LABEL: Record<string, string> = { cash: 'Ef', card: 'TJ' }
 
-function UptownHistorialTab({ rents, expenses, nomina, extraIncome, extraExpenses, month }: {
+function UptownHistorialTab({ rents, expenses, nomina, extraIncome, extraExpenses, month, renters }: {
   rents: RentRow[]
   expenses: ExpenseRow[]
   nomina: NominaRow[]
   extraIncome: ExtraItem[]
   extraExpenses: ExtraItem[]
   month: string
+  renters: Renter[]
 }) {
   const sats = saturdaysInMonth(month)
   const movs: UptownMov[] = []
 
   for (const r of rents.filter(r => r.paid)) {
-    const def = RENTER_DEFS.find(d => d.id === r.renter)
+    const def = renters.find(d => d.id === r.renter)
     movs.push({ id: `rent:${r.renter}`, description: def?.name ?? r.renter, amount: r.amount, flow: 'in', category: 'Renta', method: r.method })
   }
   for (const i of extraIncome) {
@@ -1217,7 +1255,9 @@ export default function UptownContent() {
 
 function UptownArcade() {
   const [month, setMonth]             = useState(currMonth)
-  const [rents, setRents]             = useState<RentRow[]>([])
+  const [rawRents, setRawRents]       = useState<RentRow[]>([])   // filas crudas de uptown_rents (snapshot por mes)
+  const [rents, setRents]             = useState<RentRow[]>([])   // merge con los inquilinos activos (para render/optimista)
+  const { renters: renterList, activeFor, add: addRenter, edit: editRenter, remove: removeRenter, reorder: reorderRenters } = useUptownRenters()
   const [expenses, setExpenses]       = useState<ExpenseRow[]>([])
   const [nomina, setNomina]           = useState<NominaRow[]>([])
   const [extraIncome, setExtraIncome] = useState<ExtraItem[]>([])
@@ -1238,7 +1278,7 @@ function UptownArcade() {
     try {
       const data = await (await fetch(`/api/uptown?month=${m}`)).json()
       if (data.error) throw new Error(data.error)
-      setRents(mergeRents(data.rents, m))
+      setRawRents(data.rents)
       setExpenses(mergeExpenses(data.fixed_expenses, m))
       setNomina(mergeNomina(data.nomina, m))
       setExtraIncome(data.extra_income)
@@ -1253,6 +1293,10 @@ function UptownArcade() {
   }, [])
 
   useEffect(() => { void loadMonth(month) }, [month, loadMonth])
+  // Deriva las rentas visibles = filas crudas del mes ⊕ inquilinos activos. Re-corre al cambiar
+  // rawRents, la lista de inquilinos (CRUD) o el mes. Las ediciones optimistas de abajo tocan `rents`
+  // directamente (no rawRents) → no se pisan.
+  useEffect(() => { setRents(mergeRents(rawRents, activeFor(month))) }, [rawRents, renterList, activeFor, month])
 
   // ── Rent handlers ─────────────────────────────────────────────────────────
 
@@ -1560,7 +1604,7 @@ function UptownArcade() {
           <UptownHistorialTab
             rents={rents} expenses={expenses} nomina={nomina}
             extraIncome={extraIncome} extraExpenses={extraExpenses}
-            month={month}
+            month={month} renters={renterList}
           />
         ) : loading ? (
           <div className="flex items-center justify-center py-32">
@@ -1579,9 +1623,10 @@ function UptownArcade() {
               <div className="space-y-3">
                 <p className="text-label font-black uppercase tracking-widest text-ok">↑ Ingresos</p>
                 <RentasSection
-                  rents={rents} month={month}
+                  renters={activeFor(month)} rents={rents}
                   onToggle={toggleRent} onAmount={setRentAmount} onMethod={setRentMethod}
                   paidCounts={paidCounts} onCount={setRenterCount}
+                  onAddRenter={addRenter} onEditRenter={editRenter} onDeleteRenter={removeRenter} onReorder={reorderRenters}
                 />
                 <ExtraSection
                   title="Extra Ingresos" colorClass="text-ok"
