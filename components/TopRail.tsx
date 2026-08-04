@@ -9,15 +9,17 @@ import { sectionColor } from '@/lib/sections'
 import { crtDayColor } from '@/lib/weekdayColors'
 
 // Color por tab NO se define aquí — se lee de la fuente canónica (lib/sections, el tambor manda).
+// Cubre las 8 secciones del OS (paridad con SECTIONS de app/page.tsx). Color por tab = fuente canónica
+// lib/sections. (Diario salió: ya no es sección; su ruta /journal sigue viva para el buddy de Cerebro.)
 const TABS = [
   { label: 'Inicio',    href: '/' },
   { label: 'Tareas',    href: '/crm' },
   { label: 'Contactos', href: '/contactos' },
   { label: 'Cerebro',   href: '/brain' },
+  { label: 'Hábitos',   href: '/habits' },
   { label: 'Finanzas',  href: '/finance' },
   { label: 'Uptown',    href: '/uptown' },
   { label: 'Público',   href: '/publico' },
-  { label: 'Diario',    href: '/journal' },
 ]
 
 export default function TopRail() {
@@ -29,17 +31,8 @@ export default function TopRail() {
     <header className="sticky top-0 z-[10000]" style={{ viewTransitionName: 'toprail' }}>
       <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-5 px-6" style={{ minHeight: '7rem' }}>
 
-        {/* Col 1 — logo */}
-        <div className="col-span-3 flex items-center">
-          <Link href="/" className="flex items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt="Alex Mateo"
-              style={{ height: 80, width: 'auto', mixBlendMode: 'screen' }}
-            />
-          </Link>
-        </div>
+        {/* Col 1 — vacío: el logo se retiró (no visible dentro del OS). Spacer para mantener el nav centrado. */}
+        <div className="col-span-3" aria-hidden />
 
         {/* Col 2 — nav + gear */}
         <div className="col-span-6 hidden items-center justify-center gap-3 md:flex">

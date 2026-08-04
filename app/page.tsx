@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import OSDrum, { type OSSection } from '@/components/OSDrum'
+import { type OSSection } from '@/components/OSDrum'
+import Shell from '@/components/Shell'
 import HabitTrackerContent from '@/components/sections/HabitTrackerContent'
 import CerebroContent from '@/components/sections/CerebroContent'
 import TareasContent from '@/components/sections/TareasContent'
@@ -39,7 +40,10 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   if (!mounted) return null
-  if (shell !== 'xp') return <OSDrum sections={SECTIONS} />
+  // ARCADE: navegación tipo web (TopRail) en vez del tambor. '/' = Inicio (reloj/calendario) como
+  // página; las demás secciones tienen su ruta propia (Shell+TopRail). El sim (estrellas/naves/CRT)
+  // lo monta ArcadeChrome en el layout, aparte. El tambor (OSDrum) se retira; su archivo se borra en F2.
+  if (shell !== 'xp') return <Shell><InicioContent /></Shell>
   return (
     <>
       <XPDesktop sections={SECTIONS} />
