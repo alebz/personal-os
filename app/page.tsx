@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { type OSSection } from '@/components/OSDrum'
 import Shell from '@/components/Shell'
 import HabitTrackerContent from '@/components/sections/HabitTrackerContent'
 import CerebroContent from '@/components/sections/CerebroContent'
@@ -14,7 +13,7 @@ import InicioContent from '@/components/sections/InicioContent'
 import XPDesktop from '@/components/xp/XPDesktop'
 import XpScreensaver from '@/components/xp/XpScreensaver'
 import { useOSSettings } from '@/components/OSSettingsContext'
-import { SECTION_COLORS } from '@/lib/sections'
+import { SECTION_COLORS, type OSSection } from '@/lib/sections'
 
 // OSDrum reveals faces in reverse as you scroll down (index 0 front, then N-1, N-2 … 1). So the
 // CARDS are laid out reversed-past-index-0 to make the on-screen order read top→bottom:

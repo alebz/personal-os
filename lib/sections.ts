@@ -1,8 +1,13 @@
+import type { ReactNode } from 'react'
+
+// Una SECCIÓN del OS: se pasa al escritorio XP (XPDesktop) y a la navegación arcade (TopRail/páginas).
+// Vivía en OSDrum; se movió aquí al retirar el tambor (fuente canónica de secciones + colores).
+export type OSSection = { label: string; color: string; href: string; content?: ReactNode }
+
 // ── Colores de sección · FUENTE CANÓNICA ──────────────────────────────────────
-// El tambor (OSDrum, app/page.tsx) manda. Cada sección tiene UN color, keyed por su ruta.
-// TopRail y cualquier otro consumidor leen de aquí — nunca redefinen su propia paleta (antes
-// TopRail tenía colores contradictorios: Tareas rojo vs azul, Cerebro amarillo vs morado, etc.).
-// Colores = WEEKDAY_RAINBOW del OS (un hue por sección, identidad consistente).
+// Cada sección tiene UN color, keyed por su ruta. TopRail y cualquier otro consumidor leen de aquí —
+// nunca redefinen su propia paleta (antes TopRail tenía colores contradictorios: Tareas rojo vs azul,
+// Cerebro amarillo vs morado, etc.). Colores = WEEKDAY_RAINBOW del OS (un hue por sección).
 export const SECTION_COLORS: Record<string, string> = {
   '/':          '#e8ecff',  // Inicio
   '/contactos': '#EA4335',  // Contactos
