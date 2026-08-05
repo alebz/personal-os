@@ -368,24 +368,30 @@ export default function WarpSaver({
       galA = 1 - Math.min(1, bo * 1.25)
       const SB = Math.round(bo * 2.2)
 
-      // Timón: paseo aleatorio con amortiguación + resorte al centro.
-      yawV += (Math.random() - 0.5) * 0.00019 - yawV * 0.02 - yaw * 0.0006
-      pitV += (Math.random() - 0.5) * 0.00013 - pitV * 0.022 - pit * 0.0008
+      // Timón: paseo aleatorio con amortiguación + resorte al centro. Ruido bajo + poca amortiguación
+      // de velocidad → maniobras LENTAS y sostenidas (banca suave) en vez de tembleque por-frame.
+      yawV += (Math.random() - 0.5) * 0.00007 - yawV * 0.012 - yaw * 0.0005
+      pitV += (Math.random() - 0.5) * 0.00005 - pitV * 0.013 - pit * 0.0006
       yaw += yawV; pit += pitV
       if (yaw > 0.34) yaw = 0.34; if (yaw < -0.34) yaw = -0.34
       if (pit > 0.24) pit = 0.24; if (pit < -0.24) pit = -0.24
       roll += (-yawV * 42 - roll) * 0.022 // banca hacia la vuelta
 
-      const CX = W / 2 + yaw * 34, CY = H / 2 + pit * 24
+      // Punto de fuga FIJO al centro; el timón ya NO desplaza todo rígido (antes CX=W/2+yaw*34 movía
+      // igual a lo cercano y a lo gigante-lejano). Ahora PARALLAX por profundidad: cada cuerpo se
+      // desplaza (hpx/hpy)/(z+0.4) → lo cercano barre, lo enorme y lejano (z alto) casi no se mueve.
+      // El fondo (galaxia/estrellas profundas/sol) es casi infinito → se mueve un pelín (×4/×3).
+      const CX = W / 2, CY = H / 2
+      const hpx = yaw * 22, hpy = pit * 22
       const cr = Math.cos(roll + T * 0.0035), sr = Math.sin(roll + T * 0.0035)
       const VZ = 0.0018 + bo * 0.12
-      const sunX = sun.x + yaw * 34, sunY = sun.y + pit * 24
+      const sunX = sun.x + yaw * 4, sunY = sun.y + pit * 3
 
       F(0, 0, W, H, 0)
-      o.drawImage(deep, (-40 + yaw * 34) | 0, (-30 + pit * 24) | 0)
+      o.drawImage(deep, (-40 + yaw * 4) | 0, (-30 + pit * 3) | 0)
       if (gal && galA > 0.02) {
         o.globalAlpha = galA
-        o.drawImage(gal.c, (gal.x + yaw * 34) | 0, (gal.y + pit * 24) | 0)
+        o.drawImage(gal.c, (gal.x + yaw * 4) | 0, (gal.y + pit * 3) | 0)
         o.globalAlpha = 1
       }
 
@@ -400,13 +406,13 @@ export default function WarpSaver({
         s.z -= VZ
         if (s.z < 0.06) { seed(s, false); continue }
         const rx = s.x * cr - s.y * sr, ry = s.x * sr + s.y * cr
-        const x1 = CX + (rx / s.z) * FOV, y1 = CY + (ry / s.z) * FOV
+        const x1 = CX + (rx / s.z) * FOV + hpx / (s.z + 0.4), y1 = CY + (ry / s.z) * FOV + hpy / (s.z + 0.4)
         if (x1 < -70 || x1 > W + 70 || y1 < -70 || y1 > H + 70) { seed(s, false); continue }
         let lv = 1
         if (s.z < 0.45) lv = 5; else if (s.z < 0.95) lv = 4; else if (s.z < 2.0) lv = 3; else if (s.z < 3.0) lv = 2
         lv += s.mag > 0.86 ? 2 : s.mag > 0.55 ? 1 : 0
         let bv = lv + SB + halo(x1, y1); if (bv > 6) bv = 6
-        const x0 = CX + (rx / pz) * FOV, y0 = CY + (ry / pz) * FOV
+        const x0 = CX + (rx / pz) * FOV + hpx / (pz + 0.4), y0 = CY + (ry / pz) * FOV + hpy / (pz + 0.4)
         const dx = x1 - x0, dy = y1 - y0, dl = Math.sqrt(dx * dx + dy * dy)
         if (bo > 0.18 || dl > 1.0) {
           const reps = Math.min(56, Math.max(2, Math.floor(dl * (1 + bo * 30))))
@@ -445,7 +451,7 @@ export default function WarpSaver({
         const p = pls[pi]
         p.z -= VZ * (1 + bo * 3)
         const prx = p.x * cr - p.y * sr, pry = p.x * sr + p.y * cr
-        const px2 = CX + (prx / p.z) * FOV, py2 = CY + (pry / p.z) * FOV
+        const px2 = CX + (prx / p.z) * FOV + hpx / (p.z + 0.4), py2 = CY + (pry / p.z) * FOV + hpy / (p.z + 0.4)
         const pr = p.r0 / p.z
         const eX = pr * (p.ring ? 1.85 : 1.06) + 3, eY = pr * 1.06 + 3
         if (p.z < 0.02 || px2 + eX < -BUF || px2 - eX > W + BUF || py2 + eY < -BUF || py2 - eY > H + BUF) { pls.splice(pi, 1); continue }
@@ -472,7 +478,10 @@ export default function WarpSaver({
           if (w2 < 0) continue
           const w = Math.sqrt(w2)
           const su = u * cS + w * sS // longitud → el planeta rota
-          const lit = -(u * Lx + v * Ly)
+          // Iluminación de ESFERA: además del sol lateral (u·Lx+v·Ly), suma la componente `w` de la
+          // normal (profundidad, centrada en su media ~0.67) → el terminador se CURVA alrededor de la
+          // esfera en vez de salir recto. Los escalones siguen duros; solo dejan de verse planos.
+          const lit = -((u * Lx + v * Ly) + (w - 0.67) * 0.5)
           let lv: number
           if (p.bands) {
             const lat = u * stl + v * ct
@@ -515,7 +524,7 @@ export default function WarpSaver({
         rk.z -= VZ * (1 + bo * 2.5)
         if (rk.z < 0.02) { rocks.splice(r, 1); continue }
         const krx = rk.x * cr - rk.y * sr, kry = rk.x * sr + rk.y * cr
-        const kx = CX + (krx / rk.z) * FOV, ky = CY + (kry / rk.z) * FOV
+        const kx = CX + (krx / rk.z) * FOV + hpx / (rk.z + 0.4), ky = CY + (kry / rk.z) * FOV + hpy / (rk.z + 0.4)
         const kr = rk.r0 / rk.z
         const hf = kr * 1.12 + 3
         if (kx + hf < -BUF || kx - hf > W + BUF || ky + hf < -BUF || ky - hf > H + BUF) { rocks.splice(r, 1); continue }
@@ -536,9 +545,9 @@ export default function WarpSaver({
         d.z -= VZ * 1.5
         if (d.z < 0.05) { dseed(d); continue }
         const drx = d.x * cr - d.y * sr, dry = d.x * sr + d.y * cr
-        const dx1 = CX + (drx / d.z) * FOV, dy1 = CY + (dry / d.z) * FOV
+        const dx1 = CX + (drx / d.z) * FOV + hpx / (d.z + 0.4), dy1 = CY + (dry / d.z) * FOV + hpy / (d.z + 0.4)
         if (dx1 < -40 || dx1 > W + 40 || dy1 < -40 || dy1 > H + 40) { dseed(d); continue }
-        const dx0 = CX + (drx / dpz) * FOV, dy0 = CY + (dry / dpz) * FOV
+        const dx0 = CX + (drx / dpz) * FOV + hpx / (dpz + 0.4), dy0 = CY + (dry / dpz) * FOV + hpy / (dpz + 0.4)
         const ddx = dx1 - dx0, ddy = dy1 - dy0
         const ddl = Math.sqrt(ddx * ddx + ddy * ddy)
         let dv = 2 + SB; if (dv > 5) dv = 5
