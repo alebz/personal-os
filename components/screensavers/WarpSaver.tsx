@@ -20,9 +20,8 @@
  *    binario / gigante gaseoso) y galaxia espiral en ~45% de ellos.
  *  - Hiperviaje cada 5–9 min: solo las estrellas se encienden, y al salir
  *    estás en un sector nuevo (el destello esconde el cambio de galaxia).
- *  - HUD pegado al borde: fecha, hora, velocidad, oxígeno, mira en el punto
- *    de fuga y carga del hiperimpulsor.
- *  - Easter egg raro: una nave que cruza con estela (o, 1 de cada 3, otra cosa).
+ *  - HUD pegado al borde: fecha, hora, velocidad, oxígeno y carga del
+ *    hiperimpulsor.
  *
  * MONOCOLOR: toda la escena usa una rampa de 8 niveles derivada de `color`.
  * Cambiar `color` tiñe el protector completo, igual que el selector del CRT.
@@ -231,42 +230,6 @@ export default function WarpSaver({
       }
     }
 
-    // ── Sprites del easter egg ──
-    const ship = (() => {
-      const c = document.createElement('canvas'); c.width = 26; c.height = 14
-      const g = c.getContext('2d')!
-      const pp = (x: number, y: number, l: number) => { g.fillStyle = L[l]; g.fillRect(x, y, 1, 1) }
-      for (let x = 4; x < 22; x++) {
-        const t = (x - 4) / 17, hg = Math.round(1 + 3.2 * Math.sin(t * 3.14159))
-        for (let y = 7 - hg; y <= 7 + hg; y++) pp(x, y, y < 7 ? 4 : y > 7 + hg - 1 ? 2 : 3)
-      }
-      for (let x = 22; x < 25; x++) pp(x, 7, 5)
-      pp(25, 7, 4)
-      for (let w = 8; w < 17; w++) {
-        const s = Math.round((w - 8) * 0.55)
-        pp(w, 7 - 3 - s, 3); pp(w, 7 - 4 - s, 2); pp(w, 7 + 3 + s, 3); pp(w, 7 + 4 + s, 2)
-      }
-      pp(18, 6, 6); pp(19, 6, 6); pp(18, 7, 5); pp(19, 7, 5)
-      for (let e = 0; e < 3; e++) { pp(3 - e, 6, e === 0 ? 6 : 4); pp(3 - e, 8, e === 0 ? 6 : 4); pp(3 - e, 7, e === 0 ? 6 : 5) }
-      return c
-    })()
-
-    const cat = (() => {
-      const c = document.createElement('canvas'); c.width = 15; c.height = 15
-      const g = c.getContext('2d')!
-      const pp = (x: number, y: number, l: number) => { g.fillStyle = L[l]; g.fillRect(x, y, 1, 1) }
-      for (let a = 0; a < 6.2832; a += 0.09) pp((7 + Math.cos(a) * 5.6) | 0, (6 + Math.sin(a) * 5.6) | 0, 5)
-      for (let y = 1; y < 12; y++) for (let x = 1; x < 13; x++) {
-        const dx = x - 7, dy = y - 6
-        if (dx * dx + dy * dy < 26) pp(x, y, 1)
-      }
-      pp(4, 3, 4); pp(5, 2, 4); pp(6, 3, 4); pp(8, 3, 4); pp(9, 2, 4); pp(10, 3, 4)
-      pp(5, 6, 6); pp(9, 6, 6); pp(7, 8, 4); pp(6, 9, 3); pp(8, 9, 3)
-      for (let x = 5; x < 10; x++) pp(x, 12, 3)
-      pp(4, 13, 3); pp(10, 13, 3); pp(7, 14, 2)
-      return c
-    })()
-
     // ── Fondo profundo: estrellas que NO se mueven con la velocidad ──
     let deep = document.createElement('canvas')
     const buildDeep = () => {
@@ -339,16 +302,21 @@ export default function WarpSaver({
     let pls: Planet[] = []
     let rocks: Rock[] = []
     let mode = 'belt', rockRate = 0.6, rockBig = 1
-    let egg: { x: number; y: number; z: number; vx: number; vy: number; vz: number; cat: boolean } | null = null
-    let eggTrail: number[][] = []
     let hyp = 0, hypStart = Date.now(), nextHyp = Date.now() + 150000
 
-    const offAxis = (r0: number, f: number) => {
-      const need = (r0 / FOV) * (f + Math.random() * 1.6), a = Math.random() * 6.2832
+    // Punto de nacimiento fuera del eje. Término BASE = leve descentrado por tipo (como antes). Término
+    // EXTRA = reparte el nacimiento por la PANTALLA: radio en espacio de pantalla (sesgado al centro con
+    // random^1.8) convertido a mundo con la z de spawn → los objetos ya no funnelan todos por el punto
+    // exacto (unos nacen del punto de fuga, otros entran desde más afuera y barren). Acotado en espacio
+    // de pantalla → los gigantes (r0/z alto, ya descentrados) no se van de cuadro.
+    const offAxis = (r0: number, f: number, z: number) => {
+      const baseNeed = (r0 / FOV) * (f + Math.random() * 1.6)
+      const extraNeed = (Math.pow(Math.random(), 1.8) * 0.45 * Math.min(W, H)) * z / FOV
+      const need = baseNeed + extraNeed, a = Math.random() * 6.2832
       return { x: Math.cos(a) * need, y: Math.sin(a) * need * 0.72 }
     }
     const newPlanet = (r0: number, zz: number, ring: boolean, bands: boolean): Planet => {
-      const p = offAxis(r0, bands ? 1.02 : 1.35)
+      const p = offAxis(r0, bands ? 1.02 : 1.35, zz)
       return {
         x: p.x, y: p.y, z: zz, r0, ring, bands,
         sd: Math.random() * 99, nb: 5 + ((Math.random() * 7) | 0),
@@ -361,9 +329,10 @@ export default function WarpSaver({
     const newRock = (): Rock => {
       let r0 = (3 + Math.pow(1 / Math.max(0.01, Math.random()), 0.66) * 3.6) * rockBig
       if (r0 > 620) r0 = 620
-      const p = offAxis(r0, 1.35)
+      const z = Math.max(3.6, r0 / 5.0) + Math.random() * 1.4
+      const p = offAxis(r0, 1.35, z)
       return {
-        x: p.x, y: p.y, z: Math.max(3.6, r0 / 5.0) + Math.random() * 1.4, r0,
+        x: p.x, y: p.y, z, r0,
         m: makeRock(Math.random() * 99),
         sp: (0.012 - Math.min(0.0105, r0 / 40000)) * (Math.random() < 0.5 ? -1 : 1),
       }
@@ -386,6 +355,11 @@ export default function WarpSaver({
     let raf = 0
     const draw = () => {
       const now = Date.now(), T = now * 0.001
+      // Zona de buffer FUERA de pantalla: rocas y planetas se descartan solo cuando salieron por
+      // completo + BUF (antes se cortaban apenas su extensión ESTIMADA cruzaba el borde con +3, y esa
+      // estimación subestima los píxeles reales —glow, detalle hi-res, trails de boost— → desaparecían
+      // antes de salir del todo). Generoso; el costo es nulo (≤16 rocas, ≤2 planetas).
+      const BUF = Math.max(W, H) * 0.5
 
       if (now > nextHyp && hyp <= 0) { hyp = 1; galSwap = false; hypStart = now; nextHyp = now + 300000 + Math.random() * 240000 }
       if (hyp > 0) { hyp -= 0.0026; if (hyp < 0) hyp = 0 }
@@ -474,7 +448,7 @@ export default function WarpSaver({
         const px2 = CX + (prx / p.z) * FOV, py2 = CY + (pry / p.z) * FOV
         const pr = p.r0 / p.z
         const eX = pr * (p.ring ? 1.85 : 1.06) + 3, eY = pr * 1.06 + 3
-        if (p.z < 0.02 || px2 + eX < 0 || px2 - eX > W || py2 + eY < 0 || py2 - eY > H) { pls.splice(pi, 1); continue }
+        if (p.z < 0.02 || px2 + eX < -BUF || px2 - eX > W + BUF || py2 + eY < -BUF || py2 - eY > H + BUF) { pls.splice(pi, 1); continue }
 
         const ldx = sunX - px2, ldy = sunY - py2
         const lln = Math.sqrt(ldx * ldx + ldy * ldy) || 1
@@ -544,7 +518,7 @@ export default function WarpSaver({
         const kx = CX + (krx / rk.z) * FOV, ky = CY + (kry / rk.z) * FOV
         const kr = rk.r0 / rk.z
         const hf = kr * 1.12 + 3
-        if (kx + hf < 0 || kx - hf > W || ky + hf < 0 || ky - hf > H) { rocks.splice(r, 1); continue }
+        if (kx + hf < -BUF || kx - hf > W + BUF || ky + hf < -BUF || ky - hf > H + BUF) { rocks.splice(r, 1); continue }
         const rot = T * rk.sp * 6.2832
         if (kr > 16) {
           const l2x = sunX - kx, l2y = sunY - ky, l2n = Math.sqrt(l2x * l2x + l2y * l2y) || 1
@@ -572,37 +546,6 @@ export default function WarpSaver({
         for (let q = 0; q < dr; q++) {
           const t2 = q / dr
           P(dx1 + ddx * t2 * (1 + bo * 8), dy1 + ddy * t2 * (1 + bo * 8), q < 1 ? dv : 2)
-        }
-      }
-
-      // Easter egg
-      if (!egg && Math.random() < 0.00009) {
-        const side = Math.random() < 0.5 ? -1 : 1
-        egg = {
-          x: side * 1.5, y: (Math.random() - 0.5) * 0.7, z: 2.4 + Math.random() * 0.8,
-          vx: -side * 0.008, vy: (Math.random() - 0.5) * 0.003, vz: -0.0011,
-          cat: Math.random() < 0.35,
-        }
-        eggTrail = []
-      }
-      if (egg) {
-        egg.x += egg.vx; egg.y += egg.vy; egg.z += egg.vz
-        const erx = egg.x * cr - egg.y * sr, ery = egg.x * sr + egg.y * cr
-        const ex = CX + (erx / egg.z) * FOV, ey = CY + (ery / egg.z) * FOV
-        const es = Math.max(6, ((egg.cat ? 11 : 26) / egg.z) * 1.5)
-        eggTrail.push([ex, ey]); if (eggTrail.length > 16) eggTrail.shift()
-        if (egg.z < 0.25 || ex + es < -10 || ex - es > W + 10 || ey + es < -10 || ey - es > H + 10) { egg = null; eggTrail = [] }
-        else {
-          for (let t = 0; t < eggTrail.length - 1; t++) {
-            const al = t / eggTrail.length
-            P(eggTrail[t][0], eggTrail[t][1], al > 0.7 ? 4 : al > 0.4 ? 2 : 1)
-          }
-          const pv = eggTrail[Math.max(0, eggTrail.length - 6)]
-          const ang = eggTrail.length > 3 ? Math.atan2(ey - pv[1], ex - pv[0]) : 0
-          o.save(); o.translate(ex, ey)
-          if (egg.cat) { o.rotate(T * 0.07); o.drawImage(cat, -es / 2, -es / 2, es, es) }
-          else { o.rotate(ang); o.drawImage(ship, -es * 0.7, -es * 0.38, es * 1.4, es * 0.76) }
-          o.restore()
         }
       }
 
