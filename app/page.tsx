@@ -13,6 +13,7 @@ import InicioContent from '@/components/sections/InicioContent'
 import XPDesktop from '@/components/xp/XPDesktop'
 import XpScreensaver from '@/components/xp/XpScreensaver'
 import MicelioSaver from '@/components/xp/MicelioSaver'
+import WarpSaver from '@/components/screensavers/WarpSaver'
 import { StarsBackground } from '@/components/StarsBackground'
 import Clock from '@/components/Clock'
 import { crtDayColor, dayColorFlow } from '@/lib/weekdayColors'
@@ -63,7 +64,7 @@ export default function HomePage() {
   // El cascarón (Capa B) decide qué se monta: el tambor (arcade, default) o el escritorio XP. Las
   // MISMAS secciones-componente se pasan a cualquiera. Client-only (render tras mount) porque el
   // tambor y sus secciones usan `document`.
-  const { shell, screensaverActive, xpScreensaver, screensaver } = useOSSettings()
+  const { shell, screensaverActive, xpScreensaver, screensaver, crt } = useOSSettings()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   if (!mounted) return null
@@ -74,11 +75,16 @@ export default function HomePage() {
   if (shell !== 'xp') return (
     <>
       <Shell><InicioContent /></Shell>
-      {/* Protector del arcade: el sim ("arcade sin interfaz") o Micelio, según el picker de Ajustes.
-          Ambos viven en el crt-screen (z:1) → bajo las capas CRT → se ven con fósforo + scanlines. */}
-      {screensaverActive && (screensaver.arcadeKind === 'micelio'
-        ? <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}><MicelioSaver /></div>
-        : <SimSaver />)}
+      {/* Protector del arcade: el sim ("arcade sin interfaz"), Micelio o Warp, según el picker de
+          Ajustes. Todos viven en el crt-screen (z:1) → bajo las capas CRT → se ven con fósforo +
+          scanlines. Warp se tiñe con el color del monocolor (crt.phosphor). */}
+      {screensaverActive && (
+        screensaver.arcadeKind === 'micelio'
+          ? <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}><MicelioSaver /></div>
+        : screensaver.arcadeKind === 'warp'
+          ? <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}><WarpSaver color={crt.phosphor} /></div>
+          : <SimSaver />
+      )}
     </>
   )
   return (
@@ -94,7 +100,12 @@ export default function HomePage() {
           <MicelioSaver />
         </div>
       )}
-      {screensaverActive && xpScreensaver !== 'none' && xpScreensaver !== 'arcade' && xpScreensaver !== 'micelio' && (
+      {screensaverActive && xpScreensaver === 'warp' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
+          <WarpSaver color={crt.phosphor} />
+        </div>
+      )}
+      {screensaverActive && xpScreensaver !== 'none' && xpScreensaver !== 'arcade' && xpScreensaver !== 'micelio' && xpScreensaver !== 'warp' && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
           <XpScreensaver variant={xpScreensaver} />
         </div>

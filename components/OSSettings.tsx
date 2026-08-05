@@ -249,8 +249,8 @@ export default function OSSettings() {
           {screensaver.enabled && (
             <>
               <Row label="Protector">
-                <PillSelector<'sim' | 'micelio'>
-                  options={[{ value: 'sim', label: 'Sim' }, { value: 'micelio', label: 'Micelio' }]}
+                <PillSelector<'sim' | 'micelio' | 'warp'>
+                  options={[{ value: 'sim', label: 'Sim' }, { value: 'micelio', label: 'Micelio' }, { value: 'warp', label: 'Warp' }]}
                   value={screensaver.arcadeKind}
                   onChange={v => set('screensaver', { ...screensaver, arcadeKind: v })}
                 />

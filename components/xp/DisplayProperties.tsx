@@ -22,6 +22,7 @@ const SAVERS: { value: XpScreensaverKind; label: string }[] = [
   { value: 'mystify',   label: 'Mystify' },
   { value: 'logo',      label: 'Logo flotante' },
   { value: 'micelio',   label: 'Micelio' },   // sim Physarum posterizada al color del día
+  { value: 'warp',      label: 'Warp' },   // vuelo estelar pixel-art, teñido al monocolor
   { value: 'arcade',    label: 'Arcade' },   // el sim del arcade (estrellas + naves) como protector, también bajo XP
 ]
 
