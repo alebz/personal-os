@@ -43,7 +43,7 @@ interface OSSettingsState {
   discreto:       boolean
   showLolo:       boolean
   crt:            CrtState
-  screensaver:    { enabled: boolean; speed: number; minutes: number; clock: boolean }   // minutes = umbral de inactividad (arcade+XP); clock = mostrar el reloj de Inicio centrado en el protector (EXCLUSIVO del protector). speed = vestigio del tambor.
+  screensaver:    { enabled: boolean; speed: number; minutes: number; clock: boolean; arcadeKind: 'sim' | 'micelio' }   // minutes = umbral de inactividad (arcade+XP); clock = reloj centrado en el protector; arcadeKind = qué protector usa el arcade (sim o Micelio). speed = vestigio del tambor.
   supraconsciente: SupraState
   shell:          Shell
   xpSound:        { on: boolean; volume: number }   // sonidos del cascarón XP (WAVs reales del pack)
@@ -53,8 +53,8 @@ interface OSSettingsState {
 }
 
 // Protectores de pantalla XP (canvas 2D). 'mystify' = líneas rebotando con estela; 'logo' = logo del OS
-// flotante; 'starfield' = campo de estrellas. POR TEMA: bajo XP se monta el elegido (no el tambor).
-export type XpScreensaverKind = 'none' | 'mystify' | 'logo' | 'starfield' | 'arcade'
+// flotante; 'micelio' = sim Physarum posterizada; 'arcade' = el sim. POR TEMA: bajo XP se monta el elegido.
+export type XpScreensaverKind = 'none' | 'mystify' | 'logo' | 'micelio' | 'arcade'
 
 interface OSSettingsCtx extends OSSettingsState {
   set:            <K extends keyof OSSettingsState>(key: K, value: OSSettingsState[K]) => void
@@ -98,7 +98,7 @@ const DEFAULTS: OSSettingsState = {
   discreto:    false,
   showLolo:    true,
   crt:         CRT_DEFAULTS,
-  screensaver: { enabled: true, speed: 75, minutes: 3, clock: true },   // 3 min idle → protector; reloj centrado ON por default
+  screensaver: { enabled: true, speed: 75, minutes: 3, clock: true, arcadeKind: 'sim' },   // 3 min idle → protector; reloj ON; arcade usa el sim por default
   supraconsciente: { enabled: true, rotateMinutes: 4, topics: { supra: true } },
   shell:       'arcade',   // default: el tambor. 'xp' monta el escritorio Windows XP.
   xpSound:     { on: true, volume: 0.25 },   // volumen BAJO por default — nostalgia sin fatiga

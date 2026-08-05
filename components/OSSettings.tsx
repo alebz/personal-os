@@ -248,6 +248,13 @@ export default function OSSettings() {
           <Row label="Modo screensaver"><Toggle value={screensaver.enabled} onChange={v => set('screensaver', { ...screensaver, enabled: v })} /></Row>
           {screensaver.enabled && (
             <>
+              <Row label="Protector">
+                <PillSelector<'sim' | 'micelio'>
+                  options={[{ value: 'sim', label: 'Sim' }, { value: 'micelio', label: 'Micelio' }]}
+                  value={screensaver.arcadeKind}
+                  onChange={v => set('screensaver', { ...screensaver, arcadeKind: v })}
+                />
+              </Row>
               <Slider label="Vuelta completa" value={screensaver.speed} min={45} max={240} step={5} onChange={v => set('screensaver', { ...screensaver, speed: v })} fmt={v => v + 's'} />
               <button
                 onClick={() => { startScreensaver(); closeSettings() }}

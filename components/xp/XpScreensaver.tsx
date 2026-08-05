@@ -46,7 +46,6 @@ type Ctx = CanvasRenderingContext2D
 type Dim = () => number
 
 function makeStep(variant: XpScreensaverKind, ctx: Ctx, W: Dim, H: Dim): () => void {
-  if (variant === 'starfield') return starfield(ctx, W, H)
   if (variant === 'logo') return logo(ctx, W, H)
   return mystify(ctx, W, H)
 }
@@ -133,33 +132,6 @@ function logo(ctx: Ctx, W: Dim, H: Dim): () => void {
     ctx.shadowBlur = 6
     ctx.fillText('personal·os', x + LW / 2, y + LH / 2)
     ctx.restore()
-  }
-}
-
-// ── Starfield — warp de estrellas desde el centro (barato) ──────────────────────
-function starfield(ctx: Ctx, W: Dim, H: Dim): () => void {
-  const N = 420
-  const stars = Array.from({ length: N }, () => ({
-    x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random(),
-  }))
-  return () => {
-    const w = W(), h = H()
-    const cx = w / 2, cy = h / 2
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, w, h)
-    ctx.fillStyle = '#fff'
-    for (const s of stars) {
-      s.z -= 0.007
-      if (s.z <= 0.02) { s.x = Math.random() * 2 - 1; s.y = Math.random() * 2 - 1; s.z = 1 }
-      const k = 1 / s.z
-      const sx = cx + s.x * k * cx
-      const sy = cy + s.y * k * cy
-      if (sx < 0 || sx > w || sy < 0 || sy > h) continue
-      const size = (1 - s.z) * 2.6
-      ctx.globalAlpha = Math.min(1, 1 - s.z + 0.15)
-      ctx.fillRect(sx, sy, size, size)
-    }
-    ctx.globalAlpha = 1
   }
 }
 

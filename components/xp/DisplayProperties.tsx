@@ -21,7 +21,7 @@ const SAVERS: { value: XpScreensaverKind; label: string }[] = [
   { value: 'none',      label: '(Ninguno)' },   // desactiva el protector por completo (canon XP)
   { value: 'mystify',   label: 'Mystify' },
   { value: 'logo',      label: 'Logo flotante' },
-  { value: 'starfield', label: 'Campo de estrellas' },
+  { value: 'micelio',   label: 'Micelio' },   // sim Physarum posterizada al color del día
   { value: 'arcade',    label: 'Arcade' },   // el sim del arcade (estrellas + naves) como protector, también bajo XP
 ]
 

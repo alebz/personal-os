@@ -12,6 +12,7 @@ import PublicoContent from '@/components/sections/PublicoContent'
 import InicioContent from '@/components/sections/InicioContent'
 import XPDesktop from '@/components/xp/XPDesktop'
 import XpScreensaver from '@/components/xp/XpScreensaver'
+import MicelioSaver from '@/components/xp/MicelioSaver'
 import { StarsBackground } from '@/components/StarsBackground'
 import Clock from '@/components/Clock'
 import { crtDayColor, dayColorFlow } from '@/lib/weekdayColors'
@@ -62,7 +63,7 @@ export default function HomePage() {
   // El cascarón (Capa B) decide qué se monta: el tambor (arcade, default) o el escritorio XP. Las
   // MISMAS secciones-componente se pasan a cualquiera. Client-only (render tras mount) porque el
   // tambor y sus secciones usan `document`.
-  const { shell, screensaverActive, xpScreensaver } = useOSSettings()
+  const { shell, screensaverActive, xpScreensaver, screensaver } = useOSSettings()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   if (!mounted) return null
@@ -73,18 +74,27 @@ export default function HomePage() {
   if (shell !== 'xp') return (
     <>
       <Shell><InicioContent /></Shell>
-      {screensaverActive && <SimSaver />}
+      {/* Protector del arcade: el sim ("arcade sin interfaz") o Micelio, según el picker de Ajustes.
+          Ambos viven en el crt-screen (z:1) → bajo las capas CRT → se ven con fósforo + scanlines. */}
+      {screensaverActive && (screensaver.arcadeKind === 'micelio'
+        ? <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}><MicelioSaver /></div>
+        : <SimSaver />)}
     </>
   )
   return (
     <>
       <XPDesktop sections={SECTIONS} />
       {/* Screensaver POR TEMA: bajo XP "Apagar equipo"/idle monta el PROTECTOR XP elegido. 'arcade' =
-          el sim del arcade (mismo SimSaver; bajo XP no hay CRT → limpio). Los demás (Mystify / Logo /
-          Starfield) son canvas opaco a z alto. El escritorio XP nunca se desmonta → al despertar queda
-          EXACTAMENTE como estaba. */}
+          el sim del arcade (mismo SimSaver; bajo XP no hay CRT → limpio). 'micelio' = la sim Physarum.
+          Mystify / Logo son canvas opaco a z alto. El escritorio XP nunca se desmonta → al despertar
+          queda EXACTAMENTE como estaba. */}
       {screensaverActive && xpScreensaver === 'arcade' && <SimSaver />}
-      {screensaverActive && xpScreensaver !== 'none' && xpScreensaver !== 'arcade' && (
+      {screensaverActive && xpScreensaver === 'micelio' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
+          <MicelioSaver />
+        </div>
+      )}
+      {screensaverActive && xpScreensaver !== 'none' && xpScreensaver !== 'arcade' && xpScreensaver !== 'micelio' && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
           <XpScreensaver variant={xpScreensaver} />
         </div>
