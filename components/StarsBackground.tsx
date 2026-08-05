@@ -1297,7 +1297,10 @@ function ScoreHUD({ ships, tourney }: {
   const [left, right] = tourney.contenders
   // MONOCOLOR: todo el scoreboard al fósforo. Texto/acentos vía crtDayColor; los emblemas pixel se
   // desaturan (grayscale) para no quedar en rainbow. En multi, colores reales.
-  const { crt } = useOSSettings()
+  const { crt, screensaverActive } = useOSSettings()
+  // Durante el protector ("el arcade sin interfaz") el HUD del marcador se oculta — el sim se queda,
+  // la UI no. Gatea aquí, tras los hooks (usePathname + useOSSettings), sin romper su orden.
+  if (screensaverActive) return null
   const mc = (c: string) => crtDayColor(c, crt)
   const AMBER = mc('#f2c744')
 

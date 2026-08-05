@@ -180,15 +180,6 @@ input::placeholder, textarea::placeholder {
    revela. Aquí no va CSS de máscara: era gramática glassmorphism (blur) y luego un clip que cortaba
    los glifos; ahora es puro componente. */
 
-/* ── Screensaver — "el OS como objeto vivo" ────────────────────────────────────────
-   Sin UI nueva: es el tambor girando (lógica en OSDrum + OSSettingsContext). Aquí solo atenuamos el
-   chrome para que respire — NO al 100% (queda tenue, no desaparece). Reloj y sim quedan intactos. */
-.os-dots, .os-kicker, .os-scoreboard { transition: opacity .8s ease; }
-[data-screensaver] .os-gear       { opacity: 0.12 !important; }
-[data-screensaver] .os-dots       { opacity: 0.22; }
-[data-screensaver] .os-kicker     { opacity: 0.15; }
-[data-screensaver] .os-scoreboard { opacity: 0.18; }
-
 /* ── Slider del panel de Ajustes (arcade) ──────────────────────────────────────────
    Full-custom con TOKENS → sin el gris del groove del navegador (rompía MONOCOLOR). El relleno
    two-tone lo pinta el `background` inline (gradiente accent/surface-2); aquí el groove y el thumb. */

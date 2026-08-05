@@ -22,6 +22,7 @@ const SAVERS: { value: XpScreensaverKind; label: string }[] = [
   { value: 'mystify',   label: 'Mystify' },
   { value: 'logo',      label: 'Logo flotante' },
   { value: 'starfield', label: 'Campo de estrellas' },
+  { value: 'arcade',    label: 'Arcade' },   // el sim del arcade (estrellas + naves) como protector, también bajo XP
 ]
 
 // Monitorcito de época (el chasis beige con la pantalla dentro)

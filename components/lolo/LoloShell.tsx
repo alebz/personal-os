@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import LoloChat from './LoloChat'
 import LoloConfig from './LoloConfig'
 import { S, DEVICE_W, DEVICE_H, ALL_LOLO_IMAGES } from './LoloConstants'
+import { useOSSettings } from '@/components/OSSettingsContext'
 import type { Mode, Bubble, ChatMessage, TemperamentState, SettingsRow } from './LoloTypes'
 
 interface LoloShellProps {
@@ -90,6 +91,7 @@ export default function LoloShell({
   shellStyle, shellOverlay, btnColors,
   settingsRowData, settingsSel, setSettingsSel, cycleSetting,
 }: LoloShellProps) {
+  const { screensaverActive } = useOSSettings()   // el protector ("arcade sin interfaz") oculta a Lolo
   const [pressedBtn, setPressedBtn] = useState<'SEL' | 'ENT' | 'BCK' | null>(null)
   const [widgetDragging, setWidgetDragging] = useState(false)
 
@@ -160,7 +162,7 @@ export default function LoloShell({
         onPointerDown={onPointerDown}
         onPointerMove={(e) => { onPointerMove(e); setWidgetDragging(dragging.current) }}
         onPointerUp={() => { onPointerUp(); setWidgetDragging(false) }}
-        style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 10000, width: DEVICE_W * S, height: DEVICE_H * dynS, userSelect: 'none', touchAction: 'none', overflow: 'visible' }}
+        style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 10000, width: DEVICE_W * S, height: DEVICE_H * dynS, userSelect: 'none', touchAction: 'none', overflow: 'visible', visibility: screensaverActive ? 'hidden' : 'visible' }}
       >
         {/* Scale wrapper — holds all CSS vars. pointerEvents:none prevents layout-box overflow from blocking clicks outside the visual gadget. Interactive children (bezel, dial) restore auto. */}
         <div style={{ transform: `scale(${dynS})`, transformOrigin: 'top left', width: DEVICE_W, pointerEvents: 'none', ...cssVars }}>

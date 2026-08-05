@@ -12,8 +12,23 @@ import PublicoContent from '@/components/sections/PublicoContent'
 import InicioContent from '@/components/sections/InicioContent'
 import XPDesktop from '@/components/xp/XPDesktop'
 import XpScreensaver from '@/components/xp/XpScreensaver'
+import { StarsBackground } from '@/components/StarsBackground'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { SECTION_COLORS, type OSSection } from '@/lib/sections'
+
+// Protector = EL ARCADE SIN INTERFAZ. Monta el sim completo (StarsBackground: estrellas + naves +
+// cometas + aviones, respetando los toggles del usuario) sobre negro. z-index 20000 tapa la UI que
+// vive en el crt-screen (TopRail, contenido); el scoreboard y Lolo se ocultan por su cuenta al leer
+// screensaverActive. Vive DENTRO del crt-screen (z:1) → queda debajo de las capas CRT (nivel body) →
+// el sim se ve A TRAVÉS del CRT en el arcade (el CRT es la piel del mundo, no UI). Bajo XP no hay CRT,
+// así que el sim se ve limpio. Usa el timer/minutos existente (screensaverActive lo emite el contexto).
+function SimSaver() {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
+      <StarsBackground />
+    </div>
+  )
+}
 
 // OSDrum reveals faces in reverse as you scroll down (index 0 front, then N-1, N-2 … 1). So the
 // CARDS are laid out reversed-past-index-0 to make the on-screen order read top→bottom:
@@ -41,16 +56,23 @@ export default function HomePage() {
   if (!mounted) return null
   // ARCADE: navegación tipo web (TopRail) en vez del tambor. '/' = Inicio (reloj/calendario) como
   // página; las demás secciones tienen su ruta propia (Shell+TopRail). El sim (estrellas/naves/CRT)
-  // lo monta ArcadeChrome en el layout, aparte. El tambor (OSDrum) se retira; su archivo se borra en F2.
-  if (shell !== 'xp') return <Shell><InicioContent /></Shell>
+  // lo monta ArcadeChrome en el layout, aparte. A los N minutos de inactividad, el protector "solo
+  // naves" reemplaza al tambor (usa el mismo screensaverActive + minutos del contexto).
+  if (shell !== 'xp') return (
+    <>
+      <Shell><InicioContent /></Shell>
+      {screensaverActive && <SimSaver />}
+    </>
+  )
   return (
     <>
       <XPDesktop sections={SECTIONS} />
-      {/* Screensaver POR TEMA: bajo XP "Apagar equipo"/idle monta el PROTECTOR XP elegido (Mystify /
-          Logo / Starfield), NO el tambor — antes montaba OSDrum aquí (fuga corregida). El escritorio
-          XP nunca se desmonta → al despertar (cualquier actividad, detectada por el contexto) queda
-          EXACTAMENTE como estaba. El protector es canvas limpio (sin CRT: eso es del arcade). */}
-      {screensaverActive && xpScreensaver !== 'none' && (
+      {/* Screensaver POR TEMA: bajo XP "Apagar equipo"/idle monta el PROTECTOR XP elegido. 'arcade' =
+          el sim del arcade (mismo SimSaver; bajo XP no hay CRT → limpio). Los demás (Mystify / Logo /
+          Starfield) son canvas opaco a z alto. El escritorio XP nunca se desmonta → al despertar queda
+          EXACTAMENTE como estaba. */}
+      {screensaverActive && xpScreensaver === 'arcade' && <SimSaver />}
+      {screensaverActive && xpScreensaver !== 'none' && xpScreensaver !== 'arcade' && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
           <XpScreensaver variant={xpScreensaver} />
         </div>
