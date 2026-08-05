@@ -611,14 +611,6 @@ export default function WarpSaver({
         for (let sl = 1; sl < H; sl += 3) o.fillRect(0, sl, W, 1)
       }
 
-      // Mira en el punto de fuga (se mueve con el timón).
-      const mx = CX | 0, my = CY | 0
-      for (let mg = 4; mg < 9; mg++) { P(mx + mg, my, 3); P(mx - mg, my, 3); P(mx, my + mg, 3); P(mx, my - mg, 3) }
-      const brk = [[-11, -11], [-10, -11], [-11, -10], [11, -11], [10, -11], [11, -10],
-                   [-11, 11], [-10, 11], [-11, 10], [11, 11], [10, 11], [11, 10]]
-      for (const [bx, by] of brk) P(mx + bx, my + by, 4)
-      P(mx, my, 4)
-
       // HUD
       const dt = new Date()
       const pad = (n: number) => (n < 10 ? '0' : '') + n
