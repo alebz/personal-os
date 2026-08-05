@@ -43,7 +43,7 @@ interface OSSettingsState {
   discreto:       boolean
   showLolo:       boolean
   crt:            CrtState
-  screensaver:    { enabled: boolean; speed: number; minutes: number }   // speed = seg/vuelta del tambor; minutes = umbral de inactividad (compartido arcade+XP)
+  screensaver:    { enabled: boolean; speed: number; minutes: number; clock: boolean }   // minutes = umbral de inactividad (arcade+XP); clock = mostrar el reloj de Inicio centrado en el protector (EXCLUSIVO del protector). speed = vestigio del tambor.
   supraconsciente: SupraState
   shell:          Shell
   xpSound:        { on: boolean; volume: number }   // sonidos del cascarón XP (WAVs reales del pack)
@@ -98,7 +98,7 @@ const DEFAULTS: OSSettingsState = {
   discreto:    false,
   showLolo:    true,
   crt:         CRT_DEFAULTS,
-  screensaver: { enabled: true, speed: 75, minutes: 3 },   // 3 min idle → protector; tambor gira cada 75s
+  screensaver: { enabled: true, speed: 75, minutes: 3, clock: true },   // 3 min idle → protector; reloj centrado ON por default
   supraconsciente: { enabled: true, rotateMinutes: 4, topics: { supra: true } },
   shell:       'arcade',   // default: el tambor. 'xp' monta el escritorio Windows XP.
   xpSound:     { on: true, volume: 0.25 },   // volumen BAJO por default — nostalgia sin fatiga

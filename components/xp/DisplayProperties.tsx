@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import type { XpScreensaverKind } from '@/components/OSSettingsContext'
-import { GroupBox, XpSelect, XpSpinner, XpSlider, XpCheckbox } from './xp-controls'
+import { GroupBox, XpSelect, XpSpinner, XpSlider, XpCheckbox, XpDialogModal } from './xp-controls'
 import { XP_WALLPAPERS, wallpaperSrc } from '@/lib/xpWallpapers'
 
 // "Propiedades de Pantalla" — diálogo de sistema XP LITERAL (#ECE9D8, group boxes, vocabulario XP).
@@ -41,9 +41,19 @@ function MiniMonitor({ src, children }: { src?: string; children?: ReactNode }) 
 }
 
 export default function DisplayProperties() {
-  const { shell, set, xpLogicalH, xpWallpaper, xpScreensaver, screensaver, discreto, startScreensaver } = useOSSettings()
+  const { shell, set, xpLogicalH, xpWallpaper, xpScreensaver, screensaver, discreto, startScreensaver,
+    showStars, showShips, showPlanes } = useOSSettings()
   const [tab, setTab] = useState<Tab>('Escritorio')
   const [draft, setDraft] = useState(xpLogicalH)
+  // Sub-diálogo "Configuración…" del protector Arcade. Snapshot al abrir → Cancelar revierte; los
+  // toggles editan EN VIVO el contexto (estado compartido: se refleja en el arcade y viceversa).
+  const [simCfgOpen, setSimCfgOpen] = useState(false)
+  const [simSnap, setSimSnap] = useState<{ showStars: boolean; showShips: boolean; showPlanes: boolean; clock: boolean } | null>(null)
+  const openSimCfg = () => { setSimSnap({ showStars, showShips, showPlanes, clock: screensaver.clock }); setSimCfgOpen(true) }
+  const cancelSimCfg = () => {
+    if (simSnap) { set('showStars', simSnap.showStars); set('showShips', simSnap.showShips); set('showPlanes', simSnap.showPlanes); set('screensaver', { ...screensaver, clock: simSnap.clock }) }
+    setSimCfgOpen(false)
+  }
 
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1440
   const vh = typeof window !== 'undefined' ? window.innerHeight : 900
@@ -52,7 +62,7 @@ export default function DisplayProperties() {
   const setMinutes = (n: number) => set('screensaver', { ...screensaver, minutes: Math.min(60, Math.max(1, n)) })
 
   return (
-    <div className="xp-dialog" style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '7px 8px 8px' }}>
+    <div className="xp-dialog" style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '7px 8px 8px', position: 'relative' }}>
       {/* Barra de pestañas (todas funcionales) */}
       <div style={{ display: 'flex', gap: 2, paddingLeft: 3 }}>
         {TABS.map((t) => {
@@ -131,6 +141,14 @@ export default function DisplayProperties() {
                 >
                   Vista previa
                 </button>
+                {/* Solo el protector "Arcade" tiene ajustes; el resto (Mystify/Logo/Campo de estrellas/
+                    Ninguno) no → botón grisado, como XP real. */}
+                <button
+                  className="xp-raised" onClick={openSimCfg} disabled={xpScreensaver !== 'arcade'}
+                  style={{ padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: xpScreensaver !== 'arcade' ? 'default' : 'pointer', opacity: xpScreensaver !== 'arcade' ? 0.5 : 1 }}
+                >
+                  Configuración…
+                </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: xpScreensaver === 'none' ? 0.5 : 1 }}>
                 <span style={{ fontSize: 11 }}>Esperar</span>
@@ -189,6 +207,27 @@ export default function DisplayProperties() {
           </div>
         )}
       </div>
+
+      {/* Configuración del protector Arcade — estado COMPARTIDO con el arcade (no una copia). Los dos
+          alcances van separados con nota, porque estrellas/naves/aviones afectan también el fondo del
+          arcade mientras trabajas; el reloj es exclusivo del protector. */}
+      <XpDialogModal open={simCfgOpen} title="Configuración de Arcade" onCancel={cancelSimCfg} onOk={() => setSimCfgOpen(false)} width={340}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <GroupBox label="Sim del fondo — también afecta tu escritorio arcade">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <XpCheckbox checked={showStars}  onChange={(v) => set('showStars', v)}  label="Estrellas y cometas" />
+              <XpCheckbox checked={showShips}  onChange={(v) => set('showShips', v)}  label="Naves espaciales" />
+              <XpCheckbox checked={showPlanes} onChange={(v) => set('showPlanes', v)} label="Aviones" />
+            </div>
+          </GroupBox>
+          <GroupBox label="Solo el protector">
+            <XpCheckbox checked={screensaver.clock} onChange={(v) => set('screensaver', { ...screensaver, clock: v })} label="Mostrar el reloj (centrado)" />
+          </GroupBox>
+          <span style={{ fontSize: 10.5, color: '#5f5c52', lineHeight: 1.4 }}>
+            El sim del fondo es el mismo que ves detrás del arcade: apagarlo aquí también lo apaga en tu escritorio. El reloj solo aparece en el protector.
+          </span>
+        </div>
+      </XpDialogModal>
     </div>
   )
 }

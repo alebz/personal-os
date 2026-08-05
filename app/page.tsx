@@ -13,6 +13,8 @@ import InicioContent from '@/components/sections/InicioContent'
 import XPDesktop from '@/components/xp/XPDesktop'
 import XpScreensaver from '@/components/xp/XpScreensaver'
 import { StarsBackground } from '@/components/StarsBackground'
+import Clock from '@/components/Clock'
+import { crtDayColor, dayColorFlow } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { SECTION_COLORS, type OSSection } from '@/lib/sections'
 
@@ -23,9 +25,19 @@ import { SECTION_COLORS, type OSSection } from '@/lib/sections'
 // el sim se ve A TRAVÉS del CRT en el arcade (el CRT es la piel del mundo, no UI). Bajo XP no hay CRT,
 // así que el sim se ve limpio. Usa el timer/minutos existente (screensaverActive lo emite el contexto).
 function SimSaver() {
+  const { screensaver, crt } = useOSSettings()
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: '#000' }}>
       <StarsBackground />
+      {/* Reloj de Inicio, CENTRADO (no arriba). REUSA el mismo <Clock> con idéntico scale y colorFn
+          (dayColorFlow + crt) → mismo tamaño y el color-por-día sale de la única fuente, nunca se
+          desincroniza. Va dentro del overlay (sobre el sim) y como todo el overlay vive bajo el CRT,
+          el reloj hereda fósforo + scanlines. Exclusivo del protector (toggle screensaver.clock). */}
+      {screensaver.clock && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <Clock scale={1.8} colorFn={(d: Date) => crtDayColor(dayColorFlow(d), crt)} />
+        </div>
+      )}
     </div>
   )
 }
