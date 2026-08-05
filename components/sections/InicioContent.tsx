@@ -4,6 +4,7 @@ import CalendarCard from '@/components/CalendarCard'
 import Clock from '@/components/Clock'
 import { dayColorFlow, crtDayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // ── Hero ───────────────────────────────────────────────────────────────────
 // Solo el reloj DSEG7. La quote diaria genérica (DailyQuote) murió — reemplazada conceptualmente por
@@ -15,11 +16,15 @@ import { useOSSettings } from '@/components/OSSettingsContext'
 
 function Hero() {
   const { crt } = useOSSettings()   // color del reloj reactivo: fósforo en mono, día en multi
+  const isMobile = useIsMobile()
+  // Reloj a scale 1.8 mide ~396px de ancho → desborda un teléfono (≈360px) y provoca scroll
+  // horizontal que corta el resto. En móvil baja a 1.05 (~231px), legible y sin desborde.
+  const scale = isMobile ? 1.05 : 1.8
 
   return (
-    <div className="relative flex shrink-0 flex-col items-center justify-center gap-8 py-14">
-      <div className="py-4">
-        <Clock scale={1.8} colorFn={(d: Date) => crtDayColor(dayColorFlow(d), crt)} />
+    <div className="relative flex shrink-0 flex-col items-center justify-center gap-8 py-8 md:py-14">
+      <div className="py-2 md:py-4">
+        <Clock scale={scale} colorFn={(d: Date) => crtDayColor(dayColorFlow(d), crt)} />
       </div>
     </div>
   )
@@ -29,7 +34,7 @@ function Hero() {
 
 export default function InicioContent() {
   return (
-    <main className="mx-auto flex min-h-full max-w-6xl flex-col justify-start gap-5 px-6 pb-12 pt-[9vh]">
+    <main className="mx-auto flex min-h-full max-w-6xl flex-col justify-start gap-5 px-3 pb-12 pt-[5vh] md:px-6 md:pt-[9vh]">
       <Hero />
       <CalendarCard />
     </main>

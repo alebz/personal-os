@@ -213,13 +213,13 @@ export default function CalendarCard() {
   const showTodayBtn = viewYear !== today.getFullYear() || viewMonth !== today.getMonth()
 
   return (
-    <div className={`relative rounded-card border border-border p-6 shadow-xl shadow-black/20 dashboard-card transition-[width] duration-300 ease-out sm:p-8 ${agendaOpen ? 'lg:w-full' : 'lg:mx-auto lg:w-[85%]'}`}>
+    <div className={`relative rounded-card border border-border p-3 shadow-xl shadow-black/20 dashboard-card transition-[width] duration-300 ease-out sm:p-6 md:p-8 ${agendaOpen ? 'lg:w-full' : 'lg:mx-auto lg:w-[85%]'}`}>
 
       {/* Header */}
-      <div className="mb-6 flex items-end justify-between">
+      <div className="mb-4 flex items-end justify-between md:mb-6">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-heading font-bold tracking-tight text-fg">{MONTHS[viewMonth]}</h2>
-          <span className="text-subhead font-light text-fg-muted">{viewYear}</span>
+          <h2 className="text-subhead font-bold tracking-tight text-fg md:text-heading">{MONTHS[viewMonth]}</h2>
+          <span className="text-body font-light text-fg-muted md:text-subhead">{viewYear}</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Toggle de agenda — en el header, SIEMPRE visible (antes era un chevron `hidden lg:flex`
@@ -283,7 +283,7 @@ export default function CalendarCard() {
                 <button
                   key={key}
                   onClick={() => { if (selected !== key) { resetForm(); setAddDate(key) } setSelected(key) }}
-                  className={`group relative flex min-h-[3.5rem] flex-col items-center gap-1 rounded-card px-1 pt-1.5 pb-1 transition-all ${
+                  className={`group relative flex min-h-[2.75rem] flex-col items-center gap-1 rounded-card px-0.5 pt-1.5 pb-1 transition-all md:min-h-[3.5rem] md:px-1 ${
                     isSelected ? '' : 'hover:bg-surface-hover'
                   } ${!isCurrentMonth ? 'opacity-35' : ''}`}
                   style={isSelected ? { background: cellColor + '1a', boxShadow: `0 0 0 1px ${cellColor}66` } : undefined}

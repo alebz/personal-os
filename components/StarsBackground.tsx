@@ -3543,8 +3543,13 @@ type SatEvt    = { y: number; rtl: boolean; key: string }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StarsBackground() {
-  const { showStars, showPlanes, showShips } = useOSSettings()
+// `mobile`: viewport chico → SOLO estrellas de fondo. Se fuerzan off naves, aviones, cometas,
+// satélites y el marcador de batalla (y el SpaceSim ni se monta) — aligera y no come batería.
+export function StarsBackground({ mobile = false }: { mobile?: boolean } = {}) {
+  const ctx = useOSSettings()
+  const showStars  = ctx.showStars
+  const showPlanes = mobile ? false : ctx.showPlanes
+  const showShips  = mobile ? false : ctx.showShips
   const [stars, setStars] = useState<StarData[]>([])
   // Client-only gate: the background (random planet positions, localStorage-seeded
   // score, the whole sim) never renders on the server, so there's no hydration mismatch.
@@ -3688,7 +3693,7 @@ export function StarsBackground() {
           viewTransitionName: 'stars-events',
         } as React.CSSProperties}
       >
-        {showStars && starEvent && (
+        {showStars && !mobile && starEvent && (
           <div key={starEvent.key} style={{ position: 'absolute', left: `${starEvent.x}%`, top: `${starEvent.y}%`, transform: `rotate(${starEvent.angle}deg)`, transformOrigin: 'center' }}>
             <div style={{ width: '2px', height: '2px', background: 'rgba(255,255,255,0.05)', boxShadow: SHOOT_TRAIL, imageRendering: 'pixelated', animation: 'shooting-star 1.2s linear 1 forwards' }} />
           </div>
@@ -3712,7 +3717,7 @@ export function StarsBackground() {
           </div>
         )}
 
-        {showStars && satEvent && (
+        {showStars && !mobile && satEvent && (
           <div key={satEvent.key} style={{ position: 'absolute', top: `${satEvent.y}%`, left: 0, animation: `${satEvent.rtl ? 'sat-h-rtl' : 'sat-h'} 45s linear 1 forwards` }}>
             <div style={{ animation: 'sat-v 45s ease-in-out 1 forwards' }}>
               <div style={{ width: '3px', height: '3px', background: 'rgba(255,255,255,0.9)', boxShadow: SAT_SHADOW, imageRendering: 'pixelated', transform: 'rotate(22deg)', animation: 'sat-glow 4s ease-in-out infinite' }} />

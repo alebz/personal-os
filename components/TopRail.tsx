@@ -62,14 +62,16 @@ export default function TopRail() {
 
   return (
     <header className="sticky top-0 z-[10000]" style={{ viewTransitionName: 'toprail' }}>
-      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-5 px-6" style={{ minHeight: '7rem', paddingTop: '4.5rem', paddingBottom: '4.5rem' }}>
+      {/* Desktop: nav centrado (spacers laterales) con aire vertical. Móvil: barra compacta, sin
+          spacers, nav a lo ancho con SCROLL horizontal (los 8 tabs no caben en un teléfono). */}
+      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-3 md:gap-5 px-3 md:px-6 min-h-[3.5rem] md:min-h-[7rem] pt-4 pb-3 md:pt-[4.5rem] md:pb-[4.5rem]">
 
-        {/* Col 1 — spacer izquierdo (el logo se retiró; mantiene el nav centrado). */}
-        <div className="col-span-3" aria-hidden />
+        {/* Col 1 — spacer izquierdo (solo desktop; en móvil el nav va a lo ancho). */}
+        <div className="hidden md:block md:col-span-3" aria-hidden />
 
         {/* Col 2 — nav + gear */}
-        <div className="col-span-6 hidden items-center justify-center gap-3 md:flex">
-          <nav className="flex items-center gap-1 rounded-control border border-border bg-surface-1 p-1.5 backdrop-blur-xl">
+        <div className="col-span-12 flex items-center justify-center gap-3 md:col-span-6">
+          <nav className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-control border border-border bg-surface-1 p-1.5 backdrop-blur-xl md:max-w-none md:overflow-x-visible">
             {tabs.map(({ label, href }) => {
               const active = pathname === href
               const color  = crtDayColor(sectionColor(href), crt)
@@ -89,7 +91,7 @@ export default function TopRail() {
                   onDragStart={e => { dragHref.current = href; e.dataTransfer.effectAllowed = 'move' }}
                   onDragOver={e => e.preventDefault()}
                   onDrop={e => { e.preventDefault(); drop(href) }}
-                  className="rounded-control px-5 py-2 text-body font-medium"
+                  className="shrink-0 whitespace-nowrap rounded-control px-5 py-2 text-body font-medium"
                   style={baseStyle}
                   title="Arrastra para reordenar"
                   onMouseEnter={e => {
@@ -133,9 +135,8 @@ export default function TopRail() {
           </button>
         </div>
 
-        {/* Col 3 — spacer derecho. El reloj se retiró: Inicio ya tiene el reloj sobre el calendario,
-            dos en pantalla era redundante. Spacer para mantener el nav centrado. */}
-        <div className="col-span-3" aria-hidden />
+        {/* Col 3 — spacer derecho (solo desktop; el reloj se retiró — vive en Inicio). */}
+        <div className="hidden md:block md:col-span-3" aria-hidden />
 
       </div>
 
