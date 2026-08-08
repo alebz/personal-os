@@ -6,13 +6,14 @@ import Mxn from '@/components/Mxn'
 import { MethodCell } from '@/components/finance/MethodCell'
 import { PixelIcon } from '@/components/PixelIcon'
 import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
+import CreditosTab from '@/components/finance/CreditosTab'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import MsnMoney from '@/components/xp/MsnMoney'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab      = 'Panel' | 'Historial' | 'Caja Fuerte'
+type Tab      = 'Panel' | 'Historial' | 'Caja Fuerte' | 'Créditos'
 type Flow     = 'in' | 'out'
 type Category = 'nomina' | 'freelance' | 'gasto_fijo' | 'gasto_extra' | 'vacaciones' | 'ajuste'
 
@@ -1071,7 +1072,7 @@ function HistorialTab({
 
 // ─── FinancePage ──────────────────────────────────────────────────────────────
 
-const TABS: Tab[] = ['Panel', 'Historial', 'Caja Fuerte']
+const TABS: Tab[] = ['Panel', 'Historial', 'Caja Fuerte', 'Créditos']
 
 const EMPTY_CHECKS: MonthChecks = { checks: {}, realM: {}, movIds: {} }
 
@@ -1369,7 +1370,7 @@ function FinanzasArcade() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const showMonthNav = tab === 'Panel' || tab === 'Historial'
+  const showMonthNav = tab === 'Panel' || tab === 'Historial' || tab === 'Créditos'
 
   return (
     // Molde XP: la raíz llena su contenedor (cara del tambor O ventana XP), es el ancla `relative` de
@@ -1469,6 +1470,9 @@ function FinanzasArcade() {
             )}
             {tab === 'Caja Fuerte' && (
               <CajaFuerteSection funds={cajaFuerte.funds} {...cajaFuerte.handlers} />
+            )}
+            {tab === 'Créditos' && (
+              <CreditosTab month={month} onLedgerChange={() => void loadMovements(month)} />
             )}
           </>
         )}
