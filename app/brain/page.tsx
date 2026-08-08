@@ -1,14 +1,15 @@
 import Shell from '@/components/Shell'
-import BrainIndex from '@/components/BrainIndex'
+import CerebroContent from '@/components/sections/CerebroContent'
 
-// Direct-URL access to the memory index (kept alive for isolated testing). The same BrainIndex also
-// renders inside the drum's BrainIndexModal — one component, zero duplication.
+// /brain = el command bar de Cerebro (captura + consulta + rainbow), EXACTAMENTE lo que montaba su
+// cara del tambor (app/page.tsx SECTIONS: content <CerebroContent/>). Tras la muerte del tambor
+// (1954ea5) esta ruta apuntaba a BrainIndex (solo el índice de navegación), huerfanando el command
+// bar en el arcade. El índice completo sigue accesible desde el "ver todo →" del propio command bar
+// (BrainIndexModal). Bajo XP, CerebroContent cae a MsnCerebro.
 export default function BrainPage() {
   return (
     <Shell>
-      <main className="mx-auto w-full max-w-3xl px-6 pt-[7vh] pb-28">
-        <BrainIndex />
-      </main>
+      <CerebroContent />
     </Shell>
   )
 }
