@@ -165,9 +165,9 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
       {/* Cuadre */}
       <Cuadre cardId={card.id} month={month} expected={expected} onAdjusted={() => { onLedgerRefresh() }} />
 
-      {/* Libreta */}
-      <button onClick={onOpenLedger} className="mt-2 text-label text-fg-muted hover:text-accent">{ledgerOpen ? 'Ocultar libreta' : 'Ver libreta →'}</button>
-      {ledgerOpen && <Ledger cardId={card.id} />}
+      {/* Libreta (modal) */}
+      <button onClick={onOpenLedger} className="mt-2 text-label text-fg-muted hover:text-accent">Ver libreta →</button>
+      {ledgerOpen && <Ledger cardId={card.id} cardName={card.name} onClose={onOpenLedger} />}
     </div>
   )
 }
@@ -202,21 +202,32 @@ function Cuadre({ cardId, month, expected, onAdjusted }: { cardId: string; month
 
 // ─── Libreta (unión personal + atribuido) ─────────────────────────────────────
 type LedgerRow = { kind: 'personal' | 'attributed'; month: string; date: string; description: string; amount: number; category?: string; attribution?: string | null }
-function Ledger({ cardId }: { cardId: string }) {
+// Libreta como MODAL (F3): historial completo de la tarjeta a través del tiempo, unión de cargos
+// personales reales + confirmaciones de depósito atribuidas. Overlay fixed + backdrop que cierra.
+function Ledger({ cardId, cardName, onClose }: { cardId: string; cardName: string; onClose: () => void }) {
   const [rows, setRows] = useState<LedgerRow[] | null>(null)
   useEffect(() => { void jget<LedgerRow[]>(`/api/finance/cards/${cardId}/ledger`).then(r => setRows(Array.isArray(r) ? r : [])) }, [cardId])
-  if (rows == null) return <p className="py-3 text-label text-fg-muted animate-pulse">Cargando libreta…</p>
-  if (rows.length === 0) return <p className="py-3 text-label italic text-fg-muted/50">Sin historial todavía.</p>
   return (
-    <div className="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-card border border-border bg-surface-base/40 p-2 [scrollbar-width:thin]">
-      {rows.map((r, i) => (
-        <div key={i} className="flex items-center gap-2 text-label">
-          <span className="w-14 shrink-0 tabular-nums text-fg-muted/60">{r.month}</span>
-          <span className={`shrink-0 rounded px-1 ${r.kind === 'attributed' ? 'bg-accent/10 text-accent/80' : 'bg-danger/10 text-danger/80'}`}>{r.kind === 'attributed' ? 'depósito' : 'cargo'}</span>
-          <span className="min-w-0 flex-1 truncate text-fg">{r.description}</span>
-          <span className="shrink-0 tabular-nums text-fg-muted">{'$' + r.amount.toLocaleString('es-MX')}</span>
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/55 p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-card border border-border bg-surface-1 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <div><p className="text-label uppercase tracking-widest text-fg-muted">Libreta</p><p className="text-secondary font-bold text-fg">{cardName}</p></div>
+          <button onClick={onClose} className="text-heading leading-none text-fg-muted hover:text-fg" aria-label="Cerrar">×</button>
         </div>
-      ))}
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 [scrollbar-width:thin]">
+          {rows == null ? <p className="py-6 text-center text-body text-fg-muted animate-pulse">Cargando…</p>
+            : rows.length === 0 ? <p className="py-6 text-center text-body italic text-fg-muted/50">Sin historial todavía.</p>
+            : rows.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 border-t border-border py-1.5 text-secondary first:border-0">
+                <span className="w-14 shrink-0 tabular-nums text-fg-muted/60">{r.month}</span>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-label ${r.kind === 'attributed' ? 'bg-accent/10 text-accent/80' : 'bg-danger/10 text-danger/80'}`}>{r.kind === 'attributed' ? 'depósito' : 'cargo'}</span>
+                <span className="min-w-0 flex-1 truncate text-fg">{r.description}</span>
+                <span className="shrink-0 tabular-nums text-fg-muted">{'$' + r.amount.toLocaleString('es-MX')}</span>
+              </div>
+            ))}
+        </div>
+      </div>
     </div>
   )
 }
