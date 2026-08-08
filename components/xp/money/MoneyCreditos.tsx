@@ -27,6 +27,12 @@ function isActive(c: Charge, month: string): boolean {
   if (c.ended_month && mn(month) > mn(c.ended_month)) return false
   return true
 }
+// Crédito utilizado (como el banco): por cada cargo ACTIVO, el saldo COMPLETO que el MSI aún reserva
+// contra el límite = mensualidad × mensualidades que faltan (meses − N + 1). Suma personales Y atribuidos
+// por igual. Campo COMPUTADO (sin override); si no cuadra, se corrige con el cuadre/ajuste existente.
+function creditUsed(charges: Charge[], month: string): number {
+  return charges.filter((c) => isActive(c, month)).reduce((s, c) => s + c.amount * (c.meses - numero(c, month) + 1), 0)
+}
 
 async function jget<T>(u: string): Promise<T> { const r = await fetch(u, { credentials: 'include' }); return r.json() }
 async function jsend(u: string, method: string, body?: unknown) {
@@ -135,6 +141,8 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onC
   const [adding, setAdding] = useState(false)
   const dragId = useRef<string | null>(null)
   const expected = charges.filter((c) => isActive(c, month)).reduce((s, c) => s + c.amount, 0)
+  const used = creditUsed(charges, month)
+  const available = card.credit_limit != null ? card.credit_limit - used : null
 
   async function reorder(targetId: string) {
     const from = dragId.current; dragId.current = null
@@ -158,10 +166,11 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onC
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${MONEY.rule}`, borderTop: 'none', background: '#f7fafe', padding: '3px 9px', fontSize: 10, color: '#5a6a86' }}>
           <span style={{ flex: 1, display: 'flex', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
-            {card.credit_limit != null && <span>Límite {fmtMxn(card.credit_limit)}</span>}
+            <span>Límite {card.credit_limit != null ? fmtMxn(card.credit_limit) : <span style={{ color: '#9aa3b5' }}>sin definir</span>}</span>
+            <span>Utilizado <b style={{ color: '#33415c', fontWeight: 700 }}>{fmtMxn(used)}</b></span>
+            <span>Disponible {available != null ? <b style={{ color: '#33415c', fontWeight: 700 }}>{fmtMxn(available)}</b> : <span style={{ color: '#9aa3b5' }}>—</span>}</span>
             {card.cut_day != null && <span>Corte día {card.cut_day}</span>}
             {card.due_day != null && <span>Pago día {card.due_day}</span>}
-            {card.credit_limit == null && card.cut_day == null && card.due_day == null && <span style={{ fontStyle: 'italic', color: '#9aa3b5' }}>Sin datos de la tarjeta</span>}
           </span>
           <button onClick={() => setEditHeader(true)} style={editLink}>editar</button>
         </div>

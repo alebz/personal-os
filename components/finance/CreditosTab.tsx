@@ -21,6 +21,13 @@ function isActive(c: Charge, month: string): boolean {
   if (c.ended_month && mn(month) > mn(c.ended_month)) return false
   return true
 }
+// Crédito utilizado (como lo calcula el banco): por cada cargo ACTIVO, el saldo COMPLETO que el MSI aún
+// reserva contra el límite = mensualidad × mensualidades que faltan (meses − N + 1, incluye la de este
+// mes). Suma personales Y atribuidos por igual — al banco no le importa quién me reembolsa. Es un campo
+// COMPUTADO (sin override manual): si no cuadra, se corrige con el cuadre/ajuste existente.
+function creditUsed(charges: Charge[], month: string): number {
+  return charges.filter(c => isActive(c, month)).reduce((s, c) => s + c.amount * (c.meses - numero(c, month) + 1), 0)
+}
 
 async function jget<T>(u: string): Promise<T> { const r = await fetch(u, { credentials: 'include' }); return r.json() }
 async function jsend(u: string, method: string, body?: unknown) {
@@ -93,6 +100,8 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
 
   const active = charges.filter(c => isActive(c, month))
   const expected = active.reduce((s, c) => s + c.amount, 0)   // total esperado del mes (personales + atribuidas)
+  const used = creditUsed(charges, month)                     // crédito utilizado (saldo MSI reservado)
+  const available = card.credit_limit != null ? card.credit_limit - used : null
 
   async function reorder(targetId: string) {
     const from = dragId.current; dragId.current = null
@@ -118,7 +127,9 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
                 {card.last4 && <span className="text-label text-fg-muted/60">···· {card.last4}</span>}
               </div>
               <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-label text-fg-muted/70">
-                {card.credit_limit != null && <span>Límite <Mxn v={card.credit_limit} /></span>}
+                <span>Límite {card.credit_limit != null ? <Mxn v={card.credit_limit} /> : <span className="text-fg-muted/40">sin definir</span>}</span>
+                <span>Utilizado <span className="tabular-nums text-fg-muted"><Mxn v={used} /></span></span>
+                <span>Disponible {available != null ? <span className="tabular-nums text-fg-muted"><Mxn v={available} /></span> : <span className="text-fg-muted/40">—</span>}</span>
                 {card.cut_day != null && <span>Corte día {card.cut_day}</span>}
                 {card.due_day != null && <span>Pago día {card.due_day}</span>}
               </div>
