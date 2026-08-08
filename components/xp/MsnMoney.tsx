@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MoneyChrome, MoneyBar, MONEY, fmtMxn, fmtSigned, MoneyModal, MoneyBtn, MoneyInput, MethodPick } from './money/MoneyChrome'
 import MoneyCaja from './money/MoneyCaja'
+import MoneyCreditos from './money/MoneyCreditos'
 
 // FINANZAS bajo XP = MSN MONEY 2003. Inc.2: PARIDAD TOTAL con el arcade re-presentada en estilo Money
 // (blueprint de 69 capacidades). Reusa TODAS las APIs y el modelo de estado mensual (checks/realM/movIds).
@@ -36,6 +37,7 @@ const TABS = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'panel', label: 'Panel' },
   { id: 'caja', label: 'Caja Fuerte' },
+  { id: 'creditos', label: 'Créditos' },
   { id: 'historial', label: 'Historial' },
 ]
 
@@ -194,6 +196,7 @@ export default function MsnMoney() {
         />
       )}
       {active === 'caja' && <MoneyCaja month={month} onChange={() => { loadFunds(); loadMovements(month); loadBalance() }} />}
+      {active === 'creditos' && <MoneyCreditos month={month} setMonth={setMonth} onChange={() => { loadMovements(month); loadBalance() }} />}
       {active === 'historial' && <Historial month={month} setMonth={setMonth} moves={movements} funds={funds} onDelete={deleteMovement} />}
     </MoneyChrome>
   )
