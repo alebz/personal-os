@@ -9,7 +9,7 @@ import Mxn from '@/components/Mxn'
 // contador ni escritura. Reusa la derivación de Compromisos (mn + numero).
 
 export interface Card { id: string; name: string; last4: string | null; credit_limit: number | null; cut_day: number | null; due_day: number | null; sort_order: number; archived: boolean }
-export interface Charge { id: string; card_id: string; name: string; amount: number; meses: number; start_month: string; ended_month: string | null; kind: 'personal' | 'attributed'; attribution: 'andres' | 'publico' | null; sort_order: number; archived: boolean }
+export interface Charge { id: string; card_id: string; name: string; amount: number; meses: number; start_month: string; ended_month: string | null; kind: 'personal' | 'attributed'; attribution: 'andres' | 'publico' | null; original_amount: number | null; pending_override: number | null; sort_order: number; archived: boolean }
 
 const mn = (ym: string) => { const [y, m] = ym.split('-').map(Number); return y * 12 + (m - 1) }
 // Número de mensualidad del cargo en el mes visto (1..meses). Devolución (ended_month) o fin de plazo lo
@@ -21,12 +21,26 @@ function isActive(c: Charge, month: string): boolean {
   if (c.ended_month && mn(month) > mn(c.ended_month)) return false
   return true
 }
-// Crédito utilizado (como lo calcula el banco): por cada cargo ACTIVO, el saldo COMPLETO que el MSI aún
-// reserva contra el límite = mensualidad × mensualidades que faltan (meses − N + 1, incluye la de este
-// mes). Suma personales Y atribuidos por igual — al banco no le importa quién me reembolsa. Es un campo
-// COMPUTADO (sin override manual): si no cuadra, se corrige con el cuadre/ajuste existente.
-function creditUsed(charges: Charge[], month: string): number {
-  return charges.filter(c => isActive(c, month)).reduce((s, c) => s + c.amount * (c.meses - numero(c, month) + 1), 0)
+// Saldo pendiente de un cargo (lo que el MSI aún reserva a futuro contra el límite), como el banco:
+// saldo = monto_original − N × mensualidad (el N ya cuenta la mensualidad en curso). Si hay un saldo
+// REAL capturado (pending_override), ese MANDA (p. ej. cuando alguien abona extra y rompe la derivación).
+// Sin monto_original se estima con meses×mensualidad. Nunca negativo.
+function saldoPendiente(c: Charge, month: string): number {
+  if (c.pending_override != null) return c.pending_override
+  const original = c.original_amount != null ? c.original_amount : c.meses * c.amount
+  return Math.max(0, original - numero(c, month) * c.amount)
+}
+// Crédito utilizado, partido como el estado de cuenta (suma personales Y atribuidos por igual — al banco
+// no le importa quién reembolsa):
+//  • aMeses  = Σ saldo pendiente de los cargos activos (lo diferido a futuro).
+//  • regular = Σ mensualidad de este periodo (= total esperado del mes), aún cargada y sin pagar.
+//  • deudor  = aMeses + regular → el crédito utilizado real; disponible = límite − deudor.
+// Todo COMPUTADO (sin override del total); si no cuadra, se reconcilia con pending_override / el ajuste.
+function creditBreakdown(charges: Charge[], month: string): { aMeses: number; regular: number; deudor: number } {
+  const active = charges.filter(c => isActive(c, month))
+  const aMeses = active.reduce((s, c) => s + saldoPendiente(c, month), 0)
+  const regular = active.reduce((s, c) => s + c.amount, 0)
+  return { aMeses, regular, deudor: aMeses + regular }
 }
 
 async function jget<T>(u: string): Promise<T> { const r = await fetch(u, { credentials: 'include' }); return r.json() }
@@ -100,8 +114,8 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
 
   const active = charges.filter(c => isActive(c, month))
   const expected = active.reduce((s, c) => s + c.amount, 0)   // total esperado del mes (personales + atribuidas)
-  const used = creditUsed(charges, month)                     // crédito utilizado (saldo MSI reservado)
-  const available = card.credit_limit != null ? card.credit_limit - used : null
+  const credit = creditBreakdown(charges, month)             // { aMeses, regular, deudor }
+  const available = card.credit_limit != null ? card.credit_limit - credit.deudor : null
 
   async function reorder(targetId: string) {
     const from = dragId.current; dragId.current = null
@@ -127,11 +141,17 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
                 {card.last4 && <span className="text-label text-fg-muted/60">···· {card.last4}</span>}
               </div>
               <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-label text-fg-muted/70">
-                <span>Límite {card.credit_limit != null ? <Mxn v={card.credit_limit} /> : <span className="text-fg-muted/40">sin definir</span>}</span>
-                <span>Utilizado <span className="tabular-nums text-fg-muted"><Mxn v={used} /></span></span>
-                <span>Disponible {available != null ? <span className="tabular-nums text-fg-muted"><Mxn v={available} /></span> : <span className="text-fg-muted/40">—</span>}</span>
+                <span>Límite {card.credit_limit != null ? <Mxn v={card.credit_limit} cents /> : <span className="text-fg-muted/40">sin definir</span>}</span>
                 {card.cut_day != null && <span>Corte día {card.cut_day}</span>}
                 {card.due_day != null && <span>Pago día {card.due_day}</span>}
+              </div>
+              {/* Crédito utilizado, partido como el estado de cuenta: saldo a meses + cargos del periodo
+                  = deudor total; disponible = límite − deudor. Computados (sin override del total). */}
+              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-label">
+                <span className="text-fg-muted/70">Saldo a meses <span className="tabular-nums text-fg-muted"><Mxn v={credit.aMeses} cents /></span></span>
+                <span className="text-fg-muted/70">Cargos del periodo <span className="tabular-nums text-fg-muted"><Mxn v={credit.regular} cents /></span></span>
+                <span className="text-fg-muted/70">Deudor total <span className="tabular-nums font-medium text-fg"><Mxn v={credit.deudor} cents /></span></span>
+                <span className="text-fg-muted/70">Disponible {available != null ? <span className="tabular-nums font-medium text-ok"><Mxn v={available} cents /></span> : <span className="text-fg-muted/40">— (define el límite)</span>}</span>
               </div>
             </div>
             <button onClick={() => setEditHeader(true)} className="shrink-0 text-label text-fg-muted hover:text-accent" title="Editar datos de la tarjeta">editar</button>
@@ -292,22 +312,30 @@ function ChargeEdit({ charge, onDone }: { charge: Charge; onDone: () => void }) 
   const [name, setName] = useState(charge.name); const [amount, setAmount] = useState(String(charge.amount))
   const [meses, setMeses] = useState(String(charge.meses)); const [start, setStart] = useState(charge.start_month)
   const [kind, setKind] = useState(charge.kind); const [attr, setAttr] = useState(charge.attribution ?? '')
+  const [original, setOriginal] = useState(charge.original_amount != null ? String(charge.original_amount) : '')
+  const [pending, setPending] = useState(charge.pending_override != null ? String(charge.pending_override) : '')
+  // estimado que se usaría si NO capturas el real (para saber contra qué comparas al cuadrar)
+  const est = (() => { const o = original.trim() ? Number(original) : charge.meses * Number(amount || 0); return Math.max(0, o - numero({ ...charge, meses: Number(meses) || charge.meses, start_month: /^\d{4}-\d{2}$/.test(start) ? start : charge.start_month }, month0()) * Number(amount || 0)) })()
   async function save() {
     await jsend(`/api/finance/card-charges/${charge.id}`, 'PATCH', {
       name: name.trim() || charge.name, amount: Number(amount) || 0, meses: Number(meses) || charge.meses,
       start_month: /^\d{4}-\d{2}$/.test(start) ? start : charge.start_month, kind, attribution: attr || null,
+      original_amount: original.trim() ? Number(original) : null,
+      pending_override: pending.trim() ? Number(pending) : null,
     })
     onDone()
   }
   return (
     <div className="flex flex-1 flex-wrap items-center gap-1.5">
       <input value={name} onChange={e => setName(e.target.value)} className={`flex-1 ${inp}`} />
-      <input value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" className={`w-20 ${inp} text-right`} />
+      <input value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" className={`w-20 ${inp} text-right`} title="mensualidad" />
       <span className="text-label text-fg-muted">/</span>
       <input value={meses} onChange={e => setMeses(e.target.value)} inputMode="numeric" className={`w-12 ${inp} text-right`} title="meses (M)" />
       <input value={start} onChange={e => setStart(e.target.value)} placeholder="YYYY-MM" className={`w-24 ${inp}`} title="mes inicial" />
       <select value={kind} onChange={e => setKind(e.target.value as Charge['kind'])} className={inp}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={e => setAttr(e.target.value)} className={inp}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
+      <input value={original} onChange={e => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." className={`w-24 ${inp} text-right`} title="monto original de la compra" />
+      <input value={pending} onChange={e => setPending(e.target.value)} inputMode="decimal" placeholder={`pend. real (est. ${est.toLocaleString('es-MX', { maximumFractionDigits: 2 })})`} className={`w-40 ${inp} text-right`} title="saldo pendiente REAL del estado de cuenta — manda sobre el estimado; vacío = usa el estimado" />
       <button onClick={() => void save()} className="px-1 text-ok">✓</button>
       <button onClick={onDone} className="px-1 text-fg-muted">✕</button>
     </div>
@@ -318,9 +346,10 @@ function ChargeEdit({ charge, onDone }: { charge: Charge; onDone: () => void }) 
 function AddCharge({ cardId, defaultMonth, onDone }: { cardId: string; defaultMonth: string; onDone: () => void }) {
   const [name, setName] = useState(''); const [amount, setAmount] = useState(''); const [meses, setMeses] = useState('')
   const [start, setStart] = useState(defaultMonth); const [kind, setKind] = useState<Charge['kind']>('personal'); const [attr, setAttr] = useState('')
+  const [original, setOriginal] = useState(''); const [pending, setPending] = useState('')
   async function add() {
     if (!name.trim() || !Number(amount) || !Number(meses)) return
-    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount: Number(amount), meses: Number(meses), start_month: start, kind, attribution: attr || null })
+    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount: Number(amount), meses: Number(meses), start_month: start, kind, attribution: attr || null, original_amount: original.trim() ? Number(original) : null, pending_override: pending.trim() ? Number(pending) : null })
     onDone()
   }
   return (
@@ -332,6 +361,8 @@ function AddCharge({ cardId, defaultMonth, onDone }: { cardId: string; defaultMo
       <input value={start} onChange={e => setStart(e.target.value)} placeholder="YYYY-MM" className={`w-24 ${inp}`} />
       <select value={kind} onChange={e => setKind(e.target.value as Charge['kind'])} className={inp}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={e => setAttr(e.target.value)} className={inp}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
+      <input value={original} onChange={e => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." className={`w-24 ${inp} text-right`} title="monto original de la compra (para derivar el saldo pendiente)" />
+      <input value={pending} onChange={e => setPending(e.target.value)} inputMode="decimal" placeholder="pend. real" className={`w-28 ${inp} text-right`} title="saldo pendiente REAL del estado de cuenta (opcional; manda sobre el estimado)" />
       <button onClick={() => void add()} className="px-1 text-ok" title="Añadir">✓</button>
       <button onClick={onDone} className="px-1 text-fg-muted" title="Cancelar">✕</button>
     </div>

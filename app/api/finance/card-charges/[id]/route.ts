@@ -7,7 +7,7 @@ import { createServerClient } from '@/lib/supabase'
 // detiene mensualidades futuras sin borrar el pasado). ended_month=null lo reabre.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  let b: { name?: string; amount?: number; meses?: number; start_month?: string; ended_month?: string | null; kind?: string; attribution?: string | null; sort_order?: number; archived?: boolean }
+  let b: { name?: string; amount?: number; meses?: number; start_month?: string; ended_month?: string | null; kind?: string; attribution?: string | null; sort_order?: number; archived?: boolean; original_amount?: number | null; pending_override?: number | null }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
   const patch: Record<string, unknown> = {}
@@ -18,6 +18,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (b.ended_month !== undefined) { if (b.ended_month !== null && !/^\d{4}-\d{2}$/.test(b.ended_month)) return NextResponse.json({ error: 'ended_month inválido' }, { status: 400 }); patch.ended_month = b.ended_month }
   if (b.kind !== undefined) patch.kind = b.kind === 'attributed' ? 'attributed' : 'personal'
   if (b.attribution !== undefined) patch.attribution = (b.attribution === 'andres' || b.attribution === 'publico') ? b.attribution : null
+  // original_amount / pending_override: null limpia el campo (número inválido → se ignora silenciosamente
+  // solo si no es null; null explícito SÍ limpia, p. ej. quitar un override capturado).
+  if (b.original_amount !== undefined) patch.original_amount = b.original_amount === null ? null : (Number.isFinite(Number(b.original_amount)) ? Number(b.original_amount) : null)
+  if (b.pending_override !== undefined) patch.pending_override = b.pending_override === null ? null : (Number.isFinite(Number(b.pending_override)) ? Number(b.pending_override) : null)
   if (b.sort_order !== undefined) patch.sort_order = b.sort_order
   if (b.archived !== undefined) patch.archived = b.archived
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'nada que actualizar' }, { status: 400 })

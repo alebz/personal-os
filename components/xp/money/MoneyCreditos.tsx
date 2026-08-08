@@ -10,7 +10,7 @@ import { MONEY, fmtMxn, MoneyBar, MoneyBtn, MoneyInput, MoneyModal } from './Mon
 // depositaron", cero movimiento). El cuadre reusa el ritual de ajuste nombrado.
 
 interface Card { id: string; name: string; last4: string | null; credit_limit: number | null; cut_day: number | null; due_day: number | null; sort_order: number; archived: boolean }
-interface Charge { id: string; card_id: string; name: string; amount: number; meses: number; start_month: string; ended_month: string | null; kind: 'personal' | 'attributed'; attribution: 'andres' | 'publico' | null; sort_order: number; archived: boolean }
+interface Charge { id: string; card_id: string; name: string; amount: number; meses: number; start_month: string; ended_month: string | null; kind: 'personal' | 'attributed'; attribution: 'andres' | 'publico' | null; original_amount: number | null; pending_override: number | null; sort_order: number; archived: boolean }
 type LedgerRow = { kind: 'personal' | 'attributed'; month: string; date: string; description: string; amount: number; category?: string; attribution?: string | null }
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -27,12 +27,23 @@ function isActive(c: Charge, month: string): boolean {
   if (c.ended_month && mn(month) > mn(c.ended_month)) return false
   return true
 }
-// Crédito utilizado (como el banco): por cada cargo ACTIVO, el saldo COMPLETO que el MSI aún reserva
-// contra el límite = mensualidad × mensualidades que faltan (meses − N + 1). Suma personales Y atribuidos
-// por igual. Campo COMPUTADO (sin override); si no cuadra, se corrige con el cuadre/ajuste existente.
-function creditUsed(charges: Charge[], month: string): number {
-  return charges.filter((c) => isActive(c, month)).reduce((s, c) => s + c.amount * (c.meses - numero(c, month) + 1), 0)
+// Saldo pendiente de un cargo (lo diferido a futuro): monto_original − N × mensualidad. Si hay saldo REAL
+// capturado (pending_override), ese manda. Sin monto_original se estima con meses×mensualidad. No negativo.
+function saldoPendiente(c: Charge, month: string): number {
+  if (c.pending_override != null) return c.pending_override
+  const original = c.original_amount != null ? c.original_amount : c.meses * c.amount
+  return Math.max(0, original - numero(c, month) * c.amount)
 }
+// Crédito utilizado partido como el estado de cuenta: aMeses (Σ saldo pendiente) + regular (Σ mensualidad
+// del periodo) = deudor. Personales Y atribuidos por igual. Disponible = límite − deudor.
+function creditBreakdown(charges: Charge[], month: string): { aMeses: number; regular: number; deudor: number } {
+  const active = charges.filter((c) => isActive(c, month))
+  const aMeses = active.reduce((s, c) => s + saldoPendiente(c, month), 0)
+  const regular = active.reduce((s, c) => s + c.amount, 0)
+  return { aMeses, regular, deudor: aMeses + regular }
+}
+// Money formatea a 0 decimales; los saldos de crédito deben cuadrar al centavo → variante con centavos.
+const fmtMxn2 = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0, maximumFractionDigits: 2 })
 
 async function jget<T>(u: string): Promise<T> { const r = await fetch(u, { credentials: 'include' }); return r.json() }
 async function jsend(u: string, method: string, body?: unknown) {
@@ -141,8 +152,8 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onC
   const [adding, setAdding] = useState(false)
   const dragId = useRef<string | null>(null)
   const expected = charges.filter((c) => isActive(c, month)).reduce((s, c) => s + c.amount, 0)
-  const used = creditUsed(charges, month)
-  const available = card.credit_limit != null ? card.credit_limit - used : null
+  const credit = creditBreakdown(charges, month)
+  const available = card.credit_limit != null ? card.credit_limit - credit.deudor : null
 
   async function reorder(targetId: string) {
     const from = dragId.current; dragId.current = null
@@ -166,9 +177,11 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onC
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${MONEY.rule}`, borderTop: 'none', background: '#f7fafe', padding: '3px 9px', fontSize: 10, color: '#5a6a86' }}>
           <span style={{ flex: 1, display: 'flex', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
-            <span>Límite {card.credit_limit != null ? fmtMxn(card.credit_limit) : <span style={{ color: '#9aa3b5' }}>sin definir</span>}</span>
-            <span>Utilizado <b style={{ color: '#33415c', fontWeight: 700 }}>{fmtMxn(used)}</b></span>
-            <span>Disponible {available != null ? <b style={{ color: '#33415c', fontWeight: 700 }}>{fmtMxn(available)}</b> : <span style={{ color: '#9aa3b5' }}>—</span>}</span>
+            <span>Límite {card.credit_limit != null ? fmtMxn2(card.credit_limit) : <span style={{ color: '#9aa3b5' }}>sin definir</span>}</span>
+            <span>Saldo a meses <b style={{ color: '#33415c', fontWeight: 700 }}>{fmtMxn2(credit.aMeses)}</b></span>
+            <span>Cargos del periodo <b style={{ color: '#33415c', fontWeight: 700 }}>{fmtMxn2(credit.regular)}</b></span>
+            <span>Deudor total <b style={{ color: MONEY.ink, fontWeight: 700 }}>{fmtMxn2(credit.deudor)}</b></span>
+            <span>Disponible {available != null ? <b style={{ color: MONEY.up, fontWeight: 700 }}>{fmtMxn2(available)}</b> : <span style={{ color: '#9aa3b5' }}>— (define el límite)</span>}</span>
             {card.cut_day != null && <span>Corte día {card.cut_day}</span>}
             {card.due_day != null && <span>Pago día {card.due_day}</span>}
           </span>
@@ -312,22 +325,27 @@ function ChargeEdit({ charge, onDone }: { charge: Charge; onDone: () => void }) 
   const [name, setName] = useState(charge.name); const [amount, setAmount] = useState(String(charge.amount))
   const [meses, setMeses] = useState(String(charge.meses)); const [start, setStart] = useState(charge.start_month)
   const [kind, setKind] = useState<Charge['kind']>(charge.kind); const [attr, setAttr] = useState(charge.attribution ?? '')
+  const [original, setOriginal] = useState(charge.original_amount != null ? String(charge.original_amount) : '')
+  const [pending, setPending] = useState(charge.pending_override != null ? String(charge.pending_override) : '')
   async function save() {
     await jsend(`/api/finance/card-charges/${charge.id}`, 'PATCH', {
       name: name.trim() || charge.name, amount: num(amount), meses: num(meses) || charge.meses,
       start_month: /^\d{4}-\d{2}$/.test(start) ? start : charge.start_month, kind, attribution: attr || null,
+      original_amount: original.trim() ? num(original) : null, pending_override: pending.trim() ? num(pending) : null,
     })
     onDone()
   }
   return (
     <span style={{ display: 'flex', flex: 1, gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
       <MoneyInput value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 80 }} />
-      <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={{ width: 66, textAlign: 'right' }} />
+      <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={{ width: 66, textAlign: 'right' }} title="mensualidad" />
       <span style={{ color: '#8a93a8' }}>/</span>
       <MoneyInput value={meses} onChange={(e) => setMeses(e.target.value)} inputMode="numeric" style={{ width: 40, textAlign: 'right' }} title="meses (M)" />
       <MoneyInput value={start} onChange={(e) => setStart(e.target.value)} placeholder="YYYY-MM" style={{ width: 82 }} title="mes inicial" />
       <select value={kind} onChange={(e) => setKind(e.target.value as Charge['kind'])} style={selStyle}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={(e) => setAttr(e.target.value)} style={selStyle}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
+      <MoneyInput value={original} onChange={(e) => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." style={{ width: 84, textAlign: 'right' }} title="monto original de la compra" />
+      <MoneyInput value={pending} onChange={(e) => setPending(e.target.value)} inputMode="decimal" placeholder="pend. real" style={{ width: 96, textAlign: 'right' }} title="saldo pendiente REAL del estado de cuenta — manda sobre el estimado; vacío = usa el estimado" />
       <MoneyBtn primary onClick={() => void save()}>ok</MoneyBtn>
       <MoneyBtn onClick={onDone}>✕</MoneyBtn>
     </span>
@@ -339,9 +357,10 @@ const selStyle: React.CSSProperties = { border: `1px solid ${MONEY.rule}`, borde
 function AddCharge({ cardId, defaultMonth, onDone }: { cardId: string; defaultMonth: string; onDone: () => void }) {
   const [name, setName] = useState(''); const [amount, setAmount] = useState(''); const [meses, setMeses] = useState('')
   const [start, setStart] = useState(defaultMonth); const [kind, setKind] = useState<Charge['kind']>('personal'); const [attr, setAttr] = useState('')
+  const [original, setOriginal] = useState(''); const [pending, setPending] = useState('')
   async function add() {
     if (!name.trim() || !num(amount) || !num(meses)) return
-    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount: num(amount), meses: num(meses), start_month: start, kind, attribution: attr || null })
+    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount: num(amount), meses: num(meses), start_month: start, kind, attribution: attr || null, original_amount: original.trim() ? num(original) : null, pending_override: pending.trim() ? num(pending) : null })
     onDone()
   }
   return (
@@ -353,6 +372,8 @@ function AddCharge({ cardId, defaultMonth, onDone }: { cardId: string; defaultMo
       <MoneyInput value={start} onChange={(e) => setStart(e.target.value)} placeholder="YYYY-MM" style={{ width: 82 }} />
       <select value={kind} onChange={(e) => setKind(e.target.value as Charge['kind'])} style={selStyle}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={(e) => setAttr(e.target.value)} style={selStyle}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
+      <MoneyInput value={original} onChange={(e) => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." style={{ width: 84, textAlign: 'right' }} title="monto original" />
+      <MoneyInput value={pending} onChange={(e) => setPending(e.target.value)} inputMode="decimal" placeholder="pend. real" style={{ width: 96, textAlign: 'right' }} title="saldo pendiente real (opcional)" />
       <MoneyBtn primary onClick={() => void add()}>✓</MoneyBtn>
       <MoneyBtn onClick={onDone}>✕</MoneyBtn>
     </div>
