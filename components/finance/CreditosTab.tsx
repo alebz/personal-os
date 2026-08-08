@@ -7,6 +7,13 @@ import Mxn from '@/components/Mxn'
 // Datos de F1: /api/finance/cards, /card-charges, /confirm, /status, /adjust, /ledger. El progreso
 // "N de M" y el "activo este mes" se DERIVAN de start_month/meses/ended_month contra el mes visto — sin
 // contador ni escritura. Reusa la derivación de Compromisos (mn + numero).
+//
+// TRES ESTADOS por cargo, distintos a propósito (numero = N):
+//   • aún no empieza (N < 1): ya cargado por el banco → OCUPA crédito, pero SIN mensualidad este periodo
+//     (su 1ª mensualidad arranca un corte futuro). No suma al total esperado.
+//   • activo (1 ≤ N ≤ meses): ocupa crédito Y tiene mensualidad este periodo.
+//   • saldado/cerrado (N > meses o devolución): ni ocupa ni cobra.
+// Por eso occupiesCredit (N ≥ 0) ≠ isActive (N ≥ 1): un cargo puede ocupar límite sin cobrar aún.
 
 export interface Card { id: string; name: string; last4: string | null; credit_limit: number | null; cut_day: number | null; due_day: number | null; sort_order: number; archived: boolean }
 export interface Charge { id: string; card_id: string; name: string; amount: number; meses: number; start_month: string; ended_month: string | null; kind: 'personal' | 'attributed'; attribution: 'andres' | 'publico' | null; original_amount: number | null; pending_override: number | null; sort_order: number; archived: boolean }
@@ -21,25 +28,43 @@ function isActive(c: Charge, month: string): boolean {
   if (c.ended_month && mn(month) > mn(c.ended_month)) return false
   return true
 }
+// "Aún no empieza": ya cargada por el banco pero su 1ª mensualidad es en un corte futuro → N < 1 (con
+// start_month = el mes de la 1ª mensualidad, el mes-0 es el del cargo). Ocupa crédito pero NO tiene
+// mensualidad este periodo.
+function notStarted(c: Charge, month: string): boolean {
+  const n = numero(c, month)
+  return n < 1 && !(c.ended_month != null && mn(month) > mn(c.ended_month))
+}
+// Ocupa límite: ya cargada por el banco (N ≥ 0, incluye el mes-0 "aún no empieza") y no saldada/cerrada.
+// Distinto de isActive (que exige mensualidad este periodo, N ≥ 1): un cargo puede ocupar crédito sin
+// tener aún mensualidad (MSI que arranca el próximo corte).
+function occupiesCredit(c: Charge, month: string): boolean {
+  const n = numero(c, month)
+  if (n < 0 || n > c.meses) return false
+  if (c.ended_month && mn(month) > mn(c.ended_month)) return false
+  return true
+}
+function monthName(ym: string): string { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) }
 // Saldo pendiente de un cargo (lo que el MSI aún reserva a futuro contra el límite), como el banco:
-// saldo = monto_original − N × mensualidad (el N ya cuenta la mensualidad en curso). Si hay un saldo
-// REAL capturado (pending_override), ese MANDA (p. ej. cuando alguien abona extra y rompe la derivación).
-// Sin monto_original se estima con meses×mensualidad. Nunca negativo.
+// saldo = monto_original − N × mensualidad (el N ya cuenta la mensualidad en curso). Aún no empezada
+// (N < 1): ocupa el original COMPLETO (nada amortizado todavía). Si hay un saldo REAL capturado
+// (pending_override), ese MANDA. Sin monto_original se estima con meses×mensualidad. Nunca negativo.
 function saldoPendiente(c: Charge, month: string): number {
   if (c.pending_override != null) return c.pending_override
   const original = c.original_amount != null ? c.original_amount : c.meses * c.amount
-  return Math.max(0, original - numero(c, month) * c.amount)
+  const n = numero(c, month)
+  if (n < 1) return original
+  return Math.max(0, original - n * c.amount)
 }
 // Crédito utilizado, partido como el estado de cuenta (suma personales Y atribuidos por igual — al banco
 // no le importa quién reembolsa):
-//  • aMeses  = Σ saldo pendiente de los cargos activos (lo diferido a futuro).
-//  • regular = Σ mensualidad de este periodo (= total esperado del mes), aún cargada y sin pagar.
+//  • aMeses  = Σ saldo pendiente de los cargos que OCUPAN crédito (activos + los que aún no empiezan).
+//  • regular = Σ mensualidad de los cargos ACTIVOS (= total esperado del mes); excluye los que no empiezan.
 //  • deudor  = aMeses + regular → el crédito utilizado real; disponible = límite − deudor.
 // Todo COMPUTADO (sin override del total); si no cuadra, se reconcilia con pending_override / el ajuste.
 function creditBreakdown(charges: Charge[], month: string): { aMeses: number; regular: number; deudor: number } {
-  const active = charges.filter(c => isActive(c, month))
-  const aMeses = active.reduce((s, c) => s + saldoPendiente(c, month), 0)
-  const regular = active.reduce((s, c) => s + c.amount, 0)
+  const aMeses = charges.filter(c => occupiesCredit(c, month)).reduce((s, c) => s + saldoPendiente(c, month), 0)
+  const regular = charges.filter(c => isActive(c, month)).reduce((s, c) => s + c.amount, 0)
   return { aMeses, regular, deudor: aMeses + regular }
 }
 
@@ -162,6 +187,7 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
       {charges.map(c => {
         const n = numero(c, month)
         const active = isActive(c, month)
+        const pending = notStarted(c, month)
         const isLast = active && n === c.meses
         const finished = n > c.meses || (c.ended_month != null && mn(month) > mn(c.ended_month))
         const isOn = confirmed.has(c.id)
@@ -171,7 +197,7 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
             <span className="cursor-grab select-none text-fg-muted/40" title="Arrastra para reordenar">⠿</span>
             {/* Checkbox: personal = gasto real; atribuido = puro registro. Deshabilitado si no está activo este mes. */}
             <button onClick={() => active && onToggle(c, !isOn)} disabled={!active}
-              title={c.kind === 'personal' ? 'Se cobró bien este mes' : '¿Ya depositaron este mes?'}
+              title={pending ? 'Aún no empieza su mensualidad' : c.kind === 'personal' ? 'Se cobró bien este mes' : '¿Ya depositaron este mes?'}
               className={['flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
                 isOn ? 'border-ok bg-ok' : 'border-border-strong', active ? '' : 'cursor-default'].join(' ')}>
               {isOn && <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-fg-on-accent" stroke="currentColor" strokeWidth={1.8}><path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
@@ -180,9 +206,11 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
             {c.attribution && <span className={`shrink-0 rounded px-1.5 py-0.5 text-label font-medium ${ATTR_CLS[c.attribution]}`}>{ATTR_LABEL[c.attribution]}</span>}
             {finished
               ? <span className="shrink-0 text-label text-fg-muted/50">saldado</span>
-              : isLast
-                ? <span className="shrink-0 rounded bg-amber-300/15 px-1.5 py-0.5 text-label font-medium text-amber-200/90">última · {n}/{c.meses}</span>
-                : <span className="shrink-0 text-label tabular-nums text-fg-muted/60">{n}/{c.meses}</span>}
+              : pending
+                ? <span className="shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-label font-medium text-accent/80" title="Ya ocupa crédito; su 1ª mensualidad arranca el próximo corte">inicia {monthName(c.start_month)}</span>
+                : isLast
+                  ? <span className="shrink-0 rounded bg-amber-300/15 px-1.5 py-0.5 text-label font-medium text-amber-200/90">última · {n}/{c.meses}</span>
+                  : <span className="shrink-0 text-label tabular-nums text-fg-muted/60">{n}/{c.meses}</span>}
             <span className="shrink-0 w-20 text-right text-secondary tabular-nums text-fg-muted">{'$' + c.amount.toLocaleString('es-MX')}</span>
             <ChargeActions charge={c} onDone={onRefresh} />
           </div>

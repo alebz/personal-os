@@ -27,19 +27,35 @@ function isActive(c: Charge, month: string): boolean {
   if (c.ended_month && mn(month) > mn(c.ended_month)) return false
   return true
 }
-// Saldo pendiente de un cargo (lo diferido a futuro): monto_original − N × mensualidad. Si hay saldo REAL
-// capturado (pending_override), ese manda. Sin monto_original se estima con meses×mensualidad. No negativo.
+// "Aún no empieza": ya cargada pero su 1ª mensualidad es en un corte futuro → N < 1. Ocupa crédito pero
+// no tiene mensualidad este periodo.
+function notStarted(c: Charge, month: string): boolean {
+  const n = numero(c, month)
+  return n < 1 && !(c.ended_month != null && mn(month) > mn(c.ended_month))
+}
+// Ocupa límite: ya cargada (N ≥ 0, incluye el mes-0 "aún no empieza") y no saldada/cerrada. Distinto de
+// isActive (N ≥ 1): un cargo puede ocupar crédito sin tener aún mensualidad (MSI que arranca el próximo corte).
+function occupiesCredit(c: Charge, month: string): boolean {
+  const n = numero(c, month)
+  if (n < 0 || n > c.meses) return false
+  if (c.ended_month && mn(month) > mn(c.ended_month)) return false
+  return true
+}
+const monthName = (ym: string) => { const [y, m] = ym.split('-').map(Number); return MONTHS[m - 1].slice(0, 3) + ' ' + y }
+// Saldo pendiente: monto_original − N × mensualidad. Aún no empezada (N < 1): ocupa el original COMPLETO.
+// pending_override manda. Sin monto_original se estima con meses×mensualidad. No negativo.
 function saldoPendiente(c: Charge, month: string): number {
   if (c.pending_override != null) return c.pending_override
   const original = c.original_amount != null ? c.original_amount : c.meses * c.amount
-  return Math.max(0, original - numero(c, month) * c.amount)
+  const n = numero(c, month)
+  if (n < 1) return original
+  return Math.max(0, original - n * c.amount)
 }
-// Crédito utilizado partido como el estado de cuenta: aMeses (Σ saldo pendiente) + regular (Σ mensualidad
-// del periodo) = deudor. Personales Y atribuidos por igual. Disponible = límite − deudor.
+// Crédito utilizado partido como el estado de cuenta: aMeses (Σ saldo pendiente de los que OCUPAN crédito,
+// incluye los que aún no empiezan) + regular (Σ mensualidad de los ACTIVOS) = deudor. Disponible = límite − deudor.
 function creditBreakdown(charges: Charge[], month: string): { aMeses: number; regular: number; deudor: number } {
-  const active = charges.filter((c) => isActive(c, month))
-  const aMeses = active.reduce((s, c) => s + saldoPendiente(c, month), 0)
-  const regular = active.reduce((s, c) => s + c.amount, 0)
+  const aMeses = charges.filter((c) => occupiesCredit(c, month)).reduce((s, c) => s + saldoPendiente(c, month), 0)
+  const regular = charges.filter((c) => isActive(c, month)).reduce((s, c) => s + c.amount, 0)
   return { aMeses, regular, deudor: aMeses + regular }
 }
 // Money formatea a 0 decimales; los saldos de crédito deben cuadrar al centavo → variante con centavos.
@@ -194,6 +210,7 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onC
         {charges.map((c) => {
           const n = numero(c, month)
           const active = isActive(c, month)
+          const pending = notStarted(c, month)
           const isLast = active && n === c.meses
           const finished = n > c.meses || (c.ended_month != null && mn(month) > mn(c.ended_month))
           const isOn = confirmed.has(c.id)
@@ -201,14 +218,16 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onC
             <div key={c.id} draggable onDragStart={() => { dragId.current = c.id }} onDragOver={(e) => e.preventDefault()} onDrop={() => void reorder(c.id)}
               style={{ ...rowStyle, opacity: active ? 1 : 0.5 }}>
               <span style={{ cursor: 'grab', color: '#c2cbdb', userSelect: 'none', flexShrink: 0 }} title="Arrastra para reordenar">⠿</span>
-              <Check on={isOn} disabled={!active} onClick={() => active && onToggle(c, !isOn)} title={c.kind === 'personal' ? 'Se cobró bien este mes' : '¿Ya depositaron este mes?'} />
+              <Check on={isOn} disabled={!active} onClick={() => active && onToggle(c, !isOn)} title={pending ? 'Aún no empieza su mensualidad' : c.kind === 'personal' ? 'Se cobró bien este mes' : '¿Ya depositaron este mes?'} />
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isOn ? '#7a879c' : MONEY.ink }}>{c.name}</span>
               {c.attribution && <span style={{ flexShrink: 0, borderRadius: 3, padding: '0 4px', fontSize: 9, fontWeight: 700, background: ATTR[c.attribution].bg, color: ATTR[c.attribution].fg }}>{ATTR[c.attribution].label}</span>}
               {finished
                 ? <span style={{ flexShrink: 0, fontSize: 9.5, color: '#9aa3b5' }}>saldado</span>
-                : isLast
-                  ? <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, borderRadius: 3, padding: '0 4px', background: '#fbf3d6', color: '#9a7b16', border: '1px solid #e8dca6' }}>última · {n}/{c.meses}</span>
-                  : <span style={{ flexShrink: 0, fontSize: 9, color: '#5a6a86', border: '1px solid #cdd8e8', borderRadius: 3, padding: '0 4px', fontVariantNumeric: 'tabular-nums' }}>{n} de {c.meses}</span>}
+                : pending
+                  ? <span title="Ya ocupa crédito; su 1ª mensualidad arranca el próximo corte" style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, borderRadius: 3, padding: '0 4px', background: '#e8f0fc', color: MONEY.blue, border: '1px solid #cdddf5' }}>inicia {monthName(c.start_month)}</span>
+                  : isLast
+                    ? <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, borderRadius: 3, padding: '0 4px', background: '#fbf3d6', color: '#9a7b16', border: '1px solid #e8dca6' }}>última · {n}/{c.meses}</span>
+                    : <span style={{ flexShrink: 0, fontSize: 9, color: '#5a6a86', border: '1px solid #cdd8e8', borderRadius: 3, padding: '0 4px', fontVariantNumeric: 'tabular-nums' }}>{n} de {c.meses}</span>}
               <span style={{ flexShrink: 0, width: 78, textAlign: 'right', color: '#33415c', fontVariantNumeric: 'tabular-nums' }}>{fmtMxn(c.amount)}</span>
               <ChargeActions charge={c} onDone={onRefresh} />
             </div>
