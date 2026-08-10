@@ -22,8 +22,8 @@ function Hero() {
   const scale = isMobile ? 1.05 : 1.8
 
   return (
-    <div className="relative flex shrink-0 flex-col items-center justify-center gap-8 py-8 md:py-14">
-      <div className="py-2 md:py-4">
+    <div className="relative flex shrink-0 flex-col items-center justify-center gap-8 py-4 md:py-6">
+      <div className="py-1 md:py-2">
         <Clock scale={scale} colorFn={(d: Date) => crtDayColor(dayColorFlow(d), crt)} />
       </div>
     </div>
@@ -34,7 +34,7 @@ function Hero() {
 
 export default function InicioContent() {
   return (
-    <main className="mx-auto flex min-h-full max-w-6xl flex-col justify-start gap-5 px-3 pb-12 pt-[5vh] md:px-6 md:pt-[9vh]">
+    <main className="mx-auto flex min-h-full max-w-6xl flex-col justify-start gap-5 px-3 pb-12 pt-[2vh] md:px-6 md:pt-[3vh]">
       <Hero />
       <CalendarCard />
     </main>
