@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import ICAL from 'ical.js'
 import { createServerClient } from '@/lib/supabase'
+import { type Rrule, generateOccurrences, eachDay, normalizeRrule } from '@/lib/calendarRecurrence'
 
 export const runtime = 'nodejs'
 
@@ -23,71 +24,6 @@ export interface CalEvent {
   rrule?:     Rrule   // presente en las ocurrencias de una serie recurrente (para que el editor prellene la regla)
 }
 
-// Regla de recurrencia (metadata.rrule del evento capturado). Terminación: until (fecha) · count (N) ·
-// ninguna (para siempre → acotada por el rango visible). El evento_date es el ANCLA (1ª ocurrencia).
-export interface Rrule { freq: 'weekly' | 'monthly' | 'yearly'; interval?: number; until?: string; count?: number }
-
-const pad2 = (n: number) => String(n).padStart(2, '0')
-
-// Genera las fechas de ocurrencia dentro de [fromStr..toStr]. CLAVE anti-drift: cada ocurrencia se
-// computa desde el ANCLA por offset k (no se acumula paso a paso), en espacio-de-fecha UTC puro. Así una
-// semanal SIEMPRE cae en el mismo día de la semana, y una mensual clampa el día al mes (31→28/30) sin
-// desbordar al mes siguiente. count cuenta desde el ancla; para siempre se corta por el rango.
-function generateOccurrences(anchor: string, rule: Rrule, fromStr: string, toStr: string): string[] {
-  const freq = rule.freq
-  const interval = Math.max(1, Math.floor(rule.interval || 1))
-  const until = typeof rule.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rule.until) ? rule.until : null
-  const count = typeof rule.count === 'number' && rule.count > 0 ? Math.floor(rule.count) : null
-  const [ay, am, ad] = anchor.split('-').map(Number)
-  const out: string[] = []
-  const CAP = 1200
-  for (let k = 0; k < CAP; k++) {
-    if (count != null && k >= count) break
-    let ds: string
-    if (freq === 'weekly') {
-      const t = new Date(Date.UTC(ay, am - 1, ad)); t.setUTCDate(t.getUTCDate() + k * 7 * interval); ds = t.toISOString().slice(0, 10)
-    } else if (freq === 'monthly') {
-      const abs = (am - 1) + k * interval; const ty = ay + Math.floor(abs / 12); const tm = ((abs % 12) + 12) % 12
-      const dim = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate(); const td = Math.min(ad, dim)
-      ds = `${ty}-${pad2(tm + 1)}-${pad2(td)}`
-    } else {
-      const ty = ay + k * interval; const dim = new Date(Date.UTC(ty, am, 0)).getUTCDate(); const td = Math.min(ad, dim)
-      ds = `${ty}-${pad2(am)}-${pad2(td)}`
-    }
-    if (until != null && ds > until) break
-    if (ds > toStr) break
-    if (ds >= fromStr) out.push(ds)
-  }
-  return out
-}
-
-// Valida/normaliza la regla que llega del cliente. interval>1, until (YYYY-MM-DD) o count (>0) opcionales.
-function normalizeRrule(raw: unknown): Rrule | null {
-  if (!raw || typeof raw !== 'object') return null
-  const r = raw as Record<string, unknown>
-  if (r.freq !== 'weekly' && r.freq !== 'monthly' && r.freq !== 'yearly') return null
-  const rule: Rrule = { freq: r.freq }
-  const iv = Number(r.interval); if (Number.isFinite(iv) && iv > 1) rule.interval = Math.floor(iv)
-  if (typeof r.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.until)) rule.until = r.until
-  else { const c = Number(r.count); if (Number.isFinite(c) && c > 0) rule.count = Math.floor(c) }   // until y count son excluyentes
-  return rule
-}
-
-// Itera días de calendario [from..to] INCLUSIVE en espacio-de-fecha puro (UTC de punta a punta →
-// independiente de la zona del servidor; ningún round-trip local que corra el día). Solo-fecha, sin TZ.
-function eachDay(fromDate: string, toDate: string): string[] {
-  const [y, m, d]    = fromDate.split('-').map(Number)
-  const [ey, em, ed] = toDate.split('-').map(Number)
-  const cur = new Date(Date.UTC(y, m - 1, d))
-  const end = new Date(Date.UTC(ey, em - 1, ed))
-  const out: string[] = []
-  let guard = 1000
-  while (cur.getTime() <= end.getTime() && guard-- > 0) {
-    out.push(cur.toISOString().slice(0, 10))
-    cur.setUTCDate(cur.getUTCDate() + 1)
-  }
-  return out
-}
 
 // ── iCal cache (5 min TTL, keyed by range) ───────────────────────────────────
 // Only the slow external iCal fetch is cached. Captured events are a fast Supabase query and are
@@ -175,17 +111,24 @@ async function fetchAndParse(winStartDate: Date, winEndDate: Date): Promise<CalE
 
 // ── Supabase captured events ──────────────────────────────────────────────────
 
+interface ExceptionRow { series_id: string; occurrence_date: string; cancelled: boolean; override: { title?: string; event_time?: string; note?: string } | null }
+
 async function fetchCapturedEvents(fromStr: string, toStr: string): Promise<CalEvent[]> {
   try {
     const supabase = createServerClient()
-    const { data } = await supabase
-      .from('tasks')
-      .select('id, title, metadata, urgency')
-      .eq('kind', 'event')
-      .eq('status', 'todo')
-      .order('created_at', { ascending: false })
-
+    const [tasksRes, exRes] = await Promise.all([
+      supabase.from('tasks').select('id, title, metadata, urgency').eq('kind', 'event').eq('status', 'todo').order('created_at', { ascending: false }),
+      supabase.from('event_exceptions').select('series_id, occurrence_date, cancelled, override'),
+    ])
+    const data = tasksRes.data
     if (!data?.length) return []
+
+    // Excepciones agrupadas por serie: cancelled (salta la ocurrencia) u override (título/hora/nota).
+    const exBySeries = new Map<string, Map<string, ExceptionRow>>()
+    for (const e of (exRes.data ?? []) as ExceptionRow[]) {
+      let m = exBySeries.get(e.series_id); if (!m) { m = new Map(); exBySeries.set(e.series_id, m) }
+      m.set(e.occurrence_date, e)
+    }
 
     return data.flatMap((row): CalEvent[] => {
       const meta = (row.metadata ?? {}) as { event_date?: string; event_end_date?: string; event_time?: string; note?: string; rrule?: Rrule }
@@ -193,16 +136,23 @@ async function fetchCapturedEvents(fromStr: string, toStr: string): Promise<CalE
       const event_time = meta.event_time
       if (!event_date) return []
 
-      // Recurrencia: una ocurrencia por fecha generada dentro del rango (regla + terminación). Precede al
-      // multi-día (en v1 son excluyentes). Cada ocurrencia lleva la regla para que el editor la prellene.
+      // Recurrencia: una ocurrencia por fecha generada dentro del rango, con excepciones aplicadas. Precede
+      // al multi-día (excluyentes en v1). Cada ocurrencia lleva la regla para que el editor la prellene.
       const rrule = meta.rrule
       if (rrule && (rrule.freq === 'weekly' || rrule.freq === 'monthly' || rrule.freq === 'yearly')) {
-        return generateOccurrences(event_date, rrule, fromStr, toStr).map((ds): CalEvent => {
-          const start = event_time ? `${ds}T${event_time}:00` : ds
-          const endDate = event_time
-            ? (() => { const dd = new Date(`${ds}T${event_time}:00`); dd.setHours(dd.getHours() + 1); return dd.toISOString().slice(0, 16) + ':00' })()
+        const ex = exBySeries.get(row.id as string)
+        return generateOccurrences(event_date, rrule, fromStr, toStr).flatMap((ds): CalEvent[] => {
+          const x = ex?.get(ds)
+          if (x?.cancelled) return []                         // "solo este" borrado → se salta
+          const ov = x?.override ?? null                      // "solo este" editado → sobrescribe campos
+          const title = ov?.title ?? row.title
+          const time  = ov?.event_time ?? event_time
+          const note  = ov?.note ?? meta.note
+          const start = time ? `${ds}T${time}:00` : ds
+          const endDate = time
+            ? (() => { const dd = new Date(`${ds}T${time}:00`); dd.setHours(dd.getHours() + 1); return dd.toISOString().slice(0, 16) + ':00' })()
             : ds
-          return { uid: `captured:${row.id}#${ds}`, title: row.title, start, end: endDate, allDay: !event_time, rrule, ...(meta.note ? { note: meta.note } : {}) }
+          return [{ uid: `captured:${row.id}#${ds}`, title, start, end: endDate, allDay: !time, rrule, ...(note ? { note } : {}) }]
         })
       }
 

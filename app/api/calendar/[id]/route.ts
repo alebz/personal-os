@@ -1,46 +1,48 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import type { Rrule } from '@/app/api/calendar/route'
+import { normalizeRrule, isOccurrenceOf } from '@/lib/calendarRecurrence'
 
 export const runtime = 'nodejs'
-
-function normalizeRrule(raw: unknown): Rrule | null {
-  if (!raw || typeof raw !== 'object') return null
-  const r = raw as Record<string, unknown>
-  if (r.freq !== 'weekly' && r.freq !== 'monthly' && r.freq !== 'yearly') return null
-  const rule: Rrule = { freq: r.freq }
-  const iv = Number(r.interval); if (Number.isFinite(iv) && iv > 1) rule.interval = Math.floor(iv)
-  if (typeof r.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.until)) rule.until = r.until
-  else { const c = Number(r.count); if (Number.isFinite(c) && c > 0) rule.count = Math.floor(c) }
-  return rule
-}
 
 // Captured calendar events are stored as tasks with kind='event'; their CalEvent uid is
 // `captured:<taskId>`. These routes edit/delete by that task id. (iCal events are read-only.)
 
-// PATCH /api/calendar/:id — edit. Body: { title, event_date, event_time?, note? }
+// PATCH /api/calendar/:id — editar la SERIE/evento completo. Body: { title, event_date, event_end_date?,
+// event_time?, note?, rrule?, confirmPrune? }.
+// Pre-confirm de podado: si al cambiar el patrón alguna excepción (cancelación/override) deja de caer en
+// una ocurrencia de la regla NUEVA, NO aplica y responde { needsConfirm, staleCount }. La UI pregunta; con
+// confirmPrune:true poda las stale y aplica. Renombrar/mover la hora no cambia el patrón → nada se poda.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  let body: { title?: string; event_date?: string; event_end_date?: string | null; event_time?: string | null; note?: string | null; rrule?: unknown }
+  let body: { title?: string; event_date?: string; event_end_date?: string | null; event_time?: string | null; note?: string | null; rrule?: unknown; confirmPrune?: boolean }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
   if (!body.title?.trim() || !body.event_date) {
     return NextResponse.json({ error: 'title and event_date required' }, { status: 400 })
   }
+  const newAnchor = body.event_date
   const rule = normalizeRrule(body.rrule)
-  const endDate = !rule && typeof body.event_end_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.event_end_date) && body.event_end_date > body.event_date ? body.event_end_date : null
+  const endDate = !rule && typeof body.event_end_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.event_end_date) && body.event_end_date > newAnchor ? body.event_end_date : null
 
   const supabase = createServerClient()
+
+  // Excepciones que dejarían de caer en la regla nueva (si la serie deja de ser recurrente, TODAS caen).
+  const { data: exs } = await supabase.from('event_exceptions').select('occurrence_date').eq('series_id', id)
+  const stale = (exs ?? []).map(e => e.occurrence_date as string).filter(d => !rule || !isOccurrenceOf(newAnchor, rule, d))
+  if (stale.length && body.confirmPrune !== true) {
+    return NextResponse.json({ needsConfirm: true, staleCount: stale.length })
+  }
+
   const { error } = await supabase
     .from('tasks')
     .update({
       title: body.title.trim(),
       metadata: {
-        event_date: body.event_date,
+        event_date: newAnchor,
         ...(endDate ? { event_end_date: endDate } : {}),
         ...(rule ? { rrule: rule } : {}),
         ...(body.event_time ? { event_time: body.event_time } : {}),
@@ -51,7 +53,8 @@ export async function PATCH(
     .eq('id', id)
     .eq('kind', 'event')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  if (stale.length) await supabase.from('event_exceptions').delete().eq('series_id', id).in('occurrence_date', stale)
+  return NextResponse.json({ ok: true, pruned: stale.length })
 }
 
 // DELETE /api/calendar/:id — delete a captured event.
