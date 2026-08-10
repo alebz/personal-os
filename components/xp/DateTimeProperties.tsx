@@ -41,16 +41,19 @@ function EventDialog({ event, date, onClose, onSaved }: {
   const editingId = event && isCaptured(event) ? event.uid.slice('captured:'.length).split('#')[0] : null
   const [title, setTitle] = useState(event?.title ?? '')
   const [note, setNote] = useState(event?.note ?? '')
-  const [d, setD] = useState(event ? event.start.slice(0, 10) : date)
+  // Multi-día: editar cualquier día del tramo prellena inicio=spanStart y fin=spanEnd.
+  const [d, setD] = useState(event?.spanStart ?? (event ? event.start.slice(0, 10) : date))
+  const [end, setEnd] = useState(event?.spanEnd ?? '')
   const [time, setTime] = useState(event && !event.allDay ? event.start.slice(11, 16) : '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const isSpan = !!end && end > d
 
   async function save() {
     if (!title.trim() || !d || busy) return
     setBusy(true); setErr(null)
     try {
-      const payload = { title, event_date: d, event_time: time || undefined, note: note || undefined }
+      const payload = { title, event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined }
       const res = await fetch(editingId ? `/api/calendar/${editingId}` : '/api/calendar', {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,10 +94,16 @@ function EventDialog({ event, date, onClose, onSaved }: {
             <XpField type="date" value={d} onChange={(e) => setD(e.target.value)} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
+            <XpLabel>Hasta (opcional)</XpLabel>
+            <XpField type="date" value={end} min={d} onChange={(e) => setEnd(e.target.value)} />
+          </div>
+        </div>
+        {!isSpan && (
+          <div style={{ width: 110 }}>
             <XpLabel>Hora</XpLabel>
             <XpField type="time" value={time} onChange={(e) => setTime(e.target.value)} />
           </div>
-        </div>
+        )}
         {err && <p style={{ fontSize: 11, color: '#a0201a', margin: 0 }}>{err}</p>}
       </div>
     </XpDialogModal>

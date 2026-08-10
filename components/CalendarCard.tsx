@@ -71,6 +71,7 @@ export default function CalendarCard() {
   // Add / edit form state (editingUid = a captured event's uid when editing, else null = create)
   const [addTitle,   setAddTitle]   = useState('')
   const [addDate,    setAddDate]    = useState(todayKey)
+  const [addEnd,     setAddEnd]     = useState('')     // multi-día: fecha fin (opcional)
   const [addTime,    setAddTime]    = useState('')
   const [addNote,    setAddNote]    = useState('')
   const [editingUid, setEditingUid] = useState<string | null>(null)
@@ -134,7 +135,7 @@ export default function CalendarCard() {
   }
 
   function resetForm() {
-    setAddTitle(''); setAddTime(''); setAddNote(''); setEditingUid(null); setAddError(null)
+    setAddTitle(''); setAddTime(''); setAddNote(''); setAddEnd(''); setEditingUid(null); setAddError(null)
     setAddDate(selected ?? todayKey); setFormOpen(false)
   }
 
@@ -153,7 +154,9 @@ export default function CalendarCard() {
   function startEdit(ev: CalEvent) {
     setEditingUid(ev.uid)
     setAddTitle(ev.title)
-    setAddDate(ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start)))
+    // Multi-día: editar cualquier día del tramo prellena inicio=spanStart y fin=spanEnd.
+    setAddDate(ev.spanStart ?? (ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start))))
+    setAddEnd(ev.spanEnd ?? '')
     setAddTime(ev.allDay ? '' : formatTime(ev.start))
     setAddNote(ev.note ?? '')
     setAddError(null); setConfirmDel(null); setFormOpen(true)
@@ -166,7 +169,9 @@ export default function CalendarCard() {
     setAdding(true); setAddError(null)
     try {
       const editingId = editingUid?.startsWith('captured:') ? editingUid.slice('captured:'.length).split('#')[0] : null
-      const payload = { title: addTitle, event_date: date, event_time: addTime || undefined, note: addNote || undefined }
+      // Un tramo (fin > inicio) desactiva la hora — v1 multi-día = marcador por día.
+      const isSpan = !!addEnd && addEnd > date
+      const payload = { title: addTitle, event_date: date, event_end_date: isSpan ? addEnd : undefined, event_time: isSpan ? undefined : (addTime || undefined), note: addNote || undefined }
       const res = await fetch(editingId ? `/api/calendar/${editingId}` : '/api/calendar', {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -414,16 +419,28 @@ export default function CalendarCard() {
                     value={addDate}
                     onChange={e => setAddDate(e.target.value)}
                     disabled={adding}
+                    title="Inicio"
                     className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
                   />
+                  <input
+                    type="date"
+                    value={addEnd}
+                    min={addDate}
+                    onChange={e => setAddEnd(e.target.value)}
+                    disabled={adding}
+                    title="Hasta (opcional) — para eventos de varios días"
+                    className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg-muted outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
+                  />
+                </div>
+                {!(addEnd && addEnd > addDate) && (
                   <input
                     type="time"
                     value={addTime}
                     onChange={e => setAddTime(e.target.value)}
                     disabled={adding}
-                    className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
+                    className="w-full rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
                   />
-                </div>
+                )}
                 <button
                   type="submit"
                   disabled={adding || !addTitle.trim()}
