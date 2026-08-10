@@ -252,6 +252,8 @@ function AgendaView({ from, byDay, onMarker }: { from: Date; byDay: Record<strin
   )
 }
 
+type Scope = 'solo' | 'siguientes' | 'toda'   // alcance al editar/borrar una ocurrencia de serie
+
 // ── Diálogo de evento (crear/editar/borrar) ──
 function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?: Marker; onClose: () => void; onSaved: () => void }) {
   const editing = !!marker?.editId
@@ -267,26 +269,83 @@ function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?
   const [rUntil, setRUntil] = useState(marker?.rrule?.until ?? '')
   const [rCount, setRCount] = useState(marker?.rrule?.count ? String(marker.rrule.count) : '')
   const [busy, setBusy] = useState(false)
+  const [scopeAsk, setScopeAsk] = useState<null | 'edit' | 'delete'>(null)   // ocurrencia de serie → elegir alcance
+  const [pruneAsk, setPruneAsk] = useState<null | { scope: Scope; staleCount: number }>(null)
   const recurring = freq !== ''
   const isSpan = !recurring && !!end && end > d   // multi-día: oculta la hora
+  const isSeriesOcc = editing && !!marker?.rrule   // editar/borrar toca una OCURRENCIA de una serie
+
+  const buildRrule = () => recurring ? { freq, ...(endMode === 'until' && rUntil ? { until: rUntil } : {}), ...(endMode === 'count' && Number(rCount) > 0 ? { count: Number(rCount) } : {}) } : undefined
 
   async function save() {
     if (!title.trim() || busy) return
+    if (isSeriesOcc) { setScopeAsk('edit'); return }   // serie → preguntar alcance
     setBusy(true)
-    // Recurrencia manda sobre multi-día. Sin recurrencia, "hasta" (>inicio) hace multi-día y apaga la hora.
-    const rrule = recurring ? { freq, ...(endMode === 'until' && rUntil ? { until: rUntil } : {}), ...(endMode === 'count' && Number(rCount) > 0 ? { count: Number(rCount) } : {}) } : undefined
-    const body = { title: title.trim(), event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined, rrule }
+    const body = { title: title.trim(), event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined, rrule: buildRrule() }
     try {
       const r = await fetch(editing ? `/api/calendar/${marker!.editId}` : '/api/calendar', { method: editing ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       if (r.ok) onSaved(); else setBusy(false)
     } catch { setBusy(false) }
   }
-  async function remove() { if (!editing) return; setBusy(true); try { await fetch(`/api/calendar/${marker!.editId}`, { method: 'DELETE' }); onSaved() } catch { setBusy(false) } }
+  async function remove() {
+    if (!editing) return
+    if (isSeriesOcc) { setScopeAsk('delete'); return }
+    setBusy(true); try { await fetch(`/api/calendar/${marker!.editId}`, { method: 'DELETE' }); onSaved() } catch { setBusy(false) }
+  }
+
+  // Aplica la acción según el alcance elegido. Maneja el pre-confirm de podado (needsConfirm → 2º paso).
+  async function runScope(scope: Scope, confirmPrune = false) {
+    setBusy(true)
+    const sid = marker!.editId!, occ = marker!.day
+    const post = (u: string, b: unknown) => fetch(u, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then(r => r.json())
+    let res: { ok?: boolean; needsConfirm?: boolean; staleCount?: number } = {}
+    try {
+      if (scopeAsk === 'delete') {
+        if (scope === 'solo') res = await post('/api/calendar/exception', { series_id: sid, occurrence_date: occ, cancelled: true })
+        else if (scope === 'siguientes') res = await post(`/api/calendar/${sid}/split`, { cut_date: occ, mode: 'delete', confirmPrune })
+        else { await fetch(`/api/calendar/${sid}`, { method: 'DELETE' }); res = { ok: true } }
+      } else {
+        if (scope === 'solo') res = await post('/api/calendar/exception', { series_id: sid, occurrence_date: occ, override: { title: title.trim(), event_time: time || undefined, note: note || undefined } })
+        else if (scope === 'siguientes') res = await post(`/api/calendar/${sid}/split`, { cut_date: occ, mode: 'edit', confirmPrune, newEvent: { title: title.trim(), event_date: occ, event_time: time || undefined, note: note || undefined, rrule: buildRrule() } })
+        else res = await fetch(`/api/calendar/${sid}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: title.trim(), event_date: d, event_time: time || undefined, note: note || undefined, rrule: buildRrule(), confirmPrune }) }).then(r => r.json())
+      }
+    } catch { setBusy(false); return }
+    if (res?.needsConfirm) { setPruneAsk({ scope, staleCount: res.staleCount ?? 0 }); setBusy(false); return }
+    onSaved(); onClose()
+  }
 
   return (
     <div onMouseDown={onClose} style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(20,40,80,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div onMouseDown={(e) => e.stopPropagation()} style={{ width: 320, maxWidth: '92%', background: '#ece9d8', border: '1px solid #0831d8', borderRadius: 4, boxShadow: '0 6px 22px rgba(0,0,0,0.35)', overflow: 'hidden', fontSize: 11 }}>
         <div className="xp-titlebar" style={{ height: 24, color: '#fff', fontWeight: 700, padding: '0 4px 0 9px', display: 'flex', alignItems: 'center' }}><span style={{ flex: 1 }}>{editing ? 'Editar evento' : 'Nuevo evento'}</span><button onClick={onClose} style={{ border: 0, background: 'rgba(255,255,255,0.18)', color: '#fff', width: 16, height: 16, borderRadius: 2, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
+        {scopeAsk ? (
+          pruneAsk ? (
+            <>
+              <div style={{ padding: 14, fontSize: 11, lineHeight: 1.5 }}>
+                Este cambio va a quitar <b>{pruneAsk.staleCount}</b> {scopeAsk === 'delete' ? 'cancelación(es)' : 'excepción(es)'} que hiciste a mano y que ya no caen en la serie. ¿Sigo?
+              </div>
+              <div style={{ padding: '7px 11px', borderTop: '1px solid #c9c6ba', background: '#f3f1e6', display: 'flex', gap: 7, alignItems: 'center' }}>
+                <span style={{ flex: 1 }} />
+                <button onClick={() => { setPruneAsk(null); setScopeAsk(null) }} className="xp-raised" style={btn}>No</button>
+                <button onClick={() => void runScope(pruneAsk.scope, true)} disabled={busy} className="xp-raised" style={{ ...btn, color: '#a02015' }}>Sí, seguir</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ marginBottom: 3, color: '#333' }}>{scopeAsk === 'delete' ? 'Borrar' : 'Guardar cambios en'} un evento que se repite:</div>
+                <button onClick={() => void runScope('solo')} disabled={busy} className="xp-raised" style={scopeBtn}>Solo este</button>
+                <button onClick={() => void runScope('siguientes')} disabled={busy} className="xp-raised" style={scopeBtn}>Este y los siguientes</button>
+                <button onClick={() => void runScope('toda')} disabled={busy} className="xp-raised" style={scopeBtn}>Toda la serie</button>
+              </div>
+              <div style={{ padding: '7px 11px', borderTop: '1px solid #c9c6ba', background: '#f3f1e6', display: 'flex', gap: 7, alignItems: 'center' }}>
+                <span style={{ flex: 1 }} />
+                <button onClick={() => setScopeAsk(null)} className="xp-raised" style={btn}>Cancelar</button>
+              </div>
+            </>
+          )
+        ) : (
+        <>
         <div style={{ padding: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <label style={lbl}>Título<input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} className="xp-sunken" style={inp} /></label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -320,6 +379,8 @@ function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?
           <button onClick={onClose} className="xp-raised" style={btn}>Cancelar</button>
           <button onClick={save} disabled={busy || !title.trim()} className="xp-raised" style={btn}>{busy ? '…' : 'Guardar'}</button>
         </div>
+        </>
+        )}
       </div>
     </div>
   )
@@ -327,3 +388,4 @@ function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?
 const lbl: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#3a4a64' }
 const inp: React.CSSProperties = { padding: '3px 5px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }
 const btn: React.CSSProperties = { padding: '3px 14px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }
+const scopeBtn: React.CSSProperties = { padding: '6px 10px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left', width: '100%' }
