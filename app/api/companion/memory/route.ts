@@ -44,6 +44,17 @@ async function saveMemory(mem: MemoryRow): Promise<void> {
   } catch { /* ignore */ }
 }
 
+// F1 — memoria larga: archiva PERMANENTE cada mensaje nuevo en lolo_messages (append-only, con fecha,
+// sin compresión) — nunca se pierde nada. Best-effort e independiente del buffer vivo: si esto falla, el
+// chat no se rompe. AISLADO: SOLO Lolo — jamás se indexa a memory_chunks ni lo lee Cerebro.
+async function archiveMessages(msgs: Msg[]): Promise<void> {
+  if (!msgs.length) return
+  try {
+    const supabase = createServerClient()
+    await supabase.from('lolo_messages').insert(msgs.map(m => ({ role: m.role, content: m.content })))
+  } catch { /* ignore — el registro vivo no depende de esto */ }
+}
+
 // Funde los mensajes viejos en el resumen y extrae hechos durables (una llamada a Haiku)
 async function compress(prevSummary: string, prevFacts: string, old: Msg[]): Promise<{ summary: string; facts: string }> {
   const convo = old.map(m => `${m.role === 'user' ? 'Alex' : 'Lolo'}: ${m.content}`).join('\n')
@@ -98,6 +109,12 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
   const current = await loadMemory()
+  // Los mensajes NUEVOS de esta llamada = el delta append (la vía viva; el buffer-replace es legacy y no
+  // trae deltas identificables, así que no se archiva por ahí). Se guardan permanentes antes de tocar el
+  // buffer rodante — el archivo largo nunca depende de la compresión.
+  const appended = Array.isArray(body.append) ? validMsgs(body.append) : []
+  await archiveMessages(appended)
+
   let buffer  = Array.isArray(body.append) ? [...current.buffer, ...validMsgs(body.append)] : validMsgs(body.buffer)
   let summary = current.summary
   let facts   = current.facts
