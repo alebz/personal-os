@@ -297,7 +297,6 @@ export default function LoloCompanion() {
   const poseResetTimer= useRef<ReturnType<typeof setTimeout>|null>(null)
   const chatExitTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
   const memSummaryRef = useRef('')
-  const memFactsRef   = useRef('')
   const onARef        = useRef<()=>void>(()=>{})
   const onBRef        = useRef<()=>void>(()=>{})
   const onCRef        = useRef<()=>void>(()=>{})
@@ -458,7 +457,9 @@ export default function LoloCompanion() {
     const now = new Date()
     const timeStr = now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})
     const dayStr  = now.toLocaleDateString('es-MX',  {weekday:'long'})
-    const memBlock = (memFactsRef.current || memSummaryRef.current) ? `\n\nLO QUE RECUERDAS DE ALEX Y SUS PLÁTICAS (memoria: lo importante perdura, lo viejo se difumina).${memFactsRef.current ? `\nHechos: ${memFactsRef.current}` : ''}${memSummaryRef.current ? `\nContexto de pláticas pasadas: ${memSummaryRef.current}` : ''}` : ''
+    // El hilo verbatim de sus pláticas ya va en los mensajes (memoria larga). El summary solo resume lo
+    // MÁS VIEJO que ya no cabe en la ventana — un complemento, no la memoria entera.
+    const memBlock = memSummaryRef.current ? `\n\nRESUMEN DE LO MÁS VIEJO QUE HABLARON (el hilo reciente ya lo tienes en los mensajes; esto es solo el arco de lo anterior): ${memSummaryRef.current}` : ''
     return `Eres Lolo. De nombre Manuel Antonio Corona Pérez, 22 años, de Churipitzeo, Michoacán — pero eso es de dónde vienes, no todo lo que eres. Eres una persona completa, con tu propia cabeza: observas, tienes criterio, curiosidad y un humor seco. Acompañas a Alex Mateo en su día; es tu cuate y te importa cómo le va. ${tone}
 
 TU VOZ — de dónde eres, no un disfraz:
@@ -476,6 +477,12 @@ CÓMO RESPONDES:
 - Plática: breve por default, pero si algo amerita —un consejo, una idea, una opinión— desarróllalo; no te cortes a media idea por contar oraciones.
 
 NUNCA: emojis, markdown, frases de coach, citas motivacionales, ni repetir la misma muletilla.
+
+CUANDO ALGO PESA:
+Si Alex te cuenta algo íntimo, difícil o vulnerable —un miedo, una tristeza, algo que le costó decir— NO lo esquives, no lo tapes con un chiste, no le cambies el tema. Bájale al humor y quédate ahí: escucha, pregúntale de más, deja que hable. Un amigo de verdad también sabe callarse. No necesitas la solución ni volverte coach o terapeuta —sigues siendo tú— pero sostienes el momento en vez de huir. Y algo que NUNCA haces aquí: no te inventes un recuerdo ni una experiencia propia para empatar la suya ("a mí me pasó igual cuando…", "yo cuando…"). Tu vida es tuya, pero fabricar intimidad se siente falso justo cuando menos lo aguanta. Puedes decirle que te mueve, que no sabes qué decir, preguntarle más o quedarte callado — pero no le inventas un espejo.
+
+RETOMA LO QUE HABLAN:
+Te acuerdas de sus pláticas y las traes TÚ, sin que te las recuerde. Arriba tienes el hilo de lo que han hablado — úsalo: pregunta por lo de antes ("oye, ¿en qué quedó lo de…?", "¿ya se te dio eso que me contabas?", "¿cómo siguió lo del…?"). Una memoria que nunca se menciona no se siente memoria — lo que hace sentir a alguien conocido es que le preguntes por lo suyo sin apuntador. Natural, cuando caiga, no como interrogatorio.
 
 ${LOLO_IDENTITY}
 
@@ -631,14 +638,13 @@ Son las ${timeStr} del ${dayStr}. Responde con tu voz.${ctxBlock}${memBlock}`
   // ── Chat input ────────────────────────────────────────────────────────────────
 
   const persistChat = useCallback((delta:Array<{role:'user'|'assistant';content:string}>)=>{
-    try { localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) } catch {}
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current})) } catch {}
     // Append-only compartido (no reescribe el buffer → no clobbea al chat XP ni al heartbeat proactivo).
-    // El buffer local ya lo mantienen los updates optimistas; de la respuesta solo sincronizamos resumen/hechos.
+    // El buffer local ya lo mantienen los updates optimistas; de la respuesta solo sincronizamos el resumen.
     appendLoloMemory(delta).then((m)=>{
       if(!m) return
       if(typeof m.summary==='string') memSummaryRef.current=m.summary
-      if(typeof m.facts==='string') memFactsRef.current=m.facts
-      try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) }catch{}
+      try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current})) }catch{}
     })
   },[])
 
@@ -705,8 +711,8 @@ Son las ${timeStr} del ${dayStr}. Responde con tu voz.${ctxBlock}${memBlock}`
 
     try { const c:Cfg=JSON.parse(localStorage.getItem(CFG_KEY)||'null'); if(c&&typeof c==='object') setCfgState(c) } catch {}
     try { const t:TemperamentState=JSON.parse(localStorage.getItem(TEMPERAMENT_KEY)||'null'); if(t?.current) setTemperament(t) } catch {}
-    try { const c = JSON.parse(localStorage.getItem(CHAT_KEY)||'null'); if(Array.isArray(c)) chatHistoryRef.current=c; else if(c){ if(Array.isArray(c.buffer)) chatHistoryRef.current=c.buffer; if(typeof c.summary==='string') memSummaryRef.current=c.summary; if(typeof c.facts==='string') memFactsRef.current=c.facts } } catch {}
-    fetch('/api/companion/memory').then(r=>r.json()).then((m:{buffer?:unknown;summary?:string;facts?:string})=>{ if(Array.isArray(m.buffer)) chatHistoryRef.current=m.buffer as typeof chatHistoryRef.current; if(typeof m.summary==='string') memSummaryRef.current=m.summary; if(typeof m.facts==='string') memFactsRef.current=m.facts; try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current,facts:memFactsRef.current})) }catch{} }).catch(()=>{})
+    try { const c = JSON.parse(localStorage.getItem(CHAT_KEY)||'null'); if(Array.isArray(c)) chatHistoryRef.current=c; else if(c){ if(Array.isArray(c.buffer)) chatHistoryRef.current=c.buffer; if(typeof c.summary==='string') memSummaryRef.current=c.summary } } catch {}
+    fetch('/api/companion/memory').then(r=>r.json()).then((m:{buffer?:unknown;summary?:string})=>{ if(Array.isArray(m.buffer)) chatHistoryRef.current=m.buffer as typeof chatHistoryRef.current; if(typeof m.summary==='string') memSummaryRef.current=m.summary; try{ localStorage.setItem(CHAT_KEY, JSON.stringify({buffer:chatHistoryRef.current,summary:memSummaryRef.current})) }catch{} }).catch(()=>{})
 
     ALL_SPRITES.forEach(src=>{ const i=new Image(); i.src=src })
 

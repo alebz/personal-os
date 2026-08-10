@@ -11,23 +11,25 @@ const BUFFER_KEEP = 16   // mensajes que se quedan verbatim (corto plazo)
 const COMPRESS_AT = 22   // cuando el buffer pasa esto, comprimimos lo más viejo
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-interface MemoryRow { buffer: Msg[]; summary: string; facts: string }
+// La capa `facts` (largo plazo) se retiró: nunca acumuló nada y, con lolo_messages guardando todo
+// permanente (F1), el registro durable ES la historia completa. Solo queda `summary` (mediano plazo:
+// el arco de lo más viejo que ya no cabe en la ventana).
+interface MemoryRow { buffer: Msg[]; summary: string }
 
 async function loadMemory(): Promise<MemoryRow> {
   try {
     const supabase = createServerClient()
     const { data } = await supabase
       .from('lolo_memory')
-      .select('buffer, summary, facts')
+      .select('buffer, summary')
       .eq('id', 'default')
       .maybeSingle()
     return {
       buffer:  Array.isArray(data?.buffer) ? (data!.buffer as Msg[]) : [],
       summary: typeof data?.summary === 'string' ? data!.summary : '',
-      facts:   typeof data?.facts   === 'string' ? data!.facts   : '',
     }
   } catch {
-    return { buffer: [], summary: '', facts: '' }
+    return { buffer: [], summary: '' }
   }
 }
 
@@ -38,7 +40,6 @@ async function saveMemory(mem: MemoryRow): Promise<void> {
       id: 'default',
       buffer: mem.buffer,
       summary: mem.summary,
-      facts: mem.facts,
       updated_at: new Date().toISOString(),
     })
   } catch { /* ignore */ }
@@ -55,23 +56,17 @@ async function archiveMessages(msgs: Msg[]): Promise<void> {
   } catch { /* ignore — el registro vivo no depende de esto */ }
 }
 
-// Funde los mensajes viejos en el resumen y extrae hechos durables (una llamada a Haiku)
-async function compress(prevSummary: string, prevFacts: string, old: Msg[]): Promise<{ summary: string; facts: string }> {
+// Funde los mensajes viejos en el resumen de mediano plazo (una llamada a Haiku). El verbatim NO se
+// pierde: vive permanente en lolo_messages (F1); esto es solo el arco de lo que ya no cabe en la ventana.
+async function compress(prevSummary: string, old: Msg[]): Promise<string> {
   const convo = old.map(m => `${m.role === 'user' ? 'Alex' : 'Lolo'}: ${m.content}`).join('\n')
   const prompt = `RESUMEN PREVIO (memoria de mediano plazo):
 ${prevSummary || '(vacío)'}
 
-HECHOS IMPORTANTES PREVIOS (memoria de largo plazo):
-${prevFacts || '(vacío)'}
-
 MENSAJES VIEJOS que salen de la memoria reciente (fúndelos):
 ${convo}
 
-Devuelve SOLO un objeto JSON, sin markdown ni texto extra, con dos campos:
-- "summary": funde los mensajes viejos en el resumen previo. Conciso, tercera persona, en español, sobre la relación entre Alex y Lolo y lo que ha pasado. Si el resumen crece mucho, comprime y difumina lo más viejo o trivial, como la memoria humana. Máximo ~8 oraciones.
-- "facts": toma los hechos previos y agrega SOLO cosas durables e importantes que aparezcan (decisiones, proyectos en curso, preferencias, personas, compromisos). Nada trivial ni efímero. Bullets cortos con "-". No repitas lo que ya está.
-
-No inventes nada que no esté en el material.`
+Devuelve SOLO el texto del resumen actualizado, sin markdown ni comillas. Funde los mensajes viejos en el resumen previo: conciso, tercera persona, en español, sobre la relación entre Alex y Lolo y lo que ha pasado. Si crece mucho, comprime y difumina lo más viejo o trivial, como la memoria humana. Máximo ~8 oraciones. No inventes nada que no esté en el material.`
 
   try {
     const msg = await anthropic.messages.create({
@@ -80,15 +75,10 @@ No inventes nada que no esté en el material.`
       messages: [{ role: 'user', content: prompt }],
     })
     const raw = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : ''
-    const clean = raw.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(clean)
-    return {
-      summary: typeof parsed.summary === 'string' ? parsed.summary : prevSummary,
-      facts:   typeof parsed.facts   === 'string' ? parsed.facts   : prevFacts,
-    }
+    return raw ? raw.replace(/```/g, '').trim() : prevSummary
   } catch {
     // Si la compresión falla, no perdemos nada: conservamos lo previo
-    return { summary: prevSummary, facts: prevFacts }
+    return prevSummary
   }
 }
 
@@ -117,17 +107,14 @@ export async function POST(req: NextRequest) {
 
   let buffer  = Array.isArray(body.append) ? [...current.buffer, ...validMsgs(body.append)] : validMsgs(body.buffer)
   let summary = current.summary
-  let facts   = current.facts
 
   if (buffer.length > COMPRESS_AT) {
     const overflow = buffer.slice(0, buffer.length - BUFFER_KEEP)
     buffer = buffer.slice(-BUFFER_KEEP)
-    const compressed = await compress(summary, facts, overflow)
-    summary = compressed.summary
-    facts   = compressed.facts
+    summary = await compress(summary, overflow)
   }
 
-  const mem = { buffer, summary, facts }
+  const mem = { buffer, summary }
   await saveMemory(mem)
   return NextResponse.json(mem)
 }

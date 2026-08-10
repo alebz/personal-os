@@ -226,7 +226,7 @@ export function markLoloAnswered() {
 // que hacía dos conversaciones paralelas). El bus avisa a una ventana de chat ABIERTA para pintar el
 // mensaje proactivo en el hilo en vivo; la notificación (toast) es solo el AVISO de que llegó.
 export type LoloMsg = { role: 'user' | 'assistant'; content: string }
-interface LoloMem { buffer: LoloMsg[]; summary: string; facts: string }
+interface LoloMem { buffer: LoloMsg[]; summary: string }
 
 export async function appendLoloMemory(delta: LoloMsg[]): Promise<LoloMem | null> {
   if (!delta.length) return null
