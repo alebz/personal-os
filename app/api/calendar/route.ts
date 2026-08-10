@@ -15,6 +15,27 @@ export interface CalEvent {
   end:    string
   allDay: boolean
   note?:  string   // optional free-text note (captured events only)
+  // Multi-día (v1: un marcador por día del tramo). Presentes SOLO en los marcadores de un evento
+  // multi-día — llevan el evento COMPLETO (fechas locales YYYY-MM-DD) para que el editor prellene el
+  // rango sin re-consultar. El uid de cada marcador es `captured:<id>#<YYYY-MM-DD>` (único por día).
+  spanStart?: string
+  spanEnd?:   string
+}
+
+// Itera días de calendario [from..to] INCLUSIVE en espacio-de-fecha puro (UTC de punta a punta →
+// independiente de la zona del servidor; ningún round-trip local que corra el día). Solo-fecha, sin TZ.
+function eachDay(fromDate: string, toDate: string): string[] {
+  const [y, m, d]    = fromDate.split('-').map(Number)
+  const [ey, em, ed] = toDate.split('-').map(Number)
+  const cur = new Date(Date.UTC(y, m - 1, d))
+  const end = new Date(Date.UTC(ey, em - 1, ed))
+  const out: string[] = []
+  let guard = 1000
+  while (cur.getTime() <= end.getTime() && guard-- > 0) {
+    out.push(cur.toISOString().slice(0, 10))
+    cur.setUTCDate(cur.getUTCDate() + 1)
+  }
+  return out
 }
 
 // ── iCal cache (5 min TTL, keyed by range) ───────────────────────────────────
@@ -116,12 +137,28 @@ async function fetchCapturedEvents(fromStr: string, toStr: string): Promise<CalE
     if (!data?.length) return []
 
     return data.flatMap((row): CalEvent[] => {
-      const meta = (row.metadata ?? {}) as { event_date?: string; event_time?: string; note?: string }
+      const meta = (row.metadata ?? {}) as { event_date?: string; event_end_date?: string; event_time?: string; note?: string }
       const event_date = meta.event_date
       const event_time = meta.event_time
       if (!event_date) return []
-      if (event_date < fromStr || event_date > toStr) return []
 
+      // Multi-día: un marcador all-day por cada día del tramo [event_date..event_end_date] que caiga en
+      // el rango pedido. Cada marcador lleva spanStart/spanEnd (para el editor) y un uid único por día.
+      const end_date = meta.event_end_date
+      if (end_date && end_date > event_date) {
+        return eachDay(event_date, end_date)
+          .filter(d => d >= fromStr && d <= toStr)
+          .map((d): CalEvent => ({
+            uid:    `captured:${row.id}#${d}`,
+            title:  row.title,
+            start:  d, end: d, allDay: true,
+            spanStart: event_date, spanEnd: end_date,
+            ...(meta.note ? { note: meta.note } : {}),
+          }))
+      }
+
+      // Un solo día (comportamiento actual).
+      if (event_date < fromStr || event_date > toStr) return []
       const start = event_time ? `${event_date}T${event_time}:00` : event_date
       const endDate = event_time
         ? (() => { const d = new Date(`${event_date}T${event_time}:00`); d.setHours(d.getHours() + 1); return d.toISOString().slice(0, 16) + ':00' })()
@@ -160,10 +197,12 @@ async function getIcalCached(fromStr: string, toStr: string): Promise<CalEvent[]
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, event_date, event_time, note } = await req.json()
+    const { title, event_date, event_end_date, event_time, note } = await req.json()
     if (!title?.trim() || !event_date) {
       return NextResponse.json({ error: 'title and event_date required' }, { status: 400 })
     }
+    // event_end_date solo se guarda si es un tramo real (posterior al inicio); si no, evento de un día.
+    const endDate = typeof event_end_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event_end_date) && event_end_date > event_date ? event_end_date : null
     const supabase = createServerClient()
     const { error } = await supabase.from('tasks').insert({
       title: title.trim(),
@@ -172,6 +211,7 @@ export async function POST(req: NextRequest) {
       urgency: 'someday',
       metadata: {
         event_date,
+        ...(endDate ? { event_end_date: endDate } : {}),
         ...(event_time ? { event_time } : {}),
         ...(note?.trim() ? { note: note.trim() } : {}),
       },

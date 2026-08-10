@@ -25,18 +25,20 @@ const startOfWeek = (d: Date) => { const x = new Date(d); const dow = (x.getDay(
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 const monthGrid = (year: number, month: number) => { const first = new Date(year, month, 1); const start = startOfWeek(first); return Array.from({ length: 42 }, (_, i) => addDays(start, i)) }
 
-interface CalEvent { uid: string; title: string; start: string; end: string; allDay: boolean; note?: string }
-interface Marker { key: string; day: string; title: string; time: string | null; ts: number; type: 'event' | 'ical' | 'bday'; note?: string; editId: string | null }
+interface CalEvent { uid: string; title: string; start: string; end: string; allDay: boolean; note?: string; spanStart?: string; spanEnd?: string }
+interface Marker { key: string; day: string; title: string; time: string | null; ts: number; type: 'event' | 'ical' | 'bday'; note?: string; editId: string | null; spanStart?: string; spanEnd?: string }
 interface Contact { id: string; name: string; birthday: string | null }
 
 function eventToMarker(e: CalEvent): Marker {
   const captured = e.uid.startsWith('captured:')
+  // uid de un marcador multi-día = `captured:<id>#<fecha>`; el id editable es todo antes del '#'.
+  const editId = captured ? e.uid.slice(9).split('#')[0] : null
   if (e.allDay) {
     const day = e.start.slice(0, 10)
-    return { key: e.uid, day, title: e.title, time: null, ts: new Date(day + 'T00:00:00').getTime() - 1, type: captured ? 'event' : 'ical', note: e.note, editId: captured ? e.uid.slice(9) : null }
+    return { key: e.uid, day, title: e.title, time: null, ts: new Date(day + 'T00:00:00').getTime() - 1, type: captured ? 'event' : 'ical', note: e.note, editId, spanStart: e.spanStart, spanEnd: e.spanEnd }
   }
   const d = new Date(e.start)
-  return { key: e.uid, day: ymd(d), title: e.title, time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: d.getTime(), type: captured ? 'event' : 'ical', note: e.note, editId: captured ? e.uid.slice(9) : null }
+  return { key: e.uid, day: ymd(d), title: e.title, time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: d.getTime(), type: captured ? 'event' : 'ical', note: e.note, editId, spanStart: e.spanStart, spanEnd: e.spanEnd }
 }
 
 function birthdayMarkers(contacts: Contact[], from: Date, to: Date): Marker[] {
@@ -253,7 +255,9 @@ function AgendaView({ from, byDay, onMarker }: { from: Date; byDay: Record<strin
 function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?: Marker; onClose: () => void; onSaved: () => void }) {
   const editing = !!marker?.editId
   const [title, setTitle] = useState(marker?.title ?? '')
-  const [d, setD] = useState(marker?.day ?? date)
+  // Multi-día: al editar cualquier día del tramo, la fecha de inicio es spanStart y "hasta" es spanEnd.
+  const [d, setD] = useState(marker?.spanStart ?? marker?.day ?? date)
+  const [end, setEnd] = useState(marker?.spanEnd ?? '')
   const [time, setTime] = useState(marker?.time ?? '')
   const [note, setNote] = useState(marker?.note ?? '')
   const [busy, setBusy] = useState(false)
@@ -261,7 +265,9 @@ function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?
   async function save() {
     if (!title.trim() || busy) return
     setBusy(true)
-    const body = { title: title.trim(), event_date: d, event_time: time || undefined, note: note || undefined }
+    // "hasta" solo cuenta si es posterior al inicio; un tramo desactiva la hora (v1 multi-día = por día).
+    const isSpan = !!end && end > d
+    const body = { title: title.trim(), event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined }
     try {
       const r = await fetch(editing ? `/api/calendar/${marker!.editId}` : '/api/calendar', { method: editing ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       if (r.ok) onSaved(); else setBusy(false)
@@ -277,8 +283,11 @@ function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?
           <label style={lbl}>Título<input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} className="xp-sunken" style={inp} /></label>
           <div style={{ display: 'flex', gap: 8 }}>
             <label style={{ ...lbl, flex: 1 }}>Fecha<input type="date" value={d} onChange={(e) => setD(e.target.value)} className="xp-sunken" style={inp} /></label>
-            <label style={{ ...lbl, width: 96 }}>Hora<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="xp-sunken" style={inp} /></label>
+            <label style={{ ...lbl, flex: 1 }}>Hasta (opcional)<input type="date" value={end} min={d} onChange={(e) => setEnd(e.target.value)} className="xp-sunken" style={inp} /></label>
           </div>
+          {!(end && end > d) && (
+            <label style={{ ...lbl, width: 96 }}>Hora<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="xp-sunken" style={inp} /></label>
+          )}
           <label style={lbl}>Nota<textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="xp-sunken" style={{ ...inp, resize: 'none' }} /></label>
         </div>
         <div style={{ padding: '7px 11px', borderTop: '1px solid #c9c6ba', background: '#f3f1e6', display: 'flex', gap: 7, alignItems: 'center' }}>

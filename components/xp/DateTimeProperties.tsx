@@ -38,7 +38,7 @@ function EventDialog({ event, date, onClose, onSaved }: {
   onClose: () => void
   onSaved: (savedDate: string) => void
 }) {
-  const editingId = event && isCaptured(event) ? event.uid.slice('captured:'.length) : null
+  const editingId = event && isCaptured(event) ? event.uid.slice('captured:'.length).split('#')[0] : null
   const [title, setTitle] = useState(event?.title ?? '')
   const [note, setNote] = useState(event?.note ?? '')
   const [d, setD] = useState(event ? event.start.slice(0, 10) : date)

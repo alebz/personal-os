@@ -165,7 +165,7 @@ export default function CalendarCard() {
     if (!addTitle.trim() || !date) return
     setAdding(true); setAddError(null)
     try {
-      const editingId = editingUid?.startsWith('captured:') ? editingUid.slice('captured:'.length) : null
+      const editingId = editingUid?.startsWith('captured:') ? editingUid.slice('captured:'.length).split('#')[0] : null
       const payload = { title: addTitle, event_date: date, event_time: addTime || undefined, note: addNote || undefined }
       const res = await fetch(editingId ? `/api/calendar/${editingId}` : '/api/calendar', {
         method: editingId ? 'PATCH' : 'POST',
@@ -190,7 +190,7 @@ export default function CalendarCard() {
 
   async function deleteEvent(ev: CalEvent) {
     if (!isEditable(ev)) return
-    const idPart = ev.uid.slice('captured:'.length)
+    const idPart = ev.uid.slice('captured:'.length).split('#')[0]
     setConfirmDel(null)
     setEvents(prev => prev.filter(x => x.uid !== ev.uid))       // optimistic
     if (editingUid === ev.uid) resetForm()
