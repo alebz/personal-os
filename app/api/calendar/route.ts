@@ -20,6 +20,57 @@ export interface CalEvent {
   // rango sin re-consultar. El uid de cada marcador es `captured:<id>#<YYYY-MM-DD>` (único por día).
   spanStart?: string
   spanEnd?:   string
+  rrule?:     Rrule   // presente en las ocurrencias de una serie recurrente (para que el editor prellene la regla)
+}
+
+// Regla de recurrencia (metadata.rrule del evento capturado). Terminación: until (fecha) · count (N) ·
+// ninguna (para siempre → acotada por el rango visible). El evento_date es el ANCLA (1ª ocurrencia).
+export interface Rrule { freq: 'weekly' | 'monthly' | 'yearly'; interval?: number; until?: string; count?: number }
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+// Genera las fechas de ocurrencia dentro de [fromStr..toStr]. CLAVE anti-drift: cada ocurrencia se
+// computa desde el ANCLA por offset k (no se acumula paso a paso), en espacio-de-fecha UTC puro. Así una
+// semanal SIEMPRE cae en el mismo día de la semana, y una mensual clampa el día al mes (31→28/30) sin
+// desbordar al mes siguiente. count cuenta desde el ancla; para siempre se corta por el rango.
+function generateOccurrences(anchor: string, rule: Rrule, fromStr: string, toStr: string): string[] {
+  const freq = rule.freq
+  const interval = Math.max(1, Math.floor(rule.interval || 1))
+  const until = typeof rule.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rule.until) ? rule.until : null
+  const count = typeof rule.count === 'number' && rule.count > 0 ? Math.floor(rule.count) : null
+  const [ay, am, ad] = anchor.split('-').map(Number)
+  const out: string[] = []
+  const CAP = 1200
+  for (let k = 0; k < CAP; k++) {
+    if (count != null && k >= count) break
+    let ds: string
+    if (freq === 'weekly') {
+      const t = new Date(Date.UTC(ay, am - 1, ad)); t.setUTCDate(t.getUTCDate() + k * 7 * interval); ds = t.toISOString().slice(0, 10)
+    } else if (freq === 'monthly') {
+      const abs = (am - 1) + k * interval; const ty = ay + Math.floor(abs / 12); const tm = ((abs % 12) + 12) % 12
+      const dim = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate(); const td = Math.min(ad, dim)
+      ds = `${ty}-${pad2(tm + 1)}-${pad2(td)}`
+    } else {
+      const ty = ay + k * interval; const dim = new Date(Date.UTC(ty, am, 0)).getUTCDate(); const td = Math.min(ad, dim)
+      ds = `${ty}-${pad2(am)}-${pad2(td)}`
+    }
+    if (until != null && ds > until) break
+    if (ds > toStr) break
+    if (ds >= fromStr) out.push(ds)
+  }
+  return out
+}
+
+// Valida/normaliza la regla que llega del cliente. interval>1, until (YYYY-MM-DD) o count (>0) opcionales.
+function normalizeRrule(raw: unknown): Rrule | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (r.freq !== 'weekly' && r.freq !== 'monthly' && r.freq !== 'yearly') return null
+  const rule: Rrule = { freq: r.freq }
+  const iv = Number(r.interval); if (Number.isFinite(iv) && iv > 1) rule.interval = Math.floor(iv)
+  if (typeof r.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.until)) rule.until = r.until
+  else { const c = Number(r.count); if (Number.isFinite(c) && c > 0) rule.count = Math.floor(c) }   // until y count son excluyentes
+  return rule
 }
 
 // Itera días de calendario [from..to] INCLUSIVE en espacio-de-fecha puro (UTC de punta a punta →
@@ -137,10 +188,23 @@ async function fetchCapturedEvents(fromStr: string, toStr: string): Promise<CalE
     if (!data?.length) return []
 
     return data.flatMap((row): CalEvent[] => {
-      const meta = (row.metadata ?? {}) as { event_date?: string; event_end_date?: string; event_time?: string; note?: string }
+      const meta = (row.metadata ?? {}) as { event_date?: string; event_end_date?: string; event_time?: string; note?: string; rrule?: Rrule }
       const event_date = meta.event_date
       const event_time = meta.event_time
       if (!event_date) return []
+
+      // Recurrencia: una ocurrencia por fecha generada dentro del rango (regla + terminación). Precede al
+      // multi-día (en v1 son excluyentes). Cada ocurrencia lleva la regla para que el editor la prellene.
+      const rrule = meta.rrule
+      if (rrule && (rrule.freq === 'weekly' || rrule.freq === 'monthly' || rrule.freq === 'yearly')) {
+        return generateOccurrences(event_date, rrule, fromStr, toStr).map((ds): CalEvent => {
+          const start = event_time ? `${ds}T${event_time}:00` : ds
+          const endDate = event_time
+            ? (() => { const dd = new Date(`${ds}T${event_time}:00`); dd.setHours(dd.getHours() + 1); return dd.toISOString().slice(0, 16) + ':00' })()
+            : ds
+          return { uid: `captured:${row.id}#${ds}`, title: row.title, start, end: endDate, allDay: !event_time, rrule, ...(meta.note ? { note: meta.note } : {}) }
+        })
+      }
 
       // Multi-día: un marcador all-day por cada día del tramo [event_date..event_end_date] que caiga en
       // el rango pedido. Cada marcador lleva spanStart/spanEnd (para el editor) y un uid único por día.
@@ -197,12 +261,14 @@ async function getIcalCached(fromStr: string, toStr: string): Promise<CalEvent[]
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, event_date, event_end_date, event_time, note } = await req.json()
+    const { title, event_date, event_end_date, event_time, note, rrule } = await req.json()
     if (!title?.trim() || !event_date) {
       return NextResponse.json({ error: 'title and event_date required' }, { status: 400 })
     }
+    const rule = normalizeRrule(rrule)
     // event_end_date solo se guarda si es un tramo real (posterior al inicio); si no, evento de un día.
-    const endDate = typeof event_end_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event_end_date) && event_end_date > event_date ? event_end_date : null
+    // Recurrencia y multi-día son excluyentes (v1): si hay regla, se ignora el fin de tramo.
+    const endDate = !rule && typeof event_end_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event_end_date) && event_end_date > event_date ? event_end_date : null
     const supabase = createServerClient()
     const { error } = await supabase.from('tasks').insert({
       title: title.trim(),
@@ -212,6 +278,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         event_date,
         ...(endDate ? { event_end_date: endDate } : {}),
+        ...(rule ? { rrule: rule } : {}),
         ...(event_time ? { event_time } : {}),
         ...(note?.trim() ? { note: note.trim() } : {}),
       },

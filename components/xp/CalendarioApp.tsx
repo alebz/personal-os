@@ -25,8 +25,9 @@ const startOfWeek = (d: Date) => { const x = new Date(d); const dow = (x.getDay(
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 const monthGrid = (year: number, month: number) => { const first = new Date(year, month, 1); const start = startOfWeek(first); return Array.from({ length: 42 }, (_, i) => addDays(start, i)) }
 
-interface CalEvent { uid: string; title: string; start: string; end: string; allDay: boolean; note?: string; spanStart?: string; spanEnd?: string }
-interface Marker { key: string; day: string; title: string; time: string | null; ts: number; type: 'event' | 'ical' | 'bday'; note?: string; editId: string | null; spanStart?: string; spanEnd?: string }
+interface Rrule { freq: 'weekly' | 'monthly' | 'yearly'; interval?: number; until?: string; count?: number }
+interface CalEvent { uid: string; title: string; start: string; end: string; allDay: boolean; note?: string; spanStart?: string; spanEnd?: string; rrule?: Rrule }
+interface Marker { key: string; day: string; title: string; time: string | null; ts: number; type: 'event' | 'ical' | 'bday'; note?: string; editId: string | null; spanStart?: string; spanEnd?: string; rrule?: Rrule }
 interface Contact { id: string; name: string; birthday: string | null }
 
 function eventToMarker(e: CalEvent): Marker {
@@ -35,10 +36,10 @@ function eventToMarker(e: CalEvent): Marker {
   const editId = captured ? e.uid.slice(9).split('#')[0] : null
   if (e.allDay) {
     const day = e.start.slice(0, 10)
-    return { key: e.uid, day, title: e.title, time: null, ts: new Date(day + 'T00:00:00').getTime() - 1, type: captured ? 'event' : 'ical', note: e.note, editId, spanStart: e.spanStart, spanEnd: e.spanEnd }
+    return { key: e.uid, day, title: e.title, time: null, ts: new Date(day + 'T00:00:00').getTime() - 1, type: captured ? 'event' : 'ical', note: e.note, editId, spanStart: e.spanStart, spanEnd: e.spanEnd, rrule: e.rrule }
   }
   const d = new Date(e.start)
-  return { key: e.uid, day: ymd(d), title: e.title, time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: d.getTime(), type: captured ? 'event' : 'ical', note: e.note, editId, spanStart: e.spanStart, spanEnd: e.spanEnd }
+  return { key: e.uid, day: ymd(d), title: e.title, time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: d.getTime(), type: captured ? 'event' : 'ical', note: e.note, editId, spanStart: e.spanStart, spanEnd: e.spanEnd, rrule: e.rrule }
 }
 
 function birthdayMarkers(contacts: Contact[], from: Date, to: Date): Marker[] {
@@ -260,14 +261,21 @@ function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?
   const [end, setEnd] = useState(marker?.spanEnd ?? '')
   const [time, setTime] = useState(marker?.time ?? '')
   const [note, setNote] = useState(marker?.note ?? '')
+  // Recurrencia (excluyente con multi-día): freq + terminación (nunca / hasta fecha / N veces).
+  const [freq, setFreq] = useState<'' | 'weekly' | 'monthly' | 'yearly'>(marker?.rrule?.freq ?? '')
+  const [endMode, setEndMode] = useState<'forever' | 'until' | 'count'>(marker?.rrule?.until ? 'until' : marker?.rrule?.count ? 'count' : 'forever')
+  const [rUntil, setRUntil] = useState(marker?.rrule?.until ?? '')
+  const [rCount, setRCount] = useState(marker?.rrule?.count ? String(marker.rrule.count) : '')
   const [busy, setBusy] = useState(false)
+  const recurring = freq !== ''
+  const isSpan = !recurring && !!end && end > d   // multi-día: oculta la hora
 
   async function save() {
     if (!title.trim() || busy) return
     setBusy(true)
-    // "hasta" solo cuenta si es posterior al inicio; un tramo desactiva la hora (v1 multi-día = por día).
-    const isSpan = !!end && end > d
-    const body = { title: title.trim(), event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined }
+    // Recurrencia manda sobre multi-día. Sin recurrencia, "hasta" (>inicio) hace multi-día y apaga la hora.
+    const rrule = recurring ? { freq, ...(endMode === 'until' && rUntil ? { until: rUntil } : {}), ...(endMode === 'count' && Number(rCount) > 0 ? { count: Number(rCount) } : {}) } : undefined
+    const body = { title: title.trim(), event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined, rrule }
     try {
       const r = await fetch(editing ? `/api/calendar/${marker!.editId}` : '/api/calendar', { method: editing ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       if (r.ok) onSaved(); else setBusy(false)
@@ -283,11 +291,27 @@ function EventDialog({ date, marker, onClose, onSaved }: { date: string; marker?
           <label style={lbl}>Título<input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} className="xp-sunken" style={inp} /></label>
           <div style={{ display: 'flex', gap: 8 }}>
             <label style={{ ...lbl, flex: 1 }}>Fecha<input type="date" value={d} onChange={(e) => setD(e.target.value)} className="xp-sunken" style={inp} /></label>
-            <label style={{ ...lbl, flex: 1 }}>Hasta (opcional)<input type="date" value={end} min={d} onChange={(e) => setEnd(e.target.value)} className="xp-sunken" style={inp} /></label>
+            {!recurring && <label style={{ ...lbl, flex: 1 }}>Hasta (opcional)<input type="date" value={end} min={d} onChange={(e) => setEnd(e.target.value)} className="xp-sunken" style={inp} /></label>}
           </div>
-          {!(end && end > d) && (
+          {!isSpan && (
             <label style={{ ...lbl, width: 96 }}>Hora<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="xp-sunken" style={inp} /></label>
           )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <label style={{ ...lbl, flex: 1 }}>Repetir
+              <select value={freq} onChange={(e) => setFreq(e.target.value as typeof freq)} className="xp-sunken" style={inp}>
+                <option value="">No se repite</option><option value="weekly">Cada semana</option><option value="monthly">Cada mes</option><option value="yearly">Cada año</option>
+              </select>
+            </label>
+            {recurring && (
+              <label style={{ ...lbl, flex: 1 }}>Termina
+                <select value={endMode} onChange={(e) => setEndMode(e.target.value as typeof endMode)} className="xp-sunken" style={inp}>
+                  <option value="forever">Nunca</option><option value="until">En fecha</option><option value="count">Después de N</option>
+                </select>
+              </label>
+            )}
+          </div>
+          {recurring && endMode === 'until' && <label style={lbl}>Repetir hasta<input type="date" value={rUntil} min={d} onChange={(e) => setRUntil(e.target.value)} className="xp-sunken" style={inp} /></label>}
+          {recurring && endMode === 'count' && <label style={{ ...lbl, width: 96 }}>Veces<input type="number" min={1} value={rCount} onChange={(e) => setRCount(e.target.value)} className="xp-sunken" style={inp} /></label>}
           <label style={lbl}>Nota<textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="xp-sunken" style={{ ...inp, resize: 'none' }} /></label>
         </div>
         <div style={{ padding: '7px 11px', borderTop: '1px solid #c9c6ba', background: '#f3f1e6', display: 'flex', gap: 7, alignItems: 'center' }}>
