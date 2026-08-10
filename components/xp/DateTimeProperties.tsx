@@ -45,15 +45,21 @@ function EventDialog({ event, date, onClose, onSaved }: {
   const [d, setD] = useState(event?.spanStart ?? (event ? event.start.slice(0, 10) : date))
   const [end, setEnd] = useState(event?.spanEnd ?? '')
   const [time, setTime] = useState(event && !event.allDay ? event.start.slice(11, 16) : '')
+  const [freq, setFreq] = useState<'' | 'weekly' | 'monthly' | 'yearly'>(event?.rrule?.freq ?? '')
+  const [endMode, setEndMode] = useState<'forever' | 'until' | 'count'>(event?.rrule?.until ? 'until' : event?.rrule?.count ? 'count' : 'forever')
+  const [rUntil, setRUntil] = useState(event?.rrule?.until ?? '')
+  const [rCount, setRCount] = useState(event?.rrule?.count ? String(event.rrule.count) : '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const isSpan = !!end && end > d
+  const recurring = freq !== ''
+  const isSpan = !recurring && !!end && end > d
 
   async function save() {
     if (!title.trim() || !d || busy) return
     setBusy(true); setErr(null)
     try {
-      const payload = { title, event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined }
+      const rrule = recurring ? { freq, ...(endMode === 'until' && rUntil ? { until: rUntil } : {}), ...(endMode === 'count' && Number(rCount) > 0 ? { count: Number(rCount) } : {}) } : undefined
+      const payload = { title, event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined, rrule }
       const res = await fetch(editingId ? `/api/calendar/${editingId}` : '/api/calendar', {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,10 +99,12 @@ function EventDialog({ event, date, onClose, onSaved }: {
             <XpLabel>Fecha</XpLabel>
             <XpField type="date" value={d} onChange={(e) => setD(e.target.value)} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <XpLabel>Hasta (opcional)</XpLabel>
-            <XpField type="date" value={end} min={d} onChange={(e) => setEnd(e.target.value)} />
-          </div>
+          {!recurring && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <XpLabel>Hasta (opcional)</XpLabel>
+              <XpField type="date" value={end} min={d} onChange={(e) => setEnd(e.target.value)} />
+            </div>
+          )}
         </div>
         {!isSpan && (
           <div style={{ width: 110 }}>
@@ -104,6 +112,24 @@ function EventDialog({ event, date, onClose, onSaved }: {
             <XpField type="time" value={time} onChange={(e) => setTime(e.target.value)} />
           </div>
         )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <XpLabel>Repetir</XpLabel>
+            <select className="xp-sunken" value={freq} onChange={(e) => setFreq(e.target.value as typeof freq)} style={{ width: '100%', padding: '3px 4px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }}>
+              <option value="">No se repite</option><option value="weekly">Cada semana</option><option value="monthly">Cada mes</option><option value="yearly">Cada año</option>
+            </select>
+          </div>
+          {recurring && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <XpLabel>Termina</XpLabel>
+              <select className="xp-sunken" value={endMode} onChange={(e) => setEndMode(e.target.value as typeof endMode)} style={{ width: '100%', padding: '3px 4px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }}>
+                <option value="forever">Nunca</option><option value="until">En fecha</option><option value="count">Después de N</option>
+              </select>
+            </div>
+          )}
+        </div>
+        {recurring && endMode === 'until' && <div><XpLabel>Repetir hasta</XpLabel><XpField type="date" value={rUntil} min={d} onChange={(e) => setRUntil(e.target.value)} /></div>}
+        {recurring && endMode === 'count' && <div style={{ width: 110 }}><XpLabel>Veces</XpLabel><XpField type="number" value={rCount} onChange={(e) => setRCount(e.target.value)} /></div>}
         {err && <p style={{ fontSize: 11, color: '#a0201a', margin: 0 }}>{err}</p>}
       </div>
     </XpDialogModal>

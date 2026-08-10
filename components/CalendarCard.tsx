@@ -74,6 +74,11 @@ export default function CalendarCard() {
   const [addEnd,     setAddEnd]     = useState('')     // multi-día: fecha fin (opcional)
   const [addTime,    setAddTime]    = useState('')
   const [addNote,    setAddNote]    = useState('')
+  // Recurrencia (excluyente con multi-día): freq + terminación.
+  const [addFreq,    setAddFreq]    = useState<'' | 'weekly' | 'monthly' | 'yearly'>('')
+  const [addRepMode, setAddRepMode] = useState<'forever' | 'until' | 'count'>('forever')
+  const [addRepUntil,setAddRepUntil]= useState('')
+  const [addRepCount,setAddRepCount]= useState('')
   const [editingUid, setEditingUid] = useState<string | null>(null)
   const [adding,     setAdding]     = useState(false)
   const [addError,   setAddError]   = useState<string | null>(null)
@@ -136,6 +141,7 @@ export default function CalendarCard() {
 
   function resetForm() {
     setAddTitle(''); setAddTime(''); setAddNote(''); setAddEnd(''); setEditingUid(null); setAddError(null)
+    setAddFreq(''); setAddRepMode('forever'); setAddRepUntil(''); setAddRepCount('')
     setAddDate(selected ?? todayKey); setFormOpen(false)
   }
 
@@ -159,6 +165,10 @@ export default function CalendarCard() {
     setAddEnd(ev.spanEnd ?? '')
     setAddTime(ev.allDay ? '' : formatTime(ev.start))
     setAddNote(ev.note ?? '')
+    setAddFreq(ev.rrule?.freq ?? '')
+    setAddRepMode(ev.rrule?.until ? 'until' : ev.rrule?.count ? 'count' : 'forever')
+    setAddRepUntil(ev.rrule?.until ?? '')
+    setAddRepCount(ev.rrule?.count ? String(ev.rrule.count) : '')
     setAddError(null); setConfirmDel(null); setFormOpen(true)
   }
 
@@ -169,9 +179,10 @@ export default function CalendarCard() {
     setAdding(true); setAddError(null)
     try {
       const editingId = editingUid?.startsWith('captured:') ? editingUid.slice('captured:'.length).split('#')[0] : null
-      // Un tramo (fin > inicio) desactiva la hora — v1 multi-día = marcador por día.
-      const isSpan = !!addEnd && addEnd > date
-      const payload = { title: addTitle, event_date: date, event_end_date: isSpan ? addEnd : undefined, event_time: isSpan ? undefined : (addTime || undefined), note: addNote || undefined }
+      // Recurrencia manda sobre multi-día (excluyentes en v1). Un tramo desactiva la hora.
+      const rrule = addFreq ? { freq: addFreq, ...(addRepMode === 'until' && addRepUntil ? { until: addRepUntil } : {}), ...(addRepMode === 'count' && Number(addRepCount) > 0 ? { count: Number(addRepCount) } : {}) } : undefined
+      const isSpan = !addFreq && !!addEnd && addEnd > date
+      const payload = { title: addTitle, event_date: date, event_end_date: isSpan ? addEnd : undefined, event_time: isSpan ? undefined : (addTime || undefined), note: addNote || undefined, rrule }
       const res = await fetch(editingId ? `/api/calendar/${editingId}` : '/api/calendar', {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -422,17 +433,19 @@ export default function CalendarCard() {
                     title="Inicio"
                     className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
                   />
-                  <input
-                    type="date"
-                    value={addEnd}
-                    min={addDate}
-                    onChange={e => setAddEnd(e.target.value)}
-                    disabled={adding}
-                    title="Hasta (opcional) — para eventos de varios días"
-                    className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg-muted outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
-                  />
+                  {!addFreq && (
+                    <input
+                      type="date"
+                      value={addEnd}
+                      min={addDate}
+                      onChange={e => setAddEnd(e.target.value)}
+                      disabled={adding}
+                      title="Hasta (opcional) — para eventos de varios días"
+                      className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg-muted outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
+                    />
+                  )}
                 </div>
-                {!(addEnd && addEnd > addDate) && (
+                {!(!addFreq && addEnd && addEnd > addDate) && (
                   <input
                     type="time"
                     value={addTime}
@@ -440,6 +453,26 @@ export default function CalendarCard() {
                     disabled={adding}
                     className="w-full rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none transition-colors focus:border-accent/50 [color-scheme:dark]"
                   />
+                )}
+                <div className="flex gap-2">
+                  <select value={addFreq} onChange={e => setAddFreq(e.target.value as typeof addFreq)} disabled={adding}
+                    className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none focus:border-accent/50 [color-scheme:dark]">
+                    <option value="">No se repite</option><option value="weekly">Cada semana</option><option value="monthly">Cada mes</option><option value="yearly">Cada año</option>
+                  </select>
+                  {addFreq && (
+                    <select value={addRepMode} onChange={e => setAddRepMode(e.target.value as typeof addRepMode)} disabled={adding}
+                      className="flex-1 rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none focus:border-accent/50 [color-scheme:dark]">
+                      <option value="forever">Nunca termina</option><option value="until">Hasta fecha</option><option value="count">N veces</option>
+                    </select>
+                  )}
+                </div>
+                {addFreq && addRepMode === 'until' && (
+                  <input type="date" value={addRepUntil} min={addDate} onChange={e => setAddRepUntil(e.target.value)} disabled={adding}
+                    title="Repetir hasta" className="w-full rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none focus:border-accent/50 [color-scheme:dark]" />
+                )}
+                {addFreq && addRepMode === 'count' && (
+                  <input type="number" min={1} value={addRepCount} onChange={e => setAddRepCount(e.target.value)} disabled={adding}
+                    placeholder="¿cuántas veces?" className="w-full rounded-card border border-border bg-surface-base/50 px-3 py-2 text-body text-fg outline-none focus:border-accent/50" />
                 )}
                 <button
                   type="submit"
