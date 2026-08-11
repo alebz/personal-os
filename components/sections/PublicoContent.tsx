@@ -582,6 +582,29 @@ function FoodCostPanel() {
 // ── Captura por FOTO del ticket: la IA PROPONE un borrador, tú corriges y CONFIRMAS, y hasta entonces se
 // guarda el gasto (roll-up de 1 línea en publico_costos + detalle itemizado). Tus correcciones enseñan a
 // los alias (la próxima vez llega ya traducido). NUNCA escribe sin confirmar. Alcance: Público. ──
+// Input numérico que ACEPTA decimales sin pelear. El bug viejo: guardaba Number(texto) y lo re-renderizaba, así
+// que al teclear "67." se volvía 67 y el punto desaparecía → imposible escribir decimales, y peleando con eso
+// salían strings tipo "2.2.6" → NaN pegado. Aquí se mantiene el texto crudo mientras escribes (buffer) y solo se
+// emite un número válido o null; vacío = null; los estados intermedios inválidos se ignoran. Nunca produce NaN.
+function NumInput({ value, onChange, ...rest }: {
+  value: number | null
+  onChange: (v: number | null) => void
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [buf, setBuf] = useState<string | null>(null)
+  const shown = buf ?? (value == null ? '' : String(value))
+  function commit(t: string) {
+    const s = t.trim().replace(',', '.')
+    if (s === '') { onChange(null); return }
+    const n = Number(s)
+    if (!Number.isNaN(n)) onChange(n)   // ignora "2." / "2.2." / basura: conserva el último valor válido
+  }
+  return (
+    <input {...rest} inputMode="decimal" value={shown}
+      onChange={(e) => { setBuf(e.target.value); commit(e.target.value) }}
+      onBlur={() => setBuf(null)} />
+  )
+}
+
 // Catálogo Poster (solo lectura) para los selectores de mapeo y la traducción id→nombre en la lista lista-para-teclear.
 type PosterIngredient = { id: number; name: string; unit: string }
 type PosterSupplier = { id: number; name: string }
@@ -682,7 +705,9 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
           raw, model, proveedor: d.proveedor, proveedor_raw: d.proveedor_raw, fecha: d.fecha,
           subtotal: d.subtotal, descuento: d.descuento, impuestos: d.impuestos, total: d.total,
           legibilidad: d.legibilidad, notas: d.notas, category: cat, cost_kind: catDefaults(cat).defaultKind, origin,
-          items: d.items, imageBase64: img?.b64, mediaType: img?.media, fecha_approved: dateApproved,
+          // P.U. SIEMPRE derivado del importe (fuente de verdad), nunca el valor redondeado de la IA.
+          items: d.items.map((it) => ({ ...it, precio_unitario: it.cantidad ? it.importe / it.cantidad : null })),
+          imageBase64: img?.b64, mediaType: img?.media, fecha_approved: dateApproved,
         }),
       })
       const j = await resp.json()
@@ -741,9 +766,11 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
               <div key={i} className="group flex items-center gap-1">
                 <input value={it.descripcion} onChange={(e) => patchItem(i, { descripcion: e.target.value })} style={{ ...cell, flex: 1, minWidth: 100 }} title={it.descripcion_raw && it.descripcion_raw !== it.descripcion ? `IA: ${it.descripcion_raw}` : undefined} placeholder="descripción" />
                 {it.aliased && <span className="text-ok" title="alias aplicado">✓</span>}
-                <input value={it.cantidad ?? ''} onChange={(e) => patchItem(i, { cantidad: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 46, textAlign: 'right' }} placeholder="cant" />
-                <input value={it.precio_unitario ?? ''} onChange={(e) => patchItem(i, { precio_unitario: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 64, textAlign: 'right' }} placeholder="P.U." />
-                <input value={it.importe} onChange={(e) => patchItem(i, { importe: Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} placeholder="importe" />
+                <NumInput value={it.cantidad ?? null} onChange={(v) => patchItem(i, { cantidad: v })} style={{ ...cell, width: 46, textAlign: 'right' }} placeholder="cant" />
+                <input value={it.unidad ?? ''} onChange={(e) => patchItem(i, { unidad: e.target.value.trim() || null })} style={{ ...cell, width: 44 }} placeholder="u" title="unidad de la cantidad (PZA, KG, G, L…) — la barra de mapeo la convierte a la unidad base de Poster" />
+                {/* P.U. DERIVADO (importe ÷ cantidad), read-only: el importe es la fuente de verdad, el P.U. nunca. */}
+                <span style={{ ...cell, width: 64, textAlign: 'right', opacity: 0.6, background: 'transparent', fontVariantNumeric: 'tabular-nums' }} title="P.U. derivado = importe ÷ cantidad (no editable)">{it.cantidad ? (it.importe / it.cantidad).toFixed(2) : '—'}</span>
+                <NumInput value={it.importe} onChange={(v) => patchItem(i, { importe: v ?? 0 })} style={{ ...cell, width: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} placeholder="importe" />
                 <button onClick={() => patchItem(i, { es_descuento: !it.es_descuento })} style={fotoChip(it.es_descuento)} title="marca si es cupón/descuento">desc</button>
                 <button onClick={() => delItem(i)} className="px-1 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar línea">✕</button>
               </div>
@@ -753,9 +780,9 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 
           {/* Totales */}
           <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 border-t border-border pt-2 text-label">
-            <label className="flex items-center gap-1"><span className="text-fg-muted">Subtotal</span><input value={d.subtotal ?? ''} onChange={(e) => patch({ subtotal: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
-            <label className="flex items-center gap-1"><span className="text-fg-muted">Impuestos</span><input value={d.impuestos ?? ''} onChange={(e) => patch({ impuestos: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
-            <label className="flex items-center gap-1"><span className="font-bold text-fg">Total</span><input value={d.total ?? ''} onChange={(e) => patch({ total: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 96, textAlign: 'right', fontSize: 15, fontWeight: 700 }} /></label>
+            <label className="flex items-center gap-1"><span className="text-fg-muted">Subtotal</span><NumInput value={d.subtotal} onChange={(v) => patch({ subtotal: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
+            <label className="flex items-center gap-1"><span className="text-fg-muted">Impuestos</span><NumInput value={d.impuestos} onChange={(v) => patch({ impuestos: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
+            <label className="flex items-center gap-1"><span className="font-bold text-fg">Total</span><NumInput value={d.total} onChange={(v) => patch({ total: v })} style={{ ...cell, width: 96, textAlign: 'right', fontSize: 15, fontWeight: 700 }} /></label>
           </div>
           {mismatch && <div className="text-right text-label text-warn">las líneas suman {mxn(itemsSum)} · total {mxn(totalNum)} — revisa</div>}
 
