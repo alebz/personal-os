@@ -16,9 +16,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'montos inválidos' }, { status: 400 })
 
   const supabase = createServerClient()
+  // Guardar/editar a mano marca el día 'manual' → el import de Poster ya no lo pisa (tu corrección manda).
   const row = {
     scope: 'publico', date: b.date, month: b.date.slice(0, 7),
-    efectivo, tarjeta, note: b.note?.trim() || null, updated_at: new Date().toISOString(),
+    efectivo, tarjeta, note: b.note?.trim() || null, source: 'manual', updated_at: new Date().toISOString(),
   }
   const { data, error } = await supabase
     .from('publico_ventas').upsert(row, { onConflict: 'scope,date' }).select().single()

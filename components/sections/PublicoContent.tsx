@@ -30,7 +30,7 @@ const dayLabel = (iso: string) => {
   return d.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 
-interface Venta { id: string; date: string; efectivo: number; tarjeta: number; note: string | null }
+interface Venta { id: string; date: string; efectivo: number; tarjeta: number; note: string | null; source?: 'manual' | 'poster' }
 interface Costo { id: string; date: string; category: CostCategory; cost_kind: CostKind | null; origin: OriginKey; amount: number; note: string | null }
 interface Ingreso { id: string; date: string; concepto: string; amount: number; origin: OriginKey; note: string | null }
 
@@ -59,6 +59,16 @@ export default function PublicoContent() {
   const [savedFlash, setSavedFlash] = useState(false)
   const efectivoRef = useRef<HTMLInputElement>(null)
   const tarjetaRef = useRef<HTMLInputElement>(null)
+  // ── Sincronización con Poster POS (heartbeat + import manual) ──
+  const [sync, setSync] = useState<{ last_success_at: string | null; last_import_date: string | null; last_error: string | null } | null>(null)
+  const [importing, setImporting] = useState(false)
+  const loadSync = useCallback(async () => { const s = await fetch('/api/publico/poster/import').then((r) => r.json()).catch(() => null); if (s) setSync(s) }, [])
+  useEffect(() => { void loadSync() }, [loadSync])
+  async function importNow() {
+    setImporting(true)
+    try { await fetch('/api/publico/poster/import?days=14', { method: 'POST' }); await load(); await loadSync() }
+    finally { setImporting(false) }
+  }
 
   // ── Costo (adder burst) ──
   const [cAmt, setCAmt] = useState('')
@@ -149,6 +159,10 @@ export default function PublicoContent() {
   const utilidadTotal = utilidadOper + otrosIngresosMes - rentaCondonadaMes  // no-operativos (arreglo Ameno netea 0)
   const costosHoy = costos.filter((c) => c.date === capDate)
   const ingresosHoy = ingresos.filter((i) => i.date === capDate)
+  const hoyV = ventas.find((v) => v.date === capDate)                       // el día visto (para el badge de procedencia)
+  const lastOk = sync?.last_success_at ? new Date(sync.last_success_at) : null
+  const daysSince = lastOk ? Math.floor((Date.now() - lastOk.getTime()) / 86400000) : null
+  const syncStale = !!sync?.last_error || daysSince == null || daysSince >= 2   // avisa si falló o lleva ≥2 días sin traer nada
 
   const chip = (on: boolean): React.CSSProperties => ({
     padding: '3px 9px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid',
@@ -170,6 +184,18 @@ export default function PublicoContent() {
         </div>
       </header>
 
+      {/* ── Sincronización con Poster POS: heartbeat visible + import manual (que no falle en silencio) ── */}
+      <div className="flex items-center justify-between rounded-card border border-border bg-surface-2 px-3 py-1.5 text-label">
+        <span className={syncStale ? 'text-danger' : 'text-fg-muted'}>
+          {sync?.last_error
+            ? `⚠ Import falló: ${sync.last_error}`
+            : sync?.last_success_at
+              ? `POS · último import ${daysSince === 0 ? 'hoy' : daysSince === 1 ? 'ayer' : `hace ${daysSince} días`}${syncStale ? ' — revisa' : ''}`
+              : 'POS · sin importar aún'}
+        </span>
+        <button onClick={() => void importNow()} disabled={importing} className="shrink-0 rounded-control px-2 py-0.5 text-fg-muted transition-colors hover:text-accent disabled:opacity-50">{importing ? 'importando…' : 'importar ahora'}</button>
+      </div>
+
       {tab === 'captura' && (<>
       {/* ── CIERRE DE HOY ── */}
       <section className="rounded-card border border-border bg-surface-2 p-3">
@@ -181,6 +207,7 @@ export default function PublicoContent() {
               {capDate === today ? 'hoy' : dayLabel(capDate)}
             </button>
             <button onClick={() => setCapDate((d) => addDays(d, +1) > today ? today : addDays(d, +1))} className="px-1 text-fg-muted hover:text-fg" aria-label="Día siguiente">▶</button>
+            {hoyV && <span className={`rounded px-1.5 py-0.5 text-label font-medium ${hoyV.source === 'poster' ? 'bg-accent/15 text-accent' : 'bg-surface-active text-fg-muted'}`} title={hoyV.source === 'poster' ? 'Importado del POS' : 'Capturado a mano'}>{hoyV.source === 'poster' ? 'POS' : 'manual'}</span>}
           </div>
           {savedFlash && <span className="text-secondary font-medium text-ok">✓ guardado</span>}
         </div>
