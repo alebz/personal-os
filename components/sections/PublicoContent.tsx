@@ -175,7 +175,7 @@ export default function PublicoContent() {
   }
 
   return (
-    <div data-theme-scope="publico" className="mx-auto flex max-w-2xl flex-col gap-4 p-4 text-fg">
+    <div data-theme-scope="publico" className="mx-auto flex max-w-4xl flex-col gap-4 p-4 text-fg">
       <header className="flex items-baseline justify-between">
         <h1 className="text-xl font-bold">Público Gourmet</h1>
         <div className="flex gap-1">
