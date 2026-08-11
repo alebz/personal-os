@@ -12,7 +12,7 @@ const NO_KIND = ['reinversion', 'renta_condonada']
 
 type InItem = {
   codigo?: string | null; descripcion?: string; descripcion_raw?: string | null; cantidad?: number | null
-  unidad?: string | null; precio_unitario?: number | null; importe?: number; es_descuento?: boolean
+  unidad?: string | null; precio_unitario?: number | null; importe?: number; es_descuento?: boolean; ivaTasa?: number | null
 }
 type Body = {
   raw?: unknown; model?: string
@@ -124,13 +124,13 @@ export async function POST(req: NextRequest) {
     const { data: existSup } = await supabase.from('ticket_supplier_aliases').select('proveedor').eq('raw_norm', provRaw).maybeSingle()
     const renamedSup = !!b.proveedor_raw && normAlias(b.proveedor_raw) !== normAlias(proveedor)
     await supabase.from('ticket_supplier_aliases').upsert(
-      { raw_norm: provRaw, proveedor: renamedSup || !existSup ? proveedor : existSup.proveedor, updated_at: now },
+      { raw_norm: provRaw, proveedor: renamedSup || !existSup ? proveedor : existSup.proveedor, deleted_at: null, updated_at: now },
       { onConflict: 'raw_norm' },
     )
   }
 
   // Productos: agrupa las líneas de ESTE ticket por raw_norm.
-  type Group = { raw_norm: string; stem: string; canonical: string; renamed: boolean; categoria: string | null; unidad: string | null; sum: number; qty: number }
+  type Group = { raw_norm: string; stem: string; canonical: string; renamed: boolean; categoria: string | null; unidad: string | null; sum: number; qty: number; iva: number | null }
   const groups = new Map<string, Group>()
   for (const i of items) {
     if (i.es_descuento) continue
@@ -138,9 +138,10 @@ export async function POST(req: NextRequest) {
     const rawText = (i.descripcion_raw ?? i.descripcion ?? '').trim()
     const key = normAlias(rawText)
     if (!key || !canonical) continue
-    const g = groups.get(key) ?? { raw_norm: key, stem: stemAlias(rawText), canonical, renamed: normAlias(rawText) !== normAlias(canonical), categoria: b.category ?? null, unidad: i.unidad ?? null, sum: 0, qty: 0 }
+    const g = groups.get(key) ?? { raw_norm: key, stem: stemAlias(rawText), canonical, renamed: normAlias(rawText) !== normAlias(canonical), categoria: b.category ?? null, unidad: i.unidad ?? null, sum: 0, qty: 0, iva: i.ivaTasa ?? null }
     g.sum += Number(i.importe ?? 0)
     g.qty += Number(i.cantidad ?? 0)
+    if (g.iva == null && i.ivaTasa != null) g.iva = i.ivaTasa
     groups.set(key, g)
   }
 
@@ -148,17 +149,20 @@ export async function POST(req: NextRequest) {
   if (groups.size) {
     const keys = [...groups.keys()]
     const { data: existing } = await supabase.from('ticket_product_aliases')
-      .select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces, cantidad_acumulada').in('raw_norm', keys)
+      .select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces, cantidad_acumulada, iva_tasa').in('raw_norm', keys)
     const prev = new Map((existing ?? []).map((r) => [r.raw_norm, r]))
     const rows = [...groups.values()].map((g) => {
       const e = prev.get(g.raw_norm)
       return {
         raw_norm: g.raw_norm,
         raw_stem: g.stem,   // el stem (sin número) se guarda siempre; habilita consolidar si luego marcas peso_variable
+        deleted_at: null,   // re-comprar un producto resucita su fila si estaba soft-borrada
         // nombre/categoría/unidad: si ya existían, se conservan salvo que ESTA vez los hayas corregido.
         descripcion: g.renamed || !e ? g.canonical : e.descripcion,
         categoria: e?.categoria ?? g.categoria,
         unidad: e?.unidad ?? g.unidad,
+        // IVA de la línea: lo hereda el alias si aún no lo tenía (no pisa el que ya definiste).
+        iva_tasa: e?.iva_tasa ?? g.iva,
         // acumulados: siempre suman (no pisan). El mapeo a Poster no va en el payload → queda intacto.
         importe_acumulado: Number(e?.importe_acumulado ?? 0) + g.sum,
         cantidad_acumulada: Number(e?.cantidad_acumulada ?? 0) + g.qty,   // para precio/unidad = importe_acum / cant_acum

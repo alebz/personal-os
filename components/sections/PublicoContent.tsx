@@ -605,6 +605,22 @@ function NumInput({ value, onChange, ...rest }: {
   )
 }
 
+// Propone el ×factor parseando el peso del NOMBRE y convirtiéndolo a la unidad base del ingrediente de Poster.
+// "500 GR"→0.5 (kg), "907 G"→0.907, "2.27 KG"→2.27, "1 L"→1. Sin peso → 1. Número sin unidad (ambiguo,
+// ej. "MOZZARELLA 2.26") → null: no adivina, se queda sin factor para que lo decidas. Misma lógica que el server.
+function proposeFactorClient(name: string, unit: string | undefined): number | null {
+  const N = (name ?? '').toUpperCase()
+  const m = N.match(/(\d+(?:[.,]\d+)?)\s*(KG|GR|G|ML|LT|L)\b/)
+  if (m) {
+    const v = parseFloat(m[1].replace(',', '.')), u = m[2]
+    if (unit === 'kg') { if (u === 'KG') return v; if (u === 'G' || u === 'GR') return v / 1000 }
+    if (unit === 'l') { if (u === 'L' || u === 'LT') return v; if (u === 'ML') return v / 1000 }
+    return null   // la unidad del nombre no cuadra con la base del ingrediente → que lo revises
+  }
+  if (/\b\d+(?:[.,]\d+)?\b/.test(N)) return null   // número suelto sin unidad → ambiguo
+  return 1
+}
+
 // Catálogo Poster (solo lectura) para los selectores de mapeo y la traducción id→nombre en la lista lista-para-teclear.
 type PosterIngredient = { id: number; name: string; unit: string }
 type PosterSupplier = { id: number; name: string }
@@ -976,6 +992,7 @@ function AliasManager() {
   const [cat, setCat] = useState<PosterCatalog | null>(null)   // catálogo Poster para los selectores de mapeo
   const [q, setQ] = useState('')                               // buscador de productos
   const [consolidate, setConsolidate] = useState<{ survivor: ProdAlias; siblings: ProdAlias[] } | null>(null)  // panel de fusión
+  const [undo, setUndo] = useState<{ type: 'supplier' | 'product'; raw_norm: string; label: string } | null>(null)  // "deshacer" tras borrar
 
   const loadAliases = useCallback(async () => {
     setLoading(true)
@@ -995,8 +1012,19 @@ function AliasManager() {
     const { raw_norm, ...fields } = a
     await patchAlias('product', raw_norm, fields)
   }
-  async function del(type: 'supplier' | 'product', raw_norm: string) {
+  // Borrar = SOFT delete + "deshacer" unos segundos (no diálogo, que se aprietan en automático). PERO si la fila
+  // tiene mapeo a Poster (trabajo tuyo que no se regenera solo), sí pide confirmación explícita antes.
+  async function del(type: 'supplier' | 'product', raw_norm: string, opts?: { mapped?: boolean; label?: string }) {
+    if (opts?.mapped && !window.confirm(`“${opts.label ?? raw_norm}” tiene mapeo a Poster (tu trabajo, NO se regenera solo). ¿Borrarla de todos modos?`)) return
     await fetch(`/api/publico/ticket/aliases?type=${type}&raw_norm=${encodeURIComponent(raw_norm)}`, { method: 'DELETE' })
+    setUndo({ type, raw_norm, label: opts?.label ?? raw_norm })
+    setTimeout(() => setUndo((cur) => (cur?.raw_norm === raw_norm && cur?.type === type ? null : cur)), 7000)
+    await loadAliases()
+  }
+  async function doUndo() {
+    if (!undo) return
+    await fetch('/api/publico/ticket/aliases', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'undelete', type: undo.type, raw_norm: undo.raw_norm }) })
+    setUndo(null)
     await loadAliases()
   }
   // Al marcar peso_variable: guarda el flag y, si hay hermanas (mismo stem, distinto raw_norm), abre el panel
@@ -1044,6 +1072,13 @@ function AliasManager() {
           {loading && <p className="text-secondary italic text-fg-muted">Cargando…</p>}
           {!loading && total === 0 && <p className="text-secondary italic text-fg-muted">Aún no hay alias. Se aprenden cuando corriges un ticket.</p>}
 
+          {undo && (
+            <div className="flex items-center justify-between rounded-card border border-border bg-surface-2 p-2 text-label">
+              <span className="text-fg-muted">Borré <b className="text-fg">{undo.label}</b> (se puede reconstruir del historial).</span>
+              <button onClick={() => void doUndo()} className="rounded-control border border-border px-3 py-0.5 font-bold text-accent hover:bg-surface-1">↩ deshacer</button>
+            </div>
+          )}
+
           {/* Consolidación: fusión DESTRUCTIVA de hermanas por stem. Muestra qué se une y pide confirmación. */}
           {consolidate && (() => {
             const s = consolidate.survivor, sib = consolidate.siblings
@@ -1076,7 +1111,7 @@ function AliasManager() {
                     <option value="">⚠ Poster: sin mapear</option>
                     {(cat?.suppliers ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
-                  <button onClick={() => void del('supplier', a.raw_norm)} className="px-1 text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger" aria-label="Borrar">✕</button>
+                  <button onClick={() => void del('supplier', a.raw_norm, { mapped: a.poster_supplier_id != null, label: a.proveedor })} className="ml-2 border-l border-border pl-2 text-fg-muted hover:text-danger" title="Borrar (con deshacer)" aria-label="Borrar">🗑</button>
                 </div>
               ))}
             </div>
@@ -1103,7 +1138,13 @@ function AliasManager() {
                   <input defaultValue={a.unidad ?? ''} onBlur={(e) => { if ((e.target.value.trim() || null) !== a.unidad) void saveProd({ raw_norm: a.raw_norm, unidad: e.target.value.trim() || null }) }} placeholder="unidad" style={{ ...cell, width: 56 }} />
                   {/* Mapeo a Poster (Fase 0): ingrediente + factor a unidad base + si toca stock */}
                   {a.toca_stock ? (<>
-                    <select value={a.poster_ingredient_id ?? ''} onChange={(e) => void patchAlias('product', a.raw_norm, { poster_ingredient_id: e.target.value === '' ? null : Number(e.target.value) })} style={{ ...cell, width: 150 }} title="Ingrediente en Poster">
+                    <select value={a.poster_ingredient_id ?? ''} onChange={(e) => {
+                      const id = e.target.value === '' ? null : Number(e.target.value)
+                      const fields: Record<string, unknown> = { poster_ingredient_id: id }
+                      // Al mapear, propone el factor desde el peso del nombre (si no tenías uno). Ambiguo → lo deja sin factor.
+                      if (id != null && a.factor_a_base == null) { const f = proposeFactorClient(a.descripcion, cat?.ingredients.find((i) => i.id === id)?.unit); if (f != null) fields.factor_a_base = f }
+                      void patchAlias('product', a.raw_norm, fields)
+                    }} style={{ ...cell, width: 150 }} title="Ingrediente en Poster (al elegirlo se propone el ×factor desde el peso del nombre)">
                       <option value="">⚠ Poster: sin mapear</option>
                       {(cat?.ingredients ?? []).map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
                     </select>
@@ -1119,7 +1160,8 @@ function AliasManager() {
                   )}
                   {a.toca_stock && <button onClick={() => void togglePesoVariable(a)} style={fotoChipSmall(a.peso_variable)} title="peso variable: el peso va en el nombre y cambia cada compra. Consolida las hermanas por stem y toma el peso leído como cantidad.">⚖ peso var</button>}
                   <button onClick={() => void patchAlias('product', a.raw_norm, { toca_stock: !a.toca_stock })} style={fotoChipSmall(a.toca_stock)} title="¿esta línea entra al inventario de Poster?">{a.toca_stock ? 'stock' : 'solo panel'}</button>
-                  <button onClick={() => void del('product', a.raw_norm)} className="px-1 text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger" aria-label="Borrar">✕</button>
+                  {/* Borrar SEPARADO de los controles de edición (borde + margen) para no apretarlo por error. */}
+                  <button onClick={() => void del('product', a.raw_norm, { mapped: a.poster_ingredient_id != null || a.peso_variable || a.factor_a_base != null, label: a.descripcion })} className="ml-2 border-l border-border pl-2 text-fg-muted hover:text-danger" title="Borrar (con deshacer)" aria-label="Borrar">🗑</button>
                 </div>
               )})}
             </div>

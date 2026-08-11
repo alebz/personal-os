@@ -178,14 +178,14 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
   const COLS = 'raw_norm, descripcion, categoria, unidad, poster_ingredient_id, factor_a_base, toca_stock, iva_tasa, peso_variable'
   const itemStems = [...new Set(raw.items.map((i) => stemAlias(i.descripcion)).filter(Boolean))]
   const [{ data: supRow }, { data: prodRows }, { data: stemRows }] = await Promise.all([
-    supabase.from('ticket_supplier_aliases').select('proveedor, poster_supplier_id').eq('raw_norm', provNorm).maybeSingle(),
+    supabase.from('ticket_supplier_aliases').select('proveedor, poster_supplier_id').eq('raw_norm', provNorm).is('deleted_at', null).maybeSingle(),
     itemNorms.length
-      ? supabase.from('ticket_product_aliases').select(COLS).in('raw_norm', itemNorms)
+      ? supabase.from('ticket_product_aliases').select(COLS).is('deleted_at', null).in('raw_norm', itemNorms)
       : Promise.resolve({ data: [] as ProdAliasRow[] }),
     // Peso variable: el texto (con el peso) cambia cada compra, así que el raw_norm exacto falla. Además busca
     // por STEM (sin el número) entre las filas marcadas peso_variable → todas las compras caen en la misma.
     itemStems.length
-      ? supabase.from('ticket_product_aliases').select(`${COLS}, raw_stem`).eq('peso_variable', true).in('raw_stem', itemStems)
+      ? supabase.from('ticket_product_aliases').select(`${COLS}, raw_stem`).eq('peso_variable', true).is('deleted_at', null).in('raw_stem', itemStems)
       : Promise.resolve({ data: [] as (ProdAliasRow & { raw_stem: string })[] }),
   ])
   const prodMap = new Map((prodRows ?? []).map((r) => [r.raw_norm, r as ProdAliasRow]))

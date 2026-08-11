@@ -14,8 +14,8 @@ const CATEGORIES = ['insumo', 'nomina', 'gasto_fijo', 'reinversion', 'renta_cond
 export async function GET() {
   const supabase = createServerClient()
   const [{ data: suppliers }, { data: products }] = await Promise.all([
-    supabase.from('ticket_supplier_aliases').select('raw_norm, proveedor, poster_supplier_id, updated_at').order('updated_at', { ascending: false }),
-    supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, poster_ingredient_type, factor_a_base, toca_stock, iva_tasa, importe_acumulado, cantidad_acumulada, veces, peso_variable, raw_stem, updated_at').order('updated_at', { ascending: false }),
+    supabase.from('ticket_supplier_aliases').select('raw_norm, proveedor, poster_supplier_id, updated_at').is('deleted_at', null).order('updated_at', { ascending: false }),
+    supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, poster_ingredient_type, factor_a_base, toca_stock, iva_tasa, importe_acumulado, cantidad_acumulada, veces, peso_variable, raw_stem, updated_at').is('deleted_at', null).order('updated_at', { ascending: false }),
   ])
   return NextResponse.json({ suppliers: suppliers ?? [], products: products ?? [] })
 }
@@ -57,14 +57,15 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
-// DELETE /api/publico/ticket/aliases?type=supplier|product&raw_norm=...
+// DELETE /api/publico/ticket/aliases?type=supplier|product&raw_norm=...  → SOFT delete (marca deleted_at).
+// No destruye: la fila queda para "deshacer" y el catálogo es reconstruible desde ticket_items de todos modos.
 export async function DELETE(req: NextRequest) {
   const type = req.nextUrl.searchParams.get('type')
   const raw_norm = req.nextUrl.searchParams.get('raw_norm')
   if (!raw_norm || (type !== 'supplier' && type !== 'product')) return NextResponse.json({ error: 'type y raw_norm requeridos' }, { status: 400 })
   const supabase = createServerClient()
   const table = type === 'supplier' ? 'ticket_supplier_aliases' : 'ticket_product_aliases'
-  const { error } = await supabase.from(table).delete().eq('raw_norm', raw_norm)
+  const { error } = await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq('raw_norm', raw_norm)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
@@ -74,8 +75,18 @@ export async function DELETE(req: NextRequest) {
 // acumulados de las víctimas en el sobreviviente (importe, cantidad, veces) y BORRA las víctimas. El survivor
 // queda marcado peso_variable; su mapeo a Poster se conserva. El UI muestra qué filas se fusionan y confirma antes.
 export async function POST(req: NextRequest) {
-  let b: { action?: string; survivor?: string; victims?: string[] }
+  let b: { action?: string; survivor?: string; victims?: string[]; type?: string; raw_norm?: string }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+
+  // DESHACER un borrado (limpia deleted_at). Usado por el "deshacer" del gestor.
+  if (b.action === 'undelete') {
+    if (!b.raw_norm || (b.type !== 'supplier' && b.type !== 'product')) return NextResponse.json({ error: 'type y raw_norm requeridos' }, { status: 400 })
+    const supabase = createServerClient()
+    const table = b.type === 'supplier' ? 'ticket_supplier_aliases' : 'ticket_product_aliases'
+    const { error } = await supabase.from(table).update({ deleted_at: null }).eq('raw_norm', b.raw_norm)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
   if (b.action !== 'consolidate') return NextResponse.json({ error: 'action inválida' }, { status: 400 })
   const survivor = (b.survivor ?? '').trim()
   const victims = (b.victims ?? []).filter((v) => v && v !== survivor)
