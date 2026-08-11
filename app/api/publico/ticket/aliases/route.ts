@@ -15,7 +15,7 @@ export async function GET() {
   const supabase = createServerClient()
   const [{ data: suppliers }, { data: products }] = await Promise.all([
     supabase.from('ticket_supplier_aliases').select('raw_norm, proveedor, poster_supplier_id, updated_at').order('updated_at', { ascending: false }),
-    supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, poster_ingredient_type, factor_a_base, toca_stock, iva_tasa, updated_at').order('updated_at', { ascending: false }),
+    supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, poster_ingredient_type, factor_a_base, toca_stock, iva_tasa, importe_acumulado, veces, updated_at').order('updated_at', { ascending: false }),
   ])
   return NextResponse.json({ suppliers: suppliers ?? [], products: products ?? [] })
 }

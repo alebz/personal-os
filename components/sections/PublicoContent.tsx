@@ -923,7 +923,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 // ── Alias aprendidos del capturador: verlos, editarlos o borrarlos. Una corrección tuya pudo enseñar un
 // error; aquí se arregla. raw_norm (la llave de match) es de solo lectura — para re-mapear, borra y re-aprende. ──
 type SupAlias = { raw_norm: string; proveedor: string; poster_supplier_id: number | null }
-type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean; iva_tasa: number | null }
+type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean; iva_tasa: number | null; importe_acumulado: number; veces: number }
 
 function AliasManager() {
   const [open, setOpen] = useState(false)
@@ -931,6 +931,7 @@ function AliasManager() {
   const [sup, setSup] = useState<SupAlias[]>([])
   const [prod, setProd] = useState<ProdAlias[]>([])
   const [cat, setCat] = useState<PosterCatalog | null>(null)   // catálogo Poster para los selectores de mapeo
+  const [q, setQ] = useState('')                               // buscador de productos
 
   const loadAliases = useCallback(async () => {
     setLoading(true)
@@ -958,6 +959,18 @@ function AliasManager() {
   const total = sup.length + prod.length
   const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
   const fotoChipSmall = (on: boolean): React.CSSProperties => ({ padding: '2px 7px', borderRadius: 999, fontSize: 11, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
+
+  // "Sin mapear" = va a inventario pero aún sin ingrediente de Poster (los "solo panel" NO cuentan: es a propósito).
+  const isUnmapped = (p: ProdAlias) => p.toca_stock && p.poster_ingredient_id == null
+  const unmappedN = prod.filter(isUnmapped).length
+  // Cuántos alias apuntan a cada ingrediente de Poster (varios raw distintos → mismo ingrediente es válido y se marca).
+  const ingCount = new Map<number, number>()
+  for (const p of prod) if (p.poster_ingredient_id != null) ingCount.set(p.poster_ingredient_id, (ingCount.get(p.poster_ingredient_id) ?? 0) + 1)
+  const needle = q.trim().toLowerCase()
+  const prodView = prod
+    .filter((p) => !needle || p.raw_norm.toLowerCase().includes(needle) || p.descripcion.toLowerCase().includes(needle))
+    // Orden por default: SIN MAPEAR primero, y dentro por importe acumulado desc (lo que más dinero pesa, arriba).
+    .sort((a, b) => (isUnmapped(a) === isUnmapped(b) ? (b.importe_acumulado - a.importe_acumulado) : isUnmapped(a) ? -1 : 1))
 
   return (
     <section className="rounded-card border border-border p-3">
@@ -989,13 +1002,19 @@ function AliasManager() {
           </div>)}
 
           {prod.length > 0 && (<div>
-            <div className="mb-1 text-label text-fg-muted">Productos ({prod.length})</div>
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-label text-fg-muted">Productos ({prod.length}) · {unmappedN > 0 ? <span className="text-warn">{unmappedN} sin mapear</span> : <span className="text-ok">todo mapeado ✓</span>}</div>
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar…" style={{ ...cell, width: 160 }} />
+            </div>
+            {needle && <div className="mb-1 text-label text-fg-muted">{prodView.length} coinciden con “{q.trim()}”</div>}
             <div className="space-y-1">
-              {prod.map((a) => {
+              {prodView.map((a) => {
                 const ing = a.poster_ingredient_id != null ? cat?.ingredients.find((i) => i.id === a.poster_ingredient_id) : null
+                const sharedN = a.poster_ingredient_id != null ? (ingCount.get(a.poster_ingredient_id) ?? 0) : 0
                 return (
                 <div key={a.raw_norm} className="group flex flex-wrap items-center gap-1">
-                  <span className="w-32 shrink-0 truncate text-label text-fg-muted" title={a.raw_norm}>{a.raw_norm}</span>
+                  <span className="w-32 shrink-0 truncate text-label text-fg-muted" title={`${a.raw_norm}  ·  $${a.importe_acumulado} en ${a.veces} ticket(s)`}>{a.raw_norm}</span>
+                  <span className="shrink-0 text-label tabular-nums text-fg-muted" title="importe acumulado · en cuántos tickets ha aparecido">{mxn(a.importe_acumulado)}·{a.veces}t</span>
                   <span className="text-fg-muted">→</span>
                   <input defaultValue={a.descripcion} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.descripcion) void saveProd({ raw_norm: a.raw_norm, descripcion: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 90 }} />
                   <input defaultValue={a.unidad ?? ''} onBlur={(e) => { if ((e.target.value.trim() || null) !== a.unidad) void saveProd({ raw_norm: a.raw_norm, unidad: e.target.value.trim() || null }) }} placeholder="unidad" style={{ ...cell, width: 56 }} />
@@ -1011,6 +1030,7 @@ function AliasManager() {
                       <option value="0">IVA 0%</option>
                       <option value="0.16">IVA 16%</option>
                     </select>
+                    {sharedN > 1 && <span className="shrink-0 text-label text-fg-muted" title={`${sharedN} alias distintos apuntan a ${ing?.name ?? 'este ingrediente'} — está permitido`}>⇢{sharedN}</span>}
                   </>) : (
                     <span className="text-label text-fg-muted italic">no va a inventario</span>
                   )}

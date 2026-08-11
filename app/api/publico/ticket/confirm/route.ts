@@ -111,21 +111,62 @@ export async function POST(req: NextRequest) {
   const { data: costos, error: costErr } = await supabase.from('publico_costos').insert(costoRows).select('id')
   if (costErr) return NextResponse.json({ error: costErr.message }, { status: 500 })
 
-  // 4) APRENDE: alias de proveedor + de productos donde tu texto difiere del que leyó la IA.
-  const supAliases: Array<{ raw_norm: string; proveedor: string }> = []
-  if (b.proveedor_raw && normAlias(b.proveedor_raw) !== normAlias(proveedor)) {
-    supAliases.push({ raw_norm: normAlias(b.proveedor_raw), proveedor })
-  }
-  const prodAliases = new Map<string, { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null }>()
-  for (const i of items) {
-    const desc = (i.descripcion ?? '').trim()
-    if (i.es_descuento || !i.descripcion_raw || !desc) continue
-    if (normAlias(i.descripcion_raw) === normAlias(desc)) continue     // no cambiaste nada → no hay alias que aprender
-    prodAliases.set(normAlias(i.descripcion_raw), { raw_norm: normAlias(i.descripcion_raw), descripcion: desc, categoria: b.category ?? null, unidad: i.unidad ?? null })
-  }
+  // 4) CATÁLOGO: registra CADA línea como alias (raw_norm → descripción), aunque no la corrijas, para poder
+  // mapearla a Poster. Colapsa por raw_norm (3 líneas idénticas de mozzarella = 1 fila) sumando el importe;
+  // `veces` cuenta TICKETS distintos (esa ida a Costco es 1 compra, no 3), para saber qué tan seguido lo
+  // compras — el volumen ya lo lleva importe_acumulado. NO pisa lo ya aprendido: el nombre canónico, la
+  // categoría, la unidad y el mapeo a Poster solo se escriben si esta vez los corregiste o si la fila es nueva.
   const now = new Date().toISOString()
-  if (supAliases.length) await supabase.from('ticket_supplier_aliases').upsert(supAliases.map((a) => ({ ...a, updated_at: now })), { onConflict: 'raw_norm' })
-  if (prodAliases.size) await supabase.from('ticket_product_aliases').upsert([...prodAliases.values()].map((a) => ({ ...a, updated_at: now })), { onConflict: 'raw_norm' })
 
-  return NextResponse.json({ ok: true, scanId, costoIds: (costos ?? []).map((c) => c.id), learned: { proveedores: supAliases.length, productos: prodAliases.size } })
+  // Proveedor: también se registra siempre (mismo hueco: sin fila no se puede mapear el proveedor a Poster).
+  const provRaw = b.proveedor_raw ? normAlias(b.proveedor_raw) : normAlias(proveedor)
+  if (provRaw) {
+    const { data: existSup } = await supabase.from('ticket_supplier_aliases').select('proveedor').eq('raw_norm', provRaw).maybeSingle()
+    const renamedSup = !!b.proveedor_raw && normAlias(b.proveedor_raw) !== normAlias(proveedor)
+    await supabase.from('ticket_supplier_aliases').upsert(
+      { raw_norm: provRaw, proveedor: renamedSup || !existSup ? proveedor : existSup.proveedor, updated_at: now },
+      { onConflict: 'raw_norm' },
+    )
+  }
+
+  // Productos: agrupa las líneas de ESTE ticket por raw_norm.
+  type Group = { raw_norm: string; canonical: string; renamed: boolean; categoria: string | null; unidad: string | null; sum: number }
+  const groups = new Map<string, Group>()
+  for (const i of items) {
+    if (i.es_descuento) continue
+    const canonical = (i.descripcion ?? '').trim()
+    const rawText = (i.descripcion_raw ?? i.descripcion ?? '').trim()
+    const key = normAlias(rawText)
+    if (!key || !canonical) continue
+    const g = groups.get(key) ?? { raw_norm: key, canonical, renamed: normAlias(rawText) !== normAlias(canonical), categoria: b.category ?? null, unidad: i.unidad ?? null, sum: 0 }
+    g.sum += Number(i.importe ?? 0)
+    groups.set(key, g)
+  }
+
+  let productos = 0
+  if (groups.size) {
+    const keys = [...groups.keys()]
+    const { data: existing } = await supabase.from('ticket_product_aliases')
+      .select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces').in('raw_norm', keys)
+    const prev = new Map((existing ?? []).map((r) => [r.raw_norm, r]))
+    const rows = [...groups.values()].map((g) => {
+      const e = prev.get(g.raw_norm)
+      return {
+        raw_norm: g.raw_norm,
+        // nombre/categoría/unidad: si ya existían, se conservan salvo que ESTA vez los hayas corregido.
+        descripcion: g.renamed || !e ? g.canonical : e.descripcion,
+        categoria: e?.categoria ?? g.categoria,
+        unidad: e?.unidad ?? g.unidad,
+        // acumulados: siempre suman (no pisan). El mapeo a Poster no va en el payload → queda intacto.
+        importe_acumulado: Number(e?.importe_acumulado ?? 0) + g.sum,
+        veces: Number(e?.veces ?? 0) + 1,   // +1 por TICKET (ya colapsado por raw_norm), no por línea
+        updated_at: now,
+      }
+    })
+    const { error: aliasErr } = await supabase.from('ticket_product_aliases').upsert(rows, { onConflict: 'raw_norm' })
+    if (aliasErr) return NextResponse.json({ error: aliasErr.message }, { status: 500 })
+    productos = rows.length
+  }
+
+  return NextResponse.json({ ok: true, scanId, costoIds: (costos ?? []).map((c) => c.id), learned: { productos } })
 }
