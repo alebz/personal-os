@@ -4,6 +4,12 @@ import { importWindow, shiftDays, type WindowDay } from '@/lib/posterImport'
 
 export const runtime = 'nodejs'
 
+// Inicio OFICIAL del histórico de Público Gourmet. NO backfillear antes de esta fecha: marzo–mayo 2026 fueron
+// el arranque INTERMITENTE del POS (días sueltos, sin operación real) y se descartaron a propósito — que la
+// API de Poster devuelva ventas ahí NO significa que "falten datos" en la base. Si a futuro ves huecos antes
+// de junio 2026, es deliberado, no un bug. Decisión del dueño (2026-08-10).
+const HISTORY_START = '2026-06-01'
+
 // POST /api/publico/poster/backfill?from=YYYY-MM-DD&to=YYYY-MM-DD — backfill MANUAL del histórico (una sola
 // vez). Rango EXPLÍCITO obligatorio. Trocea en ventanas ≤65 días (límite de getPaymentsReport para diario)
 // y llama importWindow por tramo → upsert respetando lo MANUAL, idempotente. NO va en ningún cron y NO
@@ -14,6 +20,9 @@ export async function POST(req: NextRequest) {
   const ok = (s: string | null) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s)
   if (!ok(from) || !ok(to) || from! > to!) {
     return NextResponse.json({ error: 'from y to (YYYY-MM-DD, from<=to) requeridos' }, { status: 400 })
+  }
+  if (from! < HISTORY_START) {
+    return NextResponse.json({ error: `El histórico de Público arranca el ${HISTORY_START}; marzo–mayo 2026 se descartaron (arranque intermitente del POS, sin operación real). No backfillees antes de esa fecha.` }, { status: 400 })
   }
 
   // Trocear [from..to] en ventanas de ≤65 días.
