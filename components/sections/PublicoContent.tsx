@@ -175,7 +175,7 @@ export default function PublicoContent() {
   }
 
   return (
-    <div data-theme-scope="publico" className="mx-auto flex max-w-4xl flex-col gap-4 p-4 text-fg">
+    <div data-theme-scope="publico" className="mx-auto flex max-w-6xl flex-col gap-4 p-4 text-fg">
       <header className="flex items-baseline justify-between">
         <h1 className="text-xl font-bold">Público Gourmet</h1>
         <div className="flex gap-1">
@@ -611,7 +611,7 @@ type PosterSupplier = { id: number; name: string }
 type PosterCatalog = { ingredients: PosterIngredient[]; suppliers: PosterSupplier[] }
 
 type FotoItem = { codigo: string | null; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean; categoria?: string | null; aliased?: boolean; posterIngredientId?: number | null; factorABase?: number | null; tocaStock?: boolean; ivaTasa?: number | null; pesoVariable?: boolean; discrepancia?: string | null }
-type FotoDraft = { proveedor: string; proveedor_raw: string; proveedor_rfc: string | null; sucursal: string | null; fecha: string | null; moneda: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number | null; legibilidad: 'alta' | 'media' | 'baja'; notas: string | null; items: FotoItem[]; proveedorAliased: boolean; posterSupplierId?: number | null }
+type FotoDraft = { proveedor: string; proveedor_raw: string; proveedor_rfc: string | null; sucursal: string | null; fecha: string | null; moneda: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number | null; legibilidad: 'alta' | 'media' | 'baja'; notas: string | null; items: FotoItem[]; proveedorAliased: boolean; posterSupplierId?: number | null; pagoEfectivo?: number | null; pagoTarjeta?: number | null; pagoUltimos4?: string | null }
 
 // Normaliza la foto EN EL CLIENTE antes de mandarla a la IA: la re-dibuja en un canvas capando el lado largo
 // a 1568px (el óptimo de Anthropic) y la re-exporta como JPEG de calidad 0.85. Esto mata las dos fallas de
@@ -656,6 +656,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
   const [origin, setOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
   const [mixed, setMixed] = useState(false)                 // pago mixto: split del total entre contenedores
   const [splitAmts, setSplitAmts] = useState<Record<string, number | null>>({})
+  const [pagoUnread, setPagoUnread] = useState(false)       // el ticket no trajo método de pago legible → elige tú
   const [dateApproved, setDateApproved] = useState(false)   // aprobación explícita de una fecha fuera de rango
   const [showPoster, setShowPoster] = useState(false)       // panel "lista para teclear en Poster"
   const fileRef = useRef<HTMLInputElement>(null)
@@ -670,7 +671,19 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
   const dateSuspect = !!d?.fecha && (d.fecha > todayLocal || d.fecha < floor60)
   const dateBlocked = dateSuspect && !dateApproved
 
-  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); setMixed(false); setSplitAmts({}); if (fileRef.current) fileRef.current.value = '' }
+  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); setMixed(false); setSplitAmts({}); setPagoUnread(false); if (fileRef.current) fileRef.current.value = '' }
+
+  // Resuelve el origen del pago desde el desglose leído del ticket. Reglas FIJAS del negocio (sin alias):
+  // efectivo → caja chica, tarjeta → CLIP. Dos montos → pago mixto ya prendido; uno → ese contenedor; ninguno
+  // legible → no adivina, marca pagoUnread para que el humano elija (mismo criterio que "sin mapear").
+  function resolvePago(draft: FotoDraft) {
+    const ef = draft.pagoEfectivo ?? 0, tj = draft.pagoTarjeta ?? 0
+    setMixed(false); setSplitAmts({}); setPagoUnread(false)
+    if (ef > 0 && tj > 0) { setMixed(true); setSplitAmts({ caja_chica: ef, clip: tj }) }
+    else if (ef > 0) setOrigin('caja_chica')
+    else if (tj > 0) setOrigin('clip')
+    else setPagoUnread(true)
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -685,6 +698,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
       const draft: FotoDraft = j.draft
       if (!draft.fecha) draft.fecha = defaultDate
       setD(draft)
+      resolvePago(draft)   // origen del pago pre-resuelto desde el ticket
     } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'no se pudo leer la foto') }
     finally { setBusy((b) => (b === 'extract' ? null : b)) }
   }
@@ -695,12 +709,25 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 
   const itemsSum = d ? d.items.reduce((s, it) => s + (it.es_descuento ? -1 : 1) * (Number(it.importe) || 0), 0) : 0
   const totalNum = d && d.total != null ? Number(d.total) : 0
-  const mismatch = d && Math.abs(itemsSum - totalNum) > 0.5   // aviso suave si las líneas no suman al total
+  // Reconciliación EN CÓDIGO (nunca la hace el modelo): la suma de líneas debe cuadrar con el SUBTOTAL impreso,
+  // porque las líneas son pre-IVA. Sin subtotal, cae a total−IVA; sin eso, al total. Comparación exacta al centavo.
+  const reconTarget = d ? (d.subtotal != null ? Number(d.subtotal)
+    : (d.total != null && d.impuestos != null ? Number(d.total) - Number(d.impuestos)
+    : (d.total != null ? Number(d.total) : null))) : null
+  const reconLabel = d?.subtotal != null ? 'subtotal' : (d?.total != null && d?.impuestos != null ? 'subtotal (total − IVA)' : 'total')
+  const reconDiff = reconTarget != null ? (Math.round(itemsSum * 100) - Math.round(reconTarget * 100)) / 100 : 0
+  const reconMismatch = reconTarget != null && Math.round(itemsSum * 100) !== Math.round(reconTarget * 100)
 
   // Pago mixto: los montos por contenedor deben cuadrar EXACTO con el total del ticket antes de confirmar.
   const splitKey = (k: OriginKey) => k ?? 'sin_caja'
   const splitSum = ORIGIN_OPTIONS.reduce((a, o) => a + (splitAmts[splitKey(o.key)] ?? 0), 0)
   const splitBlocked = mixed && (totalNum <= 0 || Math.abs(splitSum - totalNum) > 0.005)
+
+  // Validación del pago LEÍDO del ticket (punto 5): efectivo + tarjeta debe cuadrar al centavo con el total.
+  const pagoLeido = !!(d && ((d.pagoEfectivo ?? 0) > 0 || (d.pagoTarjeta ?? 0) > 0))
+  const pagoSum = (d?.pagoEfectivo ?? 0) + (d?.pagoTarjeta ?? 0)
+  const pagoDiff = d && d.total != null ? (Math.round(pagoSum * 100) - Math.round(Number(d.total) * 100)) / 100 : 0
+  const pagoMismatch = pagoLeido && d?.total != null && Math.round(pagoSum * 100) !== Math.round(Number(d.total) * 100)
 
   async function confirm() {
     if (!d) return
@@ -798,7 +825,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
             <label className="flex items-center gap-1"><span className="text-fg-muted">Impuestos</span><NumInput value={d.impuestos} onChange={(v) => patch({ impuestos: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
             <label className="flex items-center gap-1"><span className="font-bold text-fg">Total</span><NumInput value={d.total} onChange={(v) => patch({ total: v })} style={{ ...cell, width: 96, textAlign: 'right', fontSize: 15, fontWeight: 700 }} /></label>
           </div>
-          {mismatch && <div className="text-right text-label text-warn">las líneas suman {mxn(itemsSum)} · total {mxn(totalNum)} — revisa</div>}
+          {reconMismatch && reconTarget != null && <div className="text-right text-label text-warn">las líneas suman {mxn(itemsSum)} · {reconLabel} {mxn(reconTarget)} — diferencia {mxn(Math.abs(reconDiff))} {reconDiff > 0 ? 'de más en líneas' : 'de menos en líneas'} — revisa</div>}
 
           {/* Categoría + origen del roll-up */}
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
@@ -807,9 +834,21 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
               <button key={c.key} onClick={() => { setCat(c.key); setOrigin(catDefaults(c.key).defaultOrigin) }} style={fotoChip(cat === c.key)}>{c.label}</button>
             ))}
             <span className="ml-2 text-label text-fg-muted">desde</span>
-            {!mixed && ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setOrigin(ct.key)} style={fotoChip(origin === ct.key)}>{ct.label}</button>))}
-            <button onClick={() => setMixed((m) => !m)} style={fotoChip(mixed)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
+            {!mixed && ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => { setOrigin(ct.key); setPagoUnread(false) }} style={fotoChip(!pagoUnread && origin === ct.key)}>{ct.label}</button>))}
+            <button onClick={() => { setMixed((m) => !m); setPagoUnread(false) }} style={fotoChip(mixed)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
           </div>
+
+          {/* Método de pago LEÍDO del ticket (regla fija: efectivo→caja chica, tarjeta→CLIP). El origen llega
+              pre-resuelto; tú solo confirmas o corriges. Si no se leyó, no adivina y te pide elegir. */}
+          {pagoLeido && (
+            <div className="text-label text-fg-muted">
+              💳 pago del ticket: {(d.pagoEfectivo ?? 0) > 0 && <>efectivo {mxn(d.pagoEfectivo!)} <span className="text-ok">→ caja chica</span></>}
+              {(d.pagoEfectivo ?? 0) > 0 && (d.pagoTarjeta ?? 0) > 0 && ' · '}
+              {(d.pagoTarjeta ?? 0) > 0 && <>tarjeta {mxn(d.pagoTarjeta!)}{d.pagoUltimos4 ? ` ••${d.pagoUltimos4}` : ''} <span className="text-ok">→ CLIP</span></>}
+            </div>
+          )}
+          {pagoMismatch && <div className="text-label text-warn">⚠ el pago leído suma {mxn(pagoSum)} pero el total es {mxn(totalNum)} — diferencia {mxn(Math.abs(pagoDiff))} — revisa</div>}
+          {pagoUnread && <div className="rounded-card border border-warn bg-warn/10 p-2 text-label text-warn">⚠ No se leyó el método de pago del ticket. Elige el origen arriba — no se adivinó.</div>}
 
           {/* PAGO MIXTO: monto por contenedor; deben sumar EXACTO al total del ticket o no deja confirmar. */}
           {mixed && (
@@ -916,7 +955,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <button onClick={reset} disabled={busy === 'confirm'} className="rounded-card px-3 py-1.5 text-secondary text-fg-muted hover:text-fg disabled:opacity-50">Descartar</button>
-            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked || splitBlocked} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : splitBlocked ? 'Los contenedores deben sumar exacto al total' : undefined} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
+            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked || splitBlocked || pagoUnread} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : splitBlocked ? 'Los contenedores deben sumar exacto al total' : pagoUnread ? 'Elige el origen del pago (no se pudo leer del ticket)' : undefined} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
           </div>
         </div>
       )}
