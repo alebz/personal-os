@@ -494,17 +494,21 @@ function Direccion() {
   )
 }
 
-// ── Food cost real vs teórico (F4). Métrica principal = GAP. Teórico siempre (99% cobertura de receta);
-// real+gap SOLO en meses acotados por conteos físicos. Prefiere decir "no confiable" a un número falso. ──
-type FCMonth = { month: string; sales: number; theoreticalPct: number; reliability: 'confiable' | 'arranque' | 'no_confiable'; realPct: number | null; gapPct: number | null; startupAdjustment?: number; note?: string }
-type FCData = { months: FCMonth[]; lastCountDate: string | null; daysSinceCount: number | null; countAlert: boolean; anyReliable: boolean; todayStatus: string }
+// ── Food cost real vs teórico (F4). Métrica principal = GAP. Teórico por MES (siempre, 99% cobertura);
+// real+gap SOLO en PERIODOS entre conteos físicos (no por mes: el ajuste del conteo se contabiliza el día
+// del conteo). Prefiere decir "no confiable" a un número falso. ──
+type FCMonth = { month: string; sales: number; theoreticalPct: number }
+type FCPeriod = { from: string; to: string; kind: 'arranque' | 'confiable' | 'abierto'; sales: number; theoreticalPct: number; realPct: number | null; gapPct: number | null; startupAdjustment?: number; note?: string }
+type FCData = { theoreticalByMonth: FCMonth[]; periods: FCPeriod[]; lastCountDate: string | null; daysSinceCount: number | null; countAlert: boolean; anyReliable: boolean; todayStatus: string }
 
-const REL_BADGE: Record<FCMonth['reliability'], { dot: string; label: string; cls: string }> = {
+const KIND_BADGE: Record<FCPeriod['kind'], { dot: string; label: string; cls: string }> = {
   confiable: { dot: '🟢', label: 'acotado por conteos', cls: 'text-ok' },
   arranque: { dot: '🟡', label: 'arranque del sistema', cls: 'text-warn' },
-  no_confiable: { dot: '⚪', label: 'sin conteo · deriva', cls: 'text-fg-muted' },
+  abierto: { dot: '⚪', label: 'en curso · sin conteo', cls: 'text-fg-muted' },
 }
-const monthLabel = (m: string) => { const [y, mm] = m.split('-'); return `${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(mm) - 1]} ${y}` }
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const monthLabel = (m: string) => { const [y, mm] = m.split('-'); return `${MESES[Number(mm) - 1]} ${y}` }
+const dayLabelShort = (iso: string) => { const [, mm, dd] = iso.split('-'); return `${Number(dd)} ${MESES[Number(mm) - 1]}` }
 
 function FoodCostPanel() {
   const [d, setD] = useState<FCData | null>(null)
@@ -529,38 +533,48 @@ function FoodCostPanel() {
 
       {/* Aviso de conteo accionable */}
       {d.countAlert && (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded-card border border-danger bg-danger/10 p-2 text-label">
-          <span className="text-danger">🧮 Último conteo físico hace {d.daysSinceCount} días ({d.lastCountDate}). Hacer un conteo desbloquea el food cost real de este periodo.</span>
-        </div>
+        <div className="mb-2 rounded-card border border-danger bg-danger/10 p-2 text-label text-danger">🧮 Último conteo físico hace {d.daysSinceCount} días ({d.lastCountDate}). Hacer un conteo desbloquea el food cost real de este periodo.</div>
       )}
 
+      {/* Real por PERIODO entre conteos (la métrica) */}
+      <div className="mb-1 text-label text-fg-muted">Real por periodo de conteo</div>
       <div className="space-y-2">
-        {d.months.map((m) => {
-          const b = REL_BADGE[m.reliability]
+        {d.periods.map((p, i) => {
+          const b = KIND_BADGE[p.kind]
           return (
-            <div key={m.month} className="rounded-card border border-border p-2">
+            <div key={i} className="rounded-card border border-border p-2">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-fg">{monthLabel(m.month)}</span>
+                <span className="font-medium text-fg">{dayLabelShort(p.from)} → {dayLabelShort(p.to)}</span>
                 <span className={`text-label ${b.cls}`}>{b.dot} {b.label}</span>
               </div>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-secondary">
-                <span className="text-fg-muted">ventas <span className="tabular-nums text-fg">{mxn(m.sales)}</span></span>
-                <span className="text-fg-muted">teórico <span className="tabular-nums font-medium text-fg">{m.theoreticalPct.toFixed(1)}%</span></span>
-                {m.reliability === 'confiable' && m.realPct != null && m.gapPct != null && (<>
-                  <span className="text-fg-muted">real <span className="tabular-nums font-medium text-fg">{m.realPct.toFixed(1)}%</span></span>
-                  <span className={`font-bold ${m.gapPct > 3 ? 'text-danger' : m.gapPct < -3 ? 'text-warn' : 'text-ok'}`}>gap {m.gapPct > 0 ? '+' : ''}{m.gapPct.toFixed(1)} pts</span>
+                <span className="text-fg-muted">ventas <span className="tabular-nums text-fg">{mxn(p.sales)}</span></span>
+                <span className="text-fg-muted">teórico <span className="tabular-nums font-medium text-fg">{p.theoreticalPct.toFixed(1)}%</span></span>
+                {p.kind === 'confiable' && p.realPct != null && p.gapPct != null && (<>
+                  <span className="text-fg-muted">real <span className="tabular-nums font-medium text-fg">{p.realPct.toFixed(1)}%</span></span>
+                  <span className={`font-bold ${p.gapPct > 3 ? 'text-danger' : p.gapPct < -3 ? 'text-warn' : 'text-ok'}`}>gap {p.gapPct > 0 ? '+' : ''}{p.gapPct.toFixed(1)} pts</span>
                 </>)}
-                {m.reliability === 'arranque' && m.startupAdjustment != null && (
-                  <span className="text-warn">write-down inicial {mxn(m.startupAdjustment)} · sin gap</span>
-                )}
-                {m.reliability === 'no_confiable' && <span className="italic text-fg-muted">real pendiente de conteo</span>}
+                {p.kind === 'arranque' && p.startupAdjustment != null && <span className="text-warn">write-down inicial {mxn(p.startupAdjustment)} · sin gap</span>}
+                {p.kind === 'abierto' && <span className="italic text-fg-muted">real pendiente de conteo</span>}
               </div>
-              {m.note && <div className="mt-1 text-label text-fg-muted">{m.note}</div>}
+              {p.note && <div className="mt-1 text-label text-fg-muted">{p.note}</div>}
             </div>
           )
         })}
       </div>
-      <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">El gap (real − teórico) es merma + sobre-porción + desperdicio + robo. Solo es legítimo en meses 🟢 acotados por conteos físicos.</div>
+
+      {/* Teórico por mes: baseline siempre visible */}
+      <div className="mb-1 mt-3 text-label text-fg-muted">Teórico por mes <span className="normal-case">(línea base, cobertura de receta 99%)</span></div>
+      <div className="space-y-0.5">
+        {d.theoreticalByMonth.map((m) => (
+          <div key={m.month} className="flex items-baseline justify-between text-secondary">
+            <span className="text-fg-muted">{monthLabel(m.month)}</span>
+            <span className="tabular-nums"><span className="text-fg-muted">{mxn(m.sales)} · </span><span className="font-medium text-fg">{m.theoreticalPct.toFixed(1)}%</span></span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">El gap (real − teórico) es merma + sobre-porción + desperdicio + robo. Solo es legítimo en periodos 🟢 cerrados entre dos conteos físicos.</div>
     </section>
   )
 }
