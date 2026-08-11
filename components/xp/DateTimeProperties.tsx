@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CalEvent } from '@/app/api/calendar/route'
 import { GroupBox, XpSelect, XpSpinner, XpContextMenu, XpDialogModal, XpField, XpLabel } from './xp-controls'
+import { applyScope, type Scope } from '@/lib/calendarScope'
 
 // "Propiedades de Fecha y hora" — DIÁLOGO DE SISTEMA XP NATIVO LITERAL (no reusa CalendarCard).
 // Group box "Fecha" (calendario XP: dropdown mes + spinner año, día seleccionado = cuadro azul) +
@@ -51,15 +52,19 @@ function EventDialog({ event, date, onClose, onSaved }: {
   const [rCount, setRCount] = useState(event?.rrule?.count ? String(event.rrule.count) : '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [scopeAsk, setScopeAsk] = useState<null | 'edit' | 'delete'>(null)
+  const [pruneAsk, setPruneAsk] = useState<null | { scope: Scope; staleCount: number }>(null)
   const recurring = freq !== ''
   const isSpan = !recurring && !!end && end > d
+  const isSeriesOcc = !!editingId && !!event?.rrule
+  const buildRrule = () => recurring ? { freq, ...(endMode === 'until' && rUntil ? { until: rUntil } : {}), ...(endMode === 'count' && Number(rCount) > 0 ? { count: Number(rCount) } : {}) } : undefined
 
   async function save() {
     if (!title.trim() || !d || busy) return
+    if (isSeriesOcc) { setScopeAsk('edit'); return }
     setBusy(true); setErr(null)
     try {
-      const rrule = recurring ? { freq, ...(endMode === 'until' && rUntil ? { until: rUntil } : {}), ...(endMode === 'count' && Number(rCount) > 0 ? { count: Number(rCount) } : {}) } : undefined
-      const payload = { title, event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined, rrule }
+      const payload = { title, event_date: d, event_end_date: isSpan ? end : undefined, event_time: isSpan ? undefined : (time || undefined), note: note || undefined, rrule: buildRrule() }
       const res = await fetch(editingId ? `/api/calendar/${editingId}` : '/api/calendar', {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,8 +77,21 @@ function EventDialog({ event, date, onClose, onSaved }: {
   }
   async function remove() {
     if (!editingId || busy) return
+    if (isSeriesOcc) { setScopeAsk('delete'); return }
     setBusy(true)
     try { await fetch(`/api/calendar/${editingId}`, { method: 'DELETE' }) } catch { /* refetch reconcilia */ }
+    onSaved(d); onClose()
+  }
+  async function runScope(scope: Scope, confirmPrune = false) {
+    if (!editingId || !event) return
+    setBusy(true)
+    const occ = event.allDay ? event.start.slice(0, 10) : key(new Date(event.start))
+    let res: { ok?: boolean; needsConfirm?: boolean; staleCount?: number }
+    try {
+      res = await applyScope({ mode: scopeAsk === 'delete' ? 'delete' : 'edit', scope, seriesId: editingId, occ, confirmPrune,
+        edit: scopeAsk === 'edit' ? { title: title.trim(), event_date: d, event_time: time || undefined, note: note || undefined, rrule: buildRrule() } : undefined })
+    } catch { setBusy(false); return }
+    if (res?.needsConfirm) { setPruneAsk({ scope, staleCount: res.staleCount ?? 0 }); setBusy(false); return }
     onSaved(d); onClose()
   }
 
@@ -81,9 +99,30 @@ function EventDialog({ event, date, onClose, onSaved }: {
     <XpDialogModal
       open title={editingId ? 'Editar evento' : 'Nuevo evento'} width={356}
       onCancel={onClose} onOk={save}
-      okLabel={busy ? 'Guardando…' : 'Aceptar'} okDisabled={busy || !title.trim() || !d}
-      onDelete={editingId ? remove : undefined}
+      okLabel={busy ? 'Guardando…' : 'Aceptar'} okDisabled={busy || !title.trim() || !d || !!scopeAsk}
+      onDelete={editingId && !scopeAsk ? remove : undefined}
     >
+      {scopeAsk ? (
+        pruneAsk ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 11 }}>
+            <p style={{ margin: 0, lineHeight: 1.5 }}>Este cambio va a quitar <b>{pruneAsk.staleCount}</b> {scopeAsk === 'delete' ? 'cancelación(es)' : 'excepción(es)'} que hiciste a mano y que ya no caen en la serie. ¿Sigo?</p>
+            <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
+              <button className="xp-raised" style={{ padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }} onClick={() => { setPruneAsk(null); setScopeAsk(null) }}>No</button>
+              <button className="xp-raised" style={{ padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', color: '#a02015' }} disabled={busy} onClick={() => void runScope(pruneAsk.scope, true)}>Sí, seguir</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
+            <div style={{ marginBottom: 3, color: '#333' }}>{scopeAsk === 'delete' ? 'Borrar' : 'Guardar cambios en'} un evento que se repite:</div>
+            <button className="xp-raised" style={{ padding: '6px 10px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }} disabled={busy} onClick={() => void runScope('solo')}>Solo este</button>
+            <button className="xp-raised" style={{ padding: '6px 10px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }} disabled={busy} onClick={() => void runScope('siguientes')}>Este y los siguientes</button>
+            <button className="xp-raised" style={{ padding: '6px 10px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }} disabled={busy} onClick={() => void runScope('toda')}>Toda la serie</button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 3 }}>
+              <button className="xp-raised" style={{ padding: '3px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }} onClick={() => setScopeAsk(null)}>Volver</button>
+            </div>
+          </div>
+        )
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
         <div>
           <XpLabel>Título</XpLabel>
@@ -132,6 +171,7 @@ function EventDialog({ event, date, onClose, onSaved }: {
         {recurring && endMode === 'count' && <div style={{ width: 110 }}><XpLabel>Veces</XpLabel><XpField type="number" value={rCount} onChange={(e) => setRCount(e.target.value)} /></div>}
         {err && <p style={{ fontSize: 11, color: '#a0201a', margin: 0 }}>{err}</p>}
       </div>
+      )}
     </XpDialogModal>
   )
 }

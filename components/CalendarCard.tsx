@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { CalEvent } from '@/app/api/calendar/route'
 import { WEEKDAY_RAINBOW, dayColor, crtDayColor, contrastInk, lightDayInk } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import { applyScope, type Scope } from '@/lib/calendarScope'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -85,6 +86,9 @@ export default function CalendarCard() {
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [formOpen,   setFormOpen]   = useState(false)   // collapsed to just the title until focused
   const [agendaOpen, setAgendaOpen] = useState(false)   // right agenda column; starts collapsed (month full width)
+  const [editingEv,  setEditingEv]  = useState<CalEvent | null>(null)   // el evento en edición (para saber si es serie)
+  const [scopePrompt,setScopePrompt]= useState<{ mode: 'edit' | 'delete'; ev: CalEvent } | null>(null)
+  const [pruneAsk,   setPruneAsk]   = useState<{ scope: Scope; staleCount: number } | null>(null)
   const { crt, shell } = useOSSettings()   // suscribe al estado CRT → re-render al togglear mono/multi (color reactivo)
   const isMono  = crt.on && crt.color === 'mono'
   // Color de día como TEXTO: bajo XP (ventana clara) se oscurece para legibilidad; los rellenos NO
@@ -140,8 +144,9 @@ export default function CalendarCard() {
   }
 
   function resetForm() {
-    setAddTitle(''); setAddTime(''); setAddNote(''); setAddEnd(''); setEditingUid(null); setAddError(null)
+    setAddTitle(''); setAddTime(''); setAddNote(''); setAddEnd(''); setEditingUid(null); setEditingEv(null); setAddError(null)
     setAddFreq(''); setAddRepMode('forever'); setAddRepUntil(''); setAddRepCount('')
+    setScopePrompt(null); setPruneAsk(null)
     setAddDate(selected ?? todayKey); setFormOpen(false)
   }
 
@@ -159,6 +164,7 @@ export default function CalendarCard() {
 
   function startEdit(ev: CalEvent) {
     setEditingUid(ev.uid)
+    setEditingEv(ev)
     setAddTitle(ev.title)
     // Multi-día: editar cualquier día del tramo prellena inicio=spanStart y fin=spanEnd.
     setAddDate(ev.spanStart ?? (ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start))))
@@ -176,6 +182,8 @@ export default function CalendarCard() {
     e.preventDefault()
     const date = addDate
     if (!addTitle.trim() || !date) return
+    // Editar una OCURRENCIA de serie → preguntar alcance en vez de PATCH directo.
+    if (editingEv?.rrule) { setScopePrompt({ mode: 'edit', ev: editingEv }); return }
     setAdding(true); setAddError(null)
     try {
       const editingId = editingUid?.startsWith('captured:') ? editingUid.slice('captured:'.length).split('#')[0] : null
@@ -206,12 +214,31 @@ export default function CalendarCard() {
 
   async function deleteEvent(ev: CalEvent) {
     if (!isEditable(ev)) return
+    // Borrar una OCURRENCIA de serie → preguntar alcance.
+    if (ev.rrule) { setConfirmDel(null); setScopePrompt({ mode: 'delete', ev }); return }
     const idPart = ev.uid.slice('captured:'.length).split('#')[0]
     setConfirmDel(null)
     setEvents(prev => prev.filter(x => x.uid !== ev.uid))       // optimistic
     if (editingUid === ev.uid) resetForm()
     try { await fetch(`/api/calendar/${idPart}`, { method: 'DELETE' }) } catch { /* refetch reconciles */ }
     await fetchEvents()
+  }
+
+  // Alcance elegido en el prompt → ruta al endpoint correcto (con pre-confirm de podado).
+  async function runScope(scope: Scope, confirmPrune = false) {
+    const sp = scopePrompt; if (!sp) return
+    const ev = sp.ev
+    const seriesId = ev.uid.slice('captured:'.length).split('#')[0]
+    const occ = ev.allDay ? ev.start.slice(0, 10) : localDateKey(new Date(ev.start))
+    const rrule = addFreq ? { freq: addFreq, ...(addRepMode === 'until' && addRepUntil ? { until: addRepUntil } : {}), ...(addRepMode === 'count' && Number(addRepCount) > 0 ? { count: Number(addRepCount) } : {}) } : undefined
+    setAdding(true)
+    let res: { ok?: boolean; needsConfirm?: boolean; staleCount?: number }
+    try {
+      res = await applyScope({ mode: sp.mode, scope, seriesId, occ, confirmPrune,
+        edit: sp.mode === 'edit' ? { title: addTitle.trim(), event_date: addDate, event_time: addTime || undefined, note: addNote || undefined, rrule } : undefined })
+    } catch { setAdding(false); return }
+    if (res?.needsConfirm) { setPruneAsk({ scope, staleCount: res.staleCount ?? 0 }); setAdding(false); return }
+    resetForm(); setLoading(true); await fetchEvents(); setAdding(false)
   }
 
   const byDate    = groupByDate(events)
@@ -230,6 +257,35 @@ export default function CalendarCard() {
 
   return (
     <div className={`relative rounded-card border border-border p-3 shadow-xl shadow-black/20 dashboard-card transition-[width] duration-300 ease-out sm:p-6 md:p-8 ${agendaOpen ? 'lg:w-full' : 'lg:mx-auto lg:w-[85%]'}`}>
+
+      {/* Alcance de serie: solo este / este y los siguientes / toda — con pre-confirm de podado */}
+      {scopePrompt && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center rounded-card bg-black/50 p-4" onClick={() => resetForm()}>
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-xs rounded-card border border-border bg-surface-1 p-4 shadow-2xl">
+            {pruneAsk ? (
+              <>
+                <p className="text-body text-fg">Este cambio va a quitar <b>{pruneAsk.staleCount}</b> {scopePrompt.mode === 'delete' ? 'cancelación(es)' : 'excepción(es)'} que hiciste a mano y que ya no caen en la serie. ¿Sigo?</p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button onClick={() => resetForm()} className="rounded-control px-3 py-1.5 text-secondary text-fg-muted hover:text-fg">No</button>
+                  <button onClick={() => void runScope(pruneAsk.scope, true)} disabled={adding} className="rounded-control bg-danger/15 px-3 py-1.5 text-secondary font-medium text-danger hover:bg-danger/25">Sí, seguir</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mb-3 text-secondary text-fg-muted">{scopePrompt.mode === 'delete' ? 'Borrar' : 'Guardar cambios en'} un evento que se repite:</p>
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => void runScope('solo')} disabled={adding} className="rounded-control border border-border px-3 py-2 text-left text-body text-fg hover:bg-surface-hover">Solo este</button>
+                  <button onClick={() => void runScope('siguientes')} disabled={adding} className="rounded-control border border-border px-3 py-2 text-left text-body text-fg hover:bg-surface-hover">Este y los siguientes</button>
+                  <button onClick={() => void runScope('toda')} disabled={adding} className="rounded-control border border-border px-3 py-2 text-left text-body text-fg hover:bg-surface-hover">Toda la serie</button>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <button onClick={() => setScopePrompt(null)} className="rounded-control px-3 py-1.5 text-secondary text-fg-muted hover:text-fg">Cancelar</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="mb-4 flex items-end justify-between md:mb-6">
