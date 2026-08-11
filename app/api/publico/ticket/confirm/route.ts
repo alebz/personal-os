@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { normAlias } from '@/lib/ticketExtract'
+import { normAlias, stemAlias } from '@/lib/ticketExtract'
 import { todayMX, shiftDays } from '@/lib/posterImport'
 
 export const runtime = 'nodejs'
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Productos: agrupa las líneas de ESTE ticket por raw_norm.
-  type Group = { raw_norm: string; canonical: string; renamed: boolean; categoria: string | null; unidad: string | null; sum: number }
+  type Group = { raw_norm: string; stem: string; canonical: string; renamed: boolean; categoria: string | null; unidad: string | null; sum: number; qty: number }
   const groups = new Map<string, Group>()
   for (const i of items) {
     if (i.es_descuento) continue
@@ -138,8 +138,9 @@ export async function POST(req: NextRequest) {
     const rawText = (i.descripcion_raw ?? i.descripcion ?? '').trim()
     const key = normAlias(rawText)
     if (!key || !canonical) continue
-    const g = groups.get(key) ?? { raw_norm: key, canonical, renamed: normAlias(rawText) !== normAlias(canonical), categoria: b.category ?? null, unidad: i.unidad ?? null, sum: 0 }
+    const g = groups.get(key) ?? { raw_norm: key, stem: stemAlias(rawText), canonical, renamed: normAlias(rawText) !== normAlias(canonical), categoria: b.category ?? null, unidad: i.unidad ?? null, sum: 0, qty: 0 }
     g.sum += Number(i.importe ?? 0)
+    g.qty += Number(i.cantidad ?? 0)
     groups.set(key, g)
   }
 
@@ -147,18 +148,20 @@ export async function POST(req: NextRequest) {
   if (groups.size) {
     const keys = [...groups.keys()]
     const { data: existing } = await supabase.from('ticket_product_aliases')
-      .select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces').in('raw_norm', keys)
+      .select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces, cantidad_acumulada').in('raw_norm', keys)
     const prev = new Map((existing ?? []).map((r) => [r.raw_norm, r]))
     const rows = [...groups.values()].map((g) => {
       const e = prev.get(g.raw_norm)
       return {
         raw_norm: g.raw_norm,
+        raw_stem: g.stem,   // el stem (sin número) se guarda siempre; habilita consolidar si luego marcas peso_variable
         // nombre/categoría/unidad: si ya existían, se conservan salvo que ESTA vez los hayas corregido.
         descripcion: g.renamed || !e ? g.canonical : e.descripcion,
         categoria: e?.categoria ?? g.categoria,
         unidad: e?.unidad ?? g.unidad,
         // acumulados: siempre suman (no pisan). El mapeo a Poster no va en el payload → queda intacto.
         importe_acumulado: Number(e?.importe_acumulado ?? 0) + g.sum,
+        cantidad_acumulada: Number(e?.cantidad_acumulada ?? 0) + g.qty,   // para precio/unidad = importe_acum / cant_acum
         veces: Number(e?.veces ?? 0) + 1,   // +1 por TICKET (ya colapsado por raw_norm), no por línea
         updated_at: now,
       }

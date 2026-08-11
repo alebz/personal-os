@@ -610,7 +610,7 @@ type PosterIngredient = { id: number; name: string; unit: string }
 type PosterSupplier = { id: number; name: string }
 type PosterCatalog = { ingredients: PosterIngredient[]; suppliers: PosterSupplier[] }
 
-type FotoItem = { codigo: string | null; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean; categoria?: string | null; aliased?: boolean; posterIngredientId?: number | null; factorABase?: number | null; tocaStock?: boolean; ivaTasa?: number | null }
+type FotoItem = { codigo: string | null; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean; categoria?: string | null; aliased?: boolean; posterIngredientId?: number | null; factorABase?: number | null; tocaStock?: boolean; ivaTasa?: number | null; pesoVariable?: boolean; discrepancia?: string | null }
 type FotoDraft = { proveedor: string; proveedor_raw: string; proveedor_rfc: string | null; sucursal: string | null; fecha: string | null; moneda: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number | null; legibilidad: 'alta' | 'media' | 'baja'; notas: string | null; items: FotoItem[]; proveedorAliased: boolean; posterSupplierId?: number | null }
 
 // Normaliza la foto EN EL CLIENTE antes de mandarla a la IA: la re-dibuja en un canvas capando el lado largo
@@ -773,16 +773,20 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
           {/* Líneas */}
           <div className="space-y-1">
             {d.items.map((it, i) => (
-              <div key={i} className="group flex items-center gap-1">
-                <input value={it.descripcion} onChange={(e) => patchItem(i, { descripcion: e.target.value })} style={{ ...cell, flex: 1, minWidth: 100 }} title={it.descripcion_raw && it.descripcion_raw !== it.descripcion ? `IA: ${it.descripcion_raw}` : undefined} placeholder="descripción" />
-                {it.aliased && <span className="text-ok" title="alias aplicado">✓</span>}
-                <NumInput value={it.cantidad ?? null} onChange={(v) => patchItem(i, { cantidad: v })} style={{ ...cell, width: 46, textAlign: 'right' }} placeholder="cant" />
-                <input value={it.unidad ?? ''} onChange={(e) => patchItem(i, { unidad: e.target.value.trim() || null })} style={{ ...cell, width: 44 }} placeholder="u" title="unidad de la cantidad (PZA, KG, G, L…) — la barra de mapeo la convierte a la unidad base de Poster" />
-                {/* P.U. DERIVADO (importe ÷ cantidad), read-only: el importe es la fuente de verdad, el P.U. nunca. */}
-                <span style={{ ...cell, width: 64, textAlign: 'right', opacity: 0.6, background: 'transparent', fontVariantNumeric: 'tabular-nums' }} title="P.U. derivado = importe ÷ cantidad (no editable)">{it.cantidad ? (it.importe / it.cantidad).toFixed(2) : '—'}</span>
-                <NumInput value={it.importe} onChange={(v) => patchItem(i, { importe: v ?? 0 })} style={{ ...cell, width: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} placeholder="importe" />
-                <button onClick={() => patchItem(i, { es_descuento: !it.es_descuento })} style={fotoChip(it.es_descuento)} title="marca si es cupón/descuento">desc</button>
-                <button onClick={() => delItem(i)} className="px-1 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar línea">✕</button>
+              <div key={i}>
+                <div className="group flex items-center gap-1" style={it.discrepancia ? { outline: '1px solid var(--color-danger)', outlineOffset: 2, borderRadius: 6 } : undefined}>
+                  <input value={it.descripcion} onChange={(e) => patchItem(i, { descripcion: e.target.value })} style={{ ...cell, flex: 1, minWidth: 100 }} title={it.descripcion_raw && it.descripcion_raw !== it.descripcion ? `IA: ${it.descripcion_raw}` : undefined} placeholder="descripción" />
+                  {it.aliased && <span className="text-ok" title="alias aplicado">✓</span>}
+                  {it.pesoVariable && <span title="peso variable — la cantidad es el peso leído del ticket">⚖</span>}
+                  <NumInput value={it.cantidad ?? null} onChange={(v) => patchItem(i, { cantidad: v })} style={{ ...cell, width: 46, textAlign: 'right' }} placeholder="cant" />
+                  <input value={it.unidad ?? ''} onChange={(e) => patchItem(i, { unidad: e.target.value.trim() || null })} style={{ ...cell, width: 44 }} placeholder="u" title="unidad de la cantidad (PZA, KG, G, L…) — la barra de mapeo la convierte a la unidad base de Poster" />
+                  {/* P.U. DERIVADO (importe ÷ cantidad), read-only: el importe es la fuente de verdad, el P.U. nunca. */}
+                  <span style={{ ...cell, width: 64, textAlign: 'right', opacity: 0.6, background: 'transparent', fontVariantNumeric: 'tabular-nums' }} title="P.U. derivado = importe ÷ cantidad (no editable)">{it.cantidad ? (it.importe / it.cantidad).toFixed(2) : '—'}</span>
+                  <NumInput value={it.importe} onChange={(v) => patchItem(i, { importe: v ?? 0 })} style={{ ...cell, width: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} placeholder="importe" />
+                  <button onClick={() => patchItem(i, { es_descuento: !it.es_descuento })} style={fotoChip(it.es_descuento)} title="marca si es cupón/descuento">desc</button>
+                  <button onClick={() => delItem(i)} className="px-1 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar línea">✕</button>
+                </div>
+                {it.discrepancia && <div className="mt-0.5 pl-1 text-label text-danger">⚠ dato dudoso: {it.discrepancia} — verifícalo, no se ajustó solo.</div>}
               </div>
             ))}
             <button onClick={() => setD((cur) => (cur ? { ...cur, items: [...cur.items, { codigo: null, descripcion: '', descripcion_raw: null, cantidad: null, unidad: null, precio_unitario: null, importe: 0, es_descuento: false }] } : cur))} className="text-label text-fg-muted hover:text-accent">＋ línea</button>
@@ -923,7 +927,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 // ── Alias aprendidos del capturador: verlos, editarlos o borrarlos. Una corrección tuya pudo enseñar un
 // error; aquí se arregla. raw_norm (la llave de match) es de solo lectura — para re-mapear, borra y re-aprende. ──
 type SupAlias = { raw_norm: string; proveedor: string; poster_supplier_id: number | null }
-type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean; iva_tasa: number | null; importe_acumulado: number; veces: number }
+type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean; iva_tasa: number | null; importe_acumulado: number; cantidad_acumulada: number; veces: number; peso_variable: boolean; raw_stem: string | null }
 
 function AliasManager() {
   const [open, setOpen] = useState(false)
@@ -932,6 +936,7 @@ function AliasManager() {
   const [prod, setProd] = useState<ProdAlias[]>([])
   const [cat, setCat] = useState<PosterCatalog | null>(null)   // catálogo Poster para los selectores de mapeo
   const [q, setQ] = useState('')                               // buscador de productos
+  const [consolidate, setConsolidate] = useState<{ survivor: ProdAlias; siblings: ProdAlias[] } | null>(null)  // panel de fusión
 
   const loadAliases = useCallback(async () => {
     setLoading(true)
@@ -953,6 +958,23 @@ function AliasManager() {
   }
   async function del(type: 'supplier' | 'product', raw_norm: string) {
     await fetch(`/api/publico/ticket/aliases?type=${type}&raw_norm=${encodeURIComponent(raw_norm)}`, { method: 'DELETE' })
+    await loadAliases()
+  }
+  // Al marcar peso_variable: guarda el flag y, si hay hermanas (mismo stem, distinto raw_norm), abre el panel
+  // de consolidación en vez de fusionar a ciegas — tú confirmas qué filas se unen.
+  async function togglePesoVariable(a: ProdAlias) {
+    const next = !a.peso_variable
+    await patchAlias('product', a.raw_norm, { peso_variable: next })
+    if (next && a.raw_stem) {
+      const siblings = prod.filter((p) => p.raw_stem === a.raw_stem && p.raw_norm !== a.raw_norm)
+      if (siblings.length) { setConsolidate({ survivor: { ...a, peso_variable: true }, siblings }); return }
+    }
+    await loadAliases()
+  }
+  async function doConsolidate() {
+    if (!consolidate) return
+    await fetch('/api/publico/ticket/aliases', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'consolidate', survivor: consolidate.survivor.raw_norm, victims: consolidate.siblings.map((s) => s.raw_norm) }) })
+    setConsolidate(null)
     await loadAliases()
   }
 
@@ -982,6 +1004,26 @@ function AliasManager() {
         <div className="mt-2 space-y-3">
           {loading && <p className="text-secondary italic text-fg-muted">Cargando…</p>}
           {!loading && total === 0 && <p className="text-secondary italic text-fg-muted">Aún no hay alias. Se aprenden cuando corriges un ticket.</p>}
+
+          {/* Consolidación: fusión DESTRUCTIVA de hermanas por stem. Muestra qué se une y pide confirmación. */}
+          {consolidate && (() => {
+            const s = consolidate.survivor, sib = consolidate.siblings
+            const impSum = s.importe_acumulado + sib.reduce((a, x) => a + x.importe_acumulado, 0)
+            const vecSum = s.veces + sib.reduce((a, x) => a + x.veces, 0)
+            return (
+              <div className="rounded-card border border-warn bg-warn/10 p-3 text-label">
+                <div className="font-bold text-warn">⚖ Consolidar peso variable — comparten stem “{s.raw_stem}”</div>
+                <div className="mt-1 text-fg-muted">Se fusionan en <b>1 fila</b> (queda “{s.descripcion}”), sumando acumulados a ${impSum.toFixed(2)} en {vecSum} ticket(s). Esto BORRA {sib.length} fila(s):</div>
+                <ul className="mt-1 list-disc pl-5">
+                  {sib.map((x) => <li key={x.raw_norm}><span className="text-fg-muted">{x.raw_norm}</span> · {mxn(x.importe_acumulado)} · {x.veces}t</li>)}
+                </ul>
+                <div className="mt-2 flex justify-end gap-2">
+                  <button onClick={() => { setConsolidate(null); void loadAliases() }} className="rounded-control px-3 py-1 text-fg-muted hover:text-fg">No fusionar</button>
+                  <button onClick={() => void doConsolidate()} className="rounded-control bg-warn px-3 py-1 font-bold text-white">Fusionar {sib.length + 1} → 1</button>
+                </div>
+              </div>
+            )
+          })()}
 
           {sup.length > 0 && (<div>
             <div className="mb-1 text-label text-fg-muted">Proveedores ({sup.length})</div>
@@ -1015,6 +1057,8 @@ function AliasManager() {
                 <div key={a.raw_norm} className="group flex flex-wrap items-center gap-1">
                   <span className="w-32 shrink-0 truncate text-label text-fg-muted" title={`${a.raw_norm}  ·  $${a.importe_acumulado} en ${a.veces} ticket(s)`}>{a.raw_norm}</span>
                   <span className="shrink-0 text-label tabular-nums text-fg-muted" title="importe acumulado · en cuántos tickets ha aparecido">{mxn(a.importe_acumulado)}·{a.veces}t</span>
+                  {/* Precio por unidad (importe_acum / cantidad_acum): el dato útil en peso variable, donde el importe varía. */}
+                  {a.cantidad_acumulada > 0 && <span className="shrink-0 text-label tabular-nums text-ok" title={`precio promedio por ${a.unidad ?? 'unidad'} = importe acumulado ÷ cantidad acumulada (${a.cantidad_acumulada})`}>{mxn(a.importe_acumulado / a.cantidad_acumulada)}/{a.unidad ?? 'u'}</span>}
                   <span className="text-fg-muted">→</span>
                   <input defaultValue={a.descripcion} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.descripcion) void saveProd({ raw_norm: a.raw_norm, descripcion: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 90 }} />
                   <input defaultValue={a.unidad ?? ''} onBlur={(e) => { if ((e.target.value.trim() || null) !== a.unidad) void saveProd({ raw_norm: a.raw_norm, unidad: e.target.value.trim() || null }) }} placeholder="unidad" style={{ ...cell, width: 56 }} />
@@ -1024,7 +1068,7 @@ function AliasManager() {
                       <option value="">⚠ Poster: sin mapear</option>
                       {(cat?.ingredients ?? []).map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
                     </select>
-                    <input defaultValue={a.factor_a_base ?? ''} onBlur={(e) => { const v = e.target.value.trim() === '' ? null : Number(e.target.value); if (v !== a.factor_a_base) void patchAlias('product', a.raw_norm, { factor_a_base: v }) }} placeholder="×factor" title={`cantidad del ticket × factor = cantidad en ${ing?.unit ?? 'unidad base'} de Poster`} inputMode="decimal" style={{ ...cell, width: 60, textAlign: 'right' }} />
+                    <input defaultValue={a.factor_a_base ?? ''} onBlur={(e) => { const v = e.target.value.trim() === '' ? null : Number(e.target.value); if (v !== a.factor_a_base) void patchAlias('product', a.raw_norm, { factor_a_base: v }) }} placeholder="×factor" title={a.peso_variable ? `peso variable: el factor solo convierte la unidad del peso a ${ing?.unit ?? 'la base'} de Poster (kg→kg=1, g→kg=0.001)` : `cantidad del ticket × factor = cantidad en ${ing?.unit ?? 'unidad base'} de Poster`} inputMode="decimal" style={{ ...cell, width: 60, textAlign: 'right' }} />
                     <select value={a.iva_tasa ?? ''} onChange={(e) => void patchAlias('product', a.raw_norm, { iva_tasa: e.target.value === '' ? null : Number(e.target.value) })} style={{ ...cell, width: 96 }} title="Tasa de IVA por default de este producto (se usa si el ticket no la marca)">
                       <option value="">IVA: s/def</option>
                       <option value="0">IVA 0%</option>
@@ -1034,6 +1078,7 @@ function AliasManager() {
                   </>) : (
                     <span className="text-label text-fg-muted italic">no va a inventario</span>
                   )}
+                  {a.toca_stock && <button onClick={() => void togglePesoVariable(a)} style={fotoChipSmall(a.peso_variable)} title="peso variable: el peso va en el nombre y cambia cada compra. Consolida las hermanas por stem y toma el peso leído como cantidad.">⚖ peso var</button>}
                   <button onClick={() => void patchAlias('product', a.raw_norm, { toca_stock: !a.toca_stock })} style={fotoChipSmall(a.toca_stock)} title="¿esta línea entra al inventario de Poster?">{a.toca_stock ? 'stock' : 'solo panel'}</button>
                   <button onClick={() => void del('product', a.raw_norm)} className="px-1 text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger" aria-label="Borrar">✕</button>
                 </div>

@@ -15,7 +15,7 @@ export async function GET() {
   const supabase = createServerClient()
   const [{ data: suppliers }, { data: products }] = await Promise.all([
     supabase.from('ticket_supplier_aliases').select('raw_norm, proveedor, poster_supplier_id, updated_at').order('updated_at', { ascending: false }),
-    supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, poster_ingredient_type, factor_a_base, toca_stock, iva_tasa, importe_acumulado, veces, updated_at').order('updated_at', { ascending: false }),
+    supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, poster_ingredient_type, factor_a_base, toca_stock, iva_tasa, importe_acumulado, cantidad_acumulada, veces, peso_variable, raw_stem, updated_at').order('updated_at', { ascending: false }),
   ])
   return NextResponse.json({ suppliers: suppliers ?? [], products: products ?? [] })
 }
@@ -26,7 +26,7 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   let b: {
     type?: string; raw_norm?: string; proveedor?: string; descripcion?: string; categoria?: string | null; unidad?: string | null
-    poster_supplier_id?: number | null; poster_ingredient_id?: number | null; factor_a_base?: number | null; toca_stock?: boolean; iva_tasa?: number | null
+    poster_supplier_id?: number | null; poster_ingredient_id?: number | null; factor_a_base?: number | null; toca_stock?: boolean; iva_tasa?: number | null; peso_variable?: boolean
   }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   if (!b.raw_norm) return NextResponse.json({ error: 'raw_norm requerido' }, { status: 400 })
@@ -48,6 +48,7 @@ export async function PATCH(req: NextRequest) {
     if (b.factor_a_base !== undefined) upd.factor_a_base = b.factor_a_base ?? null
     if (b.toca_stock !== undefined) upd.toca_stock = !!b.toca_stock
     if (b.iva_tasa !== undefined) { if (b.iva_tasa != null && ![0, 0.16].includes(b.iva_tasa)) return NextResponse.json({ error: 'iva_tasa inválida (0, 0.16 o null)' }, { status: 400 }); upd.iva_tasa = b.iva_tasa ?? null }
+    if (b.peso_variable !== undefined) upd.peso_variable = !!b.peso_variable
     const { error } = await supabase.from('ticket_product_aliases').update(upd).eq('raw_norm', b.raw_norm)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   } else {
@@ -66,4 +67,42 @@ export async function DELETE(req: NextRequest) {
   const { error } = await supabase.from(table).delete().eq('raw_norm', raw_norm)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
+}
+
+// POST /api/publico/ticket/aliases  body: { action:'consolidate', survivor, victims:[raw_norm...] }
+// CONSOLIDA filas hermanas (mismo stem) de un producto de peso variable en UNA. DESTRUCTIVO: fusiona los
+// acumulados de las víctimas en el sobreviviente (importe, cantidad, veces) y BORRA las víctimas. El survivor
+// queda marcado peso_variable; su mapeo a Poster se conserva. El UI muestra qué filas se fusionan y confirma antes.
+export async function POST(req: NextRequest) {
+  let b: { action?: string; survivor?: string; victims?: string[] }
+  try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  if (b.action !== 'consolidate') return NextResponse.json({ error: 'action inválida' }, { status: 400 })
+  const survivor = (b.survivor ?? '').trim()
+  const victims = (b.victims ?? []).filter((v) => v && v !== survivor)
+  if (!survivor || !victims.length) return NextResponse.json({ error: 'survivor y victims requeridos' }, { status: 400 })
+
+  const supabase = createServerClient()
+  const all = [survivor, ...victims]
+  const { data: rows, error: readErr } = await supabase.from('ticket_product_aliases')
+    .select('raw_norm, raw_stem, importe_acumulado, cantidad_acumulada, veces').in('raw_norm', all)
+  if (readErr) return NextResponse.json({ error: readErr.message }, { status: 500 })
+  const byNorm = new Map((rows ?? []).map((r) => [r.raw_norm, r]))
+  const surv = byNorm.get(survivor)
+  if (!surv) return NextResponse.json({ error: 'survivor no existe' }, { status: 404 })
+  // Guardia: solo fusiona filas que realmente comparten stem con el survivor (no mezcla productos distintos).
+  const badStem = victims.filter((v) => byNorm.get(v) && byNorm.get(v)!.raw_stem !== surv.raw_stem)
+  if (badStem.length) return NextResponse.json({ error: `estas filas no comparten stem con el survivor: ${badStem.join(', ')}` }, { status: 400 })
+
+  const merged = {
+    peso_variable: true,
+    importe_acumulado: all.reduce((a, k) => a + Number(byNorm.get(k)?.importe_acumulado ?? 0), 0),
+    cantidad_acumulada: all.reduce((a, k) => a + Number(byNorm.get(k)?.cantidad_acumulada ?? 0), 0),
+    veces: all.reduce((a, k) => a + Number(byNorm.get(k)?.veces ?? 0), 0),
+    updated_at: new Date().toISOString(),
+  }
+  const { error: updErr } = await supabase.from('ticket_product_aliases').update(merged).eq('raw_norm', survivor)
+  if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+  const { error: delErr } = await supabase.from('ticket_product_aliases').delete().in('raw_norm', victims)
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+  return NextResponse.json({ ok: true, survivor, fusionadas: victims.length, ...merged })
 }

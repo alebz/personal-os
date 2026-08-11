@@ -26,6 +26,8 @@ export type TicketItem = {
   factorABase?: number | null          // num_poster = cantidad * factorABase
   tocaStock?: boolean                  // false = gasto que NO va a inventario (default true)
   ivaTasa?: number | null              // tasa de IVA de la línea: 0 | 0.16 | null (sin definir → no adivinar)
+  pesoVariable?: boolean               // true si el alias es de peso variable (cantidad = el peso leído, no un conteo)
+  discrepancia?: string | null         // la IA marcó esta línea como dudosa (leyó X pero no cuadra con Y)
 }
 export type TicketDraft = {
   proveedor: string
@@ -53,6 +55,14 @@ export function normAlias(s: string): string {
     .toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+// STEM: normAlias sin los tokens puramente numéricos. Para consolidar productos de PESO VARIABLE, cuyo peso
+// va en el nombre y cambia en cada compra. "QUESO MANCHEGO 1.234 KG" → normAlias "QUESO MANCHEGO 1 234 KG"
+// → stem "QUESO MANCHEGO KG". Se usa SOLO para el match de filas peso_variable (opt-in), nunca en general
+// (si no, fusionaría "LECHE 1L" con "LECHE 2L", que son productos distintos).
+export function stemAlias(s: string): string {
+  return normAlias(s).split(' ').filter((t) => t && !/^\d+$/.test(t)).join(' ')
+}
+
 const TOOL: Anthropic.Tool = {
   name: 'registrar_ticket',
   description: 'Registra los datos extraídos del ticket de compra.',
@@ -77,6 +87,7 @@ const TOOL: Anthropic.Tool = {
             importe: { type: 'number' },
             es_descuento: { type: 'boolean', description: 'true si la línea es un cupón/descuento (resta)' },
             iva_tasa: { type: ['number', 'null'], description: 'Tasa de IVA de ESTA línea, leída del marcador impreso (letra/código junto al precio): 0 si es exenta o tasa 0% (alimentos básicos), 0.16 si causa 16%. null si NO hay marcador legible o es ambiguo — NUNCA la adivines.' },
+            discrepancia: { type: ['string', 'null'], description: 'null si el valor de la línea es confiable. Si un importe/dígito NO cuadra (con el subtotal, con líneas hermanas idénticas, o parece mal leído), NO lo ajustes: transcribe lo que lees y describe aquí la duda citando ambos valores (ej. "leí 326.26 pero las hermanas dicen 326.33").' },
           },
           required: ['descripcion', 'importe', 'es_descuento'],
         },
@@ -96,12 +107,12 @@ const TOOL: Anthropic.Tool = {
 const SYS = `Eres un extractor de tickets de compra mexicanos (súper, proveedores). Lee la foto y llena la herramienta.
 Reglas: transcribe la descripción TAL CUAL aparece (no traduzcas, no expandas abreviaturas). Montos como números en la moneda del ticket.
 Si un dígito/campo es ilegible o está tapado, pon null y anótalo en notas — NUNCA inventes. Marca cupones/descuentos con es_descuento=true.
-NUNCA "corrijas" ni armonices un número para que cuadre: transcribe SIEMPRE el valor tal como lo lees, aunque parezca inconsistente. Si un importe no cuadra con el subtotal, o difiere de líneas hermanas idénticas, o parece mal leído, NO lo ajustes — déjalo tal cual y ANOTA la discrepancia en notas, citando la línea y ambos valores (ej. "mozzarella línea 1: leí 326.26 pero las hermanas dicen 326.33; no lo ajusté"). Marcar la duda es correcto; ajustar el número en silencio es un error grave que corrompe datos sin hacer ruido.
+NUNCA "corrijas" ni armonices un número para que cuadre: transcribe SIEMPRE el valor tal como lo lees, aunque parezca inconsistente. Si el importe de una línea no cuadra con el subtotal, o difiere de líneas hermanas idénticas, o parece mal leído, NO lo ajustes — déjalo tal cual y pon el campo discrepancia DE ESA LÍNEA describiendo la duda con ambos valores (ej. "leí 326.26 pero las hermanas dicen 326.33"). Marcar la duda por línea es correcto; ajustar el número en silencio es un error grave que corrompe datos sin hacer ruido.
 cantidad y unidad: cantidad = el número de la COLUMNA de cantidad del ticket (cuántas compraste), NO el gramaje/tamaño que viene dentro del NOMBRE. unidad = la unidad de esa cantidad (PZA, KG, G, L, ML). Ej: "BABY BELLA 500 GR" comprando 1 → cantidad=1, unidad=PZA (el "500 GR" es parte del nombre). Si el ticket vende a granel por peso, cantidad = el peso y unidad = KG o G. SIEMPRE llena unidad; si de plano no puedes deducirla, ponla null y anótalo.
 IVA por línea: DÓNDE buscar el marcador — casi siempre es una letra o código de impuesto pegado al precio de cada renglón (Costco imprime una letra/código por línea; otras cadenas usan una letra a la derecha del importe). Además, al PIE del ticket suele venir un desglose de IVA: úsalo para cruzar — si el IVA del pie solo cuadra con ciertos renglones, esos son los gravados (0.16) y el resto va a 0. Pon iva_tasa=0 para exento/tasa 0% (alimentos básicos: harina, verdura, queso, huevo) o 0.16 para 16% (bebidas, refrescos, procesados, limpieza, desechables). Pon iva_tasa=null SOLO si de verdad no hay ni marcador por línea ni desglose al pie legibles — no lo adivines.
 legibilidad = tu confianza global en la lectura.`
 
-type RawItem = { codigo?: string | null; descripcion: string; cantidad?: number | null; unidad?: string | null; precio_unitario?: number | null; importe: number; es_descuento?: boolean; iva_tasa?: number | null }
+type RawItem = { codigo?: string | null; descripcion: string; cantidad?: number | null; unidad?: string | null; precio_unitario?: number | null; importe: number; es_descuento?: boolean; iva_tasa?: number | null; discrepancia?: string | null }
 type RawExtract = {
   proveedor: string; proveedor_rfc?: string | null; sucursal?: string | null; fecha?: string | null; moneda?: string
   items: RawItem[]; subtotal?: number | null; descuento?: number | null; impuestos?: number | null; total?: number | null
@@ -154,17 +165,26 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
   const provNorm = normAlias(raw.proveedor)
   const itemNorms = [...new Set(raw.items.map((i) => normAlias(i.descripcion)))]
 
-  type ProdAliasRow = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean | null; iva_tasa: number | null }
-  const [{ data: supRow }, { data: prodRows }] = await Promise.all([
+  type ProdAliasRow = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean | null; iva_tasa: number | null; peso_variable: boolean | null }
+  const COLS = 'raw_norm, descripcion, categoria, unidad, poster_ingredient_id, factor_a_base, toca_stock, iva_tasa, peso_variable'
+  const itemStems = [...new Set(raw.items.map((i) => stemAlias(i.descripcion)).filter(Boolean))]
+  const [{ data: supRow }, { data: prodRows }, { data: stemRows }] = await Promise.all([
     supabase.from('ticket_supplier_aliases').select('proveedor, poster_supplier_id').eq('raw_norm', provNorm).maybeSingle(),
     itemNorms.length
-      ? supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, factor_a_base, toca_stock, iva_tasa').in('raw_norm', itemNorms)
+      ? supabase.from('ticket_product_aliases').select(COLS).in('raw_norm', itemNorms)
       : Promise.resolve({ data: [] as ProdAliasRow[] }),
+    // Peso variable: el texto (con el peso) cambia cada compra, así que el raw_norm exacto falla. Además busca
+    // por STEM (sin el número) entre las filas marcadas peso_variable → todas las compras caen en la misma.
+    itemStems.length
+      ? supabase.from('ticket_product_aliases').select(`${COLS}, raw_stem`).eq('peso_variable', true).in('raw_stem', itemStems)
+      : Promise.resolve({ data: [] as (ProdAliasRow & { raw_stem: string })[] }),
   ])
   const prodMap = new Map((prodRows ?? []).map((r) => [r.raw_norm, r as ProdAliasRow]))
+  const stemMap = new Map(((stemRows ?? []) as (ProdAliasRow & { raw_stem: string })[]).map((r) => [r.raw_stem, r]))
 
   const items: TicketItem[] = raw.items.map((i) => {
-    const alias = prodMap.get(normAlias(i.descripcion))
+    // Match exacto primero; si falla, match por stem SOLO contra filas peso_variable.
+    const alias = prodMap.get(normAlias(i.descripcion)) ?? stemMap.get(stemAlias(i.descripcion))
     return {
       codigo: i.codigo ?? null,
       descripcion: alias?.descripcion ?? i.descripcion,
@@ -181,6 +201,8 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
       tocaStock: alias?.toca_stock ?? true,
       // Tasa de la línea leída del ticket; si la IA no la pudo leer, cae al default aprendido del alias; si tampoco, null.
       ivaTasa: i.iva_tasa ?? alias?.iva_tasa ?? null,
+      pesoVariable: !!alias?.peso_variable,
+      discrepancia: i.discrepancia ?? null,
     }
   })
 
