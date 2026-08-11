@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   '/api/auth', // /api/auth/login, /api/auth/logout
   '/api/webhooks', // inbound webhooks authenticate themselves
   '/api/telegram/webhook', // verified via x-telegram-bot-api-secret-token
+  '/api/publico/poster/cron', // Vercel Cron: se autentica sola via Bearer $CRON_SECRET (Vercel no manda cookie ni x-api-secret). SOLO esta ruta exacta; /import y /status siguen detrás del middleware.
 ]
 
 function isPublic(pathname: string): boolean {
