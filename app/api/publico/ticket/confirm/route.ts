@@ -20,6 +20,7 @@ type Body = {
   subtotal?: number | null; descuento?: number | null; impuestos?: number | null; total?: number
   legibilidad?: string | null; notas?: string | null
   category?: string; cost_kind?: string | null; origin?: string | null
+  origins?: Array<{ origin?: string | null; amount?: number }>   // PAGO MIXTO: split del total entre contenedores
   items?: InItem[]
   imageBase64?: string; mediaType?: string
   fecha_approved?: boolean
@@ -50,6 +51,19 @@ export async function POST(req: NextRequest) {
   if (!b.category || !CATEGORIES.includes(b.category)) return NextResponse.json({ error: 'category inválida' }, { status: 400 })
   if (b.origin != null && !ORIGINS.includes(b.origin)) return NextResponse.json({ error: 'origin inválido' }, { status: 400 })
   const cost_kind = NO_KIND.includes(b.category) ? null : (b.cost_kind === 'variable' ? 'variable' : 'fijo')
+
+  // PAGO MIXTO: si vienen splits (gasto pagado desde 2+ contenedores), deben ser válidos y sumar EXACTO al
+  // total. Se escribe UNA fila de roll-up por contenedor, todas ligadas al mismo ticket_scan_id → cada caja
+  // queda correcta y el P&L (que suma amount) no cambia. Sin splits, una sola fila con `origin`, como antes.
+  let splits: Array<{ origin: string | null; amount: number }> | null = null
+  if (Array.isArray(b.origins) && b.origins.length) {
+    const parsed = b.origins.map((s) => ({ origin: s.origin ?? null, amount: Number(s.amount) })).filter((s) => Number.isFinite(s.amount) && s.amount > 0)
+    if (!parsed.length) return NextResponse.json({ error: 'splits vacíos' }, { status: 400 })
+    for (const s of parsed) if (s.origin != null && !ORIGINS.includes(s.origin)) return NextResponse.json({ error: `origin inválido en split: ${s.origin}` }, { status: 400 })
+    const sum = parsed.reduce((a, s) => a + s.amount, 0)
+    if (Math.abs(sum - total) > 0.01) return NextResponse.json({ error: `los contenedores suman ${sum.toFixed(2)} y el total es ${total.toFixed(2)} — deben cuadrar`, code: 'split_mismatch' }, { status: 400 })
+    splits = parsed
+  }
   const items = (b.items ?? []).filter((i) => i && i.descripcion != null)
 
   const supabase = createServerClient()
@@ -89,12 +103,12 @@ export async function POST(req: NextRequest) {
     if (itErr) return NextResponse.json({ error: itErr.message }, { status: 500 })
   }
 
-  // 3) Roll-up en publico_costos: UNA fila resumen por ticket (el P&L sigue leyendo esto, sin enterarse).
-  const { data: costo, error: costErr } = await supabase.from('publico_costos').insert({
-    scope: 'publico', date: b.fecha, month: b.fecha.slice(0, 7),
-    category: b.category, cost_kind, origin: b.origin ?? null, amount: total,
-    note: proveedor, ticket_scan_id: scanId,
-  }).select('id').single()
+  // 3) Roll-up en publico_costos: una fila por contenedor si hay pago mixto, si no una sola (el P&L suma amount).
+  const base = { scope: 'publico', date: b.fecha, month: b.fecha.slice(0, 7), category: b.category, cost_kind, note: proveedor, ticket_scan_id: scanId }
+  const costoRows = splits
+    ? splits.map((s) => ({ ...base, origin: s.origin, amount: s.amount }))
+    : [{ ...base, origin: b.origin ?? null, amount: total }]
+  const { data: costos, error: costErr } = await supabase.from('publico_costos').insert(costoRows).select('id')
   if (costErr) return NextResponse.json({ error: costErr.message }, { status: 500 })
 
   // 4) APRENDE: alias de proveedor + de productos donde tu texto difiere del que leyó la IA.
@@ -113,5 +127,5 @@ export async function POST(req: NextRequest) {
   if (supAliases.length) await supabase.from('ticket_supplier_aliases').upsert(supAliases.map((a) => ({ ...a, updated_at: now })), { onConflict: 'raw_norm' })
   if (prodAliases.size) await supabase.from('ticket_product_aliases').upsert([...prodAliases.values()].map((a) => ({ ...a, updated_at: now })), { onConflict: 'raw_norm' })
 
-  return NextResponse.json({ ok: true, scanId, costoId: costo.id, learned: { proveedores: supAliases.length, productos: prodAliases.size } })
+  return NextResponse.json({ ok: true, scanId, costoIds: (costos ?? []).map((c) => c.id), learned: { proveedores: supAliases.length, productos: prodAliases.size } })
 }

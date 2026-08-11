@@ -654,6 +654,8 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
   const [d, setD] = useState<FotoDraft | null>(null)
   const [cat, setCat] = useState<CostCategory>('insumo')
   const [origin, setOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
+  const [mixed, setMixed] = useState(false)                 // pago mixto: split del total entre contenedores
+  const [splitAmts, setSplitAmts] = useState<Record<string, number | null>>({})
   const [dateApproved, setDateApproved] = useState(false)   // aprobación explícita de una fecha fuera de rango
   const [showPoster, setShowPoster] = useState(false)       // panel "lista para teclear en Poster"
   const fileRef = useRef<HTMLInputElement>(null)
@@ -668,7 +670,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
   const dateSuspect = !!d?.fecha && (d.fecha > todayLocal || d.fecha < floor60)
   const dateBlocked = dateSuspect && !dateApproved
 
-  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); if (fileRef.current) fileRef.current.value = '' }
+  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); setMixed(false); setSplitAmts({}); if (fileRef.current) fileRef.current.value = '' }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -695,6 +697,11 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
   const totalNum = d && d.total != null ? Number(d.total) : 0
   const mismatch = d && Math.abs(itemsSum - totalNum) > 0.5   // aviso suave si las líneas no suman al total
 
+  // Pago mixto: los montos por contenedor deben cuadrar EXACTO con el total del ticket antes de confirmar.
+  const splitKey = (k: OriginKey) => k ?? 'sin_caja'
+  const splitSum = ORIGIN_OPTIONS.reduce((a, o) => a + (splitAmts[splitKey(o.key)] ?? 0), 0)
+  const splitBlocked = mixed && (totalNum <= 0 || Math.abs(splitSum - totalNum) > 0.005)
+
   async function confirm() {
     if (!d) return
     setBusy('confirm'); setErr(null)
@@ -704,7 +711,10 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
         body: JSON.stringify({
           raw, model, proveedor: d.proveedor, proveedor_raw: d.proveedor_raw, fecha: d.fecha,
           subtotal: d.subtotal, descuento: d.descuento, impuestos: d.impuestos, total: d.total,
-          legibilidad: d.legibilidad, notas: d.notas, category: cat, cost_kind: catDefaults(cat).defaultKind, origin,
+          legibilidad: d.legibilidad, notas: d.notas, category: cat, cost_kind: catDefaults(cat).defaultKind,
+          // Pago simple: un solo origin. Pago mixto: split del total entre contenedores (una fila por cada uno).
+          origin: mixed ? null : origin,
+          origins: mixed ? ORIGIN_OPTIONS.map((o) => ({ origin: o.key, amount: splitAmts[splitKey(o.key)] ?? 0 })).filter((s) => s.amount > 0) : undefined,
           // P.U. SIEMPRE derivado del importe (fuente de verdad), nunca el valor redondeado de la IA.
           items: d.items.map((it) => ({ ...it, precio_unitario: it.cantidad ? it.importe / it.cantidad : null })),
           imageBase64: img?.b64, mediaType: img?.media, fecha_approved: dateApproved,
@@ -793,8 +803,27 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
               <button key={c.key} onClick={() => { setCat(c.key); setOrigin(catDefaults(c.key).defaultOrigin) }} style={fotoChip(cat === c.key)}>{c.label}</button>
             ))}
             <span className="ml-2 text-label text-fg-muted">desde</span>
-            {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setOrigin(ct.key)} style={fotoChip(origin === ct.key)}>{ct.label}</button>))}
+            {!mixed && ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setOrigin(ct.key)} style={fotoChip(origin === ct.key)}>{ct.label}</button>))}
+            <button onClick={() => setMixed((m) => !m)} style={fotoChip(mixed)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
           </div>
+
+          {/* PAGO MIXTO: monto por contenedor; deben sumar EXACTO al total del ticket o no deja confirmar. */}
+          {mixed && (
+            <div className="space-y-1 rounded-card border border-border bg-surface-2 p-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {ORIGIN_OPTIONS.map((o) => (
+                  <label key={o.label} className="flex items-center gap-1 text-label">
+                    <span className="text-fg-muted">{o.label}</span>
+                    <NumInput value={splitAmts[splitKey(o.key)] ?? null} onChange={(v) => setSplitAmts((s) => ({ ...s, [splitKey(o.key)]: v }))} style={{ ...cell, width: 84, textAlign: 'right' }} placeholder="0" />
+                  </label>
+                ))}
+              </div>
+              <div className={`text-right text-label ${splitBlocked ? 'text-danger' : 'text-ok'}`}>
+                contenedores {mxn(splitSum)} · total {mxn(totalNum)}
+                {splitBlocked ? (totalNum <= 0 ? ' — captura el total primero' : ` — faltan ${mxn(totalNum - splitSum)} para cuadrar`) : ' ✓ cuadra'}
+              </div>
+            </div>
+          )}
 
           {/* Lista lista-para-teclear en Poster (Fase 0 — NO escribe al POS; solo te la ordena para copiarla al
               formulario de compra). Los renglones sin mapear o marcados "no toca stock" caen a solo-panel y avisan. */}
@@ -883,7 +912,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <button onClick={reset} disabled={busy === 'confirm'} className="rounded-card px-3 py-1.5 text-secondary text-fg-muted hover:text-fg disabled:opacity-50">Descartar</button>
-            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : undefined} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
+            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked || splitBlocked} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : splitBlocked ? 'Los contenedores deben sumar exacto al total' : undefined} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
           </div>
         </div>
       )}
