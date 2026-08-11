@@ -340,7 +340,7 @@ export default function PublicoContent() {
       <AliasManager />
       </>)}
 
-      {tab === 'direccion' && <Direccion />}
+      {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
 
       {tab === 'socios' && (
         <Socios funds={socioFunds} handlers={socioHandlers} splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
@@ -491,6 +491,77 @@ function Direccion() {
         </div>
       </section>
     </>
+  )
+}
+
+// ── Food cost real vs teórico (F4). Métrica principal = GAP. Teórico siempre (99% cobertura de receta);
+// real+gap SOLO en meses acotados por conteos físicos. Prefiere decir "no confiable" a un número falso. ──
+type FCMonth = { month: string; sales: number; theoreticalPct: number; reliability: 'confiable' | 'arranque' | 'no_confiable'; realPct: number | null; gapPct: number | null; startupAdjustment?: number; note?: string }
+type FCData = { months: FCMonth[]; lastCountDate: string | null; daysSinceCount: number | null; countAlert: boolean; anyReliable: boolean; todayStatus: string }
+
+const REL_BADGE: Record<FCMonth['reliability'], { dot: string; label: string; cls: string }> = {
+  confiable: { dot: '🟢', label: 'acotado por conteos', cls: 'text-ok' },
+  arranque: { dot: '🟡', label: 'arranque del sistema', cls: 'text-warn' },
+  no_confiable: { dot: '⚪', label: 'sin conteo · deriva', cls: 'text-fg-muted' },
+}
+const monthLabel = (m: string) => { const [y, mm] = m.split('-'); return `${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(mm) - 1]} ${y}` }
+
+function FoodCostPanel() {
+  const [d, setD] = useState<FCData | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/publico/foodcost').then((r) => r.json())
+      .then((j) => { if (!alive) return; if (j.error) setErr(j.error); else setD(j) })
+      .catch(() => alive && setErr('No se pudo cargar el food cost'))
+    return () => { alive = false }
+  }, [])
+
+  if (err) return <section className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-danger">⚠ {err}</section>
+  if (!d) return <section className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-fg-muted">Cargando food cost…</section>
+
+  return (
+    <section className="rounded-card border border-border bg-surface-2 p-3">
+      <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Food cost · real vs teórico</h2>
+
+      {/* Estado de hoy, sin adornos */}
+      <div className={`mb-2 rounded-card border p-2 text-label ${d.anyReliable ? 'border-border text-fg-muted' : 'border-warn text-warn'}`}>{d.todayStatus}</div>
+
+      {/* Aviso de conteo accionable */}
+      {d.countAlert && (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-card border border-danger bg-danger/10 p-2 text-label">
+          <span className="text-danger">🧮 Último conteo físico hace {d.daysSinceCount} días ({d.lastCountDate}). Hacer un conteo desbloquea el food cost real de este periodo.</span>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {d.months.map((m) => {
+          const b = REL_BADGE[m.reliability]
+          return (
+            <div key={m.month} className="rounded-card border border-border p-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-fg">{monthLabel(m.month)}</span>
+                <span className={`text-label ${b.cls}`}>{b.dot} {b.label}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-secondary">
+                <span className="text-fg-muted">ventas <span className="tabular-nums text-fg">{mxn(m.sales)}</span></span>
+                <span className="text-fg-muted">teórico <span className="tabular-nums font-medium text-fg">{m.theoreticalPct.toFixed(1)}%</span></span>
+                {m.reliability === 'confiable' && m.realPct != null && m.gapPct != null && (<>
+                  <span className="text-fg-muted">real <span className="tabular-nums font-medium text-fg">{m.realPct.toFixed(1)}%</span></span>
+                  <span className={`font-bold ${m.gapPct > 3 ? 'text-danger' : m.gapPct < -3 ? 'text-warn' : 'text-ok'}`}>gap {m.gapPct > 0 ? '+' : ''}{m.gapPct.toFixed(1)} pts</span>
+                </>)}
+                {m.reliability === 'arranque' && m.startupAdjustment != null && (
+                  <span className="text-warn">write-down inicial {mxn(m.startupAdjustment)} · sin gap</span>
+                )}
+                {m.reliability === 'no_confiable' && <span className="italic text-fg-muted">real pendiente de conteo</span>}
+              </div>
+              {m.note && <div className="mt-1 text-label text-fg-muted">{m.note}</div>}
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">El gap (real − teórico) es merma + sobre-porción + desperdicio + robo. Solo es legítimo en meses 🟢 acotados por conteos físicos.</div>
+    </section>
   )
 }
 
