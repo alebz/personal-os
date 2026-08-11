@@ -5,6 +5,11 @@ import { createServerClient } from '@/lib/supabase'
 // solo runPosterImport (el diario) lo escribe — el backfill usa importWindow directo, sin heartbeat.
 const MX = 'America/Mexico_City'
 export const todayMX = () => new Date().toLocaleDateString('en-CA', { timeZone: MX })
+
+// Inicio OFICIAL del histórico de Público Gourmet. Marzo–mayo 2026 fueron el arranque INTERMITENTE del POS
+// (días sueltos, sin operación real) y se descartaron a propósito: que la API tenga ventas ahí NO significa
+// que "falten datos". Huecos antes de junio 2026 son deliberados, no un bug. Decisión del dueño (2026-08-10).
+export const HISTORY_START = '2026-06-01'
 export const shiftDays = (iso: string, n: number) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d)); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10) }
 const cents = (v: unknown) => Number(v ?? 0) / 100
 

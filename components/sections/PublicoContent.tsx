@@ -41,7 +41,7 @@ export default function PublicoContent() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
-  const [tab, setTab] = useState<'captura' | 'socios'>('captura')
+  const [tab, setTab] = useState<'captura' | 'socios' | 'direccion'>('captura')
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
   const { funds: socioFunds, handlers: socioHandlers } = useCajaFuerte('publico', month)
@@ -180,6 +180,7 @@ export default function PublicoContent() {
         <h1 className="text-xl font-bold">Público Gourmet</h1>
         <div className="flex gap-1">
           <button onClick={() => setTab('captura')} style={chip(tab === 'captura')}>Captura</button>
+          <button onClick={() => setTab('direccion')} style={chip(tab === 'direccion')}>Dirección</button>
           <button onClick={() => setTab('socios')} style={chip(tab === 'socios')}>Socios</button>
         </div>
       </header>
@@ -336,10 +337,157 @@ export default function PublicoContent() {
       </section>
       </>)}
 
+      {tab === 'direccion' && <Direccion />}
+
       {tab === 'socios' && (
         <Socios funds={socioFunds} handlers={socioHandlers} splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
       )}
     </div>
+  )
+}
+
+// ── Dirección (F3): vista ejecutiva sobre dash.getTransactions (recibo por recibo) + menu.getProducts. Todo
+// se agrupa por día natural CDMX vía el epoch date_close (ver lib/posterMetrics: date_close_date NO se usa).
+// Denominador de cualquier promedio por día = días operados (con ≥1 recibo), nunca días de calendario. ──
+type ProductStat = { id: string; name: string; units: number; revenue: number; cost: number; profit: number; margin: number }
+type HourStat = { hour: number; receipts: number; revenue: number }
+type DowStat = { dow: number; label: string; receipts: number; revenue: number }
+type Metrics = {
+  range: { from: string; to: string; calendarDays: number }
+  daysOperated: number; receipts: number; ventaTotal: number; ticketPromedio: number
+  ventaPorDiaOperado: number; guestsPromedio: number
+  margin: { revenue: number; cost: number; profit: number; pct: number }
+  topProducts: ProductStat[]; hours: HourStat[]; dow: DowStat[]
+  guardian: { count: number; receipts: Array<{ id: string; date: string; time: string; sum: number }> }
+}
+
+function Bar({ value, max, label, right }: { value: number; max: number; label: string; right: string }) {
+  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0
+  return (
+    <div className="flex items-center gap-2 text-secondary">
+      <span className="w-10 shrink-0 text-fg-muted">{label}</span>
+      <div className="h-4 flex-1 overflow-hidden rounded bg-surface-active">
+        <div className="h-full rounded bg-[#c0392b]" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="w-24 shrink-0 text-right tabular-nums text-fg-muted">{right}</span>
+    </div>
+  )
+}
+
+function Direccion() {
+  const [m, setM] = useState<Metrics | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'revenue' | 'units'>('revenue')
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/publico/poster/metrics')
+      .then((r) => r.json())
+      .then((d) => { if (!alive) return; if (d.error) setErr(d.error); else setM(d) })
+      .catch(() => alive && setErr('No se pudo cargar el POS'))
+    return () => { alive = false }
+  }, [])
+
+  if (err) return <div className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-danger">⚠ {err}</div>
+  if (!m) return <div className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-fg-muted">Cargando dirección…</div>
+
+  const products = [...m.topProducts].sort((a, b) => (sortBy === 'revenue' ? b.revenue - a.revenue : b.units - a.units)).slice(0, 8)
+  const maxProd = Math.max(1, ...products.map((p) => (sortBy === 'revenue' ? p.revenue : p.units)))
+  const hoursActive = m.hours.filter((h) => h.receipts > 0)
+  const maxHour = Math.max(1, ...hoursActive.map((h) => h.receipts))
+  const dowOrder = [1, 2, 3, 4, 5, 6, 0]           // lun…dom
+  const maxDow = Math.max(1, ...m.dow.map((d) => d.receipts))
+  const closedDays = m.range.calendarDays - m.daysOperated
+
+  return (
+    <>
+      {/* ── GUARDIÁN: cierres después de medianoche rompen el supuesto de "día natural" ── */}
+      {m.guardian.count > 0 && (
+        <div className="rounded-card border-2 border-danger bg-danger/10 p-3 text-secondary">
+          <div className="font-bold text-danger">⚠ {m.guardian.count} recibo(s) cerraron entre 00:00 y 06:00 CDMX</div>
+          <div className="mt-1 text-fg-muted">El supuesto de “día natural = getPaymentsReport” asume que se cierra antes de medianoche. Estos cruzan ese límite — revisa si la operación cambió de horario:</div>
+          <div className="mt-1 space-y-0.5">
+            {m.guardian.receipts.map((r) => (
+              <div key={r.id} className="flex justify-between tabular-nums"><span>#{r.id} · {r.date} {r.time}</span><span>{mxn(r.sum)}</span></div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── RESUMEN ── */}
+      <section className="rounded-card border border-border bg-surface-2 p-3">
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Dirección</h2>
+          <span className="text-label text-fg-muted">{m.range.from} → {m.range.to}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-secondary sm:grid-cols-4">
+          <div><div className="text-label text-fg-muted">Ticket promedio</div><div className="text-lg font-bold tabular-nums">{mxn(m.ticketPromedio)}</div></div>
+          <div><div className="text-label text-fg-muted">Venta / día operado</div><div className="text-lg font-bold tabular-nums">{mxn(m.ventaPorDiaOperado)}</div></div>
+          <div><div className="text-label text-fg-muted">Recibos</div><div className="text-lg font-bold tabular-nums">{m.receipts}</div></div>
+          <div><div className="text-label text-fg-muted">Comensales prom.</div><div className="text-lg font-bold tabular-nums">{m.guestsPromedio.toFixed(1)}</div></div>
+        </div>
+        <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">
+          <b className="text-fg">{m.daysOperated}</b> días operados de {m.range.calendarDays} de calendario ({closedDays} cerrados). Los promedios por día usan los {m.daysOperated} operados, no el calendario.
+        </div>
+      </section>
+
+      {/* ── MARGEN TEÓRICO (food cost de las recetas del POS) ── */}
+      <section className="rounded-card border border-border bg-surface-2 p-3">
+        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Margen teórico</h2>
+        <div className="grid grid-cols-2 gap-y-1 text-secondary">
+          <span className="text-fg-muted">Venta</span><span className="text-right tabular-nums text-ok">{mxn(m.margin.revenue)}</span>
+          <span className="text-fg-muted">Costo de receta (teórico)</span><span className="text-right tabular-nums text-danger">−{mxn(m.margin.cost)}</span>
+          <span className="font-medium text-fg">Utilidad bruta teórica</span><span className="text-right font-medium tabular-nums text-ok">{mxn(m.margin.profit)}</span>
+          <span className="font-bold text-fg">Margen</span><span className="text-right font-bold tabular-nums">{m.margin.pct.toFixed(1)}%</span>
+        </div>
+        <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">Teórico = product_cost de las recetas. El real (vs compras) llega en F4.</div>
+      </section>
+
+      {/* ── TOP PRODUCTOS ── */}
+      <section className="rounded-card border border-border bg-surface-2 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Top productos</h2>
+          <div className="flex gap-1">
+            <button onClick={() => setSortBy('revenue')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'revenue' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>facturación</button>
+            <button onClick={() => setSortBy('units')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'units' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>unidades</button>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          {products.map((p) => (
+            <div key={p.id} className="text-secondary">
+              <div className="flex items-baseline justify-between">
+                <span className="truncate pr-2">{p.name}</span>
+                <span className="shrink-0 tabular-nums text-fg-muted">{p.units.toFixed(0)} uds · <span className="text-fg">{mxn(p.revenue)}</span> · {p.margin.toFixed(0)}%</span>
+              </div>
+              <div className="mt-0.5 h-1.5 overflow-hidden rounded bg-surface-active">
+                <div className="h-full rounded bg-[#c0392b]" style={{ width: `${((sortBy === 'revenue' ? p.revenue : p.units) / maxProd) * 100}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── HORAS PICO ── */}
+      <section className="rounded-card border border-border bg-surface-2 p-3">
+        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Horas pico <span className="font-normal normal-case tracking-normal text-fg-muted">(cierre, CDMX)</span></h2>
+        <div className="space-y-1">
+          {hoursActive.map((h) => (
+            <Bar key={h.hour} label={`${String(h.hour).padStart(2, '0')}h`} value={h.receipts} max={maxHour} right={`${h.receipts} · ${mxn(h.revenue)}`} />
+          ))}
+        </div>
+      </section>
+
+      {/* ── DÍA DE LA SEMANA ── */}
+      <section className="rounded-card border border-border bg-surface-2 p-3">
+        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Día de la semana</h2>
+        <div className="space-y-1">
+          {dowOrder.map((d) => {
+            const row = m.dow[d]
+            return <Bar key={d} label={row.label} value={row.receipts} max={maxDow} right={`${row.receipts} · ${mxn(row.revenue)}`} />
+          })}
+        </div>
+      </section>
+    </>
   )
 }
 
