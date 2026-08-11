@@ -21,6 +21,11 @@ export type TicketItem = {
   es_descuento: boolean
   categoria?: string | null    // prellenado por el alias de producto, si existe
   aliased?: boolean            // true si un alias reemplazó el texto crudo
+  // Mapeo a Poster (Fase 0 — solo alimenta la lista lista-para-teclear; NO escribe al POS):
+  posterIngredientId?: number | null   // id de Poster; null = sin mapear → solo panel
+  factorABase?: number | null          // num_poster = cantidad * factorABase
+  tocaStock?: boolean                  // false = gasto que NO va a inventario (default true)
+  ivaTasa?: number | null              // tasa de IVA de la línea: 0 | 0.16 | null (sin definir → no adivinar)
 }
 export type TicketDraft = {
   proveedor: string
@@ -37,6 +42,7 @@ export type TicketDraft = {
   notas: string | null
   items: TicketItem[]
   proveedorAliased: boolean
+  posterSupplierId: number | null   // mapeo de proveedor a Poster (Fase 0); null = sin mapear
 }
 export type ExtractResult = { ok: true; model: string; raw: unknown; draft: TicketDraft } | { ok: false; error: string; status: number }
 
@@ -70,6 +76,7 @@ const TOOL: Anthropic.Tool = {
             precio_unitario: { type: ['number', 'null'] },
             importe: { type: 'number' },
             es_descuento: { type: 'boolean', description: 'true si la línea es un cupón/descuento (resta)' },
+            iva_tasa: { type: ['number', 'null'], description: 'Tasa de IVA de ESTA línea, leída del marcador impreso (letra/código junto al precio): 0 si es exenta o tasa 0% (alimentos básicos), 0.16 si causa 16%. null si NO hay marcador legible o es ambiguo — NUNCA la adivines.' },
           },
           required: ['descripcion', 'importe', 'es_descuento'],
         },
@@ -89,24 +96,48 @@ const TOOL: Anthropic.Tool = {
 const SYS = `Eres un extractor de tickets de compra mexicanos (súper, proveedores). Lee la foto y llena la herramienta.
 Reglas: transcribe la descripción TAL CUAL aparece (no traduzcas, no expandas abreviaturas). Montos como números en la moneda del ticket.
 Si un dígito/campo es ilegible o está tapado, pon null y anótalo en notas — NUNCA inventes. Marca cupones/descuentos con es_descuento=true.
+IVA por línea: los tickets mexicanos marcan cada renglón con una letra/código de impuesto junto al precio (varía por cadena). Léelo y pon iva_tasa=0 para exento/tasa 0% (la mayoría de alimentos básicos: harina, verdura, queso, huevo) o 0.16 para 16% (bebidas, refrescos, procesados, limpieza, desechables). Si NO hay marcador legible o es ambiguo, pon iva_tasa=null — no lo adivines.
 legibilidad = tu confianza global en la lectura.`
 
-type RawItem = { codigo?: string | null; descripcion: string; cantidad?: number | null; unidad?: string | null; precio_unitario?: number | null; importe: number; es_descuento?: boolean }
+type RawItem = { codigo?: string | null; descripcion: string; cantidad?: number | null; unidad?: string | null; precio_unitario?: number | null; importe: number; es_descuento?: boolean; iva_tasa?: number | null }
 type RawExtract = {
   proveedor: string; proveedor_rfc?: string | null; sucursal?: string | null; fecha?: string | null; moneda?: string
   items: RawItem[]; subtotal?: number | null; descuento?: number | null; impuestos?: number | null; total?: number | null
   legibilidad?: 'alta' | 'media' | 'baja'; notas?: string | null
 }
 
+// Anthropic NO decodifica HEIC/HEIF (el formato por defecto del iPhone). El cliente intenta re-encodar a JPEG
+// en un canvas, pero eso solo funciona donde el navegador sabe decodificar HEIC (iOS Safari). Desde Chrome de
+// escritorio el .heic llega crudo y la API responde 400 "Could not process image". Detectamos HEIC por
+// magic bytes (`....ftyp` + marca heic/heix/mif1/heif/msf1) además del media_type, y lo convertimos a JPEG
+// aquí, en el server, para que funcione desde cualquier cliente.
+function isHeic(buf: Buffer, mediaType: string): boolean {
+  if (/hei[cf]|hevc/i.test(mediaType)) return true
+  if (buf.length < 12 || buf.toString('ascii', 4, 8) !== 'ftyp') return false
+  return ['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1', 'heif'].includes(buf.toString('ascii', 8, 12).toLowerCase())
+}
+
+// Normaliza a un formato que Anthropic sí procesa. Devuelve base64 JPEG si la entrada era HEIC; si no, la deja igual.
+async function toSupportedImage(imageBase64: string, mediaType: string): Promise<{ data: string; media: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' }> {
+  const buf = Buffer.from(imageBase64, 'base64')
+  if (isHeic(buf, mediaType)) {
+    const convert = (await import('heic-convert')).default
+    const out = await convert({ buffer: buf, format: 'JPEG', quality: 0.85 })
+    return { data: Buffer.from(out).toString('base64'), media: 'image/jpeg' }
+  }
+  const media = (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mediaType) ? mediaType : 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+  return { data: imageBase64, media }
+}
+
 // Llama a Sonnet con la foto y devuelve la extracción cruda (structured output forzado).
 async function callModel(imageBase64: string, mediaType: string): Promise<RawExtract> {
   const client = new Anthropic()   // ANTHROPIC_API_KEY del entorno
-  const media = (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mediaType) ? mediaType : 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+  const { data, media } = await toSupportedImage(imageBase64, mediaType)
   const res = await client.messages.create({
     model: MODEL, max_tokens: 2000, system: SYS,
     tools: [TOOL], tool_choice: { type: 'tool', name: 'registrar_ticket' },
     messages: [{ role: 'user', content: [
-      { type: 'image', source: { type: 'base64', media_type: media, data: imageBase64 } },
+      { type: 'image', source: { type: 'base64', media_type: media, data } },
       { type: 'text', text: 'Extrae este ticket.' },
     ] }],
   })
@@ -121,13 +152,14 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
   const provNorm = normAlias(raw.proveedor)
   const itemNorms = [...new Set(raw.items.map((i) => normAlias(i.descripcion)))]
 
+  type ProdAliasRow = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean | null; iva_tasa: number | null }
   const [{ data: supRow }, { data: prodRows }] = await Promise.all([
-    supabase.from('ticket_supplier_aliases').select('proveedor').eq('raw_norm', provNorm).maybeSingle(),
+    supabase.from('ticket_supplier_aliases').select('proveedor, poster_supplier_id').eq('raw_norm', provNorm).maybeSingle(),
     itemNorms.length
-      ? supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad').in('raw_norm', itemNorms)
-      : Promise.resolve({ data: [] as Array<{ raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null }> }),
+      ? supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, poster_ingredient_id, factor_a_base, toca_stock, iva_tasa').in('raw_norm', itemNorms)
+      : Promise.resolve({ data: [] as ProdAliasRow[] }),
   ])
-  const prodMap = new Map((prodRows ?? []).map((r) => [r.raw_norm, r]))
+  const prodMap = new Map((prodRows ?? []).map((r) => [r.raw_norm, r as ProdAliasRow]))
 
   const items: TicketItem[] = raw.items.map((i) => {
     const alias = prodMap.get(normAlias(i.descripcion))
@@ -142,6 +174,11 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
       es_descuento: !!i.es_descuento,
       categoria: alias?.categoria ?? null,
       aliased: !!alias,
+      posterIngredientId: alias?.poster_ingredient_id ?? null,
+      factorABase: alias?.factor_a_base ?? null,
+      tocaStock: alias?.toca_stock ?? true,
+      // Tasa de la línea leída del ticket; si la IA no la pudo leer, cae al default aprendido del alias; si tampoco, null.
+      ivaTasa: i.iva_tasa ?? alias?.iva_tasa ?? null,
     }
   })
 
@@ -160,6 +197,7 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
     notas: raw.notas ?? null,
     items,
     proveedorAliased: !!supRow,
+    posterSupplierId: supRow?.poster_supplier_id ?? null,
   }
 }
 

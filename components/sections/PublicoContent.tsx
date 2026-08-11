@@ -582,8 +582,45 @@ function FoodCostPanel() {
 // ── Captura por FOTO del ticket: la IA PROPONE un borrador, tú corriges y CONFIRMAS, y hasta entonces se
 // guarda el gasto (roll-up de 1 línea en publico_costos + detalle itemizado). Tus correcciones enseñan a
 // los alias (la próxima vez llega ya traducido). NUNCA escribe sin confirmar. Alcance: Público. ──
-type FotoItem = { codigo: string | null; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean; categoria?: string | null; aliased?: boolean }
-type FotoDraft = { proveedor: string; proveedor_raw: string; proveedor_rfc: string | null; sucursal: string | null; fecha: string | null; moneda: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number | null; legibilidad: 'alta' | 'media' | 'baja'; notas: string | null; items: FotoItem[]; proveedorAliased: boolean }
+// Catálogo Poster (solo lectura) para los selectores de mapeo y la traducción id→nombre en la lista lista-para-teclear.
+type PosterIngredient = { id: number; name: string; unit: string }
+type PosterSupplier = { id: number; name: string }
+type PosterCatalog = { ingredients: PosterIngredient[]; suppliers: PosterSupplier[] }
+
+type FotoItem = { codigo: string | null; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean; categoria?: string | null; aliased?: boolean; posterIngredientId?: number | null; factorABase?: number | null; tocaStock?: boolean; ivaTasa?: number | null }
+type FotoDraft = { proveedor: string; proveedor_raw: string; proveedor_rfc: string | null; sucursal: string | null; fecha: string | null; moneda: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number | null; legibilidad: 'alta' | 'media' | 'baja'; notas: string | null; items: FotoItem[]; proveedorAliased: boolean; posterSupplierId?: number | null }
+
+// Normaliza la foto EN EL CLIENTE antes de mandarla a la IA: la re-dibuja en un canvas capando el lado largo
+// a 1568px (el óptimo de Anthropic) y la re-exporta como JPEG de calidad 0.85. Esto mata las dos fallas de
+// fotos de celular que hacen que la API responda 400 "Could not process image": (1) HEIC de iPhone — el
+// media_type se forzaba a jpeg pero los BYTES seguían siendo HEIC, que Anthropic no decodifica; el canvas los
+// re-encoda a JPEG real; (2) fotos full-res demasiado pesadas/grandes. De paso achica muchísimo el payload.
+// Si el navegador no puede decodificar el archivo (HEIC en Chrome de escritorio, caso raro), cae al archivo
+// crudo — en el flujo real de captura (iOS Safari) el decodificado HEIC es nativo, así que sí funciona.
+async function normalizeImage(file: File): Promise<{ b64: string; media: string }> {
+  const rawDataUrl = () => new Promise<{ b64: string; media: string }>((res, rej) => {
+    const r = new FileReader()
+    r.onload = () => { const u = String(r.result); res({ b64: u.split(',')[1], media: u.slice(5, u.indexOf(';')) }) }
+    r.onerror = rej
+    r.readAsDataURL(file)
+  })
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url })
+    const MAX = 1568
+    const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight))
+    const w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale))
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext('2d'); if (!ctx) return await rawDataUrl()
+    ctx.drawImage(img, 0, 0, w, h)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    return { b64: dataUrl.split(',')[1], media: 'image/jpeg' }
+  } catch {
+    return await rawDataUrl()   // navegador no pudo decodificar (p.ej. HEIC en Chrome): manda crudo
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
 
 function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | void; defaultDate: string }) {
   const [busy, setBusy] = useState<'extract' | 'confirm' | null>(null)
@@ -595,7 +632,11 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
   const [cat, setCat] = useState<CostCategory>('insumo')
   const [origin, setOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
   const [dateApproved, setDateApproved] = useState(false)   // aprobación explícita de una fecha fuera de rango
+  const [showPoster, setShowPoster] = useState(false)       // panel "lista para teclear en Poster"
   const fileRef = useRef<HTMLInputElement>(null)
+  // Catálogo Poster (solo lectura) para traducir ids del mapeo a nombres en la lista lista-para-teclear.
+  const [cat2, setCat2] = useState<PosterCatalog | null>(null)
+  useEffect(() => { if (cat2) return; fetch('/api/publico/poster/catalog').then((r) => r.json()).then((j) => { if (!j.error) setCat2(j) }).catch(() => {}) }, [cat2])
 
   // Guardián de fecha: futuro o >60 días atrás = sospechosa. Una fecha mal leída ensucia el food cost de
   // dos meses sin hacer ruido, así que no deja confirmar hasta que la corrijas o la apruebes.
@@ -610,8 +651,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
     const file = e.target.files?.[0]; if (!file) return
     setErr(null); setBusy('extract'); setD(null)
     try {
-      const dataUrl: string = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file) })
-      const b64 = dataUrl.split(',')[1]; const media = dataUrl.slice(5, dataUrl.indexOf(';'))
+      const { b64, media } = await normalizeImage(file)
       setImg({ b64, media })
       const resp = await fetch('/api/publico/ticket/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageBase64: b64, mediaType: media }) })
       const j = await resp.json()
@@ -729,6 +769,91 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
             {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setOrigin(ct.key)} style={fotoChip(origin === ct.key)}>{ct.label}</button>))}
           </div>
 
+          {/* Lista lista-para-teclear en Poster (Fase 0 — NO escribe al POS; solo te la ordena para copiarla al
+              formulario de compra). Los renglones sin mapear o marcados "no toca stock" caen a solo-panel y avisan. */}
+          <div className="border-t border-border pt-2">
+            <button onClick={() => setShowPoster((s) => !s)} className="flex w-full items-center justify-between text-label font-bold uppercase tracking-widest text-fg-muted">
+              <span>📋 Para teclear en Poster <span className="font-normal normal-case tracking-normal">— compra de inventario</span></span>
+              <span>{showPoster ? '▲' : '▼'}</span>
+            </button>
+            {showPoster && (() => {
+              const ingById = new Map((cat2?.ingredients ?? []).map((i) => [i.id, i]))
+              const supMapped = d.posterSupplierId != null ? cat2?.suppliers.find((s) => s.id === d.posterSupplierId) : null
+              // Neto POR LÍNEA con la tasa de ESA línea (0% alimentos vs 16% bebidas/limpieza). Un ÷1.16 global
+              // subestimaría la comida. Sin tasa definida → no adivinar: neto=null y se marca.
+              const neto = (importe: number, tasa: number | null | undefined) => (tasa == null ? null : importe / (1 + tasa))
+              const toStock: { it: FotoItem; name: string; num: number | null; unit: string; net: number | null; tasa: number | null | undefined }[] = []
+              const panelOnly: { it: FotoItem; reason: string }[] = []
+              let ivaSinDefinir = 0
+              for (const it of d.items) {
+                if (it.es_descuento) { panelOnly.push({ it, reason: 'descuento' }); continue }
+                const mapped = it.tocaStock !== false && it.posterIngredientId != null
+                if (mapped) {
+                  const ing = ingById.get(it.posterIngredientId!)
+                  const num = it.cantidad != null && it.factorABase != null ? it.cantidad * it.factorABase : null
+                  const net = neto(it.importe, it.ivaTasa)
+                  if (it.ivaTasa == null) ivaSinDefinir++
+                  toStock.push({ it, name: ing?.name ?? `id ${it.posterIngredientId}`, num, unit: ing?.unit ?? '?', net, tasa: it.ivaTasa })
+                } else {
+                  panelOnly.push({ it, reason: it.tocaStock === false ? 'no toca stock' : 'sin mapear' })
+                }
+              }
+              return (
+                <div className="mt-2 space-y-2 text-label">
+                  <div className="rounded-card border border-border bg-surface-2 p-2">
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                      <span><span className="text-fg-muted">Proveedor:</span> {supMapped ? <b>{supMapped.name}</b> : <span className="text-warn">⚠ sin mapear en Poster</span>}</span>
+                      <span><span className="text-fg-muted">Fecha:</span> {d.fecha}</span>
+                      <span className="text-fg-muted">Almacén: elígelo en Poster</span>
+                    </div>
+                  </div>
+                  {toStock.length > 0 && (
+                    <div>
+                      <div className="mb-1 flex items-center justify-between text-fg-muted"><span>Van a inventario ({toStock.length})</span><span className="normal-case">neto sin IVA →</span></div>
+                      <div className="space-y-0.5 font-mono">
+                        {toStock.map((r, k) => (
+                          <div key={k} className="flex items-center justify-between gap-2">
+                            <span className="truncate">{r.name}</span>
+                            <span className="shrink-0 tabular-nums">
+                              {r.num != null ? `${r.num} ${r.unit}` : <span className="text-warn">⚠ falta factor</span>}
+                              {' · '}
+                              {r.net != null
+                                ? <><b>{mxn(r.net)}</b> <span className="text-fg-muted">{r.tasa === 0 ? '(0%)' : `(−${Math.round((r.tasa ?? 0) * 100)}%)`}</span></>
+                                : <span className="text-warn">⚠ IVA sin definir · {mxn(r.it.importe)}</span>}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {panelOnly.length > 0 && (
+                    <div>
+                      <div className="mb-1 text-fg-muted">Solo a tu panel — NO tocan stock ({panelOnly.length})</div>
+                      <div className="space-y-0.5">
+                        {panelOnly.map((r, k) => (
+                          <div key={k} className="flex items-center justify-between gap-2">
+                            <span className="truncate">{r.it.descripcion || r.it.descripcion_raw}</span>
+                            <span className="shrink-0 text-warn">{r.reason} · {mxn(r.it.importe)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-1 text-fg-muted">Los &quot;sin mapear&quot; se enlazan en 🏷 Alias aprendidos. Nunca se adivinan.</div>
+                    </div>
+                  )}
+                  {ivaSinDefinir > 0 && (
+                    <div className="rounded-card border border-warn/40 bg-warn/10 p-2 text-warn">
+                      ⚠ {ivaSinDefinir} {ivaSinDefinir === 1 ? 'línea' : 'líneas'} sin tasa de IVA definida. No se adivina: defínela en 🏷 Alias aprendidos (0% alimentos · 16% bebidas/limpieza) y el neto se recalcula.
+                    </div>
+                  )}
+                  <div className="rounded-card border border-border bg-surface-2 p-2 text-fg-muted">
+                    El neto es POR LÍNEA con su tasa (alimentos 0% · bebidas/procesados 16%). Poster valúa el costo con el neto — entra ESTOS montos para no inflar ni subestimar el food cost.
+                  </div>
+                  {!cat2 && <div className="text-fg-muted italic">Cargando catálogo de Poster…</div>}
+                </div>
+              )
+            })()}
+          </div>
+
           <div className="flex items-center justify-end gap-2 pt-1">
             <button onClick={reset} disabled={busy === 'confirm'} className="rounded-card px-3 py-1.5 text-secondary text-fg-muted hover:text-fg disabled:opacity-50">Descartar</button>
             <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : undefined} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
@@ -741,14 +866,15 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 
 // ── Alias aprendidos del capturador: verlos, editarlos o borrarlos. Una corrección tuya pudo enseñar un
 // error; aquí se arregla. raw_norm (la llave de match) es de solo lectura — para re-mapear, borra y re-aprende. ──
-type SupAlias = { raw_norm: string; proveedor: string }
-type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null }
+type SupAlias = { raw_norm: string; proveedor: string; poster_supplier_id: number | null }
+type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean; iva_tasa: number | null }
 
 function AliasManager() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sup, setSup] = useState<SupAlias[]>([])
   const [prod, setProd] = useState<ProdAlias[]>([])
+  const [cat, setCat] = useState<PosterCatalog | null>(null)   // catálogo Poster para los selectores de mapeo
 
   const loadAliases = useCallback(async () => {
     setLoading(true)
@@ -756,14 +882,17 @@ function AliasManager() {
     finally { setLoading(false) }
   }, [])
   useEffect(() => { if (open) void loadAliases() }, [open, loadAliases])
+  useEffect(() => { if (!open || cat) return; fetch('/api/publico/poster/catalog').then((r) => r.json()).then((j) => { if (!j.error) setCat(j) }).catch(() => {}) }, [open, cat])
 
-  async function saveSup(a: SupAlias) {
-    await fetch('/api/publico/ticket/aliases', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'supplier', ...a }) })
+  // PATCH parcial: manda SOLO los campos del mapeo, sin re-enviar nombre/categoría.
+  async function patchAlias(type: 'supplier' | 'product', raw_norm: string, fields: Record<string, unknown>) {
+    await fetch('/api/publico/ticket/aliases', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type, raw_norm, ...fields }) })
     await loadAliases()
   }
-  async function saveProd(a: ProdAlias) {
-    await fetch('/api/publico/ticket/aliases', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'product', ...a }) })
-    await loadAliases()
+  async function saveSup(a: { raw_norm: string; proveedor: string }) { await patchAlias('supplier', a.raw_norm, { proveedor: a.proveedor }) }
+  async function saveProd(a: { raw_norm: string; descripcion?: string; unidad?: string | null }) {
+    const { raw_norm, ...fields } = a
+    await patchAlias('product', raw_norm, fields)
   }
   async function del(type: 'supplier' | 'product', raw_norm: string) {
     await fetch(`/api/publico/ticket/aliases?type=${type}&raw_norm=${encodeURIComponent(raw_norm)}`, { method: 'DELETE' })
@@ -772,6 +901,7 @@ function AliasManager() {
 
   const total = sup.length + prod.length
   const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
+  const fotoChipSmall = (on: boolean): React.CSSProperties => ({ padding: '2px 7px', borderRadius: 999, fontSize: 11, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
 
   return (
     <section className="rounded-card border border-border p-3">
@@ -792,6 +922,10 @@ function AliasManager() {
                   <span className="w-40 shrink-0 truncate text-label text-fg-muted" title={a.raw_norm}>{a.raw_norm}</span>
                   <span className="text-fg-muted">→</span>
                   <input defaultValue={a.proveedor} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.proveedor) void saveSup({ raw_norm: a.raw_norm, proveedor: e.target.value.trim() }) }} style={{ ...cell, flex: 1 }} />
+                  <select value={a.poster_supplier_id ?? ''} onChange={(e) => void patchAlias('supplier', a.raw_norm, { poster_supplier_id: e.target.value === '' ? null : Number(e.target.value) })} style={{ ...cell, width: 150 }} title="Proveedor en Poster (createSupply exige uno)">
+                    <option value="">⚠ Poster: sin mapear</option>
+                    {(cat?.suppliers ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                   <button onClick={() => void del('supplier', a.raw_norm)} className="px-1 text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger" aria-label="Borrar">✕</button>
                 </div>
               ))}
@@ -801,15 +935,33 @@ function AliasManager() {
           {prod.length > 0 && (<div>
             <div className="mb-1 text-label text-fg-muted">Productos ({prod.length})</div>
             <div className="space-y-1">
-              {prod.map((a) => (
-                <div key={a.raw_norm} className="group flex items-center gap-1">
+              {prod.map((a) => {
+                const ing = a.poster_ingredient_id != null ? cat?.ingredients.find((i) => i.id === a.poster_ingredient_id) : null
+                return (
+                <div key={a.raw_norm} className="group flex flex-wrap items-center gap-1">
                   <span className="w-32 shrink-0 truncate text-label text-fg-muted" title={a.raw_norm}>{a.raw_norm}</span>
                   <span className="text-fg-muted">→</span>
-                  <input defaultValue={a.descripcion} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.descripcion) void saveProd({ ...a, descripcion: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 90 }} />
-                  <input defaultValue={a.unidad ?? ''} onBlur={(e) => { if ((e.target.value.trim() || null) !== a.unidad) void saveProd({ ...a, unidad: e.target.value.trim() || null }) }} placeholder="unidad" style={{ ...cell, width: 64 }} />
+                  <input defaultValue={a.descripcion} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.descripcion) void saveProd({ raw_norm: a.raw_norm, descripcion: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 90 }} />
+                  <input defaultValue={a.unidad ?? ''} onBlur={(e) => { if ((e.target.value.trim() || null) !== a.unidad) void saveProd({ raw_norm: a.raw_norm, unidad: e.target.value.trim() || null }) }} placeholder="unidad" style={{ ...cell, width: 56 }} />
+                  {/* Mapeo a Poster (Fase 0): ingrediente + factor a unidad base + si toca stock */}
+                  {a.toca_stock ? (<>
+                    <select value={a.poster_ingredient_id ?? ''} onChange={(e) => void patchAlias('product', a.raw_norm, { poster_ingredient_id: e.target.value === '' ? null : Number(e.target.value) })} style={{ ...cell, width: 150 }} title="Ingrediente en Poster">
+                      <option value="">⚠ Poster: sin mapear</option>
+                      {(cat?.ingredients ?? []).map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                    </select>
+                    <input defaultValue={a.factor_a_base ?? ''} onBlur={(e) => { const v = e.target.value.trim() === '' ? null : Number(e.target.value); if (v !== a.factor_a_base) void patchAlias('product', a.raw_norm, { factor_a_base: v }) }} placeholder="×factor" title={`cantidad del ticket × factor = cantidad en ${ing?.unit ?? 'unidad base'} de Poster`} inputMode="decimal" style={{ ...cell, width: 60, textAlign: 'right' }} />
+                    <select value={a.iva_tasa ?? ''} onChange={(e) => void patchAlias('product', a.raw_norm, { iva_tasa: e.target.value === '' ? null : Number(e.target.value) })} style={{ ...cell, width: 96 }} title="Tasa de IVA por default de este producto (se usa si el ticket no la marca)">
+                      <option value="">IVA: s/def</option>
+                      <option value="0">IVA 0%</option>
+                      <option value="0.16">IVA 16%</option>
+                    </select>
+                  </>) : (
+                    <span className="text-label text-fg-muted italic">no va a inventario</span>
+                  )}
+                  <button onClick={() => void patchAlias('product', a.raw_norm, { toca_stock: !a.toca_stock })} style={fotoChipSmall(a.toca_stock)} title="¿esta línea entra al inventario de Poster?">{a.toca_stock ? 'stock' : 'solo panel'}</button>
                   <button onClick={() => void del('product', a.raw_norm)} className="px-1 text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger" aria-label="Borrar">✕</button>
                 </div>
-              ))}
+              )})}
             </div>
           </div>)}
         </div>
