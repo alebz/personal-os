@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { normAlias } from '@/lib/ticketExtract'
+import { todayMX, shiftDays } from '@/lib/posterImport'
 
 export const runtime = 'nodejs'
 
@@ -21,7 +22,12 @@ type Body = {
   category?: string; cost_kind?: string | null; origin?: string | null
   items?: InItem[]
   imageBase64?: string; mediaType?: string
+  fecha_approved?: boolean
 }
+
+// Ventana razonable para la fecha del ticket: ni futuro ni más de 60 días atrás. Una fecha mal leída
+// ensucia el food cost de dos meses sin hacer ruido, así que fuera de rango exige aprobación explícita.
+const DATE_WINDOW_DAYS = 60
 
 // POST /api/publico/ticket/confirm — ÚNICA escritura del gasto. Crea el scan (confirmado, con el JSON crudo
 // para auditoría), las líneas itemizadas, la fila ROLL-UP en publico_costos (P&L intacto), y APRENDE los
@@ -33,6 +39,12 @@ export async function POST(req: NextRequest) {
   const proveedor = (b.proveedor ?? '').trim()
   if (!proveedor) return NextResponse.json({ error: 'proveedor requerido' }, { status: 400 })
   if (!b.fecha || !/^\d{4}-\d{2}-\d{2}$/.test(b.fecha)) return NextResponse.json({ error: 'fecha (YYYY-MM-DD) requerida' }, { status: 400 })
+  // Guardián de fecha: fuera de ventana (futuro o >60 días atrás) NO se guarda sin aprobación explícita.
+  const today = todayMX()
+  const floor = shiftDays(today, -DATE_WINDOW_DAYS)
+  if ((b.fecha > today || b.fecha < floor) && !b.fecha_approved) {
+    return NextResponse.json({ error: `La fecha ${b.fecha} está fuera de rango (futuro o más de ${DATE_WINDOW_DAYS} días atrás). Corrígela o apruébala explícitamente.`, code: 'fecha_rango' }, { status: 400 })
+  }
   const total = Number(b.total)
   if (!Number.isFinite(total) || total <= 0) return NextResponse.json({ error: 'total inválido (>0)' }, { status: 400 })
   if (!b.category || !CATEGORIES.includes(b.category)) return NextResponse.json({ error: 'category inválida' }, { status: 400 })

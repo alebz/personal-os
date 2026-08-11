@@ -336,6 +336,8 @@ export default function PublicoContent() {
           </div>
         )}
       </section>
+
+      <AliasManager />
       </>)}
 
       {tab === 'direccion' && <Direccion />}
@@ -507,9 +509,17 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
   const [d, setD] = useState<FotoDraft | null>(null)
   const [cat, setCat] = useState<CostCategory>('insumo')
   const [origin, setOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
+  const [dateApproved, setDateApproved] = useState(false)   // aprobación explícita de una fecha fuera de rango
   const fileRef = useRef<HTMLInputElement>(null)
 
-  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); if (fileRef.current) fileRef.current.value = '' }
+  // Guardián de fecha: futuro o >60 días atrás = sospechosa. Una fecha mal leída ensucia el food cost de
+  // dos meses sin hacer ruido, así que no deja confirmar hasta que la corrijas o la apruebes.
+  const todayLocal = localDate()
+  const floor60 = addDays(todayLocal, -60)
+  const dateSuspect = !!d?.fecha && (d.fecha > todayLocal || d.fecha < floor60)
+  const dateBlocked = dateSuspect && !dateApproved
+
+  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); if (fileRef.current) fileRef.current.value = '' }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -547,7 +557,7 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
           raw, model, proveedor: d.proveedor, proveedor_raw: d.proveedor_raw, fecha: d.fecha,
           subtotal: d.subtotal, descuento: d.descuento, impuestos: d.impuestos, total: d.total,
           legibilidad: d.legibilidad, notas: d.notas, category: cat, cost_kind: catDefaults(cat).defaultKind, origin,
-          items: d.items, imageBase64: img?.b64, mediaType: img?.media,
+          items: d.items, imageBase64: img?.b64, mediaType: img?.media, fecha_approved: dateApproved,
         }),
       })
       const j = await resp.json()
@@ -590,9 +600,15 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
             </label>
             <label>
               <span className="text-label text-fg-muted">Fecha <span className="text-warn">· verifica</span></span>
-              <input type="date" value={d.fecha ?? ''} onChange={(e) => patch({ fecha: e.target.value })} style={{ ...cell, fontSize: 15 }} />
+              <input type="date" value={d.fecha ?? ''} onChange={(e) => { setDateApproved(false); patch({ fecha: e.target.value }) }} style={{ ...cell, fontSize: 15, borderColor: dateBlocked ? 'var(--color-danger)' : undefined }} />
             </label>
           </div>
+          {dateSuspect && (
+            <div className="flex items-center justify-between gap-2 rounded-card border border-danger bg-danger/10 p-2 text-label">
+              <span className="text-danger">⚠ La fecha {d.fecha} está fuera de rango ({d.fecha! > todayLocal ? 'en el futuro' : 'más de 60 días atrás'}). Corrígela arriba, o apruébala si es correcta.</span>
+              <button onClick={() => setDateApproved(true)} disabled={dateApproved} className="shrink-0 rounded-control border border-danger px-2 py-0.5 text-danger disabled:opacity-50">{dateApproved ? '✓ aprobada' : 'Aprobar fecha'}</button>
+            </div>
+          )}
 
           {/* Líneas */}
           <div className="space-y-1">
@@ -630,11 +646,90 @@ function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | v
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <button onClick={reset} disabled={busy === 'confirm'} className="rounded-card px-3 py-1.5 text-secondary text-fg-muted hover:text-fg disabled:opacity-50">Descartar</button>
-            <button onClick={() => void confirm()} disabled={busy === 'confirm'} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
+            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : undefined} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+// ── Alias aprendidos del capturador: verlos, editarlos o borrarlos. Una corrección tuya pudo enseñar un
+// error; aquí se arregla. raw_norm (la llave de match) es de solo lectura — para re-mapear, borra y re-aprende. ──
+type SupAlias = { raw_norm: string; proveedor: string }
+type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null }
+
+function AliasManager() {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [sup, setSup] = useState<SupAlias[]>([])
+  const [prod, setProd] = useState<ProdAlias[]>([])
+
+  const loadAliases = useCallback(async () => {
+    setLoading(true)
+    try { const j = await fetch('/api/publico/ticket/aliases').then((r) => r.json()); setSup(j.suppliers ?? []); setProd(j.products ?? []) }
+    finally { setLoading(false) }
+  }, [])
+  useEffect(() => { if (open) void loadAliases() }, [open, loadAliases])
+
+  async function saveSup(a: SupAlias) {
+    await fetch('/api/publico/ticket/aliases', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'supplier', ...a }) })
+    await loadAliases()
+  }
+  async function saveProd(a: ProdAlias) {
+    await fetch('/api/publico/ticket/aliases', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'product', ...a }) })
+    await loadAliases()
+  }
+  async function del(type: 'supplier' | 'product', raw_norm: string) {
+    await fetch(`/api/publico/ticket/aliases?type=${type}&raw_norm=${encodeURIComponent(raw_norm)}`, { method: 'DELETE' })
+    await loadAliases()
+  }
+
+  const total = sup.length + prod.length
+  const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
+
+  return (
+    <section className="rounded-card border border-border p-3">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between text-label font-bold uppercase tracking-widest text-fg-muted">
+        <span>🏷 Alias aprendidos {open && total > 0 && <span className="font-normal normal-case tracking-normal">· {total}</span>}</span>
+        <span>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-3">
+          {loading && <p className="text-secondary italic text-fg-muted">Cargando…</p>}
+          {!loading && total === 0 && <p className="text-secondary italic text-fg-muted">Aún no hay alias. Se aprenden cuando corriges un ticket.</p>}
+
+          {sup.length > 0 && (<div>
+            <div className="mb-1 text-label text-fg-muted">Proveedores ({sup.length})</div>
+            <div className="space-y-1">
+              {sup.map((a) => (
+                <div key={a.raw_norm} className="group flex items-center gap-1">
+                  <span className="w-40 shrink-0 truncate text-label text-fg-muted" title={a.raw_norm}>{a.raw_norm}</span>
+                  <span className="text-fg-muted">→</span>
+                  <input defaultValue={a.proveedor} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.proveedor) void saveSup({ raw_norm: a.raw_norm, proveedor: e.target.value.trim() }) }} style={{ ...cell, flex: 1 }} />
+                  <button onClick={() => void del('supplier', a.raw_norm)} className="px-1 text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger" aria-label="Borrar">✕</button>
+                </div>
+              ))}
+            </div>
+          </div>)}
+
+          {prod.length > 0 && (<div>
+            <div className="mb-1 text-label text-fg-muted">Productos ({prod.length})</div>
+            <div className="space-y-1">
+              {prod.map((a) => (
+                <div key={a.raw_norm} className="group flex items-center gap-1">
+                  <span className="w-32 shrink-0 truncate text-label text-fg-muted" title={a.raw_norm}>{a.raw_norm}</span>
+                  <span className="text-fg-muted">→</span>
+                  <input defaultValue={a.descripcion} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.descripcion) void saveProd({ ...a, descripcion: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 90 }} />
+                  <input defaultValue={a.unidad ?? ''} onBlur={(e) => { if ((e.target.value.trim() || null) !== a.unidad) void saveProd({ ...a, unidad: e.target.value.trim() || null }) }} placeholder="unidad" style={{ ...cell, width: 64 }} />
+                  <button onClick={() => void del('product', a.raw_norm)} className="px-1 text-fg-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger" aria-label="Borrar">✕</button>
+                </div>
+              ))}
+            </div>
+          </div>)}
+        </div>
+      )}
+    </section>
   )
 }
 
