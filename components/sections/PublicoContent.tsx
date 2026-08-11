@@ -267,6 +267,7 @@ export default function PublicoContent() {
           />
           <button onClick={() => void addCosto()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
         </div>
+        <div className="mt-2 border-t border-border pt-2"><TicketFoto onSaved={load} defaultDate={capDate} /></div>
       </section>
 
       {/* ── OTROS INGRESOS (no-POS: subarriendo, etc.) — NUNCA cuentan como venta (food cost intacto) ── */}
@@ -488,6 +489,152 @@ function Direccion() {
         </div>
       </section>
     </>
+  )
+}
+
+// ── Captura por FOTO del ticket: la IA PROPONE un borrador, tú corriges y CONFIRMAS, y hasta entonces se
+// guarda el gasto (roll-up de 1 línea en publico_costos + detalle itemizado). Tus correcciones enseñan a
+// los alias (la próxima vez llega ya traducido). NUNCA escribe sin confirmar. Alcance: Público. ──
+type FotoItem = { codigo: string | null; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean; categoria?: string | null; aliased?: boolean }
+type FotoDraft = { proveedor: string; proveedor_raw: string; proveedor_rfc: string | null; sucursal: string | null; fecha: string | null; moneda: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number | null; legibilidad: 'alta' | 'media' | 'baja'; notas: string | null; items: FotoItem[]; proveedorAliased: boolean }
+
+function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | void; defaultDate: string }) {
+  const [busy, setBusy] = useState<'extract' | 'confirm' | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [img, setImg] = useState<{ b64: string; media: string } | null>(null)
+  const [raw, setRaw] = useState<unknown>(null)
+  const [model, setModel] = useState<string | null>(null)
+  const [d, setD] = useState<FotoDraft | null>(null)
+  const [cat, setCat] = useState<CostCategory>('insumo')
+  const [origin, setOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); if (fileRef.current) fileRef.current.value = '' }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    setErr(null); setBusy('extract'); setD(null)
+    try {
+      const dataUrl: string = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file) })
+      const b64 = dataUrl.split(',')[1]; const media = dataUrl.slice(5, dataUrl.indexOf(';'))
+      setImg({ b64, media })
+      const resp = await fetch('/api/publico/ticket/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageBase64: b64, mediaType: media }) })
+      const j = await resp.json()
+      if (!resp.ok) { setErr(j.error ?? 'extracción falló'); setBusy(null); return }
+      setRaw(j.raw); setModel(j.model)
+      const draft: FotoDraft = j.draft
+      if (!draft.fecha) draft.fecha = defaultDate
+      setD(draft)
+    } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'no se pudo leer la foto') }
+    finally { setBusy((b) => (b === 'extract' ? null : b)) }
+  }
+
+  function patch(p: Partial<FotoDraft>) { setD((cur) => (cur ? { ...cur, ...p } : cur)) }
+  function patchItem(i: number, p: Partial<FotoItem>) { setD((cur) => (cur ? { ...cur, items: cur.items.map((it, k) => (k === i ? { ...it, ...p } : it)) } : cur)) }
+  function delItem(i: number) { setD((cur) => (cur ? { ...cur, items: cur.items.filter((_, k) => k !== i) } : cur)) }
+
+  const itemsSum = d ? d.items.reduce((s, it) => s + (it.es_descuento ? -1 : 1) * (Number(it.importe) || 0), 0) : 0
+  const totalNum = d && d.total != null ? Number(d.total) : 0
+  const mismatch = d && Math.abs(itemsSum - totalNum) > 0.5   // aviso suave si las líneas no suman al total
+
+  async function confirm() {
+    if (!d) return
+    setBusy('confirm'); setErr(null)
+    try {
+      const resp = await fetch('/api/publico/ticket/confirm', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          raw, model, proveedor: d.proveedor, proveedor_raw: d.proveedor_raw, fecha: d.fecha,
+          subtotal: d.subtotal, descuento: d.descuento, impuestos: d.impuestos, total: d.total,
+          legibilidad: d.legibilidad, notas: d.notas, category: cat, cost_kind: catDefaults(cat).defaultKind, origin,
+          items: d.items, imageBase64: img?.b64, mediaType: img?.media,
+        }),
+      })
+      const j = await resp.json()
+      if (!resp.ok) { setErr(j.error ?? 'no se pudo guardar'); setBusy(null); return }
+      await onSaved()
+      reset()
+    } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'no se pudo guardar'); setBusy(null) }
+  }
+
+  const legColor = d?.legibilidad === 'alta' ? 'text-ok' : d?.legibilidad === 'baja' ? 'text-danger' : 'text-fg-muted'
+  const cell: React.CSSProperties = { padding: '4px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
+  const fotoChip = (on: boolean): React.CSSProperties => ({ padding: '2px 8px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
+
+  return (
+    <div>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden" />
+      {!d && (
+        <div className="flex items-center gap-2">
+          <button onClick={() => fileRef.current?.click()} disabled={busy === 'extract'} className="rounded-card border border-border px-3 py-1.5 text-secondary font-medium disabled:opacity-50">
+            {busy === 'extract' ? 'leyendo el ticket…' : '📷 Capturar por foto del ticket'}
+          </button>
+          <span className="text-label text-fg-muted">la IA propone, tú confirmas</span>
+        </div>
+      )}
+      {err && <div className="mt-2 text-secondary text-danger">⚠ {err}</div>}
+
+      {d && (
+        <div className="mt-1 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-label font-bold uppercase tracking-widest text-fg-muted">Borrador del ticket <span className="font-normal normal-case tracking-normal">— revisa y confirma</span></span>
+            <span className={`text-label ${legColor}`}>legibilidad {d.legibilidad}</span>
+          </div>
+          {d.notas && <div className="rounded-card border border-border bg-surface-2 p-2 text-label text-fg-muted">📝 {d.notas}</div>}
+
+          {/* Proveedor + fecha */}
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex-1">
+              <span className="text-label text-fg-muted">Proveedor {d.proveedorAliased && <span className="text-ok">· alias aplicado</span>}{!d.proveedorAliased && d.proveedor_raw && <span className="text-fg-muted"> · IA: {d.proveedor_raw}</span>}</span>
+              <input value={d.proveedor} onChange={(e) => patch({ proveedor: e.target.value })} style={{ ...cell, width: '100%', fontSize: 15 }} />
+            </label>
+            <label>
+              <span className="text-label text-fg-muted">Fecha <span className="text-warn">· verifica</span></span>
+              <input type="date" value={d.fecha ?? ''} onChange={(e) => patch({ fecha: e.target.value })} style={{ ...cell, fontSize: 15 }} />
+            </label>
+          </div>
+
+          {/* Líneas */}
+          <div className="space-y-1">
+            {d.items.map((it, i) => (
+              <div key={i} className="group flex items-center gap-1">
+                <input value={it.descripcion} onChange={(e) => patchItem(i, { descripcion: e.target.value })} style={{ ...cell, flex: 1, minWidth: 100 }} title={it.descripcion_raw && it.descripcion_raw !== it.descripcion ? `IA: ${it.descripcion_raw}` : undefined} placeholder="descripción" />
+                {it.aliased && <span className="text-ok" title="alias aplicado">✓</span>}
+                <input value={it.cantidad ?? ''} onChange={(e) => patchItem(i, { cantidad: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 46, textAlign: 'right' }} placeholder="cant" />
+                <input value={it.precio_unitario ?? ''} onChange={(e) => patchItem(i, { precio_unitario: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 64, textAlign: 'right' }} placeholder="P.U." />
+                <input value={it.importe} onChange={(e) => patchItem(i, { importe: Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} placeholder="importe" />
+                <button onClick={() => patchItem(i, { es_descuento: !it.es_descuento })} style={fotoChip(it.es_descuento)} title="marca si es cupón/descuento">desc</button>
+                <button onClick={() => delItem(i)} className="px-1 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar línea">✕</button>
+              </div>
+            ))}
+            <button onClick={() => setD((cur) => (cur ? { ...cur, items: [...cur.items, { codigo: null, descripcion: '', descripcion_raw: null, cantidad: null, unidad: null, precio_unitario: null, importe: 0, es_descuento: false }] } : cur))} className="text-label text-fg-muted hover:text-accent">＋ línea</button>
+          </div>
+
+          {/* Totales */}
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 border-t border-border pt-2 text-label">
+            <label className="flex items-center gap-1"><span className="text-fg-muted">Subtotal</span><input value={d.subtotal ?? ''} onChange={(e) => patch({ subtotal: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
+            <label className="flex items-center gap-1"><span className="text-fg-muted">Impuestos</span><input value={d.impuestos ?? ''} onChange={(e) => patch({ impuestos: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
+            <label className="flex items-center gap-1"><span className="font-bold text-fg">Total</span><input value={d.total ?? ''} onChange={(e) => patch({ total: e.target.value === '' ? null : Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 96, textAlign: 'right', fontSize: 15, fontWeight: 700 }} /></label>
+          </div>
+          {mismatch && <div className="text-right text-label text-warn">las líneas suman {mxn(itemsSum)} · total {mxn(totalNum)} — revisa</div>}
+
+          {/* Categoría + origen del roll-up */}
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
+            <span className="text-label text-fg-muted">Categoría</span>
+            {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
+              <button key={c.key} onClick={() => { setCat(c.key); setOrigin(catDefaults(c.key).defaultOrigin) }} style={fotoChip(cat === c.key)}>{c.label}</button>
+            ))}
+            <span className="ml-2 text-label text-fg-muted">desde</span>
+            {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setOrigin(ct.key)} style={fotoChip(origin === ct.key)}>{ct.label}</button>))}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button onClick={reset} disabled={busy === 'confirm'} className="rounded-card px-3 py-1.5 text-secondary text-fg-muted hover:text-fg disabled:opacity-50">Descartar</button>
+            <button onClick={() => void confirm()} disabled={busy === 'confirm'} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
