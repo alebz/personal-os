@@ -103,6 +103,12 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
     await fetch(`/api/publico/previstos/pay?previsto_id=${undo.previsto_id}&ocurrencia=${undo.ocurrencia}`, { method: 'DELETE' })
     setUndo(null); await load(); onCostChange?.()
   }
+  // Revertir una ocurrencia YA pagada desde el historial (persistente, no solo el toast de 7s): borra el costo
+  // real que creó y quita el pago. Reversibilidad UI total — nada de pedirlo por fuera.
+  async function revert(previsto_id: string, ocurrencia: string) {
+    await fetch(`/api/publico/previstos/pay?previsto_id=${previsto_id}&ocurrencia=${ocurrencia}`, { method: 'DELETE' })
+    await load(); onCostChange?.()
+  }
   // Opción A: pagar/desmarcar un cargo de tarjeta desde Público (crea/revierte el costo + la confirmación de Créditos).
   async function cardPay(it: Item, on: boolean) {
     if (it.kind !== 'card' || !it.chargeId) return
@@ -151,7 +157,12 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
         {open && (
           <div className="mb-1 ml-6 mt-0.5 border-l-2 pl-2 text-label text-fg-muted" style={{ borderColor: 'var(--color-border)' }}>
             <div className="italic">cada {frecLabel(it.frecuencia).toLowerCase()} es una ocurrencia nueva con su propio registro — al marcar el pago se crea su costo y la siguiente queda pendiente.</div>
-            {paidOccs.map((o) => <div key={o} className="tabular-nums">✓ pagado · {dayLabel(o)}</div>)}
+            {paidOccs.map((o) => (
+              <div key={o} className="flex items-center justify-between gap-2">
+                <span className="tabular-nums">✓ pagado · {dayLabel(o)}</span>
+                {it.manual && <button onClick={() => void revert(it.manual!.id, o)} className="underline decoration-dotted hover:text-danger" title="revierte el costo que creó este pago">↩ revertir</button>}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -191,17 +202,19 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
   prev: Prev[]; onAdd: () => void; onPatch: (id: string, f: Record<string, unknown>) => void; onDel: (id: string) => void; onDrop: (id: string) => void; dragId: React.MutableRefObject<string | null>; cell: React.CSSProperties
 }) {
   const [concepto, setConcepto] = useState('')
-  const [cat, setCat] = useState<CostCategory>('gasto_fijo')
-  const [origin, setOrigin] = useState<OriginKey>(catDefaults('gasto_fijo').defaultOrigin)
+  // Sin default de categoría: obliga a elegir explícitamente (antes default-eaba a gasto_fijo y los de nómina
+  // salían mal). '' = sin elegir; el alta se bloquea hasta que se escoja una categoría real.
+  const [cat, setCat] = useState<CostCategory | ''>('')
+  const [origin, setOrigin] = useState<OriginKey>(null)
   const [amount, setAmount] = useState('')
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual')
   const [anchor, setAnchor] = useState(localDate())
   const [ocur, setOcur] = useState('')
 
   async function add() {
-    const a = parseFloat(amount); if (!concepto.trim() || !a || a <= 0) return
+    const a = parseFloat(amount); if (!concepto.trim() || !a || a <= 0 || !cat) return   // categoría obligatoria
     await fetch('/api/publico/previstos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ concepto: concepto.trim(), categoria: cat, origin, amount: a, frecuencia, anchor_date: anchor, ocurrencias: ocur ? Number(ocur) : null }) })
-    setConcepto(''); setAmount(''); setOcur(''); onAdd()
+    setConcepto(''); setCat(''); setOrigin(null); setAmount(''); setOcur(''); onAdd()
   }
 
   return (
@@ -209,13 +222,16 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
       {/* Alta */}
       <div className="flex flex-wrap items-center gap-1 rounded-card border border-border bg-surface-2 p-2">
         <input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="concepto (ej. Suscripción Poster)" style={{ ...cell, flex: 1, minWidth: 140 }} />
-        <select value={cat} onChange={(e) => { const c = e.target.value as CostCategory; setCat(c); setOrigin(catDefaults(c).defaultOrigin) }} style={{ ...cell, width: 110 }}>{COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+        <select value={cat} onChange={(e) => { const c = e.target.value as CostCategory | ''; setCat(c); setOrigin(c ? catDefaults(c).defaultOrigin : null) }} style={{ ...cell, width: 110, ...(cat ? {} : { color: 'var(--color-warn, #b45309)' }) }}>
+          <option value="">categoría…</option>
+          {COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+        </select>
         <select value={origin ?? ''} onChange={(e) => setOrigin((e.target.value || null) as OriginKey)} style={{ ...cell, width: 100 }}>{ORIGIN_OPTIONS.map((o) => <option key={o.label} value={o.key ?? ''}>{o.label}</option>)}</select>
         <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="$ monto" style={{ ...cell, width: 80, textAlign: 'right' }} />
         <select value={frecuencia} onChange={(e) => setFrecuencia(e.target.value as Frecuencia)} style={{ ...cell, width: 100 }}>{FRECS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
         <label className="flex items-center gap-1 text-label text-fg-muted">1er vence<input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} style={cell} /></label>
         <input value={ocur} onChange={(e) => setOcur(e.target.value)} inputMode="numeric" placeholder="N de M (opc)" title="cuántos pagos en total; vacío = perpetuo" style={{ ...cell, width: 90, textAlign: 'right' }} />
-        <button onClick={() => void add()} className="rounded-card border border-border px-3 py-1 font-medium">Agregar</button>
+        <button onClick={() => void add()} disabled={!cat} className="rounded-card border border-border px-3 py-1 font-medium disabled:opacity-40" title={cat ? '' : 'elige una categoría primero'}>Agregar</button>
       </div>
       {/* Lista editable + arrastre */}
       <div className="space-y-1">
