@@ -30,7 +30,7 @@ const SOCIO_ACCOUNTS: WalletOption[] = CONTAINERS.map((c) => ({ value: c.key, la
 // componente adaptivo (tambor + ventana XP vía tokens de tema); el reskin MSN-Money es polish futuro.
 
 interface Venta { id: string; date: string; efectivo: number; tarjeta: number; note: string | null; source?: 'manual' | 'poster' }
-interface Costo { id: string; date: string; category: CostCategory; cost_kind: CostKind | null; origin: OriginKey; amount: number; note: string | null }
+interface Costo { id: string; date: string; category: CostCategory; cost_kind: CostKind | null; origin: OriginKey; amount: number; note: string | null; source?: string }
 interface Ingreso { id: string; date: string; concepto: string; amount: number; origin: OriginKey; note: string | null }
 
 export default function PublicoContent() {
@@ -310,7 +310,7 @@ export default function PublicoContent() {
           {costosHoy.map((c) => (
             <div key={c.id} className="group flex items-center gap-2 text-secondary">
               <span className="w-24 text-fg-muted">{catDefaults(c.category).label}</span>
-              <span className="flex-1 truncate">{c.note || <span className="text-fg-muted">—</span>} <span className="text-fg-muted">· {originLabel(c.origin)}</span></span>
+              <span className="flex-1 truncate">{c.note || <span className="text-fg-muted">—</span>} <span className="text-fg-muted">· {c.source === 'poster' ? 'Poster · contenedor sin asignar' : originLabel(c.origin)}</span></span>
               <span className="tabular-nums text-danger">−{mxn(Number(c.amount))}</span>
               <button onClick={() => void delCosto(c.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
             </div>
@@ -362,6 +362,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
   const [vp, setVp] = useState<number | null>(null)   // venta por persona (POS) · DEL MES (guests_count)
   const [diasOp, setDiasOp] = useState<number | null>(null)  // días con venta del mes (denominador de venta/día)
   const vd = diasOp != null && diasOp > 0 ? ventasMes / diasOp : null   // venta/día = las MISMAS ventas del mes ÷ días operados
+  const isCurrentMonth = month === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }).slice(0, 7)   // el mes en curso siempre tiene compras por capturar
   useEffect(() => {
     let alive = true
     fetch('/api/publico/foodcost').then((r) => r.json()).then((d: FCData & { error?: string }) => { if (!alive || d.error) return; const row = d.theoreticalByMonth?.find((x) => x.month === month); setFc(row ? row.theoreticalPct : null) }).catch(() => {})
@@ -412,8 +413,11 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
         <div className="grid grid-cols-1 sm:grid-cols-2" style={{ borderTop: `1px solid ${bord}` }}>
           {/* Par de caras: VENTAS (POS, cierto) y GASTOS (manual, incompleto) — mismo peso visual, procedencia honesta. */}
           <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Ventas del mes{src('pos')}</>} value={mxn(ventasMes)} big /></div>
-          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Gastos del mes{src('manual')}</>} value={`−${mxn(costosOper)}`} big hint="capturado a mano · incompleto hasta cerrar el mes" /></div>
-          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Food cost teórico{src('pos')}</>} value={fc != null ? `${fc.toFixed(1)}%` : '…'} /></div>
+          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Gastos del mes<span style={{ opacity: 0.5 }}> · poster + manual</span></>} value={`−${mxn(costosOper)}`} big hint="compras de Poster + capturas · incompleto hasta cerrar el mes" /></div>
+          {/* PRECAUCIÓN DE LECTURA: food cost = CONSUMO (recetas del POS), NO compras÷ventas. Surtirse por
+              adelantado infla compras/ventas (jun 59%, jul 49%) muy arriba del teórico 31% — es periodificación,
+              no food cost. GASTOS y FOOD COST viven en celdas distintas y nunca se dividen entre sí. */}
+          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Food cost teórico{src('pos')}</>} value={fc != null ? `${fc.toFixed(1)}%` : '…'} hint="consumo de recetas · no es gastos ÷ ventas" /></div>
           <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Ticket promedio{src('pos')}</>} value={tp != null ? mxn(tp) : '…'} hint="promedio por recibo · no por persona" /></div>
           {/* Venta por persona: sí capturas comensales (guests_count ≈ 2.4/recibo), así que es un número real y distinto del ticket. */}
           <div style={{ borderRight: `1px solid ${bord}` }}><Metric name={<>Venta · por persona{src('pos')}</>} value={vp != null ? mxn(vp) : '…'} hint="÷ comensales del recibo" /></div>
@@ -422,10 +426,17 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
         {/* Utilidad (provisional) */}
         <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>{faltan > 0 ? `provisional · faltan ${mxn(faltan)}` : 'provisional'}</span></span>
+            <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>provisional</span></span>
             <span className="tabular-nums" style={{ color: dc, fontSize: 22, fontWeight: 700 }}>{mxn(utilidadOper)}</span>
           </div>
-          <div className="mt-1 text-label text-fg-muted italic">= ventas del mes − gastos del mes</div>
+          <div className="mt-1 text-label text-fg-muted italic">= ventas del mes − gastos capturados</div>
+          {/* Honestidad: la utilidad se INFLA cuando faltan costos. Los fijos/nómina viven en previstos y no
+              restan hasta marcarse pagados; el mes en curso además tiene compras por capturar. Lo decimos claro. */}
+          {(faltan > 0 || isCurrentMonth) && (
+            <div className="mt-1 text-label text-warn" style={{ lineHeight: 1.3 }}>
+              ⚠ se ve alta —{faltan > 0 && <> aún no resta <b className="tabular-nums">{mxn(faltan)}</b> de nómina/fijos sin marcar como pagados</>}{faltan > 0 && isCurrentMonth && ' ·'}{isCurrentMonth && ' compras del mes aún por capturar'}. La real será menor.
+            </div>
+          )}
           {(otrosIngresosMes > 0 || rentaCondonadaMes > 0 || reinversionMes > 0) && (
             <div className="mt-2 space-y-0.5 border-t pt-2 text-label text-fg-muted" style={{ borderColor: bord }}>
               {otrosIngresosMes > 0 && <div className="flex justify-between"><span>+ otros ingresos</span><span className="tabular-nums">{mxn(otrosIngresosMes)}</span></div>}
