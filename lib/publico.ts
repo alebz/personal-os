@@ -5,7 +5,7 @@
 
 export type ContainerKey = 'clip' | 'caja_chica' | 'caja_pos'
 export type OriginKey = ContainerKey | null   // null = "sin caja" (protocolo/condonado; no toca contenedor)
-export type CostCategory = 'insumo' | 'nomina' | 'gasto_fijo' | 'reinversion' | 'renta_condonada'
+export type CostCategory = 'insumo' | 'nomina' | 'gasto_fijo' | 'mantenimiento' | 'empaque' | 'suministros' | 'reinversion' | 'renta_condonada'
 export type CostKind = 'fijo' | 'variable'
 
 // Contenedores de dinero del negocio. En F1 son ATRIBUCIÓN (enum en cada movimiento); en F5 nacen
@@ -33,6 +33,12 @@ export const COST_CATEGORIES: {
   { key: 'insumo',          label: 'Insumo',          defaultOrigin: 'clip',       defaultKind: 'variable' },
   { key: 'nomina',          label: 'Nómina',          defaultOrigin: 'clip',       defaultKind: 'fijo' },
   { key: 'gasto_fijo',      label: 'Gasto fijo',      defaultOrigin: 'caja_chica', defaultKind: 'fijo' },
+  // No-comida OPERATIVOS (variables, restan utilidad, NO cuentan al breakeven de fijos):
+  //  · mantenimiento: reparaciones/servicios técnicos/equipo · empaque: lo que se va CON la venta (escala
+  //    con ventas → se mira como % de ventas, aparte del food cost) · suministros: papelería/imprenta/limpieza.
+  { key: 'mantenimiento',   label: 'Mantenimiento',   defaultOrigin: 'clip',       defaultKind: 'variable' },
+  { key: 'empaque',         label: 'Empaque',         defaultOrigin: 'clip',       defaultKind: 'variable' },
+  { key: 'suministros',     label: 'Suministros',     defaultOrigin: 'clip',       defaultKind: 'variable' },
   { key: 'reinversion',     label: 'Reinversión',     defaultOrigin: 'clip',       defaultKind: null },
   // Renta condonada (arreglo Ameno): NO-operativa (fuera de utilidad operativa), sin caja por default.
   { key: 'renta_condonada', label: 'Renta condonada', defaultOrigin: null,         defaultKind: null },
@@ -45,5 +51,7 @@ export const SALES_CONTAINER: Record<'efectivo' | 'tarjeta', ContainerKey> = {
   tarjeta: 'clip',
 }
 
-// Utilidad OPERATIVA = ventas − (insumo + nómina + gasto_fijo). Reinversión NO cuenta (uso de utilidad).
-export const OPERATING_CATEGORIES: CostCategory[] = ['insumo', 'nomina', 'gasto_fijo']
+// Utilidad OPERATIVA = ventas − (insumo + nómina + gasto_fijo + mantenimiento + empaque + suministros).
+// Reinversión y renta_condonada NO cuentan (uso de utilidad / net-cero). Estas 6 restan la utilidad operativa;
+// solo nómina y gasto_fijo (defaultKind='fijo') pesan además en el punto de equilibrio.
+export const OPERATING_CATEGORIES: CostCategory[] = ['insumo', 'nomina', 'gasto_fijo', 'mantenimiento', 'empaque', 'suministros']

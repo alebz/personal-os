@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { mxn } from '@/components/Mxn'
+import { dayMonth } from './util'
 
 type Cont = {
   contenedor: 'clip' | 'caja_chica' | 'caja_pos'; label: string; procedencia: 'derivado' | 'capturado'
   needsBaseline: boolean; balance: number | null; desde: string | null; diasSinCuadrar: number | null
 }
+type Pend = { since: string | null; count: number; total: number; items: { id: string; date: string; concepto: string; amount: number }[] }
 
 const ALERTA_DIAS = 21   // aviso de "hace mucho que no cuadras", análogo al del conteo físico del food cost
 
@@ -15,12 +17,27 @@ export function Contenedores({ dc }: { dc: string }) {
   const [openC, setOpenC] = useState<string | null>(null)   // contenedor con el cuadre abierto
   const [val, setVal] = useState('')
   const [flash, setFlash] = useState<string | null>(null)
+  const [pend, setPend] = useState<Pend | null>(null)       // compras Poster sin contenedor tras el baseline
+  const [pendOpen, setPendOpen] = useState(false)
 
   const load = useCallback(async () => {
-    const j = await fetch('/api/publico/contenedores').then((r) => r.json()).catch(() => null)
+    const [j, p] = await Promise.all([
+      fetch('/api/publico/contenedores').then((r) => r.json()).catch(() => null),
+      fetch('/api/publico/contenedores/pendientes').then((r) => r.json()).catch(() => null),
+    ])
     if (j?.contenedores) setConts(j.contenedores)
+    if (p && typeof p.count === 'number') setPend(p)
   }, [])
   useEffect(() => { void load() }, [load])
+
+  async function asignar(origin: 'clip' | 'caja_chica') {
+    const resp = await fetch('/api/publico/contenedores/pendientes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ origin }) })
+    const r = await resp.json().catch(() => ({} as { error?: string; assigned?: number }))
+    if (!resp.ok || r.error) { setFlash(`no se pudo asignar — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
+    setFlash(`${r.assigned} compra${r.assigned === 1 ? '' : 's'} → ${origin === 'clip' ? 'CLIP' : 'caja chica'}`)
+    setTimeout(() => setFlash(null), 5000)
+    setPendOpen(false); await load()
+  }
 
   async function cuadrar(c: Cont) {
     const contado = parseFloat(val)
@@ -39,6 +56,35 @@ export function Contenedores({ dc }: { dc: string }) {
   return (
     <div className="space-y-2">
       {flash && <div className="rounded-card border border-border bg-surface-2 p-1.5 text-label text-fg-muted">{flash}</div>}
+
+      {/* Pendientes de asignar: compras de Poster (origin desconocido) posteriores al baseline. No tocan
+          cajones hasta asignarlas — pero si no se asignan, el saldo real se aleja del mostrado. Punto 2. */}
+      {pend && pend.count > 0 && (
+        <div className="rounded-card border p-2 text-label" style={{ borderColor: 'var(--color-warn, #b45309)' }}>
+          <div className="flex items-center justify-between gap-2">
+            <button onClick={() => setPendOpen((o) => !o)} className="text-left text-warn hover:underline">
+              ⚠ <b>{pend.count}</b> compra{pend.count === 1 ? '' : 's'} sin contenedor (<b className="tabular-nums">{mxn(pend.total)}</b>) tras el baseline
+            </button>
+            <div className="flex shrink-0 gap-1">
+              <span className="text-fg-muted">todas →</span>
+              <button onClick={() => void asignar('clip')} className="rounded-control border border-border px-2 py-0.5 font-medium hover:text-accent">CLIP</button>
+              <button onClick={() => void asignar('caja_chica')} className="rounded-control border border-border px-2 py-0.5 font-medium hover:text-accent">caja chica</button>
+            </div>
+          </div>
+          <div className="mt-1 text-fg-muted">No inflan ningún cajón hasta asignarlas. Asígnalas al cajón de donde salió el dinero.</div>
+          {pendOpen && (
+            <div className="mt-1 space-y-0.5 border-t border-border pt-1">
+              {pend.items.map((i) => (
+                <div key={i.id} className="flex items-center justify-between gap-2 tabular-nums text-fg-muted">
+                  <span className="truncate">{dayMonth(i.date)} · {i.concepto}</span>
+                  <span className="shrink-0 text-danger">−{mxn(i.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {conts.map((c) => (
         <div key={c.contenedor} className="border-t border-border pt-1 first:border-0 first:pt-0">
           <div className="flex items-baseline justify-between gap-2">

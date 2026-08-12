@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { mxn } from '@/components/Mxn'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, originLabel, OPERATING_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
 import { currentDue, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
-import { localDate, addDays } from './util'
+import { localDate, addDays, dayMonth, dayLabel } from './util'
 
 const PRONTO_DIAS = 7   // ventana "vence pronto": vencidos siempre + próximos 7 días (constante ajustable)
 const FRECS: { key: Frecuencia; label: string }[] = [
   { key: 'semanal', label: 'Semanal' }, { key: 'quincenal', label: 'Quincenal' }, { key: 'mensual', label: 'Mensual' }, { key: 'bimestral', label: 'Bimestral' },
 ]
+const RECUR = new Set<Frecuencia>(['semanal', 'quincenal'])   // frecuencias donde el día de la semana importa (el "día de paga")
+const frecLabel = (f: Frecuencia) => FRECS.find((x) => x.key === f)?.label ?? f
 
 type Prev = { id: string; concepto: string; categoria: CostCategory; origin: OriginKey; amount: number; frecuencia: Frecuencia; anchor_date: string; ocurrencias: number | null; sort_order: number; archived: boolean }
 type Pago = { previsto_id: string; ocurrencia: string; costo_id: string | null }
@@ -31,6 +33,7 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
   const [deriv, setDeriv] = useState<Derivado[]>([])
   const [showRest, setShowRest] = useState(false)
   const [manage, setManage] = useState(false)
+  const [histOpen, setHistOpen] = useState<string | null>(null)   // previsto con su historial de pagos desplegado
   const [undo, setUndo] = useState<{ previsto_id: string; ocurrencia: string; label: string } | null>(null)
   const dragId = useRef<string | null>(null)
 
@@ -122,19 +125,35 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
 
   const row = (it: Item) => {
     const overdue = it.due && it.due.date < today
+    const recur = RECUR.has(it.frecuencia)   // semanal/quincenal: cada período es una ocurrencia NUEVA (no un reset)
+    // Ocurrencias YA pagadas de este previsto (historial), más recientes primero.
+    const paidOccs = it.kind === 'manual' && it.manual ? pagos.filter((x) => x.previsto_id === it.manual!.id).map((x) => x.ocurrencia).sort((a, b) => (a < b ? 1 : -1)) : []
+    // La pendiente: en recurrentes muestra el DÍA DE LA SEMANA ("dom, 09 ago" = el domingo de paga); en el resto, corto.
+    const dueTxt = it.due ? (recur ? dayLabel(it.due.date) : dayMonth(it.due.date)) : null
+    const open = histOpen === it.key
     return (
-      <div key={it.key} draggable={it.kind === 'manual' && manage} onDragStart={() => { if (it.manual) dragId.current = it.manual.id }} onDragOver={(e) => e.preventDefault()} onDrop={() => it.manual && onDrop(it.manual.id)}
-        className="flex items-center gap-2 text-secondary" style={it.kind === 'card' ? { opacity: 0.85 } : undefined}>
-        {it.kind === 'manual'
-          ? <input type="checkbox" checked={false} onChange={(e) => void pay(it, e.target.checked)} title="marcar pagado (crea el costo real)" />
-          : <input type="checkbox" checked={!!it.cardPaid} onChange={(e) => void cardPay(it, e.target.checked)} title="pagar desde Público (crea el costo y marca la confirmación en Créditos, que allá queda de solo lectura)" />}
-        <span className="flex-1 truncate">
-          {it.concepto}
-          {it.kind === 'card' && <span className="ml-1 rounded px-1 text-label" style={{ border: '1px solid var(--color-border)', opacity: 0.7 }}>tarjeta · Créditos</span>}
-          {it.ocurrencias != null && it.due && <span className="ml-1 text-fg-muted">{it.due.n}/{it.ocurrencias}</span>}
-        </span>
-        <span className={`shrink-0 text-label ${overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.due ? (overdue ? `vencido ${it.due.date.slice(5)}` : `vence ${it.due.date.slice(5)}`) : '—'}</span>
-        <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>
+      <div key={it.key}>
+        <div draggable={it.kind === 'manual' && manage} onDragStart={() => { if (it.manual) dragId.current = it.manual.id }} onDragOver={(e) => e.preventDefault()} onDrop={() => it.manual && onDrop(it.manual.id)}
+          className="flex items-center gap-2 text-secondary" style={it.kind === 'card' ? { opacity: 0.85 } : undefined}>
+          {it.kind === 'manual'
+            ? <input type="checkbox" checked={false} onChange={(e) => void pay(it, e.target.checked)} title="marcar pagado (crea el costo real)" />
+            : <input type="checkbox" checked={!!it.cardPaid} onChange={(e) => void cardPay(it, e.target.checked)} title="pagar desde Público (crea el costo y marca la confirmación en Créditos, que allá queda de solo lectura)" />}
+          <span className="flex-1 truncate">
+            {it.concepto}
+            {it.kind === 'card' && <span className="ml-1 rounded px-1 text-label" style={{ border: '1px solid var(--color-border)', opacity: 0.7 }}>tarjeta · Créditos</span>}
+            {recur && <span className="ml-1 text-fg-muted" title="cada período es una ocurrencia nueva con su propio registro; el check no se 'resetea', avanza a la siguiente">· {frecLabel(it.frecuencia)}</span>}
+            {it.ocurrencias != null && it.due && <span className="ml-1 text-fg-muted">{it.due.n}/{it.ocurrencias}</span>}
+            {paidOccs.length > 0 && <button onClick={() => setHistOpen(open ? null : it.key)} className="ml-1 text-fg-muted underline decoration-dotted hover:text-accent" title="ver las ya pagadas">· {paidOccs.length} pagada{paidOccs.length === 1 ? '' : 's'}</button>}
+          </span>
+          <span className={`shrink-0 text-label ${overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.due ? (overdue ? `vencido ${dueTxt}` : `vence ${dueTxt}`) : '—'}</span>
+          <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>
+        </div>
+        {open && (
+          <div className="mb-1 ml-6 mt-0.5 border-l-2 pl-2 text-label text-fg-muted" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="italic">cada {frecLabel(it.frecuencia).toLowerCase()} es una ocurrencia nueva con su propio registro — al marcar el pago se crea su costo y la siguiente queda pendiente.</div>
+            {paidOccs.map((o) => <div key={o} className="tabular-nums">✓ pagado · {dayLabel(o)}</div>)}
+          </div>
+        )}
       </div>
     )
   }

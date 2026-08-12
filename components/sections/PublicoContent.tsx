@@ -14,7 +14,7 @@ import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
 import { Previstos } from './publico/Previstos'
 import { Contenedores } from './publico/Contenedores'
-import { localDate, addDays, dayLabel } from './publico/util'
+import { localDate, addDays, dayLabel, dayMonth, monthName } from './publico/util'
 import { dayColor, crtDayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 
@@ -409,7 +409,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
 
       {/* Fila asimétrica: MÉTRICAS + punto de equilibrio (2/3, el bloque hero) · alerta + qué toca (1/3). */}
       <section className="lg:col-span-4" style={box}>
-        <div className="px-3 pt-3"><Head>Métricas · {month}</Head></div>
+        <div className="px-3 pt-3"><Head>Métricas · {monthName(month)}</Head></div>
         <div className="grid grid-cols-1 sm:grid-cols-2" style={{ borderTop: `1px solid ${bord}` }}>
           {/* Par de caras: VENTAS (POS, cierto) y GASTOS (manual, incompleto) — mismo peso visual, procedencia honesta. */}
           <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Ventas del mes{src('pos')}</>} value={mxn(ventasMes)} big /></div>
@@ -564,7 +564,7 @@ function Direccion() {
           <div className="mt-1 text-fg-muted">El supuesto de “día natural = getPaymentsReport” asume que se cierra antes de medianoche. Estos cruzan ese límite — revisa si la operación cambió de horario:</div>
           <div className="mt-1 space-y-0.5">
             {m.guardian.receipts.map((r) => (
-              <div key={r.id} className="flex justify-between tabular-nums"><span>#{r.id} · {r.date} {r.time}</span><span>{mxn(r.sum)}</span></div>
+              <div key={r.id} className="flex justify-between tabular-nums"><span>#{r.id} · {dayMonth(r.date)} {r.time}</span><span>{mxn(r.sum)}</span></div>
             ))}
           </div>
         </div>
@@ -574,7 +574,7 @@ function Direccion() {
       <section className="rounded-card border border-border bg-surface-2 p-3">
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Dirección</h2>
-          <span className="text-label text-fg-muted">{m.range.from} → {m.range.to}</span>
+          <span className="text-label text-fg-muted">{dayMonth(m.range.from)} → {dayMonth(m.range.to)}</span>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-secondary sm:grid-cols-4">
           <div><div className="text-label text-fg-muted">Ticket promedio</div><div className="text-lg font-bold tabular-nums">{mxn(m.ticketPromedio)}</div></div>
@@ -663,14 +663,19 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 const monthLabel = (m: string) => { const [y, mm] = m.split('-'); return `${MESES[Number(mm) - 1]} ${y}` }
 const dayLabelShort = (iso: string) => { const [, mm, dd] = iso.split('-'); return `${Number(dd)} ${MESES[Number(mm) - 1]}` }
 
+type EmpMonth = { month: string; sales: number; empaque: number; pct: number | null }
+
 function FoodCostPanel() {
   const [d, setD] = useState<FCData | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [emp, setEmp] = useState<EmpMonth[] | null>(null)
   useEffect(() => {
     let alive = true
     fetch('/api/publico/foodcost').then((r) => r.json())
       .then((j) => { if (!alive) return; if (j.error) setErr(j.error); else setD(j) })
       .catch(() => alive && setErr('No se pudo cargar el food cost'))
+    fetch('/api/publico/empaque').then((r) => r.json())
+      .then((j) => { if (alive && j.byMonth) setEmp(j.byMonth) }).catch(() => {})
     return () => { alive = false }
   }, [])
 
@@ -728,6 +733,23 @@ function FoodCostPanel() {
       </div>
 
       <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">El gap (real − teórico) es merma + sobre-porción + desperdicio + robo. Solo es legítimo en periodos 🟢 cerrados entre dos conteos físicos.</div>
+
+      {/* EMPAQUE · % de ventas — SEPARADO del food cost (no es consumo de receta). Es lo que se va CON la venta
+          (cajas, vasos, servilletas); escala con el volumen, por eso se mira como % de ventas. Punto 5. */}
+      {emp && emp.length > 0 && (
+        <div className="mt-3 rounded-card border border-border p-2" style={{ borderStyle: 'dashed' }}>
+          <div className="mb-1 text-label font-bold uppercase tracking-widest text-fg-muted">Empaque · % de ventas <span className="font-normal normal-case tracking-normal">(no es food cost — lo que se va con la venta)</span></div>
+          <div className="space-y-0.5">
+            {emp.map((m) => (
+              <div key={m.month} className="flex items-baseline justify-between text-secondary">
+                <span className="text-fg-muted">{monthLabel(m.month)}</span>
+                <span className="tabular-nums"><span className="text-fg-muted">{mxn(m.empaque)} · </span><span className="font-medium text-fg">{m.pct != null ? `${m.pct.toFixed(1)}%` : '—'}</span></span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 text-label text-fg-muted">Sube = sirves más (bien) o el empaque se encareció (revisar). Nunca se suma al food cost.</div>
+        </div>
+      )}
     </section>
   )
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { runPosterImport } from '@/lib/posterImport'
+import { runPosterImport, importSupplies } from '@/lib/posterImport'
 
 export const runtime = 'nodejs'
 
@@ -13,5 +13,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'no autorizado' }, { status: 401 })
   }
   const r = await runPosterImport(14)
-  return NextResponse.json(r, { status: r.ok ? 200 : r.status })
+  // Compras de Poster: las nuevas entran solas (idempotente, anti-dup por supply_id, respeta lo manual).
+  // No hace fallar el cron de ventas si algo truena aquí: se reporta aparte.
+  const s = await importSupplies({ commit: true })
+  return NextResponse.json({ ventas: r, compras: s.ok ? { imported: s.imported, skippedManual: s.skippedManual.length } : { error: s.error } }, { status: r.ok ? 200 : r.status })
 }

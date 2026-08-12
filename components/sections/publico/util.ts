@@ -8,6 +8,10 @@ export const dayLabel = (iso: string) => {
   const d = new Date(iso + 'T12:00:00')
   return d.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short' })
 }
+// Corto es-MX "6 ago" (día antes que mes, nunca MM/DD) para etiquetas inline como "vence 6 ago".
+export const dayMonth = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
+// Mes legible es-MX "agosto 2026" desde "YYYY-MM".
+export const monthName = (ym: string) => { const [y, m] = ym.split('-').map(Number); return `${new Date(y, m - 1, 1).toLocaleDateString('es-MX', { month: 'long' })} ${y}` }
 
 export type PosterIngredient = { id: number; name: string; unit: string }
 export type PosterSupplier = { id: number; name: string }
