@@ -13,6 +13,11 @@ import { todayMX, shiftDays, HISTORY_START } from '@/lib/posterImport'
 
 const MX = 'America/Mexico_City'
 const COUNT_ALERT_DAYS = 35   // pasados estos días desde el último conteo, se enciende el aviso
+// Un tramo entre conteos MÁS largo que esto no puede aislar la merma operativa: su "gap" mezcla drift
+// acumulado + compras que aún no viven en el perpetuo de Poster (se importaron al ledger de caja, no a
+// inventario). Se marca como RECONCILIACIÓN, no como merma del periodo. El primer conteo tras un hueco así
+// reconcilia lo acumulado — igual que el arranque. El food cost confiable llega en el próximo tramo corto.
+const RECONCILE_DAYS = 45
 
 const cdmxDate = (epochMs: number) => new Date(epochMs).toLocaleDateString('en-CA', { timeZone: MX })   // YYYY-MM-DD
 const pesos = (v: unknown) => Number(v ?? 0) / 100
@@ -29,6 +34,8 @@ export type Period = {
   sales: number; theoreticalPct: number
   realPct: number | null; gapPct: number | null   // solo 'confiable'
   startupAdjustment?: number                       // solo 'arranque'
+  contaminated?: boolean                           // 'confiable' pero demasiado largo → reconciliación, no merma
+  days?: number
   note?: string
 }
 export type FoodCost = {
@@ -128,7 +135,14 @@ export async function computeFoodCost(): Promise<FoodCostResult> {
       const from = shiftDays(countDates[i - 1], 1), to = countDates[i]
       const s = span(from, to)
       const real = await realConsumption(from, to, storageIds, token)
-      periods.push({ from, to, kind: 'confiable', sales: s.sales, theoreticalPct: s.theoreticalPct, realPct: s.sales ? (real / s.sales) * 100 : 0, gapPct: (s.sales ? (real / s.sales) * 100 : 0) - s.theoreticalPct })
+      const realPct = s.sales ? (real / s.sales) * 100 : 0
+      const days = daysBetweenISO(from, to)
+      // Tramo demasiado largo → reconciliación acumulada, NO merma del periodo (ver RECONCILE_DAYS).
+      const contaminated = days > RECONCILE_DAYS
+      periods.push({
+        from, to, kind: 'confiable', sales: s.sales, theoreticalPct: s.theoreticalPct, realPct, gapPct: realPct - s.theoreticalPct, days,
+        ...(contaminated ? { contaminated: true, note: `Reconciliación acumulada de ${days} días: el ajuste incluye drift y compras que aún no viven en el perpetuo de Poster — NO es merma de este periodo. El food cost real confiable empieza en el próximo tramo corto entre dos conteos.` } : {}),
+      })
     }
     // Periodo abierto: desde el último conteo hasta hoy, sin conteo de cierre → no confiable.
     const openFrom = shiftDays(lastCountDate!, 1)

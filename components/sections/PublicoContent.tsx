@@ -651,7 +651,7 @@ function Direccion() {
 // real+gap SOLO en PERIODOS entre conteos físicos (no por mes: el ajuste del conteo se contabiliza el día
 // del conteo). Prefiere decir "no confiable" a un número falso. ──
 type FCMonth = { month: string; sales: number; theoreticalPct: number }
-type FCPeriod = { from: string; to: string; kind: 'arranque' | 'confiable' | 'abierto'; sales: number; theoreticalPct: number; realPct: number | null; gapPct: number | null; startupAdjustment?: number; note?: string }
+type FCPeriod = { from: string; to: string; kind: 'arranque' | 'confiable' | 'abierto'; sales: number; theoreticalPct: number; realPct: number | null; gapPct: number | null; startupAdjustment?: number; contaminated?: boolean; days?: number; note?: string }
 type FCData = { theoreticalByMonth: FCMonth[]; periods: FCPeriod[]; lastCountDate: string | null; daysSinceCount: number | null; countAlert: boolean; anyReliable: boolean; todayStatus: string }
 
 const KIND_BADGE: Record<FCPeriod['kind'], { dot: string; label: string; cls: string }> = {
@@ -698,7 +698,9 @@ function FoodCostPanel() {
       <div className="mb-1 text-label text-fg-muted">Real por periodo de conteo</div>
       <div className="space-y-2">
         {d.periods.map((p, i) => {
-          const b = KIND_BADGE[p.kind]
+          // Un 'confiable' demasiado largo se presenta como RECONCILIACIÓN, no como merma: el gap no es un
+          // hallazgo del negocio (mezcla drift + compras no escritas al perpetuo). Badge y gap amortiguados.
+          const b = p.contaminated ? { dot: '🟠', label: `reconciliación · ${p.days} días`, cls: 'text-warn' } : KIND_BADGE[p.kind]
           return (
             <div key={i} className="rounded-card border border-border p-2">
               <div className="flex items-center justify-between">
@@ -708,10 +710,11 @@ function FoodCostPanel() {
               <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-secondary">
                 <span className="text-fg-muted">ventas <span className="tabular-nums text-fg">{mxn(p.sales)}</span></span>
                 <span className="text-fg-muted">teórico <span className="tabular-nums font-medium text-fg">{p.theoreticalPct.toFixed(1)}%</span></span>
-                {p.kind === 'confiable' && p.realPct != null && p.gapPct != null && (<>
+                {p.kind === 'confiable' && !p.contaminated && p.realPct != null && p.gapPct != null && (<>
                   <span className="text-fg-muted">real <span className="tabular-nums font-medium text-fg">{p.realPct.toFixed(1)}%</span></span>
                   <span className={`font-bold ${p.gapPct > 3 ? 'text-danger' : p.gapPct < -3 ? 'text-warn' : 'text-ok'}`}>gap {p.gapPct > 0 ? '+' : ''}{p.gapPct.toFixed(1)} pts</span>
                 </>)}
+                {p.contaminated && <span className="italic text-fg-muted">reconciliación acumulada · el gap no es merma del periodo</span>}
                 {p.kind === 'arranque' && p.startupAdjustment != null && <span className="text-warn">write-down inicial {mxn(p.startupAdjustment)} · sin gap</span>}
                 {p.kind === 'abierto' && <span className="italic text-fg-muted">real pendiente de conteo</span>}
               </div>
