@@ -3,12 +3,13 @@ import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { normAlias, stemAlias } from '@/lib/ticketExtract'
 import { todayMX, shiftDays } from '@/lib/posterImport'
+import { COST_CATEGORIES } from '@/lib/publico'
 
 export const runtime = 'nodejs'
 
-const CATEGORIES = ['insumo', 'nomina', 'gasto_fijo', 'reinversion', 'renta_condonada']
+const CATEGORIES: string[] = COST_CATEGORIES.map((c) => c.key)   // fuente única (incluye mantenimiento/empaque/suministros)
 const ORIGINS = ['clip', 'caja_chica', 'caja_pos']
-const NO_KIND = ['reinversion', 'renta_condonada']
+const NO_KIND: string[] = COST_CATEGORIES.filter((c) => c.defaultKind === null).map((c) => c.key)   // reinversión + renta_condonada
 
 type InItem = {
   codigo?: string | null; descripcion?: string; descripcion_raw?: string | null; cantidad?: number | null

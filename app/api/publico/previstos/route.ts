@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { catDefaults, type CostCategory, type OriginKey } from '@/lib/publico'
+import { catDefaults, COST_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
 
 export const runtime = 'nodejs'
 
-const CATS = ['insumo', 'nomina', 'gasto_fijo', 'reinversion', 'renta_condonada']
+const CATS: string[] = COST_CATEGORIES.map((c) => c.key)   // fuente única (incluye mantenimiento/empaque/suministros)
 const ORIGINS = ['clip', 'caja_chica', 'caja_pos']
 const FRECS = ['semanal', 'quincenal', 'mensual', 'bimestral']
 

@@ -151,7 +151,7 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
             {it.ocurrencias != null && it.due && <span className="ml-1 text-fg-muted">{it.due.n}/{it.ocurrencias}</span>}
             {paidOccs.length > 0 && <button onClick={() => setHistOpen(open ? null : it.key)} className="ml-1 text-fg-muted underline decoration-dotted hover:text-accent" title="ver las ya pagadas">· {paidOccs.length} pagada{paidOccs.length === 1 ? '' : 's'}</button>}
           </span>
-          <span className={`shrink-0 text-label ${overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.due ? (overdue ? `vencido ${dueTxt}` : `vence ${dueTxt}`) : '—'}</span>
+          <span className={`shrink-0 text-label ${overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.due ? `${overdue ? 'vencido' : 'vence'} ${dueTxt}` : '—'}</span>
           <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>
         </div>
         {open && (
