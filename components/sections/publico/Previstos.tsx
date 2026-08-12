@@ -25,7 +25,7 @@ type Item = {
 const clampDay = (month: string, day: number) => { const [y, m] = month.split('-').map(Number); const last = new Date(y, m, 0).getDate(); return `${month}-${String(Math.min(day, last)).padStart(2, '0')}` }
 const monthsBetween = (a: string, b: string) => { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by * 12 + bm) - (ay * 12 + am) }
 
-export function Previstos({ month, onFaltan, onFixed, onCostChange }: { month: string; onFaltan?: (v: number) => void; onFixed?: (v: number) => void; onCostChange?: () => void }) {
+export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange }: { month: string; onFaltan?: (v: number) => void; onFixed?: (v: number) => void; onRentaCond?: (v: number) => void; onCostChange?: () => void }) {
   const [prev, setPrev] = useState<Prev[]>([])
   const [pagos, setPagos] = useState<Pago[]>([])
   const [deriv, setDeriv] = useState<Derivado[]>([])
@@ -74,6 +74,12 @@ export function Previstos({ month, onFaltan, onFixed, onCostChange }: { month: s
   const fixedMonthly = prev.filter((p) => !p.archived && catDefaults(p.categoria).defaultKind === 'fijo')
     .reduce((s, p) => s + occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month).length * p.amount, 0)
   useEffect(() => { onFixed?.(fixedMonthly) }, [fixedMonthly, onFixed])
+
+  // Renta condonada del mes (para el 2º breakeven, "de pie solo"). NO es costo operativo — se modela como par
+  // net-cero sin caja; aquí solo se usa su MONTO para saber cuándo el negocio podría pagar su propia renta.
+  const rentaCondMonthly = prev.filter((p) => !p.archived && p.categoria === 'renta_condonada')
+    .reduce((s, p) => s + occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month).length * p.amount, 0)
+  useEffect(() => { onRentaCond?.(rentaCondMonthly) }, [rentaCondMonthly, onRentaCond])
 
   const enPronto = (it: Item) => !!it.due && it.due.date <= prontoHasta && !(it.kind === 'card' && it.cardPaid)
   const pronto = items.filter(enPronto).sort((a, b) => (a.due!.date < b.due!.date ? -1 : 1))

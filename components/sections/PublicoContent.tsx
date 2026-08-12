@@ -354,7 +354,8 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
 }) {
   const { crt } = useOSSettings()
   const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
-  const [fixed, setFixed] = useState(0)     // gasto fijo mensual (previstos fijos) → punto de equilibrio
+  const [fixed, setFixed] = useState(0)     // gasto fijo mensual (previstos fijos) → punto de equilibrio operativo
+  const [rentaCond, setRentaCond] = useState(0)   // renta condonada mensual → 2º breakeven "de pie solo"
   const dc = crtDayColor(dayColor(new Date()), crt)   // color del día (monocolor de la pantalla)
   const [fc, setFc] = useState<number | null>(null)   // food cost teórico % del mes
   const [tp, setTp] = useState<number | null>(null)   // ticket promedio (POS)
@@ -419,7 +420,8 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
             </div>
           )}
         </div>
-        {/* Punto de equilibrio — VACÍO con leyenda (recuerda que hay algo pendiente), no escondido. */}
+        {/* Punto de equilibrio — DOS números: operativo (con la renta que le condonas) y "de pie solo" (incluye
+            la renta condonada, sin meterla como costo real). El 2º contesta cuándo el negocio paga su propia renta. */}
         <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
           <div className="text-label uppercase tracking-widest text-fg-muted">Punto de equilibrio</div>
           {(() => {
@@ -427,18 +429,28 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
             const margin = fc != null ? 1 - fc / 100 : null
             if (margin == null) return <div className="mt-1 text-secondary italic text-fg-muted">food cost teórico pendiente para el margen…</div>
             if (margin <= 0) return <div className="mt-1 text-secondary italic text-warn">food cost teórico ≥ 100% — revisa, no hay margen</div>
-            const be = fixed / margin, pct = be > 0 ? ventasMes / be : 0, STEPS = 24, filled = Math.round(Math.min(pct, 1) * STEPS), cubierto = ventasMes >= be
+            const STEPS = 24
+            const beRow = (label: string, fijos: number, sub: string) => {
+              const be = fijos / margin, pct = be > 0 ? ventasMes / be : 0, filled = Math.round(Math.min(pct, 1) * STEPS), cubierto = ventasMes >= be
+              return (
+                <div className="space-y-1">
+                  <div className="flex items-baseline justify-between gap-2 text-label">
+                    <span className="text-fg-muted"><b className="uppercase" style={{ color: dc }}>{label}</b> · necesitas <b className="tabular-nums" style={{ color: dc }}>{mxn(be)}</b> · fijos {mxn(fijos)}</span>
+                    <span className="tabular-nums" style={{ color: dc }}>{Math.round(pct * 100)}%</span>
+                  </div>
+                  {/* Barra de ESCALONES DUROS (no continua): cada bloque es un paso. */}
+                  <div className="flex h-3 gap-0.5">{Array.from({ length: STEPS }).map((_, i) => <div key={i} className="flex-1" style={{ background: i < filled ? dc : `${dc}22` }} />)}</div>
+                  <div className="text-label">{cubierto ? <span className="text-ok">✓ cubierto · +{mxn(ventasMes - be)}</span> : <span className="text-warn">faltan {mxn(be - ventasMes)} de ventas</span>} <span className="text-fg-muted">· {sub}</span></div>
+                </div>
+              )
+            }
             return (
-              <div className="mt-1 space-y-1">
-                <div className="flex items-baseline justify-between gap-2 text-label">
-                  <span className="text-fg-muted">necesitas <b className="tabular-nums" style={{ color: dc }}>{mxn(be)}</b> en ventas · fijos {mxn(fixed)} ÷ margen {(margin * 100).toFixed(0)}%</span>
-                  <span className="tabular-nums" style={{ color: dc }}>{Math.round(pct * 100)}%</span>
-                </div>
-                {/* Barra de ESCALONES DUROS (no continua): cada bloque es un paso, relleno = color del día. */}
-                <div className="flex h-3 gap-0.5">
-                  {Array.from({ length: STEPS }).map((_, i) => <div key={i} className="flex-1" style={{ background: i < filled ? dc : `${dc}22` }} />)}
-                </div>
-                <div className="text-label">{cubierto ? <span className="text-ok">✓ cubierto · +{mxn(ventasMes - be)} sobre el punto</span> : <span className="text-warn">faltan {mxn(be - ventasMes)} de ventas para cubrir los fijos</span>}</div>
+              <div className="mt-1 space-y-3">
+                <div className="text-label text-fg-muted">margen {(margin * 100).toFixed(0)}% (1 − food cost teórico {fc!.toFixed(1)}%)</div>
+                {beRow('Operativo', fixed, 'con la renta que le condonas')}
+                {rentaCond > 0
+                  ? beRow('De pie solo', fixed + rentaCond, `+ renta ${mxn(rentaCond)} · cuándo paga su propia renta`)
+                  : <div className="text-label italic text-fg-muted">Agrega la renta como previsto (categoría <b>Renta condonada</b>) para ver el <b>&quot;de pie solo&quot;</b> — cuándo el negocio paga su propia renta.</div>}
               </div>
             )
           })()}
@@ -454,7 +466,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
       {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Gastos previstos</Head>
-        <Previstos month={month} onFaltan={setFaltan} onFixed={setFixed} onCostChange={onCostChange} />
+        <Previstos month={month} onFaltan={setFaltan} onFixed={setFixed} onRentaCond={setRentaCond} onCostChange={onCostChange} />
       </section>
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Contenedores</Head>
