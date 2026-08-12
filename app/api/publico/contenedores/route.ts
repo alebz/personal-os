@@ -1,0 +1,100 @@
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { createServerClient } from '@/lib/supabase'
+import { computeCuadre } from '@/lib/cuadre'
+
+export const runtime = 'nodejs'
+
+type Cont = 'clip' | 'caja_chica' | 'caja_pos'
+const CONTS: Cont[] = ['caja_pos', 'clip', 'caja_chica']
+const LABEL: Record<Cont, string> = { clip: 'CLIP', caja_chica: 'Caja chica', caja_pos: 'Caja POS' }
+// Procedencia: caja POS la DERIVA el sistema (su entrada es el efectivo que importa Poster); CLIP y caja chica
+// son capturados (sus movimientos los tecleas). Punto 5.
+const PROCEDENCIA: Record<Cont, 'derivado' | 'capturado'> = { caja_pos: 'derivado', clip: 'capturado', caja_chica: 'capturado' }
+
+type Flows = {
+  ventas: { date: string; efectivo: number; tarjeta: number }[]
+  costos: { date: string; origin: string | null; amount: number }[]
+  ingresos: { date: string; origin: string | null; amount: number }[]
+  socioMovs: { date: string; metodo: string | null; flow: string; amount: number }[]
+}
+
+// Flujo neto de un contenedor DESDE una fecha (exclusiva): ventas (efectivo→caja_pos, tarjeta→clip), costos e
+// ingresos por origin, aportaciones/retiros de socios por método (aporta=out→resta, retira=in→suma).
+function flowSince(c: Cont, since: string, f: Flows): number {
+  let s = 0
+  for (const v of f.ventas) if (v.date > since) s += c === 'caja_pos' ? Number(v.efectivo) : c === 'clip' ? Number(v.tarjeta) : 0
+  for (const x of f.costos) if (x.date > since && x.origin === c) s -= Number(x.amount)
+  for (const x of f.ingresos) if (x.date > since && x.origin === c) s += Number(x.amount)
+  for (const m of f.socioMovs) if (m.date > since && m.metodo === c) s += (m.flow === 'in' ? Number(m.amount) : -Number(m.amount))
+  return Math.round(s * 100) / 100
+}
+
+async function loadFlows(supabase: ReturnType<typeof createServerClient>): Promise<Flows> {
+  const [{ data: ventas }, { data: costos }, { data: ingresos }, { data: env }] = await Promise.all([
+    supabase.from('publico_ventas').select('date, efectivo, tarjeta'),
+    supabase.from('publico_costos').select('date, origin, amount'),
+    supabase.from('publico_ingresos').select('date, origin, amount'),
+    supabase.from('finance_envelopes').select('id').eq('scope', 'publico'),
+  ])
+  const envIds = (env ?? []).map((e) => e.id)
+  const { data: socioMovs } = envIds.length
+    ? await supabase.from('finance_movements').select('date, metodo, flow, amount').in('envelope_id', envIds).not('metodo', 'is', null)
+    : { data: [] }
+  return { ventas: ventas ?? [], costos: costos ?? [], ingresos: ingresos ?? [], socioMovs: socioMovs ?? [] }
+}
+
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+const daysBetween = (a: string, b: string) => Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
+
+async function latestSnaps(supabase: ReturnType<typeof createServerClient>) {
+  const { data } = await supabase.from('publico_contenedor_saldos').select('contenedor, saldo, fecha, esperado, nota, created_at').order('fecha', { ascending: false }).order('created_at', { ascending: false })
+  const map = new Map<string, { saldo: number; fecha: string }>()
+  for (const r of data ?? []) if (!map.has(r.contenedor)) map.set(r.contenedor, { saldo: Number(r.saldo), fecha: r.fecha })
+  return map
+}
+
+// GET → por contenedor: saldo mostrado (snapshot + flujos), procedencia, y desde cuándo no cuadras. Sin snapshot
+// aún → needsBaseline (hay que sembrarlo contando hoy).
+export async function GET() {
+  const supabase = createServerClient()
+  const [flows, snaps] = await Promise.all([loadFlows(supabase), latestSnaps(supabase)])
+  const today = todayISO()
+  const contenedores = CONTS.map((c) => {
+    const snap = snaps.get(c)
+    if (!snap) return { contenedor: c, label: LABEL[c], procedencia: PROCEDENCIA[c], needsBaseline: true, balance: null, desde: null, diasSinCuadrar: null }
+    const balance = Math.round((snap.saldo + flowSince(c, snap.fecha, flows)) * 100) / 100
+    return { contenedor: c, label: LABEL[c], procedencia: PROCEDENCIA[c], needsBaseline: false, balance, desde: snap.fecha, diasSinCuadrar: daysBetween(snap.fecha, today) }
+  })
+  return NextResponse.json({ contenedores })
+}
+
+// POST /api/publico/contenedores  body: { contenedor, contado } — CUADRE (o baseline si es el primero).
+// Cuenta el real; delta = contado − mostrado (vía lib/cuadre); inserta snapshot nuevo con esperado + nota.
+export async function POST(req: NextRequest) {
+  let b: { contenedor?: string; contado?: number }
+  try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  if (!b.contenedor || !CONTS.includes(b.contenedor as Cont)) return NextResponse.json({ error: 'contenedor inválido' }, { status: 400 })
+  const contado = Number(b.contado)
+  if (!Number.isFinite(contado)) return NextResponse.json({ error: 'contado inválido' }, { status: 400 })
+  const c = b.contenedor as Cont
+  const supabase = createServerClient()
+  const snaps = await latestSnaps(supabase)
+  const snap = snaps.get(c)
+  const today = todayISO()
+
+  if (!snap) {
+    // Baseline: primer conteo. No hay "esperado" ni delta — es el punto de partida.
+    const { error } = await supabase.from('publico_contenedor_saldos').insert({ contenedor: c, saldo: contado, fecha: today, esperado: null, nota: 'Saldo de apertura (baseline)' })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true, baseline: true })
+  }
+
+  const flows = await loadFlows(supabase)
+  const shown = Math.round((snap.saldo + flowSince(c, snap.fecha, flows)) * 100) / 100
+  const { delta, adjustment } = computeCuadre(contado, shown, LABEL[c])
+  const nota = adjustment ? `${adjustment.label} ${delta > 0 ? '+' : ''}${delta} (esperaba ${shown}, conté ${contado})` : 'Cuadre sin diferencia'
+  const { error } = await supabase.from('publico_contenedor_saldos').insert({ contenedor: c, saldo: contado, fecha: today, esperado: shown, nota })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true, delta, shown, adjustment })
+}

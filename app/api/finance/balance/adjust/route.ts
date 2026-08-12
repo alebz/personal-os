@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { computeCuadre } from '@/lib/cuadre'
 
 type Account = 'tarjeta' | 'efectivo' | 'caja_fuerte'
 const LABEL: Record<Account, string> = { tarjeta: 'Tarjeta', efectivo: 'Efectivo', caja_fuerte: 'Caja Fuerte' }
@@ -31,7 +32,9 @@ export async function POST(req: NextRequest) {
     efectivo:    Number(b.shown.efectivo)    || 0,
     caja_fuerte: Number(b.shown.caja_fuerte) || 0,
   }
-  const diff = b.to - shown[account]
+  // Delta + ajuste nombrado vía lib/cuadre (misma lógica, ahora compartida con Público). Verificado equivalente
+  // a la versión inline: idéntico salvo dust de float que numeric(12,2) trunca igual al insertar.
+  const { adjustment: adj } = computeCuadre(b.to, shown[account], LABEL[account])
 
   const supabase = createServerClient()
   const now   = new Date()
@@ -40,20 +43,20 @@ export async function POST(req: NextRequest) {
 
   // 1. Record the named adjustment (only if there's a real discrepancy)
   let adjustment: unknown = null
-  if (diff !== 0) {
+  if (adj) {
     let row: Record<string, unknown>
     if (account === 'caja_fuerte') {
       const { data: cajaFund } = await supabase
         .from('finance_envelopes').select('id').eq('key', 'caja_fuerte').maybeSingle()
       row = {
-        month, date, description: 'Ajuste · Caja Fuerte', amount: Math.abs(diff),
-        flow: diff > 0 ? 'out' : 'in',          // fund perspective: increase = money set aside = 'out'
+        month, date, description: adj.label, amount: adj.amount,
+        flow: adj.direction === 'in' ? 'out' : 'in',   // fondo: sube = dinero apartado = 'out' (invierte wallet)
         category: 'fondo', commitment_id: null, envelope_id: cajaFund?.id ?? null, source_key: null,
       }
     } else {
       row = {
-        month, date, description: `Ajuste · ${LABEL[account]}`, amount: Math.abs(diff),
-        flow: diff > 0 ? 'in' : 'out',          // wallet perspective: increase = money in
+        month, date, description: adj.label, amount: adj.amount,
+        flow: adj.direction,                            // wallet: sube = 'in'
         category: 'ajuste', commitment_id: null, envelope_id: null, metodo: account,
       }
     }

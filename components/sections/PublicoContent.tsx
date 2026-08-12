@@ -13,6 +13,7 @@ import {
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
 import { Previstos } from './publico/Previstos'
+import { Contenedores } from './publico/Contenedores'
 import { localDate, addDays, dayLabel } from './publico/util'
 import { dayColor, crtDayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
@@ -457,7 +458,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
       </section>
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Contenedores</Head>
-        {placeholder('Fase 3', 'CLIP · caja chica · caja POS, con saldo y cuadre.')}
+        <Contenedores dc={dc} />
       </section>
     </div>
   )
