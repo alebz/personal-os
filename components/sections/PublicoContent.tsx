@@ -13,6 +13,8 @@ import {
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
 import { localDate, addDays, dayLabel } from './publico/util'
+import { dayColor, crtDayColor } from '@/lib/weekdayColors'
+import { useOSSettings } from '@/components/OSSettingsContext'
 
 // Los 3 contenedores como cuentas para aportar/retirar de socios → captura el ORIGEN (metodo) desde el
 // día 1, para que F5 (cuadre) pueda conciliar de dónde entró/salió cada aportación/distribución.
@@ -316,26 +318,8 @@ export default function PublicoContent() {
 
       </>)}
 
-      {/* ── MES · totales (Fase 0: movido a PANEL tal cual; la honestidad de la utilidad llega en Fase 1) ── */}
       {tab === 'panel' && (
-      <section className="rounded-card border border-border bg-surface-2 p-3">
-        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Mes · {month}</h2>
-        <div className="grid grid-cols-2 gap-y-1 text-secondary">
-          <span className="text-fg-muted">Ventas</span><span className="text-right tabular-nums text-ok">{mxn(ventasMes)}</span>
-          <span className="text-fg-muted">Costos operativos</span><span className="text-right tabular-nums text-danger">−{mxn(costosOper)}</span>
-          <span className="font-medium text-fg">Utilidad operativa</span><span className={`text-right font-medium tabular-nums ${utilidadOper >= 0 ? 'text-ok' : 'text-danger'}`}>{mxn(utilidadOper)}</span>
-          {(otrosIngresosMes > 0 || rentaCondonadaMes > 0) && (<>
-            {otrosIngresosMes > 0 && <><span className="text-fg-muted">+ Otros ingresos</span><span className="text-right tabular-nums text-ok">+{mxn(otrosIngresosMes)}</span></>}
-            {rentaCondonadaMes > 0 && <><span className="text-fg-muted">− Renta condonada</span><span className="text-right tabular-nums text-danger">−{mxn(rentaCondonadaMes)}</span></>}
-            <span className="font-bold text-fg">Utilidad</span><span className={`text-right font-bold tabular-nums ${utilidadTotal >= 0 ? 'text-ok' : 'text-danger'}`}>{mxn(utilidadTotal)}</span>
-          </>)}
-        </div>
-        {reinversionMes > 0 && (
-          <div className="mt-2 flex justify-between border-t border-border pt-2 text-label text-fg-muted">
-            <span>Reinversión (aparte, no resta utilidad)</span><span className="tabular-nums">{mxn(reinversionMes)}</span>
-          </div>
-        )}
-      </section>
+        <Panel month={month} ventasMes={ventasMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} />
       )}
 
       {tab === 'captura' && (
@@ -353,6 +337,109 @@ export default function PublicoContent() {
           Notas — datos operativos del negocio. (Pestaña nueva; su contenido llega en una fase próxima.)
         </section>
       )}
+    </div>
+  )
+}
+
+// ── PANEL (F1): la portada. SOLO métricas con datos reales HOY (todas del POS, ciertas): ventas del mes,
+// food cost teórico, ticket promedio, venta por día operado. La utilidad lleva badge "provisional" porque
+// resta costos capturados a mano que aún están incompletos (misma lógica visual del food cost). Cada cifra
+// marca su PROCEDENCIA (POS vs manual). Estética arcade: UNA rejilla con divisiones de 1px en el color del
+// día (monocolor, hard steps, sin degradados). El punto de equilibrio es placeholder → llega en Fase 2 con
+// los gastos fijos/nómina (previstos); pintarlo ahora sería una barra basada en nada. Debe caber sin scroll. ──
+function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes }: {
+  month: string; ventasMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number
+}) {
+  const { crt } = useOSSettings()
+  const dc = crtDayColor(dayColor(new Date()), crt)   // color del día (monocolor de la pantalla)
+  const [fc, setFc] = useState<number | null>(null)   // food cost teórico % del mes
+  const [tp, setTp] = useState<number | null>(null)   // ticket promedio (POS)
+  const [vd, setVd] = useState<number | null>(null)   // venta por día operado (POS)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/publico/foodcost').then((r) => r.json()).then((d: FCData & { error?: string }) => { if (!alive || d.error) return; const row = d.theoreticalByMonth?.find((x) => x.month === month); setFc(row ? row.theoreticalPct : null) }).catch(() => {})
+    fetch('/api/publico/poster/metrics').then((r) => r.json()).then((d: Metrics & { error?: string }) => { if (!alive || d.error) return; setTp(d.ticketPromedio); setVd(d.ventaPorDiaOperado) }).catch(() => {})
+    return () => { alive = false }
+  }, [month])
+
+  const bord = `${dc}22`                                // divisiones de 1px, color del día tenue
+  const box: React.CSSProperties = { border: `1px solid ${dc}44`, borderRadius: 8 }   // bloque bento
+  // PROCEDENCIA en la etiqueta (no en badge aparte): "· pos" en el color del día (dato cierto del POS),
+  // "· manual" en gris apagado (lo tecleaste tú). Se lee de un vistazo qué dio el POS y qué capturaste.
+  const src = (s: 'pos' | 'manual') => <span style={s === 'pos' ? { color: dc } : { opacity: 0.5 }}> · {s}</span>
+  const Head = ({ children }: { children: React.ReactNode }) => <div className="mb-2 text-label uppercase tracking-widest" style={{ color: dc }}>{children}</div>
+  const Metric = ({ name, value, big }: { name: React.ReactNode; value: string; big?: boolean }) => (
+    <div style={{ padding: '10px 12px' }}>
+      <div className="text-label uppercase tracking-widest text-fg-muted">{name}</div>
+      <div className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: big ? 26 : 20, marginTop: 2 }}>{value}</div>
+    </div>
+  )
+  const placeholder = (fase: string, txt: string) => <div className="text-secondary text-fg-muted"><span className="italic">{fase}</span> — {txt}</div>
+
+  // Bento: bloques de distinto tamaño = jerarquía. Colapsa a 1 columna en móvil (grid-cols-1), usa el ancho
+  // real en desktop (lg:grid-cols-6). Los bloques aún sin datos NO se esconden: se muestran con su leyenda.
+  return (
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
+      {/* Línea dinámica — ancho completo (es texto, necesita renglón largo). Contenido: Fase 5. */}
+      <div className="flex flex-wrap items-center gap-x-2 px-3 py-2 text-secondary lg:col-span-6" style={box}>
+        <span className="text-label uppercase tracking-widest" style={{ color: dc }}>Línea dinámica</span>
+        <span className="text-fg-muted italic">Fase 5 — leerá tus datos (ventas, costos, previstos) y escribirá la frase que importa hoy.</span>
+      </div>
+
+      {/* Fila asimétrica: MÉTRICAS + punto de equilibrio (2/3, el bloque hero) · alerta + qué toca (1/3). */}
+      <section className="lg:col-span-4" style={box}>
+        <div className="px-3 pt-3"><Head>Métricas · {month}</Head></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2" style={{ borderTop: `1px solid ${bord}` }}>
+          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Ventas del mes{src('pos')}</>} value={mxn(ventasMes)} big /></div>
+          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Food cost teórico{src('pos')}</>} value={fc != null ? `${fc.toFixed(1)}%` : '…'} /></div>
+          <div style={{ borderRight: `1px solid ${bord}` }}><Metric name={<>Ticket promedio{src('pos')}</>} value={tp != null ? mxn(tp) : '…'} /></div>
+          <div><Metric name={<>Venta · día operado{src('pos')}</>} value={vd != null ? mxn(vd) : '…'} /></div>
+        </div>
+        {/* Utilidad (provisional) */}
+        <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>provisional</span></span>
+            <span className="tabular-nums" style={{ color: dc, fontSize: 22, fontWeight: 700 }}>{mxn(utilidadOper)}</span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 text-label text-fg-muted">
+            <span>Costos capturados{src('manual')}</span>
+            <span className="tabular-nums">−{mxn(costosOper)}</span>
+            <span className="italic">· a mano, incompletos hasta cerrar el mes</span>
+          </div>
+          {(otrosIngresosMes > 0 || rentaCondonadaMes > 0 || reinversionMes > 0) && (
+            <div className="mt-2 space-y-0.5 border-t pt-2 text-label text-fg-muted" style={{ borderColor: bord }}>
+              {otrosIngresosMes > 0 && <div className="flex justify-between"><span>+ otros ingresos</span><span className="tabular-nums">{mxn(otrosIngresosMes)}</span></div>}
+              {rentaCondonadaMes > 0 && <div className="flex justify-between"><span>− renta condonada</span><span className="tabular-nums">−{mxn(rentaCondonadaMes)}</span></div>}
+              {(otrosIngresosMes > 0 || rentaCondonadaMes > 0) && <div className="flex justify-between font-medium text-fg"><span>= utilidad</span><span className="tabular-nums">{mxn(utilidadTotal)}</span></div>}
+              {reinversionMes > 0 && <div className="flex justify-between"><span>reinversión (aparte, no resta utilidad)</span><span className="tabular-nums">{mxn(reinversionMes)}</span></div>}
+            </div>
+          )}
+        </div>
+        {/* Punto de equilibrio — VACÍO con leyenda (recuerda que hay algo pendiente), no escondido. */}
+        <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
+          <div className="text-label uppercase tracking-widest text-fg-muted">Punto de equilibrio</div>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="tabular-nums text-lg tracking-widest" style={{ color: dc, opacity: 0.35 }}>▮▮▯▯▯</span>
+            <span className="text-secondary italic text-warn">falta configurar gastos fijos</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Alerta + qué toca (1/3). Contenido: Fase 5. */}
+      <section className="px-3 py-3 lg:col-span-2" style={box}>
+        <Head>Alerta · qué toca</Head>
+        {placeholder('Fase 5', 'lo que bloquea y las 2-3 acciones del día.')}
+      </section>
+
+      {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}
+      <section className="px-3 py-3 lg:col-span-3" style={box}>
+        <Head>Gastos previstos</Head>
+        {placeholder('Fase 2', 'los que vencen pronto, arriba. Habilitan el punto de equilibrio.')}
+      </section>
+      <section className="px-3 py-3 lg:col-span-3" style={box}>
+        <Head>Contenedores</Head>
+        {placeholder('Fase 3', 'CLIP · caja chica · caja POS, con saldo y cuadre.')}
+      </section>
     </div>
   )
 }
