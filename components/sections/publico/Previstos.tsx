@@ -4,9 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { mxn } from '@/components/Mxn'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, originLabel, OPERATING_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
 import { nthOccurrence, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
-import { localDate, addDays, dayMonth, dayLabel } from './util'
+import { localDate, dayMonth, dayLabel } from './util'
 
-const PRONTO_DIAS = 7   // ventana "vence pronto": vencidos siempre + próximos 7 días (constante ajustable)
 const FRECS: { key: Frecuencia; label: string }[] = [
   { key: 'semanal', label: 'Semanal' }, { key: 'quincenal', label: 'Quincenal' }, { key: 'mensual', label: 'Mensual' }, { key: 'bimestral', label: 'Bimestral' },
 ]
@@ -38,7 +37,8 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
   const [prev, setPrev] = useState<Prev[]>([])
   const [pagos, setPagos] = useState<Pago[]>([])
   const [deriv, setDeriv] = useState<Derivado[]>([])
-  const [fullOpen, setFullOpen] = useState(false)   // rejilla completa del mes
+  const [paidOpen, setPaidOpen] = useState(false)   // desplegable de PAGADOS (archivo)
+  const [editKey, setEditKey] = useState<string | null>(null)   // fila con su editor de definición abierto
   const [manage, setManage] = useState(false)
   const [amtBuf, setAmtBuf] = useState<Record<string, string>>({})   // buffer de monto por ocurrencia
   const [undo, setUndo] = useState<{ previsto_id: string; ocurrencia: string; label: string } | null>(null)
@@ -52,7 +52,6 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
   useEffect(() => { void load() }, [load])
 
   const today = localDate()
-  const prontoHasta = addDays(today, PRONTO_DIAS)
 
   // ── Ocurrencias del mes (MATERIALIZADAS): una por ocurrencia, con su estado pagado y monto efectivo ──
   const occItems: OccItem[] = []
@@ -95,9 +94,10 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
     .reduce((s, p) => s + occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month).length * p.amount, 0)
   useEffect(() => { onRentaCond?.(rentaCondMonthly) }, [rentaCondMonthly, onRentaCond])
 
-  // Panel = "vence pronto": vencidas (todas) + próximos 7 días. Una pagada dentro de la ventana se ve CON su
-  // check lleno (ese era el punto: ver que algo ya se pagó). La rejilla completa del mes va en el desplegable.
-  const pronto = occItems.filter((it) => it.occ <= prontoHasta)
+  // PENDIENTES siempre visibles (accionables): las ocurrencias IMPAGAS del mes. occItems ya viene ordenado por
+  // fecha asc → los VENCIDOS (fecha < hoy) quedan primero, luego los que vienen. Los PAGADOS van al archivo.
+  const pendientes = occItems.filter((it) => !it.paid)
+  const pagados = occItems.filter((it) => it.paid)
 
   async function setPaid(it: OccItem, on: boolean) {
     if (it.kind === 'card') return cardPay(it, on)
@@ -143,27 +143,48 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
 
   const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
-  // Fila de UNA ocurrencia: checkbox reversible (desmarcar borra el costo) + monto editable por ocurrencia.
+  // Fila de UNA ocurrencia: checkbox reversible (desmarcar borra el costo) + monto editable por ocurrencia +
+  // editar/borrar EL PREVISTO (definición), en controles SEPARADOS del checkbox (punto 7).
   const occRow = (it: OccItem) => {
+    const p = it.previstoId ? prev.find((x) => x.id === it.previstoId) : undefined
     const recur = RECUR.has(it.frecuencia)
     const dueTxt = recur ? dayLabel(it.occ) : dayMonth(it.occ)   // recurrente muestra el día de la semana
     const amtVal = amtBuf[it.key] ?? String(it.amount)
+    const editing = editKey === it.key
     return (
-      <div key={it.key} className="flex items-center gap-2 text-secondary" style={it.kind === 'card' ? { opacity: 0.85 } : undefined}>
-        <input type="checkbox" checked={it.paid} onChange={(e) => void setPaid(it, e.target.checked)} title={it.paid ? 'desmarcar revierte el costo' : 'marcar crea el costo real'} />
-        <span className="flex-1 truncate">
-          {it.concepto}
-          {it.kind === 'card' && <span className="ml-1 rounded px-1 text-label" style={{ border: '1px solid var(--color-border)', opacity: 0.7 }}>tarjeta · Créditos</span>}
-          {recur && <span className="ml-1 text-fg-muted">· {frecLabel(it.frecuencia).toLowerCase()}</span>}
-          {it.total != null && it.n != null && <span className="ml-1 text-fg-muted">{it.n}/{it.total}</span>}
-        </span>
-        <span className={`shrink-0 text-label ${it.paid ? 'text-ok' : it.overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.paid ? `✓ ${dueTxt}` : `${it.overdue ? 'vencido' : 'vence'} ${dueTxt}`}</span>
-        {it.kind === 'manual'
-          ? <input value={amtVal} onChange={(e) => setAmtBuf((b) => ({ ...b, [it.key]: e.target.value }))}
-              onBlur={() => { if (it.paid) { const v = Number(amtBuf[it.key] ?? it.amount); if (v > 0 && Math.abs(v - it.amount) > 0.001) void patchAmount(it, v) } }}
-              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-              inputMode="decimal" title="monto de esta ocurrencia (editable)" style={{ ...cell, width: 74, textAlign: 'right' }} />
-          : <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>}
+      <div key={it.key}>
+        <div className="group flex items-center gap-2 text-secondary" style={it.kind === 'card' ? { opacity: 0.85 } : undefined}>
+          <input type="checkbox" checked={it.paid} onChange={(e) => void setPaid(it, e.target.checked)} title={it.paid ? 'desmarcar revierte el costo' : 'marcar crea el costo real'} />
+          <span className="flex-1 truncate">
+            {it.concepto}
+            {it.kind === 'card' && <span className="ml-1 rounded px-1 text-label" style={{ border: '1px solid var(--color-border)', opacity: 0.7 }}>tarjeta · Créditos</span>}
+            {recur && <span className="ml-1 text-fg-muted">· {frecLabel(it.frecuencia).toLowerCase()}</span>}
+            {it.total != null && it.n != null && <span className="ml-1 text-fg-muted">{it.n}/{it.total}</span>}
+          </span>
+          <span className={`shrink-0 text-label ${it.paid ? 'text-ok' : it.overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.paid ? `✓ ${dueTxt}` : `${it.overdue ? 'vencido' : 'vence'} ${dueTxt}`}</span>
+          {it.kind === 'manual'
+            ? <input value={amtVal} onChange={(e) => setAmtBuf((b) => ({ ...b, [it.key]: e.target.value }))}
+                onBlur={() => { if (it.paid) { const v = Number(amtBuf[it.key] ?? it.amount); if (v > 0 && Math.abs(v - it.amount) > 0.001) void patchAmount(it, v) } }}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                inputMode="decimal" title="monto de esta ocurrencia (editable)" style={{ ...cell, width: 74, textAlign: 'right' }} />
+            : <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>}
+          {/* Editar / borrar EL PREVISTO — aparte del checkbox de pago (son cosas distintas, punto 7). */}
+          {it.kind === 'manual' && p && (
+            <span className="flex shrink-0 gap-1 text-label opacity-0 transition-opacity group-hover:opacity-100">
+              <button onClick={() => setEditKey(editing ? null : it.key)} className="text-fg-muted hover:text-accent" title="editar este previsto (concepto, monto, categoría, frecuencia, día…)">✎</button>
+              <button onClick={() => { if (window.confirm(`¿Eliminar el previsto "${p.concepto}"? Deja de generar ocurrencias; los pagos ya hechos se conservan.`)) void del(p.id) }} className="text-fg-muted hover:text-danger" title="eliminar este previsto" aria-label="Eliminar">🗑</button>
+            </span>
+          )}
+        </div>
+        {editing && p && (
+          <div className="mb-1 ml-6 mt-1 rounded-card border border-border bg-surface-2 p-2">
+            <PrevFields p={p} onPatch={patch} cell={cell} />
+            <div className="mt-1 flex items-center gap-3 text-label">
+              <button onClick={() => { void patch(p.id, { archived: true }); setEditKey(null) }} className="text-fg-muted hover:text-accent" title="archivar: detiene la generación, conserva el historial">archivar</button>
+              <button onClick={() => setEditKey(null)} className="text-fg-muted hover:text-accent">listo</button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -176,14 +197,16 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
           <button onClick={() => void doUndo()} className="rounded-control border border-border px-2 py-0.5 font-bold text-accent">↩ deshacer</button>
         </div>
       )}
+      {/* PENDIENTES — siempre visibles (accionables): vencidos primero en rojo, luego los que vienen. */}
       {occItems.length === 0 && <div className="text-secondary italic text-fg-muted">Sin previstos. Agrégalos con ＋.</div>}
-      {pronto.length > 0 && <div className="space-y-1">{pronto.map(occRow)}</div>}
-      {pronto.length === 0 && occItems.length > 0 && <div className="text-label italic text-fg-muted">Nada vence pronto — todo al día. Ver el mes completo abajo.</div>}
+      {pendientes.length > 0 && <div className="space-y-1">{pendientes.map(occRow)}</div>}
+      {pendientes.length === 0 && pagados.length > 0 && <div className="text-label italic text-ok">✓ Todo pagado este mes.</div>}
 
-      {occItems.length > 0 && (
-        <button onClick={() => setFullOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{fullOpen ? '▲ ocultar el mes' : `▼ ver todo el mes (${occItems.length} ocurrencia${occItems.length === 1 ? '' : 's'})`}</button>
-      )}
-      {fullOpen && <div className="space-y-1 border-t border-border pt-1">{occItems.map(occRow)}</div>}
+      {/* PAGADOS — archivo, en desplegable (con su check lleno y su fecha). */}
+      {pagados.length > 0 && (<>
+        <button onClick={() => setPaidOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{paidOpen ? '▲ ocultar pagados' : `▼ ${pagados.length} pagado${pagados.length === 1 ? '' : 's'} este mes`}</button>
+        {paidOpen && <div className="space-y-1 border-t border-border pt-1">{pagados.map(occRow)}</div>}
+      </>)}
 
       <div className="border-t border-border pt-1">
         <button onClick={() => setManage((m) => !m)} className="text-label text-fg-muted hover:text-accent">{manage ? '▲ listo' : '＋ agregar · gestionar'}</button>
@@ -198,7 +221,23 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
   )
 }
 
-// Alta + edición + archivar + eliminar + reordenar por arrastre (solo previstos manuales).
+// Campos editables de la DEFINICIÓN de un previsto (concepto, categoría, contenedor, monto, frecuencia, día,
+// N/M). Reusado en la fila (editor inline) y en "gestionar". Guarda al salir de cada campo.
+function PrevFields({ p, onPatch, cell }: { p: Prev; onPatch: (id: string, f: Record<string, unknown>) => void; cell: React.CSSProperties }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <input defaultValue={p.concepto} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== p.concepto) onPatch(p.id, { concepto: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 120 }} />
+      <select value={p.categoria} onChange={(e) => onPatch(p.id, { categoria: e.target.value, origin: catDefaults(e.target.value as CostCategory).defaultOrigin })} style={{ ...cell, width: 110 }}>{COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+      <select value={p.origin ?? ''} onChange={(e) => onPatch(p.id, { origin: e.target.value || null })} style={{ ...cell, width: 100 }}>{ORIGIN_OPTIONS.map((o) => <option key={o.label} value={o.key ?? ''}>{o.label}</option>)}</select>
+      <input defaultValue={p.amount} onBlur={(e) => { const v = Number(e.target.value); if (v > 0 && v !== p.amount) onPatch(p.id, { amount: v }) }} inputMode="decimal" title="monto" style={{ ...cell, width: 76, textAlign: 'right' }} />
+      <select value={p.frecuencia} onChange={(e) => onPatch(p.id, { frecuencia: e.target.value })} style={{ ...cell, width: 100 }}>{FRECS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
+      <label className="flex items-center gap-1 text-label text-fg-muted">día<input type="date" defaultValue={p.anchor_date} onBlur={(e) => { if (e.target.value && e.target.value !== p.anchor_date) onPatch(p.id, { anchor_date: e.target.value }) }} style={cell} /></label>
+      <input defaultValue={p.ocurrencias ?? ''} onBlur={(e) => onPatch(p.id, { ocurrencias: e.target.value ? Number(e.target.value) : null })} placeholder="N/M" title="cuántos pagos en total; vacío = perpetuo" style={{ ...cell, width: 56, textAlign: 'right' }} />
+    </div>
+  )
+}
+
+// Alta + archivar + eliminar + reordenar por arrastre (la edición fina también vive en cada fila).
 function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
   prev: Prev[]; onAdd: () => void; onPatch: (id: string, f: Record<string, unknown>) => void; onDel: (id: string) => void; onDrop: (id: string) => void; dragId: React.MutableRefObject<string | null>; cell: React.CSSProperties
 }) {
@@ -239,13 +278,7 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
         {prev.map((p) => (
           <div key={p.id} draggable onDragStart={() => { dragId.current = p.id }} onDragOver={(e) => e.preventDefault()} onDrop={() => onDrop(p.id)} className="group flex flex-wrap items-center gap-1">
             <span className="cursor-grab text-fg-muted" title="arrastra para reordenar">⠿</span>
-            <input defaultValue={p.concepto} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== p.concepto) onPatch(p.id, { concepto: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 120 }} />
-            <select value={p.categoria} onChange={(e) => onPatch(p.id, { categoria: e.target.value, origin: catDefaults(e.target.value as CostCategory).defaultOrigin })} style={{ ...cell, width: 110 }}>{COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
-            <select value={p.origin ?? ''} onChange={(e) => onPatch(p.id, { origin: e.target.value || null })} style={{ ...cell, width: 100 }}>{ORIGIN_OPTIONS.map((o) => <option key={o.label} value={o.key ?? ''}>{o.label}</option>)}</select>
-            <input defaultValue={p.amount} onBlur={(e) => { const v = Number(e.target.value); if (v > 0 && v !== p.amount) onPatch(p.id, { amount: v }) }} inputMode="decimal" style={{ ...cell, width: 76, textAlign: 'right' }} />
-            <select value={p.frecuencia} onChange={(e) => onPatch(p.id, { frecuencia: e.target.value })} style={{ ...cell, width: 100 }}>{FRECS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
-            <input type="date" defaultValue={p.anchor_date} onBlur={(e) => { if (e.target.value && e.target.value !== p.anchor_date) onPatch(p.id, { anchor_date: e.target.value }) }} style={cell} />
-            <input defaultValue={p.ocurrencias ?? ''} onBlur={(e) => onPatch(p.id, { ocurrencias: e.target.value ? Number(e.target.value) : null })} placeholder="N/M" title="perpetuo si vacío" style={{ ...cell, width: 56, textAlign: 'right' }} />
+            <div className="flex-1"><PrevFields p={p} onPatch={onPatch} cell={cell} /></div>
             <button onClick={() => onPatch(p.id, { archived: true })} className="text-label text-fg-muted hover:text-accent" title="archivar (detiene generación, conserva historial)">archivar</button>
             <button onClick={() => { if (window.confirm(`¿Eliminar "${p.concepto}"? (el historial de costos ya creados se conserva)`)) onDel(p.id) }} className="px-1 text-fg-muted hover:text-danger" aria-label="Eliminar">🗑</button>
           </div>
