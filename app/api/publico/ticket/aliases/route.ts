@@ -26,7 +26,7 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   let b: {
     type?: string; raw_norm?: string; proveedor?: string; descripcion?: string; categoria?: string | null; unidad?: string | null
-    poster_supplier_id?: number | null; poster_ingredient_id?: number | null; factor_a_base?: number | null; toca_stock?: boolean; iva_tasa?: number | null; peso_variable?: boolean
+    poster_supplier_id?: number | null; poster_ingredient_id?: number | null; poster_ingredient_type?: number; factor_a_base?: number | null; toca_stock?: boolean; iva_tasa?: number | null; peso_variable?: boolean
   }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   if (!b.raw_norm) return NextResponse.json({ error: 'raw_norm requerido' }, { status: 400 })
@@ -45,6 +45,8 @@ export async function PATCH(req: NextRequest) {
     if (b.categoria !== undefined) { if (b.categoria != null && b.categoria !== '' && !CATEGORIES.includes(b.categoria)) return NextResponse.json({ error: 'categoria inválida' }, { status: 400 }); upd.categoria = b.categoria || null }
     if (b.unidad !== undefined) upd.unidad = b.unidad?.trim() || null
     if (b.poster_ingredient_id !== undefined) upd.poster_ingredient_id = b.poster_ingredient_id ?? null
+    // type del destino: 10 = ingrediente (createSupply con ingredient_id) · 1 = producto/mercancía (product_id).
+    if (b.poster_ingredient_type !== undefined) { if (![1, 10].includes(b.poster_ingredient_type)) return NextResponse.json({ error: 'poster_ingredient_type inválido (1 o 10)' }, { status: 400 }); upd.poster_ingredient_type = b.poster_ingredient_type }
     if (b.factor_a_base !== undefined) upd.factor_a_base = b.factor_a_base ?? null
     if (b.toca_stock !== undefined) upd.toca_stock = !!b.toca_stock
     if (b.iva_tasa !== undefined) { if (b.iva_tasa != null && ![0, 0.16].includes(b.iva_tasa)) return NextResponse.json({ error: 'iva_tasa inválida (0, 0.16 o null)' }, { status: 400 }); upd.iva_tasa = b.iva_tasa ?? null }

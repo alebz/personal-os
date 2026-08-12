@@ -23,7 +23,7 @@ function proposeFactorClient(name: string, unit: string | undefined): number | n
 // ── Alias aprendidos del capturador: verlos, editarlos o borrarlos. Una corrección tuya pudo enseñar un
 // error; aquí se arregla. raw_norm (la llave de match) es de solo lectura — para re-mapear, borra y re-aprende. ──
 type SupAlias = { raw_norm: string; proveedor: string; poster_supplier_id: number | null }
-type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean; iva_tasa: number | null; importe_acumulado: number; cantidad_acumulada: number; veces: number; peso_variable: boolean; raw_stem: string | null }
+type ProdAlias = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; poster_ingredient_type: number; factor_a_base: number | null; toca_stock: boolean; iva_tasa: number | null; importe_acumulado: number; cantidad_acumulada: number; veces: number; peso_variable: boolean; raw_stem: string | null }
 
 export function AliasManager() {
   const [open, setOpen] = useState(false)
@@ -93,9 +93,11 @@ export function AliasManager() {
   // "Sin mapear" = va a inventario pero aún sin ingrediente de Poster (los "solo panel" NO cuentan: es a propósito).
   const isUnmapped = (p: ProdAlias) => p.toca_stock && p.poster_ingredient_id == null
   const unmappedN = prod.filter(isUnmapped).length
-  // Cuántos alias apuntan a cada ingrediente de Poster (varios raw distintos → mismo ingrediente es válido y se marca).
-  const ingCount = new Map<number, number>()
-  for (const p of prod) if (p.poster_ingredient_id != null) ingCount.set(p.poster_ingredient_id, (ingCount.get(p.poster_ingredient_id) ?? 0) + 1)
+  // Cuántos alias apuntan a cada destino de Poster (varios raw → mismo destino es válido y se marca). Se llavea
+  // por type:id para no confundir un ingrediente #52 con un producto #52.
+  const ingCount = new Map<string, number>()
+  const destKey = (a: ProdAlias) => `${a.poster_ingredient_type}:${a.poster_ingredient_id}`
+  for (const p of prod) if (p.poster_ingredient_id != null) ingCount.set(destKey(p), (ingCount.get(destKey(p)) ?? 0) + 1)
   const needle = q.trim().toLowerCase()
   const prodView = prod
     .filter((p) => !needle || p.raw_norm.toLowerCase().includes(needle) || p.descripcion.toLowerCase().includes(needle))
@@ -166,8 +168,11 @@ export function AliasManager() {
             {needle && <div className="mb-1 text-label text-fg-muted">{prodView.length} coinciden con “{q.trim()}”</div>}
             <div className="space-y-1">
               {prodView.map((a) => {
-                const ing = a.poster_ingredient_id != null ? cat?.ingredients.find((i) => i.id === a.poster_ingredient_id) : null
-                const sharedN = a.poster_ingredient_id != null ? (ingCount.get(a.poster_ingredient_id) ?? 0) : 0
+                // El destino mapeado puede ser un INGREDIENTE (type 10) o MERCANCÍA/producto (type 1).
+                const isMerch = a.poster_ingredient_type === 1
+                const ing = a.poster_ingredient_id != null ? (isMerch ? cat?.merchandise.find((m) => m.id === a.poster_ingredient_id) : cat?.ingredients.find((i) => i.id === a.poster_ingredient_id)) : null
+                const selVal = a.poster_ingredient_id != null ? `${isMerch ? 'prod' : 'ing'}:${a.poster_ingredient_id}` : ''
+                const sharedN = a.poster_ingredient_id != null ? (ingCount.get(destKey(a)) ?? 0) : 0
                 return (
                 <div key={a.raw_norm} className="group flex flex-wrap items-center gap-1">
                   <span className="w-32 shrink-0 truncate text-label text-fg-muted" title={`${a.raw_norm}  ·  $${a.importe_acumulado} en ${a.veces} ticket(s)`}>{a.raw_norm}</span>
@@ -179,15 +184,24 @@ export function AliasManager() {
                   <input defaultValue={a.unidad ?? ''} onBlur={(e) => { if ((e.target.value.trim() || null) !== a.unidad) void saveProd({ raw_norm: a.raw_norm, unidad: e.target.value.trim() || null }) }} placeholder="unidad" style={{ ...cell, width: 56 }} />
                   {/* Mapeo a Poster (Fase 0): ingrediente + factor a unidad base + si toca stock */}
                   {a.toca_stock ? (<>
-                    <select value={a.poster_ingredient_id ?? ''} onChange={(e) => {
-                      const id = e.target.value === '' ? null : Number(e.target.value)
-                      const fields: Record<string, unknown> = { poster_ingredient_id: id }
-                      // Al mapear, propone el factor desde el peso del nombre (si no tenías uno). Ambiguo → lo deja sin factor.
-                      if (id != null && a.factor_a_base == null) { const f = proposeFactorClient(a.descripcion, cat?.ingredients.find((i) => i.id === id)?.unit); if (f != null) fields.factor_a_base = f }
+                    <select value={selVal} onChange={(e) => {
+                      const v = e.target.value   // '' | 'ing:<id>' | 'prod:<id>'
+                      const [kind, idStr] = v ? v.split(':') : ['', '']
+                      const id = idStr ? Number(idStr) : null
+                      const ptype = kind === 'prod' ? 1 : 10   // 10 = ingrediente · 1 = mercancía/producto
+                      const fields: Record<string, unknown> = { poster_ingredient_id: id, poster_ingredient_type: ptype }
+                      // Factor propuesto SOLO para ingredientes (parsea el peso del nombre → unidad del ingrediente).
+                      // Mercancía se stockea por PIEZA: no se auto-propone; el factor lo pones tú (caja→piezas).
+                      if (id != null && kind === 'ing' && a.factor_a_base == null) { const f = proposeFactorClient(a.descripcion, cat?.ingredients.find((i) => i.id === id)?.unit); if (f != null) fields.factor_a_base = f }
                       void patchAlias('product', a.raw_norm, fields)
-                    }} style={{ ...cell, width: 150 }} title="Ingrediente en Poster (al elegirlo se propone el ×factor desde el peso del nombre)">
+                    }} style={{ ...cell, width: 168 }} title="Destino en Poster: INGREDIENTE (insumo de receta) o MERCANCÍA (reventa embotellada). Marca cuál es cuál.">
                       <option value="">⚠ Poster: sin mapear</option>
-                      {(cat?.ingredients ?? []).map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                      <optgroup label="🥕 Ingredientes (receta)">
+                        {(cat?.ingredients ?? []).map((i) => <option key={`ing${i.id}`} value={`ing:${i.id}`}>{i.name} ({i.unit})</option>)}
+                      </optgroup>
+                      <optgroup label="🥤 Mercancía (reventa)">
+                        {(cat?.merchandise ?? []).map((m) => <option key={`prod${m.id}`} value={`prod:${m.id}`}>{m.name}</option>)}
+                      </optgroup>
                     </select>
                     <input defaultValue={a.factor_a_base ?? ''} onBlur={(e) => { const v = e.target.value.trim() === '' ? null : Number(e.target.value); if (v !== a.factor_a_base) void patchAlias('product', a.raw_norm, { factor_a_base: v }) }} placeholder="×factor" title={a.peso_variable ? `peso variable: el factor solo convierte la unidad del peso a ${ing?.unit ?? 'la base'} de Poster (kg→kg=1, g→kg=0.001)` : `cantidad del ticket × factor = cantidad en ${ing?.unit ?? 'unidad base'} de Poster`} inputMode="decimal" style={{ ...cell, width: 60, textAlign: 'right' }} />
                     <select value={a.iva_tasa ?? ''} onChange={(e) => void patchAlias('product', a.raw_norm, { iva_tasa: e.target.value === '' ? null : Number(e.target.value) })} style={{ ...cell, width: 96 }} title="Tasa de IVA por default de este producto (se usa si el ticket no la marca)">
