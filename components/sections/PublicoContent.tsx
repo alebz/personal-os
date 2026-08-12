@@ -157,7 +157,6 @@ export default function PublicoContent() {
   const utilidadOper = ventasMes - costosOper                            // limpia (food business); food cost % intacto
   const utilidadTotal = utilidadOper + otrosIngresosMes - rentaCondonadaMes  // no-operativos (arreglo Ameno netea 0)
   const costosHoy = costos.filter((c) => c.date === capDate)
-  const ingresosHoy = ingresos.filter((i) => i.date === capDate)
   const hoyV = ventas.find((v) => v.date === capDate)                       // el día visto (para el badge de procedencia)
   const lastOk = sync?.last_success_at ? new Date(sync.last_success_at) : null
   const daysSince = lastOk ? Math.floor((Date.now() - lastOk.getTime()) / 86400000) : null
@@ -271,42 +270,11 @@ export default function PublicoContent() {
         <div className="mt-2 border-t border-border pt-2"><TicketFoto onSaved={load} defaultDate={capDate} /></div>
       </section>
 
-      {/* ── OTROS INGRESOS (no-POS: subarriendo, etc.) — NUNCA cuentan como venta (food cost intacto) ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
-        <div className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS)</span></div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            value={iConcepto} onChange={(e) => setIConcepto(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }}
-            placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }}
-          />
-          <input
-            ref={iAmtRef} value={iAmt} onChange={(e) => setIAmt(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }}
-            inputMode="decimal" placeholder="$ monto" style={{ ...numInput, width: 120, fontSize: 16 }}
-          />
-          <span className="text-label text-fg-muted">a</span>
-          {ORIGIN_OPTIONS.map((ct) => (
-            <button key={ct.label} onClick={() => setIOrigin(ct.key)} style={chip(iOrigin === ct.key)}>{ct.label}</button>
-          ))}
-          <button onClick={() => void addIngreso()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
-        </div>
-        <div className="mt-1 text-label text-fg-muted">Suman a la utilidad, nunca a las ventas. El subarriendo que cubre la renta va con origen <b>Sin caja</b>.</div>
-      </section>
-
-      {/* ── HOY: lo capturado ── */}
+      {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
       <section className="rounded-card border border-border p-3">
         <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">{capDate === today ? 'Hoy' : dayLabel(capDate)}</h2>
-        {costosHoy.length === 0 && ingresosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos ni otros ingresos este día.</p>}
+        {costosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos este día.</p>}
         <div className="space-y-1">
-          {ingresosHoy.map((i) => (
-            <div key={i.id} className="group flex items-center gap-2 text-secondary">
-              <span className="w-24 text-fg-muted">Otro ingreso</span>
-              <span className="flex-1 truncate">{i.concepto} <span className="text-fg-muted">· {originLabel(i.origin)}</span></span>
-              <span className="tabular-nums text-ok">+{mxn(Number(i.amount))}</span>
-              <button onClick={() => void delIngreso(i.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
-            </div>
-          ))}
           {costosHoy.map((c) => (
             <div key={c.id} className="group flex items-center gap-2 text-secondary">
               <span className="w-24 text-fg-muted">{catDefaults(c.category).label}</span>
@@ -330,9 +298,33 @@ export default function PublicoContent() {
 
       {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
 
-      {tab === 'fondos' && (
+      {tab === 'fondos' && (<div className="space-y-3">
         <Socios funds={socioFunds} handlers={socioHandlers} splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
-      )}
+        {/* OTROS INGRESOS (no-POS: subarriendo, etc.) — vive en Fondos, no en Captura: es un evento raro, no
+            parte del ritual diario. Suma a la utilidad, nunca a las ventas (food cost intacto). */}
+        <section className="rounded-card border border-border bg-surface-2 p-3">
+          <div className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS · {monthName(month)})</span></div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={iConcepto} onChange={(e) => setIConcepto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }} />
+            <input ref={iAmtRef} value={iAmt} onChange={(e) => setIAmt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} inputMode="decimal" placeholder="$ monto" style={{ ...numInput, width: 120, fontSize: 16 }} />
+            <span className="text-label text-fg-muted">a</span>
+            {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setIOrigin(ct.key)} style={chip(iOrigin === ct.key)}>{ct.label}</button>))}
+            <button onClick={() => void addIngreso()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
+          </div>
+          <div className="mt-1 text-label text-fg-muted">Suman a la utilidad, nunca a las ventas. El subarriendo que cubre la renta va con origen <b>Sin caja</b>.</div>
+          {ingresos.length > 0 && (
+            <div className="mt-2 space-y-1 border-t border-border pt-2">
+              {ingresos.map((i) => (
+                <div key={i.id} className="group flex items-center gap-2 text-secondary">
+                  <span className="flex-1 truncate">{dayMonth(i.date)} · {i.concepto} <span className="text-fg-muted">· {originLabel(i.origin)}</span></span>
+                  <span className="tabular-nums text-ok">+{mxn(Number(i.amount))}</span>
+                  <button onClick={() => void delIngreso(i.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>)}
 
       {tab === 'notas' && (
         <section className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-fg-muted">

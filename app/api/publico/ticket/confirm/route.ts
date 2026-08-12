@@ -24,6 +24,7 @@ type Body = {
   origins?: Array<{ origin?: string | null; amount?: number }>   // PAGO MIXTO: split del total entre contenedores
   items?: InItem[]
   imageBase64?: string; mediaType?: string
+  storagePath?: string   // la foto ya subida a Storage (vía nueva); al confirmar se mueve de drafts/ a su fecha
   fecha_approved?: boolean
 }
 
@@ -69,18 +70,23 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient()
 
-  // Imagen (evidencia): sube a storage si viene; bucket se crea perezosamente. Falla suave — no bloquea el gasto.
+  // Imagen (evidencia). Vía NUEVA: ya está en Storage (drafts/…) → se MUEVE a su carpeta por fecha (una sola
+  // copia, sin re-subir). Vía vieja (base64): se sube. Falla suave — no bloquea el gasto.
   let image_path: string | null = null
-  if (b.imageBase64) {
-    try {
-      await supabase.storage.createBucket('ticket-scans', { public: false }).catch(() => {})
+  try {
+    await supabase.storage.createBucket('ticket-scans', { public: false }).catch(() => {})
+    if (b.storagePath) {
+      const base = b.storagePath.split('/').pop() ?? `${Date.now()}.jpg`
+      const dest = `${b.fecha}/${base}`
+      const mv = await supabase.storage.from('ticket-scans').move(b.storagePath, dest)
+      image_path = mv.error ? b.storagePath : dest   // si el move falla, al menos conserva la ruta del draft
+    } else if (b.imageBase64) {
       const ext = (b.mediaType ?? 'image/jpeg').split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg'
       const path = `${b.fecha}/${Date.now()}.${ext}`
-      const bytes = Buffer.from(b.imageBase64, 'base64')
-      const up = await supabase.storage.from('ticket-scans').upload(path, bytes, { contentType: b.mediaType ?? 'image/jpeg', upsert: false })
+      const up = await supabase.storage.from('ticket-scans').upload(path, Buffer.from(b.imageBase64, 'base64'), { contentType: b.mediaType ?? 'image/jpeg', upsert: false })
       if (!up.error) image_path = path
-    } catch { /* evidencia es best-effort */ }
-  }
+    }
+  } catch { /* evidencia es best-effort */ }
 
   // 1) Cabecera del scan (confirmado).
   const { data: scan, error: scanErr } = await supabase.from('ticket_scans').insert({

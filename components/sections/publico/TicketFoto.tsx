@@ -84,7 +84,7 @@ const MAX_B64 = 4_200_000
 export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | void; defaultDate: string }) {
   const [busy, setBusy] = useState<'extract' | 'confirm' | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [img, setImg] = useState<{ b64: string; media: string } | null>(null)
+  const [img, setImg] = useState<{ b64?: string; storagePath?: string; media: string } | null>(null)
   const [raw, setRaw] = useState<unknown>(null)
   const [model, setModel] = useState<string | null>(null)
   const [d, setD] = useState<FotoDraft | null>(null)
@@ -125,15 +125,33 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
     const file = e.target.files?.[0]; if (!file) return
     setErr(null); setBusy('extract'); setD(null)
     try {
-      const { b64, media } = await normalizeImage(file)
-      setImg({ b64, media })
-      // Guardia de tamaño: si el navegador no pudo comprimir la foto (HEIC no decodable en escritorio → archivo
-      // crudo), avisa claro ANTES de mandar, en vez de recibir un 413 sin body de Vercel. Punto 6.
-      if (b64.length > MAX_B64) {
-        setErr('Esta foto pesa demasiado para subirla (el navegador no la pudo comprimir — suele pasar con HEIC en escritorio). Tómala desde el iPhone, o vuelve a guardarla/súbela como JPEG.')
-        setBusy(null); return
+      // VÍA NUEVA: sube la foto DIRECTO a Storage (sin el límite de 4.5 MB de Vercel), y manda solo la RUTA.
+      // HEIC de cualquier tamaño incluido — el server la baja y convierte, sin depender del navegador. Punto A.
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+      let storagePath: string | null = null
+      try {
+        const u = await parseResp(await fetch('/api/publico/ticket/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ext }) }))
+        if (u.ok && typeof u.j.signedUrl === 'string') {
+          const put = await fetch(u.j.signedUrl as string, { method: 'PUT', body: file, headers: { 'content-type': file.type || 'application/octet-stream' } })
+          if (put.ok) storagePath = u.j.path as string
+        }
+      } catch { /* si la subida directa falla, cae al fallback base64 de abajo */ }
+
+      let body: Record<string, unknown>
+      if (storagePath) {
+        setImg({ storagePath, media: file.type || 'image/jpeg' })
+        body = { storagePath, mediaType: file.type || 'image/jpeg' }
+      } else {
+        // RED (#6): fallback a la vía vieja (base64 normalizado) + guardia de tamaño contra el 413.
+        const { b64, media } = await normalizeImage(file)
+        if (b64.length > MAX_B64) {
+          setErr('No se pudo subir la foto a Storage y como base64 pesa demasiado (~4.5 MB). Reintenta, o súbela como JPEG.')
+          setBusy(null); return
+        }
+        setImg({ b64, media })
+        body = { imageBase64: b64, mediaType: media }
       }
-      const resp = await fetch('/api/publico/ticket/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageBase64: b64, mediaType: media }) })
+      const resp = await fetch('/api/publico/ticket/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       const { ok, j } = await parseResp(resp)
       if (!ok) { setErr(j.error ?? 'extracción falló'); setBusy(null); return }
       setRaw(j.raw); setModel(j.model as string | null)
@@ -186,7 +204,7 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
           origins: mixed ? ORIGIN_OPTIONS.map((o) => ({ origin: o.key, amount: splitAmts[splitKey(o.key)] ?? 0 })).filter((s) => s.amount > 0) : undefined,
           // P.U. SIEMPRE derivado del importe (fuente de verdad), nunca el valor redondeado de la IA.
           items: d.items.map((it) => ({ ...it, precio_unitario: it.cantidad ? it.importe / it.cantidad : null })),
-          imageBase64: img?.b64, mediaType: img?.media, fecha_approved: dateApproved,
+          storagePath: img?.storagePath, imageBase64: img?.b64, mediaType: img?.media, fecha_approved: dateApproved,
         }),
       })
       const { ok, j } = await parseResp(resp)
