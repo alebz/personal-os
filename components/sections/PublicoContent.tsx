@@ -736,7 +736,7 @@ function FoodCostPanel() {
 
       {/* EMPAQUE · % de ventas — SEPARADO del food cost (no es consumo de receta). Es lo que se va CON la venta
           (cajas, vasos, servilletas); escala con el volumen, por eso se mira como % de ventas. Punto 5. */}
-      {emp && emp.length > 0 && (
+      {emp && emp.some((m) => m.empaque > 0) && (
         <div className="mt-3 rounded-card border border-border p-2" style={{ borderStyle: 'dashed' }}>
           <div className="mb-1 text-label font-bold uppercase tracking-widest text-fg-muted">Empaque · % de ventas <span className="font-normal normal-case tracking-normal">(no es food cost — lo que se va con la venta)</span></div>
           <div className="space-y-0.5">
