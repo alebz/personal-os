@@ -66,6 +66,21 @@ async function normalizeImage(file: File): Promise<{ b64: string; media: string 
   }
 }
 
+// Lee la respuesta SIN reventar con "Unexpected end of JSON input": si el body no es JSON (413 de Vercel por
+// imagen grande, error de plataforma, HTML), devuelve un mensaje legible con el status en vez de tirar.
+async function parseResp(resp: Response): Promise<{ ok: boolean; j: { error?: string; [k: string]: unknown } }> {
+  const text = await resp.text().catch(() => '')
+  try { return { ok: resp.ok, j: text ? JSON.parse(text) : {} } }
+  catch {
+    const msg = resp.status === 413
+      ? 'La imagen es demasiado grande para subirla (límite ~4.5 MB). Tómala con menos resolución o vuelve a intentarlo.'
+      : `El servidor respondió ${resp.status} sin JSON${text ? `: ${text.slice(0, 140)}` : ' (respuesta vacía)'}.`
+    return { ok: false, j: { error: msg } }
+  }
+}
+// base64 pesa ~1.33× el binario; el límite de body de Vercel es ~4.5 MB. Cortamos con margen.
+const MAX_B64 = 4_200_000
+
 export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | void; defaultDate: string }) {
   const [busy, setBusy] = useState<'extract' | 'confirm' | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -112,11 +127,17 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
     try {
       const { b64, media } = await normalizeImage(file)
       setImg({ b64, media })
+      // Guardia de tamaño: si el navegador no pudo comprimir la foto (HEIC no decodable en escritorio → archivo
+      // crudo), avisa claro ANTES de mandar, en vez de recibir un 413 sin body de Vercel. Punto 6.
+      if (b64.length > MAX_B64) {
+        setErr('Esta foto pesa demasiado para subirla (el navegador no la pudo comprimir — suele pasar con HEIC en escritorio). Tómala desde el iPhone, o vuelve a guardarla/súbela como JPEG.')
+        setBusy(null); return
+      }
       const resp = await fetch('/api/publico/ticket/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageBase64: b64, mediaType: media }) })
-      const j = await resp.json()
-      if (!resp.ok) { setErr(j.error ?? 'extracción falló'); setBusy(null); return }
-      setRaw(j.raw); setModel(j.model)
-      const draft: FotoDraft = j.draft
+      const { ok, j } = await parseResp(resp)
+      if (!ok) { setErr(j.error ?? 'extracción falló'); setBusy(null); return }
+      setRaw(j.raw); setModel(j.model as string | null)
+      const draft = j.draft as FotoDraft
       if (!draft.fecha) draft.fecha = defaultDate
       setD(draft)
       resolvePago(draft)   // origen del pago pre-resuelto desde el ticket
@@ -168,8 +189,8 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
           imageBase64: img?.b64, mediaType: img?.media, fecha_approved: dateApproved,
         }),
       })
-      const j = await resp.json()
-      if (!resp.ok) { setErr(j.error ?? 'no se pudo guardar'); setBusy(null); return }
+      const { ok, j } = await parseResp(resp)
+      if (!ok) { setErr(j.error ?? 'no se pudo guardar'); setBusy(null); return }
       await onSaved()
       reset()
     } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'no se pudo guardar'); setBusy(null) }

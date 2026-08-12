@@ -50,7 +50,7 @@ export type TicketDraft = {
   pagoTarjeta: number | null
   pagoUltimos4: string | null
 }
-export type ExtractResult = { ok: true; model: string; raw: unknown; draft: TicketDraft } | { ok: false; error: string; status: number }
+export type ExtractResult = { ok: true; model: string; raw: unknown; draft: TicketDraft; aliasWarning?: string } | { ok: false; error: string; status: number }
 
 // Normaliza para el match de alias: mayúsculas, sin acentos, espacios colapsados, sin puntuación de borde.
 export function normAlias(s: string): string {
@@ -171,12 +171,13 @@ async function callModel(imageBase64: string, mediaType: string): Promise<RawExt
 // Aplica los alias APRENDIDOS antes de mostrar el borrador: traduce proveedor y productos a tu versión
 // canónica y prellena categoría/unidad. Match exacto por texto normalizado.
 async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<TicketDraft> {
+  const rawItems = Array.isArray(raw.items) ? raw.items : []   // la IA podría no devolver items; no revientes
   const provNorm = normAlias(raw.proveedor)
-  const itemNorms = [...new Set(raw.items.map((i) => normAlias(i.descripcion)))]
+  const itemNorms = [...new Set(rawItems.map((i) => normAlias(i.descripcion)))]
 
   type ProdAliasRow = { raw_norm: string; descripcion: string; categoria: string | null; unidad: string | null; poster_ingredient_id: number | null; factor_a_base: number | null; toca_stock: boolean | null; iva_tasa: number | null; peso_variable: boolean | null }
   const COLS = 'raw_norm, descripcion, categoria, unidad, poster_ingredient_id, factor_a_base, toca_stock, iva_tasa, peso_variable'
-  const itemStems = [...new Set(raw.items.map((i) => stemAlias(i.descripcion)).filter(Boolean))]
+  const itemStems = [...new Set(rawItems.map((i) => stemAlias(i.descripcion)).filter(Boolean))]
   const [{ data: supRow }, { data: prodRows }, { data: stemRows }] = await Promise.all([
     supabase.from('ticket_supplier_aliases').select('proveedor, poster_supplier_id').eq('raw_norm', provNorm).is('deleted_at', null).maybeSingle(),
     itemNorms.length
@@ -191,7 +192,7 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
   const prodMap = new Map((prodRows ?? []).map((r) => [r.raw_norm, r as ProdAliasRow]))
   const stemMap = new Map(((stemRows ?? []) as (ProdAliasRow & { raw_stem: string })[]).map((r) => [r.raw_stem, r]))
 
-  const items: TicketItem[] = raw.items.map((i) => {
+  const items: TicketItem[] = rawItems.map((i) => {
     // Match exacto primero; si falla, match por stem SOLO contra filas peso_variable.
     const alias = prodMap.get(normAlias(i.descripcion)) ?? stemMap.get(stemAlias(i.descripcion))
     return {
@@ -237,11 +238,36 @@ async function applyAliases(supabase: SupabaseClient, raw: RawExtract): Promise<
   }
 }
 
+// Borrador SIN alias (fallback): mapea raw→draft sin tocar la base. Robusto ante items mal formado.
+function rawDraft(raw: RawExtract): TicketDraft {
+  const items: TicketItem[] = (Array.isArray(raw.items) ? raw.items : []).map((i) => ({
+    codigo: i.codigo ?? null, descripcion: i.descripcion, descripcion_raw: i.descripcion,
+    cantidad: i.cantidad ?? null, unidad: i.unidad ?? null, precio_unitario: i.precio_unitario ?? null,
+    importe: Number(i.importe ?? 0), es_descuento: !!i.es_descuento, categoria: null, aliased: false,
+    posterIngredientId: null, factorABase: null, tocaStock: true, ivaTasa: i.iva_tasa ?? null,
+    pesoVariable: false, discrepancia: i.discrepancia ?? null,
+  }))
+  return {
+    proveedor: raw.proveedor, proveedor_raw: raw.proveedor, proveedor_rfc: raw.proveedor_rfc ?? null,
+    sucursal: raw.sucursal ?? null, fecha: raw.fecha ?? null, moneda: raw.moneda ?? 'MXN',
+    subtotal: raw.subtotal ?? null, descuento: raw.descuento ?? null, impuestos: raw.impuestos ?? null,
+    total: raw.total ?? null, legibilidad: raw.legibilidad ?? 'media', notas: raw.notas ?? null, items,
+    proveedorAliased: false, posterSupplierId: null,
+    pagoEfectivo: raw.pago_efectivo ?? null, pagoTarjeta: raw.pago_tarjeta ?? null, pagoUltimos4: raw.pago_ultimos4 ?? null,
+  }
+}
+
 export async function extractTicket(supabase: SupabaseClient, imageBase64: string, mediaType: string): Promise<ExtractResult> {
   if (!process.env.ANTHROPIC_API_KEY) return { ok: false, error: 'ANTHROPIC_API_KEY no configurado', status: 400 }
   let raw: RawExtract
   try { raw = await callModel(imageBase64, mediaType) }
   catch (e) { return { ok: false, error: `extracción falló: ${e instanceof Error ? e.message : String(e)}`, status: 502 } }
-  const draft = await applyAliases(supabase, raw)
-  return { ok: true, model: MODEL, raw, draft }
+  // applyAliases va en su PROPIO try: si la extracción (cara) ya salió bien, un tropiezo aplicando alias NO
+  // debe tirar todo. Cae a un borrador sin alias (raw), que el humano igual puede confirmar/corregir.
+  try {
+    const draft = await applyAliases(supabase, raw)
+    return { ok: true, model: MODEL, raw, draft }
+  } catch (e) {
+    return { ok: true, model: MODEL, raw, draft: rawDraft(raw), aliasWarning: e instanceof Error ? e.message : String(e) }
+  }
 }
