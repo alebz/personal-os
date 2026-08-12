@@ -358,12 +358,26 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
   const [rentaCond, setRentaCond] = useState(0)   // renta condonada mensual → 2º breakeven "de pie solo"
   const dc = crtDayColor(dayColor(new Date()), crt)   // color del día (monocolor de la pantalla)
   const [fc, setFc] = useState<number | null>(null)   // food cost teórico % del mes
-  const [tp, setTp] = useState<number | null>(null)   // ticket promedio (POS)
-  const [vd, setVd] = useState<number | null>(null)   // venta por día operado (POS)
+  const [tp, setTp] = useState<number | null>(null)   // ticket promedio (POS) · DEL MES
+  const [vp, setVp] = useState<number | null>(null)   // venta por persona (POS) · DEL MES (guests_count)
+  const [diasOp, setDiasOp] = useState<number | null>(null)  // días con venta del mes (denominador de venta/día)
+  const vd = diasOp != null && diasOp > 0 ? ventasMes / diasOp : null   // venta/día = las MISMAS ventas del mes ÷ días operados
   useEffect(() => {
     let alive = true
     fetch('/api/publico/foodcost').then((r) => r.json()).then((d: FCData & { error?: string }) => { if (!alive || d.error) return; const row = d.theoreticalByMonth?.find((x) => x.month === month); setFc(row ? row.theoreticalPct : null) }).catch(() => {})
-    fetch('/api/publico/poster/metrics').then((r) => r.json()).then((d: Metrics & { error?: string }) => { if (!alive || d.error) return; setTp(d.ticketPromedio); setVd(d.ventaPorDiaOperado) }).catch(() => {})
+    // Métricas DEL MES (no del histórico): ticket, venta/día y venta/persona acotados al rango del mes para que
+    // sean coherentes con "Métricas · {month}". El histórico completo vive en la pestaña Dirección (F3).
+    const [my, mm] = month.split('-').map(Number)
+    const mFrom = `${month}-01`, mTo = `${month}-${String(new Date(my, mm, 0).getDate()).padStart(2, '0')}`
+    fetch(`/api/publico/poster/metrics?from=${mFrom}&to=${mTo}`).then((r) => r.json()).then((d: Metrics & { error?: string }) => {
+      if (!alive || d.error) return
+      // Venta/día se DERIVA de las mismas "ventas del mes" que se muestran arriba (getPaymentsReport, cuadró al
+      // centavo) ÷ días operados del POS. NO se usa d.ventaPorDiaOperado porque su numerador es getTransactions
+      // (~1.4% distinto) y rompía la aritmética mental: $42,954 ÷ 7 debe dar el número que se ve.
+      setDiasOp(d.daysOperated)
+      setTp(d.ticketPromedio)   // ticket y venta/persona SÍ son nivel-recibo (getTransactions): no hay cómo derivarlos de getPaymentsReport
+      setVp(d.guestsPromedio > 0 ? d.ticketPromedio / d.guestsPromedio : null)   // venta/persona = ticket/comensalesProm
+    }).catch(() => {})
     return () => { alive = false }
   }, [month])
 
@@ -373,10 +387,11 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
   // "· manual" en gris apagado (lo tecleaste tú). Se lee de un vistazo qué dio el POS y qué capturaste.
   const src = (s: 'pos' | 'manual') => <span style={s === 'pos' ? { color: dc } : { opacity: 0.5 }}> · {s}</span>
   const Head = ({ children }: { children: React.ReactNode }) => <div className="mb-2 text-label uppercase tracking-widest" style={{ color: dc }}>{children}</div>
-  const Metric = ({ name, value, big }: { name: React.ReactNode; value: string; big?: boolean }) => (
+  const Metric = ({ name, value, big, hint }: { name: React.ReactNode; value: string; big?: boolean; hint?: string }) => (
     <div style={{ padding: '10px 12px' }}>
       <div className="text-label uppercase tracking-widest text-fg-muted">{name}</div>
       <div className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: big ? 26 : 20, marginTop: 2 }}>{value}</div>
+      {hint && <div className="mt-0.5 text-fg-muted" style={{ fontSize: 10, lineHeight: 1.25 }}>{hint}</div>}
     </div>
   )
   const placeholder = (fase: string, txt: string) => <div className="text-secondary text-fg-muted"><span className="italic">{fase}</span> — {txt}</div>
@@ -395,10 +410,14 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
       <section className="lg:col-span-4" style={box}>
         <div className="px-3 pt-3"><Head>Métricas · {month}</Head></div>
         <div className="grid grid-cols-1 sm:grid-cols-2" style={{ borderTop: `1px solid ${bord}` }}>
+          {/* Par de caras: VENTAS (POS, cierto) y GASTOS (manual, incompleto) — mismo peso visual, procedencia honesta. */}
           <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Ventas del mes{src('pos')}</>} value={mxn(ventasMes)} big /></div>
-          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Food cost teórico{src('pos')}</>} value={fc != null ? `${fc.toFixed(1)}%` : '…'} /></div>
-          <div style={{ borderRight: `1px solid ${bord}` }}><Metric name={<>Ticket promedio{src('pos')}</>} value={tp != null ? mxn(tp) : '…'} /></div>
-          <div><Metric name={<>Venta · día operado{src('pos')}</>} value={vd != null ? mxn(vd) : '…'} /></div>
+          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Gastos del mes{src('manual')}</>} value={`−${mxn(costosOper)}`} big hint="capturado a mano · incompleto hasta cerrar el mes" /></div>
+          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Food cost teórico{src('pos')}</>} value={fc != null ? `${fc.toFixed(1)}%` : '…'} /></div>
+          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Ticket promedio{src('pos')}</>} value={tp != null ? mxn(tp) : '…'} hint="promedio por recibo · no por persona" /></div>
+          {/* Venta por persona: sí capturas comensales (guests_count ≈ 2.4/recibo), así que es un número real y distinto del ticket. */}
+          <div style={{ borderRight: `1px solid ${bord}` }}><Metric name={<>Venta · por persona{src('pos')}</>} value={vp != null ? mxn(vp) : '…'} hint="÷ comensales del recibo" /></div>
+          <div><Metric name={<>Venta · día operado{src('pos')}</>} value={vd != null ? mxn(vd) : '…'} hint={diasOp != null ? `÷ ${diasOp} días con venta · no del calendario` : '÷ días con venta · no del calendario'} /></div>
         </div>
         {/* Utilidad (provisional) */}
         <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
@@ -406,11 +425,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
             <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>{faltan > 0 ? `provisional · faltan ${mxn(faltan)}` : 'provisional'}</span></span>
             <span className="tabular-nums" style={{ color: dc, fontSize: 22, fontWeight: 700 }}>{mxn(utilidadOper)}</span>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 text-label text-fg-muted">
-            <span>Costos capturados{src('manual')}</span>
-            <span className="tabular-nums">−{mxn(costosOper)}</span>
-            <span className="italic">· a mano, incompletos hasta cerrar el mes</span>
-          </div>
+          <div className="mt-1 text-label text-fg-muted italic">= ventas del mes − gastos del mes</div>
           {(otrosIngresosMes > 0 || rentaCondonadaMes > 0 || reinversionMes > 0) && (
             <div className="mt-2 space-y-0.5 border-t pt-2 text-label text-fg-muted" style={{ borderColor: bord }}>
               {otrosIngresosMes > 0 && <div className="flex justify-between"><span>+ otros ingresos</span><span className="tabular-nums">{mxn(otrosIngresosMes)}</span></div>}
