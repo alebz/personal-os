@@ -25,7 +25,7 @@ type Item = {
 const clampDay = (month: string, day: number) => { const [y, m] = month.split('-').map(Number); const last = new Date(y, m, 0).getDate(); return `${month}-${String(Math.min(day, last)).padStart(2, '0')}` }
 const monthsBetween = (a: string, b: string) => { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by * 12 + bm) - (ay * 12 + am) }
 
-export function Previstos({ month, onFaltan, onCostChange }: { month: string; onFaltan?: (v: number) => void; onCostChange?: () => void }) {
+export function Previstos({ month, onFaltan, onFixed, onCostChange }: { month: string; onFaltan?: (v: number) => void; onFixed?: (v: number) => void; onCostChange?: () => void }) {
   const [prev, setPrev] = useState<Prev[]>([])
   const [pagos, setPagos] = useState<Pago[]>([])
   const [deriv, setDeriv] = useState<Derivado[]>([])
@@ -68,6 +68,12 @@ export function Previstos({ month, onFaltan, onCostChange }: { month: string; on
     return s + occ.filter((o) => !paid.has(o)).length * p.amount
   }, 0)
   useEffect(() => { onFaltan?.(faltan) }, [faltan, onFaltan])
+
+  // Gasto FIJO mensual (para el punto de equilibrio): previstos operativos de naturaleza fija (nómina + gasto
+  // fijo), sumando las ocurrencias del mes × monto — pagados o no (es el peso recurrente que hay que cubrir).
+  const fixedMonthly = prev.filter((p) => !p.archived && catDefaults(p.categoria).defaultKind === 'fijo')
+    .reduce((s, p) => s + occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month).length * p.amount, 0)
+  useEffect(() => { onFixed?.(fixedMonthly) }, [fixedMonthly, onFixed])
 
   const enPronto = (it: Item) => !!it.due && it.due.date <= prontoHasta && !(it.kind === 'card' && it.cardPaid)
   const pronto = items.filter(enPronto).sort((a, b) => (a.due!.date < b.due!.date ? -1 : 1))

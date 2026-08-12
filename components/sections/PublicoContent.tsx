@@ -353,6 +353,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
 }) {
   const { crt } = useOSSettings()
   const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
+  const [fixed, setFixed] = useState(0)     // gasto fijo mensual (previstos fijos) → punto de equilibrio
   const dc = crtDayColor(dayColor(new Date()), crt)   // color del día (monocolor de la pantalla)
   const [fc, setFc] = useState<number | null>(null)   // food cost teórico % del mes
   const [tp, setTp] = useState<number | null>(null)   // ticket promedio (POS)
@@ -365,7 +366,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
   }, [month])
 
   const bord = `${dc}22`                                // divisiones de 1px, color del día tenue
-  const box: React.CSSProperties = { border: `1px solid ${dc}44`, borderRadius: 8 }   // bloque bento
+  const box: React.CSSProperties = { border: `1px solid ${dc}44`, borderRadius: 8, background: 'var(--color-surface-1)' }   // bloque bento; surface-1 = card fill al 85% (legible sobre el sim)
   // PROCEDENCIA en la etiqueta (no en badge aparte): "· pos" en el color del día (dato cierto del POS),
   // "· manual" en gris apagado (lo tecleaste tú). Se lee de un vistazo qué dio el POS y qué capturaste.
   const src = (s: 'pos' | 'manual') => <span style={s === 'pos' ? { color: dc } : { opacity: 0.5 }}> · {s}</span>
@@ -420,10 +421,26 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
         {/* Punto de equilibrio — VACÍO con leyenda (recuerda que hay algo pendiente), no escondido. */}
         <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
           <div className="text-label uppercase tracking-widest text-fg-muted">Punto de equilibrio</div>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="tabular-nums text-lg tracking-widest" style={{ color: dc, opacity: 0.35 }}>▮▮▯▯▯</span>
-            <span className="text-secondary italic text-warn">falta configurar gastos fijos</span>
-          </div>
+          {(() => {
+            if (fixed <= 0) return <div className="mt-1 flex items-center gap-2"><span className="tabular-nums text-lg tracking-widest" style={{ color: dc, opacity: 0.35 }}>▮▯▯▯▯</span><span className="text-secondary italic text-warn">falta configurar gastos fijos</span></div>
+            const margin = fc != null ? 1 - fc / 100 : null
+            if (margin == null) return <div className="mt-1 text-secondary italic text-fg-muted">food cost teórico pendiente para el margen…</div>
+            if (margin <= 0) return <div className="mt-1 text-secondary italic text-warn">food cost teórico ≥ 100% — revisa, no hay margen</div>
+            const be = fixed / margin, pct = be > 0 ? ventasMes / be : 0, STEPS = 24, filled = Math.round(Math.min(pct, 1) * STEPS), cubierto = ventasMes >= be
+            return (
+              <div className="mt-1 space-y-1">
+                <div className="flex items-baseline justify-between gap-2 text-label">
+                  <span className="text-fg-muted">necesitas <b className="tabular-nums" style={{ color: dc }}>{mxn(be)}</b> en ventas · fijos {mxn(fixed)} ÷ margen {(margin * 100).toFixed(0)}%</span>
+                  <span className="tabular-nums" style={{ color: dc }}>{Math.round(pct * 100)}%</span>
+                </div>
+                {/* Barra de ESCALONES DUROS (no continua): cada bloque es un paso, relleno = color del día. */}
+                <div className="flex h-3 gap-0.5">
+                  {Array.from({ length: STEPS }).map((_, i) => <div key={i} className="flex-1" style={{ background: i < filled ? dc : `${dc}22` }} />)}
+                </div>
+                <div className="text-label">{cubierto ? <span className="text-ok">✓ cubierto · +{mxn(ventasMes - be)} sobre el punto</span> : <span className="text-warn">faltan {mxn(be - ventasMes)} de ventas para cubrir los fijos</span>}</div>
+              </div>
+            )
+          })()}
         </div>
       </section>
 
@@ -436,7 +453,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
       {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Gastos previstos</Head>
-        <Previstos month={month} onFaltan={setFaltan} onCostChange={onCostChange} />
+        <Previstos month={month} onFaltan={setFaltan} onFixed={setFixed} onCostChange={onCostChange} />
       </section>
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Contenedores</Head>

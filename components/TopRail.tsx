@@ -71,7 +71,7 @@ export default function TopRail() {
 
         {/* Col 2 — nav + gear */}
         <div className="col-span-12 flex items-center justify-center gap-3 md:col-span-6">
-          <nav className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-control border border-border bg-surface-1 p-1.5 backdrop-blur-xl md:max-w-none md:overflow-x-visible">
+          <nav className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-control border border-border bg-surface-1 p-1.5 shadow-[0_10px_30px_-6px_rgba(0,0,0,0.65)] backdrop-blur-xl md:max-w-none md:overflow-x-visible">
             {tabs.map(({ label, href }) => {
               const active = pathname === href
               const color  = crtDayColor(sectionColor(href), crt)
