@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { mxn } from '@/components/Mxn'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, originLabel, OPERATING_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
-import { currentDue, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
+import { nthOccurrence, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
 import { localDate, addDays, dayMonth, dayLabel } from './util'
 
 const PRONTO_DIAS = 7   // ventana "vence pronto": vencidos siempre + próximos 7 días (constante ajustable)
@@ -14,26 +14,33 @@ const RECUR = new Set<Frecuencia>(['semanal', 'quincenal'])   // frecuencias don
 const frecLabel = (f: Frecuencia) => FRECS.find((x) => x.key === f)?.label ?? f
 
 type Prev = { id: string; concepto: string; categoria: CostCategory; origin: OriginKey; amount: number; frecuencia: Frecuencia; anchor_date: string; ocurrencias: number | null; sort_order: number; archived: boolean }
-type Pago = { previsto_id: string; ocurrencia: string; costo_id: string | null }
+type Pago = { previsto_id: string; ocurrencia: string; costo_id: string | null; amount: number | null }
 type Derivado = { charge_id: string; card_id: string; concepto: string; amount: number; meses: number; start_month: string; ended_month: string | null; due_day: number; confirmed: string[] }
 
-// Item unificado con su vencimiento derivado. `card` = derivado de Créditos (read-only). `manual` = editable.
-type Item = {
-  key: string; kind: 'manual' | 'card'; concepto: string; amount: number; frecuencia: Frecuencia
-  categoria?: CostCategory; origin?: OriginKey; due: { date: string; n: number } | null; ocurrencias: number | null
-  manual?: Prev; cardPaid?: boolean; chargeId?: string
+// MATERIALIZADO (estilo Uptown): una fila por OCURRENCIA del mes, no una por previsto. Semanal → 4-5 filas;
+// mensual → 1. El estado pagado vive en publico_previsto_pagos; el monto efectivo = pago.amount ?? definición.
+type OccItem = {
+  key: string; kind: 'manual' | 'card'; concepto: string; frecuencia: Frecuencia
+  occ: string; n: number | null; total: number | null
+  paid: boolean; amount: number; overdue: boolean
+  previstoId?: string; chargeId?: string
 }
 
 const clampDay = (month: string, day: number) => { const [y, m] = month.split('-').map(Number); const last = new Date(y, m, 0).getDate(); return `${month}-${String(Math.min(day, last)).padStart(2, '0')}` }
 const monthsBetween = (a: string, b: string) => { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by * 12 + bm) - (ay * 12 + am) }
+// Índice (1-based) de una ocurrencia dentro de la recurrencia — solo para "N de M" en previstos finitos.
+function occIndex(anchor: string, frecuencia: Frecuencia, occ: string): number | null {
+  for (let n = 1; n <= 520; n++) if (nthOccurrence(anchor, frecuencia, n) >= occ) return n
+  return null
+}
 
 export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange }: { month: string; onFaltan?: (v: number) => void; onFixed?: (v: number) => void; onRentaCond?: (v: number) => void; onCostChange?: () => void }) {
   const [prev, setPrev] = useState<Prev[]>([])
   const [pagos, setPagos] = useState<Pago[]>([])
   const [deriv, setDeriv] = useState<Derivado[]>([])
-  const [showRest, setShowRest] = useState(false)
+  const [fullOpen, setFullOpen] = useState(false)   // rejilla completa del mes
   const [manage, setManage] = useState(false)
-  const [histOpen, setHistOpen] = useState<string | null>(null)   // previsto con su historial de pagos desplegado
+  const [amtBuf, setAmtBuf] = useState<Record<string, string>>({})   // buffer de monto por ocurrencia
   const [undo, setUndo] = useState<{ previsto_id: string; ocurrencia: string; label: string } | null>(null)
   const dragId = useRef<string | null>(null)
 
@@ -47,24 +54,30 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
   const today = localDate()
   const prontoHasta = addDays(today, PRONTO_DIAS)
 
-  // Construye los items con su vencimiento derivado (lib/previstos). Derivados completados/terminados se caen solos.
-  const items: Item[] = []
+  // ── Ocurrencias del mes (MATERIALIZADAS): una por ocurrencia, con su estado pagado y monto efectivo ──
+  const occItems: OccItem[] = []
   for (const p of prev) {
     if (p.archived) continue
-    const paid = new Set(pagos.filter((x) => x.previsto_id === p.id).map((x) => x.ocurrencia))
-    items.push({ key: `m:${p.id}`, kind: 'manual', concepto: p.concepto, amount: p.amount, frecuencia: p.frecuencia, categoria: p.categoria, origin: p.origin, ocurrencias: p.ocurrencias, due: currentDue(p.anchor_date, p.frecuencia, p.ocurrencias, paid), manual: p })
+    const pagoByOcc = new Map(pagos.filter((x) => x.previsto_id === p.id).map((x) => [x.ocurrencia, x] as const))
+    for (const occ of occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month)) {
+      const pago = pagoByOcc.get(occ)
+      occItems.push({
+        key: `m:${p.id}:${occ}`, kind: 'manual', concepto: p.concepto, frecuencia: p.frecuencia,
+        occ, n: p.ocurrencias != null ? occIndex(p.anchor_date, p.frecuencia, occ) : null, total: p.ocurrencias,
+        paid: !!pago, amount: pago?.amount != null ? Number(pago.amount) : p.amount, overdue: occ < today, previstoId: p.id,
+      })
+    }
   }
   for (const d of deriv) {
     if (d.ended_month && d.ended_month < month) continue                 // devuelto/cerrado
-    // Modelo de Créditos: confirmación INDEPENDIENTE por mes. La ocurrencia relevante es la del mes en curso
-    // (N = mes − inicio + 1), no "la más vieja impaga". Fuera de su plazo N de M → deja de aparecer (punto 3).
-    const idx = monthsBetween(d.start_month, month)
+    const idx = monthsBetween(d.start_month, month)                       // Créditos: confirmación por mes, N=mes−inicio+1
     if (idx < 0 || idx >= d.meses) continue
-    items.push({ key: `c:${d.charge_id}`, kind: 'card', chargeId: d.charge_id, concepto: d.concepto, amount: d.amount, frecuencia: 'mensual', ocurrencias: d.meses, due: { date: clampDay(month, d.due_day), n: idx + 1 }, cardPaid: d.confirmed.includes(month) })
+    const occ = clampDay(month, d.due_day)
+    occItems.push({ key: `c:${d.charge_id}:${month}`, kind: 'card', concepto: d.concepto, frecuencia: 'mensual', occ, n: idx + 1, total: d.meses, paid: d.confirmed.includes(month), amount: d.amount, overdue: occ < today, chargeId: d.charge_id })
   }
+  occItems.sort((a, b) => (a.occ < b.occ ? -1 : a.occ > b.occ ? 1 : a.concepto < b.concepto ? -1 : 1))
 
-  // "Cuánto falta" (honestidad): previstos OPERATIVOS impagos del mes en curso (los que sí mueven la utilidad
-  // operativa). Excluye derivados de tarjeta (su tratamiento se define en el punto 2) y no-operativos.
+  // "Cuánto falta" (honestidad): ocurrencias operativas IMPAGAS del mes × su monto de definición.
   const faltan = prev.filter((p) => !p.archived && OPERATING_CATEGORIES.includes(p.categoria)).reduce((s, p) => {
     const paid = new Set(pagos.filter((x) => x.previsto_id === p.id).map((x) => x.ocurrencia))
     const occ = occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month)
@@ -72,30 +85,37 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
   }, 0)
   useEffect(() => { onFaltan?.(faltan) }, [faltan, onFaltan])
 
-  // Gasto FIJO mensual (para el punto de equilibrio): previstos operativos de naturaleza fija (nómina + gasto
-  // fijo), sumando las ocurrencias del mes × monto — pagados o no (es el peso recurrente que hay que cubrir).
+  // Gasto FIJO mensual (punto de equilibrio): ocurrencias fijas del mes × monto, pagadas o no.
   const fixedMonthly = prev.filter((p) => !p.archived && catDefaults(p.categoria).defaultKind === 'fijo')
     .reduce((s, p) => s + occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month).length * p.amount, 0)
   useEffect(() => { onFixed?.(fixedMonthly) }, [fixedMonthly, onFixed])
 
-  // Renta condonada del mes (para el 2º breakeven, "de pie solo"). NO es costo operativo — se modela como par
-  // net-cero sin caja; aquí solo se usa su MONTO para saber cuándo el negocio podría pagar su propia renta.
+  // Renta condonada del mes (2º breakeven "de pie solo"); par net-cero, solo su monto.
   const rentaCondMonthly = prev.filter((p) => !p.archived && p.categoria === 'renta_condonada')
     .reduce((s, p) => s + occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, month).length * p.amount, 0)
   useEffect(() => { onRentaCond?.(rentaCondMonthly) }, [rentaCondMonthly, onRentaCond])
 
-  const enPronto = (it: Item) => !!it.due && it.due.date <= prontoHasta && !(it.kind === 'card' && it.cardPaid)
-  const pronto = items.filter(enPronto).sort((a, b) => (a.due!.date < b.due!.date ? -1 : 1))
-  const resto = items.filter((it) => !enPronto(it)).sort((a, b) => ((a.due?.date ?? '9') < (b.due?.date ?? '9') ? -1 : 1))
+  // Panel = "vence pronto": vencidas (todas) + próximos 7 días. Una pagada dentro de la ventana se ve CON su
+  // check lleno (ese era el punto: ver que algo ya se pagó). La rejilla completa del mes va en el desplegable.
+  const pronto = occItems.filter((it) => it.occ <= prontoHasta)
 
-  async function pay(it: Item, on: boolean) {
-    if (it.kind !== 'manual' || !it.due || !it.manual) return
-    const q = { previsto_id: it.manual.id, ocurrencia: it.due.date }
+  async function setPaid(it: OccItem, on: boolean) {
+    if (it.kind === 'card') return cardPay(it, on)
+    const previsto_id = it.previstoId!
     if (on) {
-      await fetch('/api/publico/previstos/pay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(q) })
-      setUndo({ ...q, label: it.concepto })   // deshacer: revierte el costo real
-      setTimeout(() => setUndo((c) => (c?.previsto_id === q.previsto_id && c?.ocurrencia === q.ocurrencia ? null : c)), 7000)
+      const amt = Number(amtBuf[it.key] ?? it.amount)
+      await fetch('/api/publico/previstos/pay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ previsto_id, ocurrencia: it.occ, amount: amt > 0 ? amt : undefined }) })
+      setUndo({ previsto_id, ocurrencia: it.occ, label: it.concepto })
+      setTimeout(() => setUndo((c) => (c?.previsto_id === previsto_id && c?.ocurrencia === it.occ ? null : c)), 7000)
+    } else {
+      await fetch(`/api/publico/previstos/pay?previsto_id=${previsto_id}&ocurrencia=${it.occ}`, { method: 'DELETE' })   // desmarcar revierte el costo
     }
+    setAmtBuf((b) => { const n = { ...b }; delete n[it.key]; return n })
+    await load(); onCostChange?.()
+  }
+  // Editar el monto de una ocurrencia YA pagada → actualiza el pago y el costo ligado (bono/parcial/recibo que varía).
+  async function patchAmount(it: OccItem, amount: number) {
+    await fetch('/api/publico/previstos/pay', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ previsto_id: it.previstoId, ocurrencia: it.occ, amount }) })
     await load(); onCostChange?.()
   }
   async function doUndo() {
@@ -103,15 +123,9 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
     await fetch(`/api/publico/previstos/pay?previsto_id=${undo.previsto_id}&ocurrencia=${undo.ocurrencia}`, { method: 'DELETE' })
     setUndo(null); await load(); onCostChange?.()
   }
-  // Revertir una ocurrencia YA pagada desde el historial (persistente, no solo el toast de 7s): borra el costo
-  // real que creó y quita el pago. Reversibilidad UI total — nada de pedirlo por fuera.
-  async function revert(previsto_id: string, ocurrencia: string) {
-    await fetch(`/api/publico/previstos/pay?previsto_id=${previsto_id}&ocurrencia=${ocurrencia}`, { method: 'DELETE' })
-    await load(); onCostChange?.()
-  }
   // Opción A: pagar/desmarcar un cargo de tarjeta desde Público (crea/revierte el costo + la confirmación de Créditos).
-  async function cardPay(it: Item, on: boolean) {
-    if (it.kind !== 'card' || !it.chargeId) return
+  async function cardPay(it: OccItem, on: boolean) {
+    if (!it.chargeId) return
     if (on) await fetch('/api/publico/previstos/card-pay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ charge_id: it.chargeId, month }) })
     else await fetch(`/api/publico/previstos/card-pay?charge_id=${it.chargeId}&month=${month}`, { method: 'DELETE' })
     await load(); onCostChange?.()
@@ -129,42 +143,27 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
 
   const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
-  const row = (it: Item) => {
-    const overdue = it.due && it.due.date < today
-    const recur = RECUR.has(it.frecuencia)   // semanal/quincenal: cada período es una ocurrencia NUEVA (no un reset)
-    // Ocurrencias YA pagadas de este previsto (historial), más recientes primero.
-    const paidOccs = it.kind === 'manual' && it.manual ? pagos.filter((x) => x.previsto_id === it.manual!.id).map((x) => x.ocurrencia).sort((a, b) => (a < b ? 1 : -1)) : []
-    // La pendiente: en recurrentes muestra el DÍA DE LA SEMANA ("dom, 09 ago" = el domingo de paga); en el resto, corto.
-    const dueTxt = it.due ? (recur ? dayLabel(it.due.date) : dayMonth(it.due.date)) : null
-    const open = histOpen === it.key
+  // Fila de UNA ocurrencia: checkbox reversible (desmarcar borra el costo) + monto editable por ocurrencia.
+  const occRow = (it: OccItem) => {
+    const recur = RECUR.has(it.frecuencia)
+    const dueTxt = recur ? dayLabel(it.occ) : dayMonth(it.occ)   // recurrente muestra el día de la semana
+    const amtVal = amtBuf[it.key] ?? String(it.amount)
     return (
-      <div key={it.key}>
-        <div draggable={it.kind === 'manual' && manage} onDragStart={() => { if (it.manual) dragId.current = it.manual.id }} onDragOver={(e) => e.preventDefault()} onDrop={() => it.manual && onDrop(it.manual.id)}
-          className="flex items-center gap-2 text-secondary" style={it.kind === 'card' ? { opacity: 0.85 } : undefined}>
-          {it.kind === 'manual'
-            ? <input type="checkbox" checked={false} onChange={(e) => void pay(it, e.target.checked)} title="marcar pagado (crea el costo real)" />
-            : <input type="checkbox" checked={!!it.cardPaid} onChange={(e) => void cardPay(it, e.target.checked)} title="pagar desde Público (crea el costo y marca la confirmación en Créditos, que allá queda de solo lectura)" />}
-          <span className="flex-1 truncate">
-            {it.concepto}
-            {it.kind === 'card' && <span className="ml-1 rounded px-1 text-label" style={{ border: '1px solid var(--color-border)', opacity: 0.7 }}>tarjeta · Créditos</span>}
-            {recur && <span className="ml-1 text-fg-muted" title="cada período es una ocurrencia nueva con su propio registro; el check no se 'resetea', avanza a la siguiente">· {frecLabel(it.frecuencia)}</span>}
-            {it.ocurrencias != null && it.due && <span className="ml-1 text-fg-muted">{it.due.n}/{it.ocurrencias}</span>}
-            {paidOccs.length > 0 && <button onClick={() => setHistOpen(open ? null : it.key)} className="ml-1 text-fg-muted underline decoration-dotted hover:text-accent" title="ver las ya pagadas">· {paidOccs.length} pagada{paidOccs.length === 1 ? '' : 's'}</button>}
-          </span>
-          <span className={`shrink-0 text-label ${overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.due ? `${overdue ? 'vencido' : 'vence'} ${dueTxt}` : '—'}</span>
-          <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>
-        </div>
-        {open && (
-          <div className="mb-1 ml-6 mt-0.5 border-l-2 pl-2 text-label text-fg-muted" style={{ borderColor: 'var(--color-border)' }}>
-            <div className="italic">cada {frecLabel(it.frecuencia).toLowerCase()} es una ocurrencia nueva con su propio registro — al marcar el pago se crea su costo y la siguiente queda pendiente.</div>
-            {paidOccs.map((o) => (
-              <div key={o} className="flex items-center justify-between gap-2">
-                <span className="tabular-nums">✓ pagado · {dayLabel(o)}</span>
-                {it.manual && <button onClick={() => void revert(it.manual!.id, o)} className="underline decoration-dotted hover:text-danger" title="revierte el costo que creó este pago">↩ revertir</button>}
-              </div>
-            ))}
-          </div>
-        )}
+      <div key={it.key} className="flex items-center gap-2 text-secondary" style={it.kind === 'card' ? { opacity: 0.85 } : undefined}>
+        <input type="checkbox" checked={it.paid} onChange={(e) => void setPaid(it, e.target.checked)} title={it.paid ? 'desmarcar revierte el costo' : 'marcar crea el costo real'} />
+        <span className="flex-1 truncate">
+          {it.concepto}
+          {it.kind === 'card' && <span className="ml-1 rounded px-1 text-label" style={{ border: '1px solid var(--color-border)', opacity: 0.7 }}>tarjeta · Créditos</span>}
+          {recur && <span className="ml-1 text-fg-muted">· {frecLabel(it.frecuencia).toLowerCase()}</span>}
+          {it.total != null && it.n != null && <span className="ml-1 text-fg-muted">{it.n}/{it.total}</span>}
+        </span>
+        <span className={`shrink-0 text-label ${it.paid ? 'text-ok' : it.overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.paid ? `✓ ${dueTxt}` : `${it.overdue ? 'vencido' : 'vence'} ${dueTxt}`}</span>
+        {it.kind === 'manual'
+          ? <input value={amtVal} onChange={(e) => setAmtBuf((b) => ({ ...b, [it.key]: e.target.value }))}
+              onBlur={() => { if (it.paid) { const v = Number(amtBuf[it.key] ?? it.amount); if (v > 0 && Math.abs(v - it.amount) > 0.001) void patchAmount(it, v) } }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              inputMode="decimal" title="monto de esta ocurrencia (editable)" style={{ ...cell, width: 74, textAlign: 'right' }} />
+          : <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>}
       </div>
     )
   }
@@ -177,12 +176,14 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
           <button onClick={() => void doUndo()} className="rounded-control border border-border px-2 py-0.5 font-bold text-accent">↩ deshacer</button>
         </div>
       )}
-      {pronto.length === 0 && resto.length === 0 && <div className="text-secondary italic text-fg-muted">Sin previstos. Agrégalos con ＋.</div>}
-      {pronto.length > 0 && <div className="space-y-1">{pronto.map(row)}</div>}
-      {resto.length > 0 && (
-        <button onClick={() => setShowRest((s) => !s)} className="text-label text-fg-muted hover:text-accent">{showRest ? '▲ ocultar' : `▼ ver los ${resto.length} restantes`}</button>
+      {occItems.length === 0 && <div className="text-secondary italic text-fg-muted">Sin previstos. Agrégalos con ＋.</div>}
+      {pronto.length > 0 && <div className="space-y-1">{pronto.map(occRow)}</div>}
+      {pronto.length === 0 && occItems.length > 0 && <div className="text-label italic text-fg-muted">Nada vence pronto — todo al día. Ver el mes completo abajo.</div>}
+
+      {occItems.length > 0 && (
+        <button onClick={() => setFullOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{fullOpen ? '▲ ocultar el mes' : `▼ ver todo el mes (${occItems.length} ocurrencia${occItems.length === 1 ? '' : 's'})`}</button>
       )}
-      {showRest && <div className="space-y-1 border-t border-border pt-1">{resto.map(row)}</div>}
+      {fullOpen && <div className="space-y-1 border-t border-border pt-1">{occItems.map(occRow)}</div>}
 
       <div className="border-t border-border pt-1">
         <button onClick={() => setManage((m) => !m)} className="text-label text-fg-muted hover:text-accent">{manage ? '▲ listo' : '＋ agregar · gestionar'}</button>

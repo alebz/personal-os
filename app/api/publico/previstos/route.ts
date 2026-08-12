@@ -18,7 +18,7 @@ export async function GET() {
   const supabase = createServerClient()
   const [{ data: previstos }, { data: pagos }, { data: charges }, { data: cards }, { data: confirms }] = await Promise.all([
     supabase.from('publico_previstos').select('id, concepto, categoria, origin, amount, frecuencia, anchor_date, ocurrencias, sort_order, archived').order('sort_order', { ascending: true }),
-    supabase.from('publico_previsto_pagos').select('previsto_id, ocurrencia, costo_id'),
+    supabase.from('publico_previsto_pagos').select('previsto_id, ocurrencia, costo_id, amount'),
     supabase.from('finance_card_charges').select('id, card_id, name, amount, meses, start_month, ended_month').eq('attribution', 'publico').eq('archived', false),
     supabase.from('finance_cards').select('id, name, due_day'),
     supabase.from('finance_card_confirmations').select('charge_id, month'),
