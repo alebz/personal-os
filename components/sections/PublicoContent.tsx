@@ -12,6 +12,7 @@ import {
 } from '@/lib/publico'
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
+import { Previstos } from './publico/Previstos'
 import { localDate, addDays, dayLabel } from './publico/util'
 import { dayColor, crtDayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
@@ -319,7 +320,7 @@ export default function PublicoContent() {
       </>)}
 
       {tab === 'panel' && (
-        <Panel month={month} ventasMes={ventasMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} />
+        <Panel month={month} ventasMes={ventasMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} onCostChange={load} />
       )}
 
       {tab === 'captura' && (
@@ -347,10 +348,11 @@ export default function PublicoContent() {
 // marca su PROCEDENCIA (POS vs manual). Estética arcade: UNA rejilla con divisiones de 1px en el color del
 // día (monocolor, hard steps, sin degradados). El punto de equilibrio es placeholder → llega en Fase 2 con
 // los gastos fijos/nómina (previstos); pintarlo ahora sería una barra basada en nada. Debe caber sin scroll. ──
-function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes }: {
-  month: string; ventasMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number
+function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, onCostChange }: {
+  month: string; ventasMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; onCostChange: () => void
 }) {
   const { crt } = useOSSettings()
+  const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
   const dc = crtDayColor(dayColor(new Date()), crt)   // color del día (monocolor de la pantalla)
   const [fc, setFc] = useState<number | null>(null)   // food cost teórico % del mes
   const [tp, setTp] = useState<number | null>(null)   // ticket promedio (POS)
@@ -398,7 +400,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
         {/* Utilidad (provisional) */}
         <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>provisional</span></span>
+            <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>{faltan > 0 ? `provisional · faltan ${mxn(faltan)}` : 'provisional'}</span></span>
             <span className="tabular-nums" style={{ color: dc, fontSize: 22, fontWeight: 700 }}>{mxn(utilidadOper)}</span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 text-label text-fg-muted">
@@ -434,7 +436,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
       {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Gastos previstos</Head>
-        {placeholder('Fase 2', 'los que vencen pronto, arriba. Habilitan el punto de equilibrio.')}
+        <Previstos month={month} onFaltan={setFaltan} onCostChange={onCostChange} />
       </section>
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Contenedores</Head>

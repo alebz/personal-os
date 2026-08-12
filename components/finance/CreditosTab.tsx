@@ -191,15 +191,16 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
         const isLast = active && n === c.meses
         const finished = n > c.meses || (c.ended_month != null && mn(month) > mn(c.ended_month))
         const isOn = confirmed.has(c.id)
+        const publicoRO = c.attribution === 'publico'   // Opción A: lo marca Público (crea su costo); aquí es reflejo de solo lectura.
         return (
           <div key={c.id} draggable onDragStart={() => { dragId.current = c.id }} onDragOver={e => e.preventDefault()} onDrop={() => void reorder(c.id)}
             className={`group flex items-center gap-2 border-t border-border py-1.5 first:border-0 ${!active ? 'opacity-45' : ''}`}>
             <span className="cursor-grab select-none text-fg-muted/40" title="Arrastra para reordenar">⠿</span>
-            {/* Checkbox: personal = gasto real; atribuido = puro registro. Deshabilitado si no está activo este mes. */}
-            <button onClick={() => active && onToggle(c, !isOn)} disabled={!active}
-              title={pending ? 'Aún no empieza su mensualidad' : c.kind === 'personal' ? 'Se cobró bien este mes' : '¿Ya depositaron este mes?'}
+            {/* Checkbox: personal = gasto real; atribuido = puro registro. Los de Público son de solo lectura (los marca Público). */}
+            <button onClick={() => active && !publicoRO && onToggle(c, !isOn)} disabled={!active || publicoRO}
+              title={publicoRO ? 'Lo marca Público al pagar (opción A); aquí es de solo lectura' : pending ? 'Aún no empieza su mensualidad' : c.kind === 'personal' ? 'Se cobró bien este mes' : '¿Ya depositaron este mes?'}
               className={['flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                isOn ? 'border-ok bg-ok' : 'border-border-strong', active ? '' : 'cursor-default'].join(' ')}>
+                isOn ? 'border-ok bg-ok' : 'border-border-strong', active && !publicoRO ? '' : 'cursor-default'].join(' ')}>
               {isOn && <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5 text-fg-on-accent" stroke="currentColor" strokeWidth={1.8}><path d="M1 4l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
             </button>
             <span className={`flex-1 truncate text-body ${isOn ? 'text-fg-muted/70' : 'text-fg'}`}>{c.name}</span>
