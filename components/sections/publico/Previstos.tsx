@@ -33,7 +33,7 @@ function occIndex(anchor: string, frecuencia: Frecuencia, occ: string): number |
   return null
 }
 
-export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange }: { month: string; onFaltan?: (v: number) => void; onFixed?: (v: number) => void; onRentaCond?: (v: number) => void; onCostChange?: () => void }) {
+export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onCostChange }: { month: string; onFaltan?: (v: number) => void; onFixed?: (v: number) => void; onRentaCond?: (v: number) => void; onTotals?: (t: { pendiente: number; vencido: number; pagado: number; mes: number }) => void; onCostChange?: () => void }) {
   const [prev, setPrev] = useState<Prev[]>([])
   const [pagos, setPagos] = useState<Pago[]>([])
   const [deriv, setDeriv] = useState<Derivado[]>([])
@@ -98,6 +98,15 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
   // fecha asc → los VENCIDOS (fecha < hoy) quedan primero, luego los que vienen. Los PAGADOS van al archivo.
   const pendientes = occItems.filter((it) => !it.paid)
   const pagados = occItems.filter((it) => it.paid)
+
+  // Totales del mes (lo que se muestra en la card). Pendiente = falta pagar; vencido = pendiente ya vencido;
+  // pagado = archivo; mes = pagado + pendiente (todas las ocurrencias). fixedMonthly (arriba) = subconjunto
+  // FIJO, que es el que alimenta el punto de equilibrio.
+  const pendienteTotal = pendientes.reduce((s, it) => s + it.amount, 0)
+  const vencidoTotal = pendientes.filter((it) => it.overdue).reduce((s, it) => s + it.amount, 0)
+  const pagadoTotal = pagados.reduce((s, it) => s + it.amount, 0)
+  const mesTotal = pendienteTotal + pagadoTotal
+  useEffect(() => { onTotals?.({ pendiente: pendienteTotal, vencido: vencidoTotal, pagado: pagadoTotal, mes: mesTotal }) }, [pendienteTotal, vencidoTotal, pagadoTotal, mesTotal, onTotals])
 
   async function setPaid(it: OccItem, on: boolean) {
     if (it.kind === 'card') return cardPay(it, on)
@@ -202,11 +211,20 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onCostChange 
       {pendientes.length > 0 && <div className="space-y-1">{pendientes.map(occRow)}</div>}
       {pendientes.length === 0 && pagados.length > 0 && <div className="text-label italic text-ok">✓ Todo pagado este mes.</div>}
 
-      {/* PAGADOS — archivo, en desplegable (con su check lleno y su fecha). */}
+      {/* PAGADOS — archivo, en desplegable (con su check lleno y su fecha) + total pagado del mes. */}
       {pagados.length > 0 && (<>
-        <button onClick={() => setPaidOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{paidOpen ? '▲ ocultar pagados' : `▼ ${pagados.length} pagado${pagados.length === 1 ? '' : 's'} este mes`}</button>
+        <button onClick={() => setPaidOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{paidOpen ? '▲ ocultar pagados' : `▼ ${pagados.length} pagado${pagados.length === 1 ? '' : 's'} · ${mxn(pagadoTotal)} este mes`}</button>
         {paidOpen && <div className="space-y-1 border-t border-border pt-1">{pagados.map(occRow)}</div>}
       </>)}
+
+      {/* TOTAL DEL MES (pagado + pendiente) = base de costos previstos. `fijos` es el subconjunto que alimenta
+          el punto de equilibrio (nómina + gasto fijo); el resto (tarjeta/reinversión, variables) no pesa ahí. */}
+      {occItems.length > 0 && (
+        <div className="border-t border-border pt-1 text-label text-fg-muted">
+          Total del mes <b className="tabular-nums text-fg">{mxn(mesTotal)}</b> <span className="opacity-70">= pagado {mxn(pagadoTotal)} + pendiente {mxn(pendienteTotal)}</span>
+          {fixedMonthly > 0 && <> · fijos <b className="tabular-nums" style={{ color: 'var(--color-accent)' }}>{mxn(fixedMonthly)}</b> → punto de equilibrio</>}
+        </div>
+      )}
 
       <div className="border-t border-border pt-1">
         <button onClick={() => setManage((m) => !m)} className="text-label text-fg-muted hover:text-accent">{manage ? '▲ listo' : '＋ agregar · gestionar'}</button>

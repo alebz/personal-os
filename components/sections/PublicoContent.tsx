@@ -354,6 +354,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
 }) {
   const { crt } = useOSSettings()
   const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
+  const [prevTotals, setPrevTotals] = useState({ pendiente: 0, vencido: 0, pagado: 0, mes: 0 })   // totales de la card de previstos
   const [fixed, setFixed] = useState(0)     // gasto fijo mensual (previstos fijos) → punto de equilibrio operativo
   const [rentaCond, setRentaCond] = useState(0)   // renta condonada mensual → 2º breakeven "de pie solo"
   const dc = crtDayColor(dayColor(new Date()), crt)   // color del día (monocolor de la pantalla)
@@ -491,8 +492,10 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
 
       {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}
       <section className="px-3 py-3 lg:col-span-3" style={box}>
-        <Head>Gastos previstos</Head>
-        <Previstos month={month} onFaltan={setFaltan} onFixed={setFixed} onRentaCond={setRentaCond} onCostChange={onCostChange} />
+        <Head>Gastos previstos {(prevTotals.pendiente > 0 || prevTotals.vencido > 0) && (
+          <span className="font-normal normal-case tracking-normal text-fg-muted">· pendiente <b className="tabular-nums text-fg">{mxn(prevTotals.pendiente)}</b>{prevTotals.vencido > 0 && <span className="text-danger"> · vencido <b className="tabular-nums">{mxn(prevTotals.vencido)}</b></span>}</span>
+        )}</Head>
+        <Previstos month={month} onFaltan={setFaltan} onFixed={setFixed} onRentaCond={setRentaCond} onTotals={setPrevTotals} onCostChange={onCostChange} />
       </section>
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Contenedores</Head>
