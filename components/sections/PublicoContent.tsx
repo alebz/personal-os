@@ -12,6 +12,7 @@ import {
 } from '@/lib/publico'
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
+import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
 import { Contenedores } from './publico/Contenedores'
 import { localDate, addDays, dayLabel, dayMonth, monthName } from './publico/util'
@@ -40,7 +41,7 @@ export default function PublicoContent() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
-  const [tab, setTab] = useState<'panel' | 'captura' | 'direccion' | 'fondos' | 'notas'>('panel')
+  const [tab, setTab] = useState<'panel' | 'captura' | 'tickets' | 'direccion' | 'fondos' | 'notas'>('panel')
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
   const { funds: socioFunds, handlers: socioHandlers } = useCajaFuerte('publico', month)
@@ -179,6 +180,7 @@ export default function PublicoContent() {
         <div className="flex gap-1">
           <button onClick={() => setTab('panel')} style={chip(tab === 'panel')}>Panel</button>
           <button onClick={() => setTab('captura')} style={chip(tab === 'captura')}>Captura</button>
+          <button onClick={() => setTab('tickets')} style={chip(tab === 'tickets')}>Tickets</button>
           <button onClick={() => setTab('direccion')} style={chip(tab === 'direccion')}>Dirección</button>
           <button onClick={() => setTab('fondos')} style={chip(tab === 'fondos')}>Fondos</button>
           <button onClick={() => setTab('notas')} style={chip(tab === 'notas')}>Notas</button>
@@ -294,6 +296,10 @@ export default function PublicoContent() {
 
       {tab === 'captura' && (
       <AliasManager />
+      )}
+
+      {tab === 'tickets' && (
+      <TicketsArchive />
       )}
 
       {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
