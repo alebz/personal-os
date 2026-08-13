@@ -3,9 +3,9 @@
 // la captura rápida. El default se aplica al elegir categoría; el usuario puede overridear (1 tap) y
 // la elección es sticky en burst — así meter 5 insumos seguidos no re-pregunta nada.
 
-export type ContainerKey = 'clip' | 'caja_chica' | 'caja_pos'
+export type ContainerKey = 'clip' | 'caja_chica' | 'caja_pos' | 'banco'
 export type OriginKey = ContainerKey | null   // null = "sin caja" (protocolo/condonado; no toca contenedor)
-export type CostCategory = 'insumo' | 'nomina' | 'gasto_fijo' | 'mantenimiento' | 'empaque' | 'suministros' | 'reinversion' | 'renta_condonada'
+export type CostCategory = 'insumo' | 'nomina' | 'gasto_fijo' | 'mantenimiento' | 'empaque' | 'suministros' | 'comision' | 'reinversion' | 'renta_condonada'
 export type CostKind = 'fijo' | 'variable'
 
 // Contenedores de dinero del negocio. En F1 son ATRIBUCIÓN (enum en cada movimiento); en F5 nacen
@@ -14,6 +14,7 @@ export const CONTAINERS: { key: ContainerKey; label: string; tipo: 'banco' | 'ef
   { key: 'clip',       label: 'CLIP',       tipo: 'banco' },     // caen las ventas con tarjeta
   { key: 'caja_chica', label: 'Caja chica', tipo: 'efectivo' },
   { key: 'caja_pos',   label: 'Caja POS',   tipo: 'efectivo' },  // caen las ventas en efectivo
+  { key: 'banco',      label: 'Banco',      tipo: 'banco' },     // donde CLIP deposita (neto); se cuadra vs estado de cuenta
 ]
 export const containerLabel = (k: ContainerKey) => CONTAINERS.find((c) => c.key === k)?.label ?? k
 // Etiqueta de ORIGEN incluyendo "sin caja" (null). Para selectores/listados.
@@ -39,6 +40,9 @@ export const COST_CATEGORIES: {
   { key: 'mantenimiento',   label: 'Mantenimiento',   defaultOrigin: 'clip',       defaultKind: 'variable' },
   { key: 'empaque',         label: 'Empaque',         defaultOrigin: 'clip',       defaultKind: 'variable' },
   { key: 'suministros',     label: 'Suministros',     defaultOrigin: 'clip',       defaultKind: 'variable' },
+  // Comisión de cobro con tarjeta (Clip): costo VARIABLE que escala con las ventas tarjeta. Reduce la utilidad
+  // Y entra al margen del punto de equilibrio (como el food cost). Sale de CLIP (de ahí cobra Clip su fee).
+  { key: 'comision',        label: 'Comisión',        defaultOrigin: 'clip',       defaultKind: 'variable' },
   { key: 'reinversion',     label: 'Reinversión',     defaultOrigin: 'clip',       defaultKind: null },
   // Renta condonada (arreglo Ameno): NO-operativa (fuera de utilidad operativa), sin caja por default.
   { key: 'renta_condonada', label: 'Renta condonada', defaultOrigin: null,         defaultKind: null },
@@ -54,4 +58,4 @@ export const SALES_CONTAINER: Record<'efectivo' | 'tarjeta', ContainerKey> = {
 // Utilidad OPERATIVA = ventas − (insumo + nómina + gasto_fijo + mantenimiento + empaque + suministros).
 // Reinversión y renta_condonada NO cuentan (uso de utilidad / net-cero). Estas 6 restan la utilidad operativa;
 // solo nómina y gasto_fijo (defaultKind='fijo') pesan además en el punto de equilibrio.
-export const OPERATING_CATEGORIES: CostCategory[] = ['insumo', 'nomina', 'gasto_fijo', 'mantenimiento', 'empaque', 'suministros']
+export const OPERATING_CATEGORIES: CostCategory[] = ['insumo', 'nomina', 'gasto_fijo', 'mantenimiento', 'empaque', 'suministros', 'comision']

@@ -6,22 +6,24 @@ import { createServerClient } from '@/lib/supabase'
 // El % es la DECISIÓN (config); las libretas de socios son la EVIDENCIA. Arranca 50/50.
 export async function GET() {
   const supabase = createServerClient()
-  const { data, error } = await supabase.from('publico_config').select('split_alex').eq('id', 1).maybeSingle()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ split_alex: Number(data?.split_alex ?? 50) })
+  // Resiliente a que clip_rate aún no exista (antes de la migración 0079): cae a solo split_alex.
+  let row = await supabase.from('publico_config').select('split_alex, clip_rate').eq('id', 1).maybeSingle()
+  if (row.error) row = await supabase.from('publico_config').select('split_alex').eq('id', 1).maybeSingle() as typeof row
+  if (row.error) return NextResponse.json({ error: row.error.message }, { status: 500 })
+  const d = row.data as { split_alex?: number; clip_rate?: number } | null
+  return NextResponse.json({ split_alex: Number(d?.split_alex ?? 50), clip_rate: Number(d?.clip_rate ?? 0.036) })
 }
 
 export async function POST(req: NextRequest) {
-  let b: { split_alex?: number }
+  let b: { split_alex?: number; clip_rate?: number }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const s = Number(b.split_alex)
-  if (!Number.isFinite(s) || s < 0 || s > 100) return NextResponse.json({ error: 'split_alex 0–100' }, { status: 400 })
+  const upd: Record<string, unknown> = { id: 1, updated_at: new Date().toISOString() }
+  if (b.split_alex !== undefined) { const s = Number(b.split_alex); if (!Number.isFinite(s) || s < 0 || s > 100) return NextResponse.json({ error: 'split_alex 0–100' }, { status: 400 }); upd.split_alex = s }
+  // Tasa de Clip como FRACCIÓN (0.036 = 3.6%). Se acepta en % (3.6) o fracción (0.036) y se normaliza.
+  if (b.clip_rate !== undefined) { let r = Number(b.clip_rate); if (!Number.isFinite(r) || r < 0) return NextResponse.json({ error: 'clip_rate inválida' }, { status: 400 }); if (r >= 1) r = r / 100; if (r >= 1) return NextResponse.json({ error: 'clip_rate debe ser < 100%' }, { status: 400 }); upd.clip_rate = r }
 
   const supabase = createServerClient()
-  const { data, error } = await supabase
-    .from('publico_config')
-    .upsert({ id: 1, split_alex: s, updated_at: new Date().toISOString() }, { onConflict: 'id' })
-    .select('split_alex').single()
+  const { data, error } = await supabase.from('publico_config').upsert(upd, { onConflict: 'id' }).select('split_alex, clip_rate').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ split_alex: Number(data.split_alex) })
+  return NextResponse.json({ split_alex: Number(data.split_alex), clip_rate: Number(data.clip_rate) })
 }

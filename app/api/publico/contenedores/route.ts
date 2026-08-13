@@ -5,12 +5,12 @@ import { computeCuadre } from '@/lib/cuadre'
 
 export const runtime = 'nodejs'
 
-type Cont = 'clip' | 'caja_chica' | 'caja_pos'
-const CONTS: Cont[] = ['caja_pos', 'clip', 'caja_chica']
-const LABEL: Record<Cont, string> = { clip: 'CLIP', caja_chica: 'Caja chica', caja_pos: 'Caja POS' }
+type Cont = 'clip' | 'caja_chica' | 'caja_pos' | 'banco'
+const CONTS: Cont[] = ['caja_pos', 'clip', 'caja_chica', 'banco']
+const LABEL: Record<Cont, string> = { clip: 'CLIP', caja_chica: 'Caja chica', caja_pos: 'Caja POS', banco: 'Banco' }
 // Procedencia: caja POS la DERIVA el sistema (su entrada es el efectivo que importa Poster); CLIP y caja chica
 // son capturados (sus movimientos los tecleas). Punto 5.
-const PROCEDENCIA: Record<Cont, 'derivado' | 'capturado'> = { caja_pos: 'derivado', clip: 'capturado', caja_chica: 'capturado' }
+const PROCEDENCIA: Record<Cont, 'derivado' | 'capturado'> = { caja_pos: 'derivado', clip: 'capturado', caja_chica: 'capturado', banco: 'capturado' }
 
 type Flows = {
   ventas: { date: string; efectivo: number; tarjeta: number }[]
@@ -65,7 +65,7 @@ export async function GET() {
   const [flows, snaps, { data: allSnaps }, { data: traspasos }] = await Promise.all([
     loadFlows(supabase), latestSnaps(supabase),
     supabase.from('publico_contenedor_saldos').select('contenedor, saldo, fecha, esperado, nota, created_at').order('fecha', { ascending: false }).order('created_at', { ascending: false }),
-    supabase.from('publico_traspasos').select('id, origin, destino, amount, fecha, nota, created_at').order('fecha', { ascending: false }).order('created_at', { ascending: false }),
+    supabase.from('publico_traspasos').select('id, origin, destino, amount, fecha, nota, deposito_id, created_at').order('fecha', { ascending: false }).order('created_at', { ascending: false }),
   ])
   const today = todayISO()
   const contenedores = CONTS.map((c) => {
@@ -77,7 +77,7 @@ export async function GET() {
     }))
     const trasp = (traspasos ?? []).filter((t) => t.origin === c || t.destino === c).map((t) => ({
       tipo: 'traspaso' as const, id: t.id, fecha: t.fecha, direccion: (t.origin === c ? 'sale' : 'entra') as 'sale' | 'entra',
-      otro: t.origin === c ? t.destino : t.origin, amount: Number(t.amount), nota: t.nota,
+      otro: t.origin === c ? t.destino : t.origin, amount: Number(t.amount), nota: t.nota, depositoId: t.deposito_id as string | null,
     }))
     const historial = [...cuadres, ...trasp].sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
     const snap = snaps.get(c)

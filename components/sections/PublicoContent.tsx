@@ -151,6 +151,7 @@ export default function PublicoContent() {
 
   // ── Totales del mes ──
   const ventasMes = ventas.reduce((s, v) => s + Number(v.efectivo) + Number(v.tarjeta), 0)
+  const tarjetaMes = ventas.reduce((s, v) => s + Number(v.tarjeta), 0)   // para la comisión efectiva del margen
   const costosOper = costos.filter((c) => OPERATING_CATEGORIES.includes(c.category)).reduce((s, c) => s + Number(c.amount), 0)
   const reinversionMes = costos.filter((c) => c.category === 'reinversion').reduce((s, c) => s + Number(c.amount), 0)
   const rentaCondonadaMes = costos.filter((c) => c.category === 'renta_condonada').reduce((s, c) => s + Number(c.amount), 0)
@@ -291,7 +292,7 @@ export default function PublicoContent() {
       </>)}
 
       {tab === 'panel' && (
-        <Panel month={month} ventasMes={ventasMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} onCostChange={load} />
+        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} onCostChange={load} />
       )}
 
       {tab === 'captura' && (
@@ -347,8 +348,8 @@ export default function PublicoContent() {
 // marca su PROCEDENCIA (POS vs manual). Estética arcade: UNA rejilla con divisiones de 1px en el color del
 // día (monocolor, hard steps, sin degradados). El punto de equilibrio es placeholder → llega en Fase 2 con
 // los gastos fijos/nómina (previstos); pintarlo ahora sería una barra basada en nada. Debe caber sin scroll. ──
-function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, onCostChange }: {
-  month: string; ventasMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; onCostChange: () => void
+function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, onCostChange }: {
+  month: string; ventasMes: number; tarjetaMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; onCostChange: () => void
 }) {
   const { crt } = useOSSettings()
   const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
@@ -360,7 +361,12 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
   const [tp, setTp] = useState<number | null>(null)   // ticket promedio (POS) · DEL MES
   const [vp, setVp] = useState<number | null>(null)   // venta por persona (POS) · DEL MES (guests_count)
   const [diasOp, setDiasOp] = useState<number | null>(null)  // días con venta del mes (denominador de venta/día)
+  const [clipRate, setClipRate] = useState(0.036)   // tasa de comisión de Clip (configurable) → margen del breakeven
+  const [rateEd, setRateEd] = useState<string | null>(null)   // buffer de edición de la tasa
   const vd = diasOp != null && diasOp > 0 ? ventasMes / diasOp : null   // venta/día = las MISMAS ventas del mes ÷ días operados
+  // Comisión EFECTIVA sobre ventas = proporción de ventas con tarjeta × tasa de Clip. Escala con el mix real:
+  // si un mes vendes más en efectivo, baja sola. Entra al MARGEN del punto de equilibrio (como el food cost).
+  const comEfectiva = ventasMes > 0 ? (tarjetaMes / ventasMes) * clipRate : 0
   const isCurrentMonth = month === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }).slice(0, 7)   // el mes en curso siempre tiene compras por capturar
   useEffect(() => {
     let alive = true
@@ -378,6 +384,7 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
       setTp(d.ticketPromedio)   // ticket y venta/persona SÍ son nivel-recibo (getTransactions): no hay cómo derivarlos de getPaymentsReport
       setVp(d.guestsPromedio > 0 ? d.ticketPromedio / d.guestsPromedio : null)   // venta/persona = ticket/comensalesProm
     }).catch(() => {})
+    fetch('/api/publico/config').then((r) => r.json()).then((d: { clip_rate?: number }) => { if (alive && d.clip_rate != null) setClipRate(Number(d.clip_rate)) }).catch(() => {})
     return () => { alive = false }
   }, [month])
 
@@ -451,9 +458,11 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
           <div className="text-label uppercase tracking-widest text-fg-muted">Punto de equilibrio</div>
           {(() => {
             if (fixed <= 0) return <div className="mt-1 flex items-center gap-2"><span className="tabular-nums text-lg tracking-widest" style={{ color: dc, opacity: 0.35 }}>▮▯▯▯▯</span><span className="text-secondary italic text-warn">falta configurar gastos fijos</span></div>
-            const margin = fc != null ? 1 - fc / 100 : null
+            // Margen = 1 − food cost teórico − comisión efectiva (ambos escalan con las ventas). La comisión ya
+            // NO se ignora: con tarjeta siendo la mayoría, mueve el breakeven varios puntos.
+            const margin = fc != null ? 1 - fc / 100 - comEfectiva : null
             if (margin == null) return <div className="mt-1 text-secondary italic text-fg-muted">food cost teórico pendiente para el margen…</div>
-            if (margin <= 0) return <div className="mt-1 text-secondary italic text-warn">food cost teórico ≥ 100% — revisa, no hay margen</div>
+            if (margin <= 0) return <div className="mt-1 text-secondary italic text-warn">food cost teórico + comisión ≥ 100% — revisa, no hay margen</div>
             const STEPS = 24
             const beRow = (label: string, fijos: number, sub: string) => {
               const be = fijos / margin, pct = be > 0 ? ventasMes / be : 0, filled = Math.round(Math.min(pct, 1) * STEPS), cubierto = ventasMes >= be
@@ -471,7 +480,16 @@ function Panel({ month, ventasMes, costosOper, utilidadOper, otrosIngresosMes, r
             }
             return (
               <div className="mt-1 space-y-3">
-                <div className="text-label text-fg-muted">margen {(margin * 100).toFixed(0)}% (1 − food cost teórico {fc!.toFixed(1)}%)</div>
+                {/* Desglose del margen: se ve de dónde sale, con la TASA de Clip editable inline (se guarda en config). */}
+                <div className="flex flex-wrap items-baseline gap-x-1 text-label text-fg-muted">
+                  <span>margen <b className="tabular-nums" style={{ color: dc }}>{(margin * 100).toFixed(1)}%</b> = 1 − food cost {fc!.toFixed(1)}% − comisión <b className="tabular-nums">{(comEfectiva * 100).toFixed(1)}%</b></span>
+                  <span className="opacity-70">(tarjeta {ventasMes > 0 ? Math.round((tarjetaMes / ventasMes) * 100) : 0}% × tasa Clip
+                    <input value={rateEd ?? (clipRate * 100).toFixed(2)} onChange={(e) => setRateEd(e.target.value)}
+                      onBlur={() => { const v = parseFloat(rateEd ?? ''); setRateEd(null); if (Number.isFinite(v) && Math.abs(v / 100 - clipRate) > 1e-6) { setClipRate(v / 100); void fetch('/api/publico/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clip_rate: v }) }) } }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                      inputMode="decimal" title="tasa de comisión de Clip (editable) — pon tu tasa real del settlement"
+                      style={{ width: 44, margin: '0 3px', padding: '1px 4px', fontSize: 12, borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-surface-base, #fff)', color: 'inherit', textAlign: 'right' }} />%)</span>
+                </div>
                 {beRow('Operativo', fixed, 'con la renta que le condonas')}
                 {rentaCond > 0
                   ? beRow('De pie solo', fixed + rentaCond, `+ renta ${mxn(rentaCond)} · cuándo paga su propia renta`)

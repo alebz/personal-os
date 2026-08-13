@@ -5,7 +5,7 @@ import { mxn } from '@/components/Mxn'
 import { dayMonth, localDate } from './util'
 
 type HistCuadre = { tipo: 'cuadre'; fecha: string; contado: number; esperado: number | null; diferencia: number | null; nota: string | null; baseline: boolean }
-type HistTraspaso = { tipo: 'traspaso'; id: string; fecha: string; direccion: 'sale' | 'entra'; otro: string; amount: number; nota: string | null }
+type HistTraspaso = { tipo: 'traspaso'; id: string; fecha: string; direccion: 'sale' | 'entra'; otro: string; amount: number; nota: string | null; depositoId: string | null }
 type Hist = HistCuadre | HistTraspaso
 type ContKey = 'clip' | 'caja_chica' | 'caja_pos'
 type Cont = {
@@ -29,6 +29,8 @@ export function Contenedores({ dc }: { dc: string }) {
   const [pendOpen, setPendOpen] = useState(false)
   const [traOpen, setTraOpen] = useState(false)             // formulario de traspaso
   const [tr, setTr] = useState<{ origin: ContKey; destino: ContKey; amount: string; fecha: string; nota: string }>({ origin: 'caja_pos', destino: 'caja_chica', amount: '', fecha: localDate(), nota: '' })
+  const [depOpen, setDepOpen] = useState(false)             // formulario de depósito CLIP → banco
+  const [dep, setDep] = useState<{ gross: string; fee: string; fecha: string; nota: string }>({ gross: '', fee: '', fecha: localDate(), nota: '' })
 
   const load = useCallback(async () => {
     const [j, p] = await Promise.all([
@@ -71,9 +73,23 @@ export function Contenedores({ dc }: { dc: string }) {
     setTraOpen(false); setTr({ ...tr, amount: '', nota: '' }); await load()
   }
 
-  async function revertTraspaso(id: string) {
-    await fetch(`/api/publico/contenedores/traspaso?id=${id}`, { method: 'DELETE' })
-    setFlash('traspaso revertido'); setTimeout(() => setFlash(null), 4000); await load()
+  async function depositar() {
+    const gross = parseFloat(dep.gross), fee = parseFloat(dep.fee || '0')
+    if (!Number.isFinite(gross) || gross <= 0 || !Number.isFinite(fee) || fee < 0 || fee >= gross) return
+    const resp = await fetch('/api/publico/contenedores/deposito', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ gross, fee, fecha: dep.fecha, nota: dep.nota }) })
+    const r = await resp.json().catch(() => ({} as { error?: string; net?: number }))
+    if (!resp.ok || r.error) { setFlash(`depósito: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
+    setFlash(`depósito · CLIP −${mxn(gross)} → Banco +${mxn(r.net ?? gross - fee)} · comisión ${mxn(fee)}`)
+    setTimeout(() => setFlash(null), 6000)
+    setDepOpen(false); setDep({ ...dep, gross: '', fee: '', nota: '' }); await load()
+  }
+
+  // Revertir: si el traspaso es parte de un DEPÓSITO, borra el depósito completo (traspaso + comisión); si no,
+  // solo el traspaso.
+  async function revertTraspaso(id: string, depositoId: string | null) {
+    if (depositoId) await fetch(`/api/publico/contenedores/deposito?id=${depositoId}`, { method: 'DELETE' })
+    else await fetch(`/api/publico/contenedores/traspaso?id=${id}`, { method: 'DELETE' })
+    setFlash(depositoId ? 'depósito revertido' : 'traspaso revertido'); setTimeout(() => setFlash(null), 4000); await load()
   }
 
   const src = (p: string) => <span style={{ opacity: p === 'derivado' ? 1 : 0.5, color: p === 'derivado' ? dc : undefined }}> · {p === 'derivado' ? 'derivado · POS' : 'capturado'}</span>
@@ -103,6 +119,24 @@ export function Contenedores({ dc }: { dc: string }) {
             <input value={tr.nota} onChange={(e) => setTr({ ...tr, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 80 }} />
             <button onClick={() => void traspasar()} disabled={tr.origin === tr.destino} className="rounded-control border border-border px-2 py-0.5 font-medium disabled:opacity-40">traspasar</button>
             {tr.origin === tr.destino && <span className="text-warn">origen y destino iguales</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Depósito CLIP → Banco: CLIP baja el BRUTO, Banco sube el NETO, la comisión es un costo real (reduce
+          utilidad). No es net-cero — el negocio pierde la comisión (el precio de cobrar con tarjeta). */}
+      <div>
+        <button onClick={() => setDepOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{depOpen ? '▲ cerrar depósito' : '🏦 depósito CLIP → banco (con comisión)'}</button>
+        {depOpen && (
+          <div className="mt-1 flex flex-wrap items-center gap-1 rounded-card border border-border bg-surface-2 p-2 text-label">
+            <span className="text-fg-muted">bruto</span>
+            <input value={dep.gross} onChange={(e) => setDep({ ...dep, gross: e.target.value })} inputMode="decimal" placeholder="$ que sale de CLIP" style={{ ...cell, width: 100, textAlign: 'right' }} />
+            <span className="text-fg-muted">comisión</span>
+            <input value={dep.fee} onChange={(e) => setDep({ ...dep, fee: e.target.value })} inputMode="decimal" placeholder="$ fee" style={{ ...cell, width: 74, textAlign: 'right' }} />
+            <input type="date" value={dep.fecha} onChange={(e) => setDep({ ...dep, fecha: e.target.value })} style={cell} />
+            <input value={dep.nota} onChange={(e) => setDep({ ...dep, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 70 }} />
+            <button onClick={() => void depositar()} className="rounded-control border border-border px-2 py-0.5 font-medium">depositar</button>
+            {parseFloat(dep.gross) > 0 && <span className="text-fg-muted">→ Banco recibe <b className="tabular-nums">{mxn(Math.max(0, (parseFloat(dep.gross) || 0) - (parseFloat(dep.fee) || 0)))}</b></span>}
           </div>
         )}
       </div>
@@ -170,8 +204,8 @@ export function Contenedores({ dc }: { dc: string }) {
                 </div>
               ) : (
                 <div key={`t${i}`} className="flex items-center justify-between gap-2">
-                  <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(h.fecha)}</span> · <b style={{ color: dc }}>traspaso</b> {h.direccion === 'sale' ? '→' : '←'} {LABELS[h.otro as ContKey]} <span className="tabular-nums">{h.direccion === 'sale' ? '−' : '+'}{mxn(h.amount)}</span>{h.nota && <span> · {h.nota}</span>}</span>
-                  <button onClick={() => void revertTraspaso(h.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir este traspaso">↩</button>
+                  <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(h.fecha)}</span> · <b style={{ color: dc }}>{h.depositoId ? 'depósito' : 'traspaso'}</b> {h.direccion === 'sale' ? '→' : '←'} {LABELS[h.otro as ContKey]} <span className="tabular-nums">{h.direccion === 'sale' ? '−' : '+'}{mxn(h.amount)}</span>{h.nota && <span> · {h.nota}</span>}</span>
+                  <button onClick={() => void revertTraspaso(h.id, h.depositoId)} className="shrink-0 text-fg-muted hover:text-danger" title={h.depositoId ? 'revertir el depósito completo (traspaso + comisión)' : 'revertir este traspaso'}>↩</button>
                 </div>
               ))}
             </div>
