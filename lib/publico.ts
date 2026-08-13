@@ -3,7 +3,7 @@
 // la captura rápida. El default se aplica al elegir categoría; el usuario puede overridear (1 tap) y
 // la elección es sticky en burst — así meter 5 insumos seguidos no re-pregunta nada.
 
-export type ContainerKey = 'clip' | 'caja_chica' | 'caja_pos' | 'banco'
+export type ContainerKey = 'clip' | 'caja_chica' | 'caja_pos'
 export type OriginKey = ContainerKey | null   // null = "sin caja" (protocolo/condonado; no toca contenedor)
 export type CostCategory = 'insumo' | 'nomina' | 'gasto_fijo' | 'mantenimiento' | 'empaque' | 'suministros' | 'comision' | 'reinversion' | 'renta_condonada'
 export type CostKind = 'fijo' | 'variable'
@@ -14,7 +14,6 @@ export const CONTAINERS: { key: ContainerKey; label: string; tipo: 'banco' | 'ef
   { key: 'clip',       label: 'CLIP',       tipo: 'banco' },     // caen las ventas con tarjeta
   { key: 'caja_chica', label: 'Caja chica', tipo: 'efectivo' },
   { key: 'caja_pos',   label: 'Caja POS',   tipo: 'efectivo' },  // caen las ventas en efectivo
-  { key: 'banco',      label: 'Banco',      tipo: 'banco' },     // donde CLIP deposita (neto); se cuadra vs estado de cuenta
 ]
 export const containerLabel = (k: ContainerKey) => CONTAINERS.find((c) => c.key === k)?.label ?? k
 // Etiqueta de ORIGEN incluyendo "sin caja" (null). Para selectores/listados.

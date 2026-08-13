@@ -5,7 +5,7 @@ import { mxn } from '@/components/Mxn'
 import { dayMonth, localDate } from './util'
 
 type HistCuadre = { tipo: 'cuadre'; fecha: string; contado: number; esperado: number | null; diferencia: number | null; nota: string | null; baseline: boolean }
-type HistTraspaso = { tipo: 'traspaso'; id: string; fecha: string; direccion: 'sale' | 'entra'; otro: string; amount: number; nota: string | null; depositoId: string | null }
+type HistTraspaso = { tipo: 'traspaso'; id: string; fecha: string; direccion: 'sale' | 'entra'; otro: string; amount: number; nota: string | null }
 type Hist = HistCuadre | HistTraspaso
 type ContKey = 'clip' | 'caja_chica' | 'caja_pos'
 type Cont = {
@@ -13,12 +13,13 @@ type Cont = {
   needsBaseline: boolean; balance: number | null; desde: string | null; diasSinCuadrar: number | null; historial: Hist[]
 }
 type Pend = { since: string | null; count: number; total: number; items: { id: string; date: string; concepto: string; amount: number }[] }
+type Comision = { id: string; date: string; amount: number; note: string | null }
 
 const ALERTA_DIAS = 21   // aviso de "hace mucho que no cuadras", análogo al del conteo físico del food cost
 const LABELS: Record<ContKey, string> = { clip: 'CLIP', caja_chica: 'Caja chica', caja_pos: 'Caja POS' }
 const CONT_OPTS: ContKey[] = ['caja_pos', 'clip', 'caja_chica']
 
-export function Contenedores({ dc }: { dc: string }) {
+export function Contenedores({ dc, month }: { dc: string; month: string }) {
   const [conts, setConts] = useState<Cont[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [openC, setOpenC] = useState<string | null>(null)   // contenedor con el cuadre abierto
@@ -29,17 +30,20 @@ export function Contenedores({ dc }: { dc: string }) {
   const [pendOpen, setPendOpen] = useState(false)
   const [traOpen, setTraOpen] = useState(false)             // formulario de traspaso
   const [tr, setTr] = useState<{ origin: ContKey; destino: ContKey; amount: string; fecha: string; nota: string }>({ origin: 'caja_pos', destino: 'caja_chica', amount: '', fecha: localDate(), nota: '' })
-  const [depOpen, setDepOpen] = useState(false)             // formulario de depósito CLIP → banco
-  const [dep, setDep] = useState<{ gross: string; fee: string; fecha: string; nota: string }>({ gross: '', fee: '', fecha: localDate(), nota: '' })
+  const [comOpen, setComOpen] = useState(false)             // formulario de comisión Clip
+  const [com, setCom] = useState<{ amount: string; fecha: string; nota: string }>({ amount: '', fecha: localDate(), nota: '' })
+  const [comisiones, setComisiones] = useState<Comision[]>([])
 
   const load = useCallback(async () => {
-    const [j, p] = await Promise.all([
+    const [j, p, m] = await Promise.all([
       fetch('/api/publico/contenedores').then((r) => r.json()).catch(() => null),
       fetch('/api/publico/contenedores/pendientes').then((r) => r.json()).catch(() => null),
+      fetch(`/api/publico?month=${month}`).then((r) => r.json()).catch(() => null),
     ])
     if (j?.contenedores) { setConts(j.contenedores); setTotal(j.total ?? null) }
     if (p && typeof p.count === 'number') setPend(p)
-  }, [])
+    if (m?.costos) setComisiones((m.costos as { id: string; date: string; amount: number; note: string | null; category: string }[]).filter((c) => c.category === 'comision').map((c) => ({ id: c.id, date: c.date, amount: Number(c.amount), note: c.note })))
+  }, [month])
   useEffect(() => { void load() }, [load])
 
   async function asignar(origin: 'clip' | 'caja_chica') {
@@ -73,23 +77,26 @@ export function Contenedores({ dc }: { dc: string }) {
     setTraOpen(false); setTr({ ...tr, amount: '', nota: '' }); await load()
   }
 
-  async function depositar() {
-    const gross = parseFloat(dep.gross), fee = parseFloat(dep.fee || '0')
-    if (!Number.isFinite(gross) || gross <= 0 || !Number.isFinite(fee) || fee < 0 || fee >= gross) return
-    const resp = await fetch('/api/publico/contenedores/deposito', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ gross, fee, fecha: dep.fecha, nota: dep.nota }) })
-    const r = await resp.json().catch(() => ({} as { error?: string; net?: number }))
-    if (!resp.ok || r.error) { setFlash(`depósito: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
-    setFlash(`depósito · CLIP −${mxn(gross)} → Banco +${mxn(r.net ?? gross - fee)} · comisión ${mxn(fee)}`)
-    setTimeout(() => setFlash(null), 6000)
-    setDepOpen(false); setDep({ ...dep, gross: '', fee: '', nota: '' }); await load()
+  async function revertTraspaso(id: string) {
+    await fetch(`/api/publico/contenedores/traspaso?id=${id}`, { method: 'DELETE' })
+    setFlash('traspaso revertido'); setTimeout(() => setFlash(null), 4000); await load()
   }
 
-  // Revertir: si el traspaso es parte de un DEPÓSITO, borra el depósito completo (traspaso + comisión); si no,
-  // solo el traspaso.
-  async function revertTraspaso(id: string, depositoId: string | null) {
-    if (depositoId) await fetch(`/api/publico/contenedores/deposito?id=${depositoId}`, { method: 'DELETE' })
-    else await fetch(`/api/publico/contenedores/traspaso?id=${id}`, { method: 'DELETE' })
-    setFlash(depositoId ? 'depósito revertido' : 'traspaso revertido'); setTimeout(() => setFlash(null), 4000); await load()
+  // Comisión de Clip: CLIP es la cuenta del negocio; Clip solo descuenta su fee. Se registra como un COSTO real
+  // (categoría comisión, origen CLIP) → baja el saldo de CLIP y la utilidad. Reversible = borrar el costo.
+  async function registrarComision() {
+    const amount = parseFloat(com.amount)
+    if (!Number.isFinite(amount) || amount <= 0) return
+    const resp = await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: com.fecha, category: 'comision', cost_kind: 'variable', origin: 'clip', amount, note: com.nota?.trim() || 'Comisión Clip' }) })
+    const r = await resp.json().catch(() => ({} as { error?: string }))
+    if (!resp.ok || r.error) { setFlash(`comisión: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
+    setFlash(`comisión Clip · CLIP −${mxn(amount)}`)
+    setTimeout(() => setFlash(null), 5000)
+    setComOpen(false); setCom({ ...com, amount: '', nota: '' }); await load()
+  }
+  async function revertComision(id: string) {
+    await fetch(`/api/publico/costo?id=${id}`, { method: 'DELETE' })
+    setFlash('comisión revertida'); setTimeout(() => setFlash(null), 4000); await load()
   }
 
   const src = (p: string) => <span style={{ opacity: p === 'derivado' ? 1 : 0.5, color: p === 'derivado' ? dc : undefined }}> · {p === 'derivado' ? 'derivado · POS' : 'capturado'}</span>
@@ -97,7 +104,7 @@ export function Contenedores({ dc }: { dc: string }) {
 
   return (
     <div className="space-y-2">
-      {/* TOTAL del negocio = suma de los tres contenedores (el dinero que hay AHORA). Punto 1. */}
+      {/* TOTAL del negocio = suma de los tres contenedores (el dinero que hay AHORA). */}
       <div className="flex items-baseline justify-between border-b border-border pb-1">
         <span className="text-label uppercase tracking-widest text-fg-muted">Total del negocio</span>
         <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: 20 }}>{total != null ? mxn(total) : '—'}</span>
@@ -123,20 +130,29 @@ export function Contenedores({ dc }: { dc: string }) {
         )}
       </div>
 
-      {/* Depósito CLIP → Banco: CLIP baja el BRUTO, Banco sube el NETO, la comisión es un costo real (reduce
-          utilidad). No es net-cero — el negocio pierde la comisión (el precio de cobrar con tarjeta). */}
+      {/* Comisión de Clip: CLIP baja por lo que Clip te descuenta (costo real → reduce utilidad). Reversible. */}
       <div>
-        <button onClick={() => setDepOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{depOpen ? '▲ cerrar depósito' : '🏦 depósito CLIP → banco (con comisión)'}</button>
-        {depOpen && (
-          <div className="mt-1 flex flex-wrap items-center gap-1 rounded-card border border-border bg-surface-2 p-2 text-label">
-            <span className="text-fg-muted">bruto</span>
-            <input value={dep.gross} onChange={(e) => setDep({ ...dep, gross: e.target.value })} inputMode="decimal" placeholder="$ que sale de CLIP" style={{ ...cell, width: 100, textAlign: 'right' }} />
-            <span className="text-fg-muted">comisión</span>
-            <input value={dep.fee} onChange={(e) => setDep({ ...dep, fee: e.target.value })} inputMode="decimal" placeholder="$ fee" style={{ ...cell, width: 74, textAlign: 'right' }} />
-            <input type="date" value={dep.fecha} onChange={(e) => setDep({ ...dep, fecha: e.target.value })} style={cell} />
-            <input value={dep.nota} onChange={(e) => setDep({ ...dep, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 70 }} />
-            <button onClick={() => void depositar()} className="rounded-control border border-border px-2 py-0.5 font-medium">depositar</button>
-            {parseFloat(dep.gross) > 0 && <span className="text-fg-muted">→ Banco recibe <b className="tabular-nums">{mxn(Math.max(0, (parseFloat(dep.gross) || 0) - (parseFloat(dep.fee) || 0)))}</b></span>}
+        <button onClick={() => setComOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{comOpen ? '▲ cerrar comisión' : `%  registrar comisión de Clip${comisiones.length ? ` (${comisiones.length} este mes · ${mxn(comisiones.reduce((s, x) => s + x.amount, 0))})` : ''}`}</button>
+        {comOpen && (
+          <div className="mt-1 space-y-1 rounded-card border border-border bg-surface-2 p-2 text-label">
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-fg-muted">CLIP −</span>
+              <input value={com.amount} onChange={(e) => setCom({ ...com, amount: e.target.value })} inputMode="decimal" placeholder="$ comisión" style={{ ...cell, width: 90, textAlign: 'right' }} />
+              <input type="date" value={com.fecha} onChange={(e) => setCom({ ...com, fecha: e.target.value })} style={cell} />
+              <input value={com.nota} onChange={(e) => setCom({ ...com, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 80 }} />
+              <button onClick={() => void registrarComision()} className="rounded-control border border-border px-2 py-0.5 font-medium">registrar</button>
+            </div>
+            <div className="text-fg-muted">Baja el saldo de CLIP y la utilidad (es un costo real). El margen del breakeven ya la estima aparte por tasa.</div>
+            {comisiones.length > 0 && (
+              <div className="space-y-0.5 border-t border-border pt-1">
+                {comisiones.map((x) => (
+                  <div key={x.id} className="flex items-center justify-between gap-2">
+                    <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(x.date)}</span> · {x.note} <span className="tabular-nums text-danger">−{mxn(x.amount)}</span></span>
+                    <button onClick={() => void revertComision(x.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir esta comisión">↩</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -193,7 +209,7 @@ export function Contenedores({ dc }: { dc: string }) {
               <button onClick={() => void cuadrar(c)} className="rounded-control border border-border px-2 py-0.5 font-medium">{c.needsBaseline ? 'sembrar' : 'cuadrar'}</button>
             </div>
           )}
-          {/* Historial: cuadres (rastro de auditoría) + traspasos (reversibles), distinguibles. Puntos 2 y 8. */}
+          {/* Historial: cuadres (rastro de auditoría) + traspasos (reversibles), distinguibles. */}
           {histC === c.contenedor && (
             <div className="mt-1 ml-2 space-y-0.5 border-l-2 border-border pl-2 text-label">
               {c.historial.map((h, i) => h.tipo === 'cuadre' ? (
@@ -204,8 +220,8 @@ export function Contenedores({ dc }: { dc: string }) {
                 </div>
               ) : (
                 <div key={`t${i}`} className="flex items-center justify-between gap-2">
-                  <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(h.fecha)}</span> · <b style={{ color: dc }}>{h.depositoId ? 'depósito' : 'traspaso'}</b> {h.direccion === 'sale' ? '→' : '←'} {LABELS[h.otro as ContKey]} <span className="tabular-nums">{h.direccion === 'sale' ? '−' : '+'}{mxn(h.amount)}</span>{h.nota && <span> · {h.nota}</span>}</span>
-                  <button onClick={() => void revertTraspaso(h.id, h.depositoId)} className="shrink-0 text-fg-muted hover:text-danger" title={h.depositoId ? 'revertir el depósito completo (traspaso + comisión)' : 'revertir este traspaso'}>↩</button>
+                  <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(h.fecha)}</span> · <b style={{ color: dc }}>traspaso</b> {h.direccion === 'sale' ? '→' : '←'} {LABELS[h.otro as ContKey]} <span className="tabular-nums">{h.direccion === 'sale' ? '−' : '+'}{mxn(h.amount)}</span>{h.nota && <span> · {h.nota}</span>}</span>
+                  <button onClick={() => void revertTraspaso(h.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir este traspaso">↩</button>
                 </div>
               ))}
             </div>

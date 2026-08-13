@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { COST_CATEGORIES, CONTAINERS } from '@/lib/publico'
 
-const CATEGORIES = ['insumo', 'nomina', 'gasto_fijo', 'reinversion', 'renta_condonada']
-const ORIGINS = ['clip', 'caja_chica', 'caja_pos']
-const NO_KIND = ['reinversion', 'renta_condonada']   // no llevan fijo/variable (no-operativas)
+const CATEGORIES: string[] = COST_CATEGORIES.map((c) => c.key)   // fuente única (incluye comisión y no-comida)
+const ORIGINS: string[] = CONTAINERS.map((c) => c.key)
+const NO_KIND: string[] = COST_CATEGORIES.filter((c) => c.defaultKind === null).map((c) => c.key)   // reinversión + renta_condonada
 
 // POST /api/publico/costo — inserta un costo con su ORIGEN (contenedor, o null = "sin caja") y, si aplica,
 // su naturaleza fijo/variable.

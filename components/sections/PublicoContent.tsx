@@ -515,7 +515,7 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
       </section>
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Contenedores</Head>
-        <Contenedores dc={dc} />
+        <Contenedores dc={dc} month={month} />
       </section>
     </div>
   )
