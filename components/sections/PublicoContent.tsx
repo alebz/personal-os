@@ -34,10 +34,20 @@ interface Venta { id: string; date: string; efectivo: number; tarjeta: number; n
 interface Costo { id: string; date: string; category: CostCategory; cost_kind: CostKind | null; origin: OriginKey; amount: number; note: string | null; source?: string }
 interface Ingreso { id: string; date: string; concepto: string; amount: number; origin: OriginKey; note: string | null }
 
+// Navegación por MES (mismo patrón que Uptown/Finanzas): corre capDate d meses, clampeando el día al mes destino.
+function shiftMonthDate(dateStr: string, d: number): string {
+  const [y, m, day] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1 + d, 1)
+  const ny = dt.getFullYear(), nm = dt.getMonth()
+  const nd = Math.min(day, new Date(ny, nm + 1, 0).getDate())
+  return `${ny}-${String(nm + 1).padStart(2, '0')}-${String(nd).padStart(2, '0')}`
+}
+
 export default function PublicoContent() {
   const today = localDate()
   const [capDate, setCapDate] = useState(today)          // día que se está capturando (◀ hoy ▶)
   const month = capDate.slice(0, 7)
+  const currentMonth = today.slice(0, 7)                 // no se navega a meses futuros (sin datos)
   const [ventas, setVentas] = useState<Venta[]>([])
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
@@ -176,8 +186,16 @@ export default function PublicoContent() {
 
   return (
     <div data-theme-scope="publico" className="mx-auto flex max-w-6xl flex-col gap-4 p-4 text-fg">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-bold">Público Gourmet</h1>
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold">Público Gourmet</h1>
+          {/* Navegador de MES — corre capDate; aplica a Panel, Dirección, Fondos (todo lo mensual). */}
+          <div className="flex items-center gap-1 text-secondary">
+            <button onClick={() => setCapDate((d) => shiftMonthDate(d, -1))} className="px-1 text-fg-muted hover:text-fg" aria-label="Mes anterior">‹</button>
+            <span className="min-w-[104px] text-center font-semibold capitalize text-fg">{monthName(month)}</span>
+            <button onClick={() => { if (month < currentMonth) setCapDate((d) => { const n = shiftMonthDate(d, 1); return n > today ? today : n }) }} disabled={month >= currentMonth} className="px-1 text-fg-muted hover:text-fg disabled:opacity-30" aria-label="Mes siguiente">›</button>
+          </div>
+        </div>
         <div className="flex gap-1">
           <button onClick={() => setTab('panel')} style={chip(tab === 'panel')}>Panel</button>
           <button onClick={() => setTab('captura')} style={chip(tab === 'captura')}>Captura</button>
@@ -432,7 +450,9 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
         {/* Utilidad (provisional) */}
         <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>provisional</span></span>
+            <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa {isCurrentMonth
+              ? <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>provisional</span>
+              : <span className="text-ok" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>mes cerrado</span>}</span>
             <span className="tabular-nums" style={{ color: dc, fontSize: 22, fontWeight: 700 }}>{mxn(utilidadOper)}</span>
           </div>
           <div className="mt-1 text-label text-fg-muted italic">= ventas del mes − gastos capturados</div>
@@ -515,7 +535,11 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
       </section>
       <section className="px-3 py-3 lg:col-span-3" style={box}>
         <Head>Contenedores</Head>
-        <Contenedores dc={dc} month={month} />
+        {/* Los contenedores son el dinero que hay AHORA (efectivo físico + derivado), no un saldo mensual. En un
+            mes pasado no aplican: mostrarlos bajo "junio" implicaría que son de junio, y no lo son. Se ocultan. */}
+        {isCurrentMonth
+          ? <Contenedores dc={dc} month={month} />
+          : <div className="text-secondary italic text-fg-muted">Los saldos son de <b>hoy</b>, no de un mes pasado. Vuelve al mes en curso para verlos y cuadrarlos.</div>}
       </section>
     </div>
   )
