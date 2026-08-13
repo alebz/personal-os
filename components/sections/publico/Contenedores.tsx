@@ -33,15 +33,18 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   const [comOpen, setComOpen] = useState(false)             // formulario de comisión Clip
   const [com, setCom] = useState<{ amount: string; fecha: string; nota: string }>({ amount: '', fecha: localDate(), nota: '' })
   const [comisiones, setComisiones] = useState<Comision[]>([])
+  const [clipSync, setClipSync] = useState<{ last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null>(null)
 
   const load = useCallback(async () => {
-    const [j, p, m] = await Promise.all([
+    const [j, p, m, cs] = await Promise.all([
       fetch('/api/publico/contenedores').then((r) => r.json()).catch(() => null),
       fetch('/api/publico/contenedores/pendientes').then((r) => r.json()).catch(() => null),
       fetch(`/api/publico?month=${month}`).then((r) => r.json()).catch(() => null),
+      fetch('/api/publico/clip/import').then((r) => r.json()).catch(() => null),
     ])
     if (j?.contenedores) { setConts(j.contenedores); setTotal(j.total ?? null) }
     if (p && typeof p.count === 'number') setPend(p)
+    if (cs?.sync) setClipSync(cs.sync)
     if (m?.costos) setComisiones((m.costos as { id: string; date: string; amount: number; note: string | null; category: string }[]).filter((c) => c.category === 'comision').map((c) => ({ id: c.id, date: c.date, amount: Number(c.amount), note: c.note })))
   }, [month])
   useEffect(() => { void load() }, [load])
@@ -143,6 +146,12 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
               <button onClick={() => void registrarComision()} className="rounded-control border border-border px-2 py-0.5 font-medium">registrar</button>
             </div>
             <div className="text-fg-muted">Baja el saldo de CLIP y la utilidad (es un costo real). El margen del breakeven ya la estima aparte por tasa.</div>
+            {/* Heartbeat del import de Clip (settlements): la fee REAL entra sola. Visible si falla (#4). */}
+            {clipSync && (clipSync.last_error
+              ? <div className="text-danger">⚠ Clip import falló: {clipSync.last_error}</div>
+              : clipSync.last_success_at
+                ? <div className="text-fg-muted">Clip · settlements importados hasta {clipSync.last_import_to ?? '—'} (la fee real entra sola)</div>
+                : <div className="text-fg-muted">Clip · aún sin importar settlements (configura las credenciales)</div>)}
             {comisiones.length > 0 && (
               <div className="space-y-0.5 border-t border-border pt-1">
                 {comisiones.map((x) => (

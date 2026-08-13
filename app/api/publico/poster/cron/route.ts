@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { runPosterImport, importSupplies } from '@/lib/posterImport'
+import { runClipImport } from '@/lib/clipSettlements'
 import { createServerClient } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
@@ -32,5 +33,10 @@ export async function GET(req: NextRequest) {
   // No hace fallar el cron de ventas si algo truena aquí: se reporta aparte.
   const s = await importSupplies({ commit: true })
   const drafts = await sweepDraftTickets()   // limpia fotos de ticket subidas y nunca confirmadas
-  return NextResponse.json({ ventas: r, compras: s.ok ? { imported: s.imported, skippedManual: s.skippedManual.length } : { error: s.error }, draftsBarridos: drafts }, { status: r.ok ? 200 : r.status })
+  // Comisiones de Clip (settlements): ventana reciente (relleno de huecos), idempotente. Solo si hay credenciales;
+  // si no, devuelve error suave sin tumbar el cron. Escribe su propio heartbeat (publico_clip_sync).
+  const to = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+  const from = (() => { const [y, m, d] = to.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d)); t.setUTCDate(t.getUTCDate() - 40); return t.toISOString().slice(0, 10) })()
+  const clip = await runClipImport(createServerClient(), from, to).catch((e) => ({ ok: false as const, error: String(e), status: 500 }))
+  return NextResponse.json({ ventas: r, compras: s.ok ? { imported: s.imported, skippedManual: s.skippedManual.length } : { error: s.error }, draftsBarridos: drafts, comisionesClip: clip.ok ? { imported: clip.imported, totalFee: clip.totalFee } : { error: clip.error } }, { status: r.ok ? 200 : r.status })
 }
