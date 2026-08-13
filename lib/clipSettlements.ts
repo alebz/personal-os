@@ -34,7 +34,7 @@ function comision(s: Settlement): number {
 
 // La doc de Clip es ambigua sobre el header exacto (x-api-key vs Authorization, base64 vs key cruda). En vez de
 // adivinar, probamos las variantes en orden y usamos la 1ª que responde 200. Reporta cuál sirvió (authVariant).
-async function fetchSettlements(url: string, apiKey: string, secret: string): Promise<{ res: Response; variant: string } | { error: string; status: number }> {
+async function fetchSettlements(url: string, apiKey: string, secret: string): Promise<{ res: Response; variant: string } | { error: string; status: number; attempts: { name: string; status: number | string; body: string }[]; keyLen: number; secretLen: number }> {
   const b64 = Buffer.from(`${apiKey}:${secret}`).toString('base64')
   const ACCEPT = 'application/vnd.com.payclip.v2+json'
   const variants: { name: string; h: Record<string, string> }[] = [
@@ -45,21 +45,21 @@ async function fetchSettlements(url: string, apiKey: string, secret: string): Pr
     { name: 'both b64', h: { 'x-api-key': b64, 'Authorization': `Basic ${b64}`, 'Accept': ACCEPT } },
     { name: 'Authorization Bearer b64', h: { 'Authorization': `Bearer ${b64}`, 'Accept': ACCEPT } },
   ]
-  let last = 'sin respuesta'
+  const attempts: { name: string; status: number | string; body: string }[] = []
   for (const v of variants) {
     const r = await fetch(url, { headers: v.h, cache: 'no-store' }).catch(() => null)
     if (r && r.ok) return { res: r, variant: v.name }
-    last = r ? `${r.status}: ${(await r.text().catch(() => '')).slice(0, 100)}` : 'network error'
+    attempts.push({ name: v.name, status: r ? r.status : 'network', body: r ? (await r.text().catch(() => '')).slice(0, 80) : '' })
   }
-  return { error: `ninguna variante de auth funcionó — última: Clip ${last}`, status: 502 }
+  return { error: 'ninguna variante de auth funcionó', status: 502, attempts, keyLen: apiKey.length, secretLen: secret.length }
 }
 
-export async function importClipSettlements(supabase: SupabaseClient, opts: { from: string; to: string; commit: boolean }): Promise<ClipResult & { authVariant?: string }> {
+export async function importClipSettlements(supabase: SupabaseClient, opts: { from: string; to: string; commit: boolean }): Promise<ClipResult & { authVariant?: string; diag?: unknown }> {
   const apiKey = process.env.CLIP_API_KEY, secret = process.env.CLIP_SECRET_KEY
   if (!apiKey || !secret) return { ok: false, error: 'CLIP_API_KEY / CLIP_SECRET_KEY no configurados', status: 400 }
 
   const fetched = await fetchSettlements(`${API}?from=${opts.from}&to=${opts.to}`, apiKey, secret)
-  if ('error' in fetched) return { ok: false, error: fetched.error, status: fetched.status }
+  if ('error' in fetched) return { ok: false, error: fetched.error, status: fetched.status, diag: { attempts: fetched.attempts, keyLen: fetched.keyLen, secretLen: fetched.secretLen } }
   const res = fetched.res
   const authVariant = fetched.variant
 
