@@ -48,6 +48,8 @@ export default function PublicoContent() {
   const [capDate, setCapDate] = useState(today)          // día que se está capturando (◀ hoy ▶)
   const month = capDate.slice(0, 7)
   const currentMonth = today.slice(0, 7)                 // no se navega a meses futuros (sin datos)
+  const prevMonthStr = shiftMonthDate(capDate, -1).slice(0, 7)   // mes anterior, para el comparativo
+  const [prevAgg, setPrevAgg] = useState<{ ventas: number; costosOper: number } | null>(null)
   const [ventas, setVentas] = useState<Venta[]>([])
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
@@ -95,7 +97,13 @@ export default function PublicoContent() {
   const iAmtRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
-    const r = await fetch(`/api/publico?month=${month}&today=${capDate}`).then((r) => r.json()).catch(() => null)
+    // Trae el mes visto Y el anterior (para el comparativo). Periodificación: si el mes visto es el EN CURSO,
+    // el anterior se acota al MISMO tramo (hasta el mismo día) — comparar parcial vs completo engañaría.
+    const cutoffDay = month === currentMonth ? Number(today.slice(8, 10)) : null
+    const [r, pr] = await Promise.all([
+      fetch(`/api/publico?month=${month}&today=${capDate}`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/publico?month=${prevMonthStr}`).then((r) => r.json()).catch(() => null),
+    ])
     if (!r) return
     setVentas(r.ventas ?? [])
     setCostos(r.costos ?? [])
@@ -103,7 +111,13 @@ export default function PublicoContent() {
     const hoy: Venta | null = r.ventas?.find((v: Venta) => v.date === capDate) ?? null
     setEfectivo(hoy && hoy.efectivo ? String(hoy.efectivo) : '')
     setTarjeta(hoy && hoy.tarjeta ? String(hoy.tarjeta) : '')
-  }, [month, capDate])
+    if (pr && Array.isArray(pr.ventas)) {
+      const inPer = (d: string) => cutoffDay == null || Number(d.slice(8, 10)) <= cutoffDay
+      const pv = (pr.ventas as Venta[]).filter((v) => inPer(v.date)).reduce((s, v) => s + Number(v.efectivo) + Number(v.tarjeta), 0)
+      const pc = (pr.costos as Costo[] ?? []).filter((c) => OPERATING_CATEGORIES.includes(c.category) && inPer(c.date)).reduce((s, c) => s + Number(c.amount), 0)
+      setPrevAgg(pv > 0 || pc > 0 ? { ventas: pv, costosOper: pc } : null)
+    } else setPrevAgg(null)
+  }, [month, capDate, currentMonth, prevMonthStr, today])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => { efectivoRef.current?.focus() }, [])   // autofocus al abrir: el cierre es lo que haces siempre
@@ -310,7 +324,7 @@ export default function PublicoContent() {
       </>)}
 
       {tab === 'panel' && (
-        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} onCostChange={load} />
+        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} prevVentas={prevAgg?.ventas ?? null} prevCostos={prevAgg?.costosOper ?? null} prevMonthName={monthName(prevMonthStr)} comparativoPartial={month === currentMonth} onCostChange={load} />
       )}
 
       {tab === 'captura' && (
@@ -366,8 +380,8 @@ export default function PublicoContent() {
 // marca su PROCEDENCIA (POS vs manual). Estética arcade: UNA rejilla con divisiones de 1px en el color del
 // día (monocolor, hard steps, sin degradados). El punto de equilibrio es placeholder → llega en Fase 2 con
 // los gastos fijos/nómina (previstos); pintarlo ahora sería una barra basada en nada. Debe caber sin scroll. ──
-function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, onCostChange }: {
-  month: string; ventasMes: number; tarjetaMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; onCostChange: () => void
+function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, prevVentas, prevCostos, prevMonthName, comparativoPartial, onCostChange }: {
+  month: string; ventasMes: number; tarjetaMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; prevVentas: number | null; prevCostos: number | null; prevMonthName: string; comparativoPartial: boolean; onCostChange: () => void
 }) {
   const { crt } = useOSSettings()
   const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
@@ -412,13 +426,24 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
   // "· manual" en gris apagado (lo tecleaste tú). Se lee de un vistazo qué dio el POS y qué capturaste.
   const src = (s: 'pos' | 'manual') => <span style={s === 'pos' ? { color: dc } : { opacity: 0.5 }}> · {s}</span>
   const Head = ({ children }: { children: React.ReactNode }) => <div className="mb-2 text-label uppercase tracking-widest" style={{ color: dc }}>{children}</div>
-  const Metric = ({ name, value, big, hint }: { name: React.ReactNode; value: string; big?: boolean; hint?: string }) => (
+  const Metric = ({ name, value, big, hint, delta }: { name: React.ReactNode; value: string; big?: boolean; hint?: string; delta?: React.ReactNode }) => (
     <div style={{ padding: '10px 12px' }}>
       <div className="text-label uppercase tracking-widest text-fg-muted">{name}</div>
-      <div className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: big ? 26 : 20, marginTop: 2 }}>{value}</div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: big ? 26 : 20, marginTop: 2 }}>{value}</span>
+        {delta}
+      </div>
       {hint && <div className="mt-0.5 text-fg-muted" style={{ fontSize: 10, lineHeight: 1.25 }}>{hint}</div>}
     </div>
   )
+  // Delta vs mes anterior (mismo tramo si el mes está en curso). goodUp: si subir es bueno (ventas/utilidad) o
+  // malo (gastos). null si no hay base comparable (primer mes, o sin datos previos).
+  const deltaBadge = (cur: number, prev: number | null, goodUp: boolean) => {
+    if (prev == null || prev === 0) return null
+    const pct = ((cur - prev) / Math.abs(prev)) * 100
+    const up = pct >= 0, good = up === goodUp
+    return <span className={good ? 'text-ok' : 'text-warn'} style={{ fontSize: 11, fontWeight: 600 }} title={`${mxn(prev)} en ${prevMonthName}${comparativoPartial ? ' (mismo tramo)' : ''}`}>{up ? '▲' : '▼'}{Math.abs(pct).toFixed(0)}%</span>
+  }
   const placeholder = (fase: string, txt: string) => <div className="text-secondary text-fg-muted"><span className="italic">{fase}</span> — {txt}</div>
 
   // Bento: bloques de distinto tamaño = jerarquía. Colapsa a 1 columna en móvil (grid-cols-1), usa el ancho
@@ -433,11 +458,11 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
 
       {/* Fila asimétrica: MÉTRICAS + punto de equilibrio (2/3, el bloque hero) · alerta + qué toca (1/3). */}
       <section className="lg:col-span-4" style={box}>
-        <div className="px-3 pt-3"><Head>Métricas · {monthName(month)}</Head></div>
+        <div className="px-3 pt-3"><Head>Métricas · {monthName(month)} {(prevVentas != null || prevCostos != null) && <span className="font-normal normal-case tracking-normal text-fg-muted">· ▲▼ vs {prevMonthName}{comparativoPartial ? ' (mismo tramo)' : ''}</span>}</Head></div>
         <div className="grid grid-cols-1 sm:grid-cols-2" style={{ borderTop: `1px solid ${bord}` }}>
           {/* Par de caras: VENTAS (POS, cierto) y GASTOS (manual, incompleto) — mismo peso visual, procedencia honesta. */}
-          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Ventas del mes{src('pos')}</>} value={mxn(ventasMes)} big /></div>
-          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Gastos del mes<span style={{ opacity: 0.5 }}> · poster + manual</span></>} value={`−${mxn(costosOper)}`} big hint="compras de Poster + capturas · incompleto hasta cerrar el mes" /></div>
+          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Ventas del mes{src('pos')}</>} value={mxn(ventasMes)} big delta={deltaBadge(ventasMes, prevVentas, true)} /></div>
+          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Gastos del mes<span style={{ opacity: 0.5 }}> · poster + manual</span></>} value={`−${mxn(costosOper)}`} big hint="compras de Poster + capturas · incompleto hasta cerrar el mes" delta={deltaBadge(costosOper, prevCostos, false)} /></div>
           {/* PRECAUCIÓN DE LECTURA: food cost = CONSUMO (recetas del POS), NO compras÷ventas. Surtirse por
               adelantado infla compras/ventas (jun 59%, jul 49%) muy arriba del teórico 31% — es periodificación,
               no food cost. GASTOS y FOOD COST viven en celdas distintas y nunca se dividen entre sí. */}
@@ -453,7 +478,7 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
             <span className="text-label uppercase tracking-widest text-fg-muted">Utilidad operativa {isCurrentMonth
               ? <span className="text-warn" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>provisional</span>
               : <span className="text-ok" style={{ border: '1px solid currentColor', borderRadius: 4, padding: '0 4px', fontSize: 9, letterSpacing: 1 }}>mes cerrado</span>}</span>
-            <span className="tabular-nums" style={{ color: dc, fontSize: 22, fontWeight: 700 }}>{mxn(utilidadOper)}</span>
+            <span className="flex items-baseline gap-1.5"><span className="tabular-nums" style={{ color: dc, fontSize: 22, fontWeight: 700 }}>{mxn(utilidadOper)}</span>{prevVentas != null && prevCostos != null && deltaBadge(utilidadOper, prevVentas - prevCostos, true)}</span>
           </div>
           <div className="mt-1 text-label text-fg-muted italic">= ventas del mes − gastos capturados</div>
           {/* Honestidad: la utilidad se INFLA cuando faltan costos. Los fijos/nómina viven en previstos y no
