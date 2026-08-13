@@ -66,7 +66,7 @@ export async function importClipSettlements(supabase: SupabaseClient, opts: { fr
     .filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date) && r.fee > 0)
 
   const totalFee = Math.round(rows.reduce((a, r) => a + r.fee, 0) * 100) / 100
-  if (!opts.commit) return { ok: true, from: opts.from, to: opts.to, settlements: list.length, imported: rows.length, totalFee, committed: false }
+  if (!opts.commit) return { ok: true, from: opts.from, to: opts.to, settlements: list.length, imported: rows.length, totalFee, committed: false, diag: { topKeys: j && typeof j === 'object' ? Object.keys(j as object) : typeof j, firstRaw: (list as unknown[])[0] ?? (Array.isArray(j) ? null : j), firstRow: rows[0] ?? null } }
 
   let imported = 0
   for (const r of rows) {
