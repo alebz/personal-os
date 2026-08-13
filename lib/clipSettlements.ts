@@ -6,8 +6,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // Clip da la comisión EXACTA de cada depósito (varía por tipo de tarjeta) — mejor que una tasa tecleada.
 // CLIP ES la cuenta del negocio: NO se modela depósito a otro lado; solo la comisión que baja CLIP.
 //
-// API (verificada en la doc): GET https://api-gw.payclip.com/settlements?from=YYYY-MM-DD&to=YYYY-MM-DD
-//   Auth: base64(API_KEY:SECRET_KEY) en `x-api-key` y/o `Authorization: Basic …` (mandamos ambos).
+// API (verificada en la doc oficial): GET https://api-gw.payclip.com/settlements?from=YYYY-MM-DD&to=YYYY-MM-DD
+//   Auth: header `x-api-key: Basic <base64(API_KEY:SECRET_KEY)>`  ← el token INCLUYE el prefijo "Basic " (ese
+//   era el bug: mandar el b64 pelón daba 500 por token malformado, no 401). Accept: application/vnd.com.payclip.v2+json.
 //   Rango máx: 90 días. Campos por settlement: settlement_report_id, disbursement_date, gross_amount,
 //   total_fee, total_tax, total_retention, disbursed_net_amount, total_transactions.
 const API = 'https://api-gw.payclip.com/settlements'
@@ -32,33 +33,16 @@ function comision(s: Settlement): number {
   return ft > 0 ? ft : num(s.total_fee)
 }
 
-// La doc de Clip es ambigua sobre el header exacto (x-api-key vs Authorization, base64 vs key cruda). En vez de
-// adivinar, probamos las variantes en orden y usamos la 1ª que responde 200. Reporta cuál sirvió (authVariant).
-const shiftD = (iso: string, n: number) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d)); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10) }
+// Token de Clip = "Basic " + base64(apiKey:secretKey), colocado en el header `x-api-key`.
+const clipToken = (apiKey: string, secret: string) => `Basic ${Buffer.from(`${apiKey}:${secret}`).toString('base64')}`
 
-// Auth confirmado = `x-api-key: base64(apiKey:secretKey)` (las demás variantes dan 401; esta pasa a 500, lo que
-// indica que autentica pero el REQUEST estaba mal). Aquí variamos la forma del request para pasar el 500:
-// fecha `to` (hoy vs ayer, por si el día en curso no está liquidado), el header Accept, y el rango.
-async function fetchSettlements(from: string, to: string, apiKey: string, secret: string): Promise<{ res: Response; variant: string } | { error: string; status: number; attempts: { name: string; status: number | string; body: string }[]; keyLen: number; secretLen: number }> {
-  const b64 = Buffer.from(`${apiKey}:${secret}`).toString('base64')
-  const yday = shiftD(to, -1)
-  const V2 = 'application/vnd.com.payclip.v2+json'
-  const shapes: { name: string; to: string; accept: string | null }[] = [
-    { name: 'v2 · to=hoy', to, accept: V2 },
-    { name: 'v2 · to=ayer', to: yday, accept: V2 },
-    { name: 'json · to=ayer', to: yday, accept: 'application/json' },
-    { name: 'sin Accept · to=ayer', to: yday, accept: null },
-    { name: 'sin Accept · to=hoy', to, accept: null },
-  ]
-  const attempts: { name: string; status: number | string; body: string }[] = []
-  for (const s of shapes) {
-    const headers: Record<string, string> = { 'x-api-key': b64 }
-    if (s.accept) headers['Accept'] = s.accept
-    const r = await fetch(`${API}?from=${from}&to=${s.to}`, { headers, cache: 'no-store' }).catch(() => null)
-    if (r && r.ok) return { res: r, variant: `x-api-key:b64 · ${s.name}` }
-    attempts.push({ name: s.name, status: r ? r.status : 'network', body: r ? (await r.text().catch(() => '')).slice(0, 90) : '' })
-  }
-  return { error: 'x-api-key:b64 no dio 200 en ninguna forma de request', status: 502, attempts, keyLen: apiKey.length, secretLen: secret.length }
+async function fetchSettlements(from: string, to: string, apiKey: string, secret: string): Promise<{ res: Response } | { error: string; status: number; body: string }> {
+  const r = await fetch(`${API}?from=${from}&to=${to}`, {
+    headers: { 'x-api-key': clipToken(apiKey, secret), 'Accept': 'application/vnd.com.payclip.v2+json' },
+    cache: 'no-store',
+  }).catch(() => null)
+  if (r && r.ok) return { res: r }
+  return { error: `Clip settlements ${r ? r.status : 'network error'}`, status: r ? r.status : 502, body: r ? (await r.text().catch(() => '')).slice(0, 200) : '' }
 }
 
 export async function importClipSettlements(supabase: SupabaseClient, opts: { from: string; to: string; commit: boolean }): Promise<ClipResult & { authVariant?: string; diag?: unknown }> {
@@ -66,9 +50,8 @@ export async function importClipSettlements(supabase: SupabaseClient, opts: { fr
   if (!apiKey || !secret) return { ok: false, error: 'CLIP_API_KEY / CLIP_SECRET_KEY no configurados', status: 400 }
 
   const fetched = await fetchSettlements(opts.from, opts.to, apiKey, secret)
-  if ('error' in fetched) return { ok: false, error: fetched.error, status: fetched.status, diag: { attempts: fetched.attempts, keyLen: fetched.keyLen, secretLen: fetched.secretLen } }
+  if ('error' in fetched) return { ok: false, error: fetched.error, status: fetched.status, diag: { body: fetched.body } }
   const res = fetched.res
-  const authVariant = fetched.variant
 
   const j = await res.json().catch(() => null) as unknown
   // La respuesta puede venir como array o envuelta; probamos las formas comunes.
@@ -83,7 +66,7 @@ export async function importClipSettlements(supabase: SupabaseClient, opts: { fr
     .filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date) && r.fee > 0)
 
   const totalFee = Math.round(rows.reduce((a, r) => a + r.fee, 0) * 100) / 100
-  if (!opts.commit) return { ok: true, from: opts.from, to: opts.to, settlements: list.length, imported: rows.length, totalFee, committed: false, authVariant }
+  if (!opts.commit) return { ok: true, from: opts.from, to: opts.to, settlements: list.length, imported: rows.length, totalFee, committed: false }
 
   let imported = 0
   for (const r of rows) {
@@ -93,7 +76,7 @@ export async function importClipSettlements(supabase: SupabaseClient, opts: { fr
     }, { onConflict: 'scope,clip_settlement_id' })
     if (!error) imported++
   }
-  return { ok: true, from: opts.from, to: opts.to, settlements: list.length, imported, totalFee, committed: true, authVariant }
+  return { ok: true, from: opts.from, to: opts.to, settlements: list.length, imported, totalFee, committed: true }
 }
 
 // Corre el import y actualiza el heartbeat. window = días hacia atrás desde `to` (default hoy). Máx 90.
