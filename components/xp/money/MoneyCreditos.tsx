@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MONEY, fmtMxn, MoneyBar, MoneyBtn, MoneyInput, MoneyModal } from './MoneyChrome'
+import { MONEY, fmtMxn, MoneyAmount, MoneyBar, MoneyBtn, MoneyInput, MoneyModal } from './MoneyChrome'
 
 // CRÉDITOS bajo XP = paridad del panel arcade (CreditosTab) re-presentada en estilo MSN Money. Reusa las
 // MISMAS APIs de F1: /api/finance/cards, /card-charges, /confirm, /status, /adjust, /ledger. El progreso
@@ -250,11 +250,11 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onC
 
 // ── cuadre (total esperado vs estado de cuenta → ajuste nombrado) ──
 function Cuadre({ cardId, month, expected, onAdjusted }: { cardId: string; month: string; expected: number; onAdjusted: () => void }) {
-  const [note, setNote] = useState(''); const [amt, setAmt] = useState(''); const [open, setOpen] = useState(false)
+  const [note, setNote] = useState(''); const [amt, setAmt] = useState<number | null>(null); const [open, setOpen] = useState(false)
   async function register() {
-    const a = Number(amt); if (!Number.isFinite(a) || a === 0 || !note.trim()) return
-    await jsend(`/api/finance/cards/${cardId}/adjust`, 'POST', { month, amount: Math.abs(a), note: note.trim(), flow: a < 0 ? 'in' : 'out' })
-    setNote(''); setAmt(''); setOpen(false); onAdjusted()
+    if (amt == null || amt === 0 || !note.trim()) return
+    await jsend(`/api/finance/cards/${cardId}/adjust`, 'POST', { month, amount: Math.abs(amt), note: note.trim(), flow: amt < 0 ? 'in' : 'out' })
+    setNote(''); setAmt(null); setOpen(false); onAdjusted()
   }
   return (
     <div style={{ marginTop: 9, borderTop: `1px solid ${MONEY.rule}`, paddingTop: 7 }}>
@@ -265,7 +265,7 @@ function Cuadre({ cardId, month, expected, onAdjusted }: { cardId: string; month
       {open ? (
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
           <MoneyInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="causa (comisión, cargo suelto…)" style={{ flex: 1, minWidth: 120 }} />
-          <MoneyInput value={amt} onChange={(e) => setAmt(e.target.value)} inputMode="decimal" placeholder="$ dif (− = crédito)" style={{ width: 116, textAlign: 'right' }} />
+          <MoneyAmount value={amt} onChange={setAmt} placeholder="$ dif (− = crédito)" style={{ width: 116, textAlign: 'right' }} />
           <MoneyBtn primary onClick={() => void register()}>Ajuste</MoneyBtn>
           <MoneyBtn onClick={() => setOpen(false)}>✕</MoneyBtn>
         </div>
@@ -301,12 +301,12 @@ function Ledger({ card, onClose }: { card: Card; onClose: () => void }) {
 // ── editar datos de la tarjeta ──
 function CardHeaderEdit({ card, onDone }: { card: Card; onDone: () => void }) {
   const [name, setName] = useState(card.name); const [last4, setLast4] = useState(card.last4 ?? '')
-  const [limit, setLimit] = useState(card.credit_limit != null ? String(card.credit_limit) : '')
+  const [limit, setLimit] = useState<number | null>(card.credit_limit ?? null)
   const [cut, setCut] = useState(card.cut_day != null ? String(card.cut_day) : ''); const [due, setDue] = useState(card.due_day != null ? String(card.due_day) : '')
   async function save() {
     await jsend(`/api/finance/cards/${card.id}`, 'PATCH', {
       name: name.trim() || card.name, last4: last4.trim() || null,
-      credit_limit: limit.trim() ? num(limit) : null,
+      credit_limit: limit,
       cut_day: cut.trim() ? num(cut) : null, due_day: due.trim() ? num(due) : null,
     })
     onDone()
@@ -315,7 +315,7 @@ function CardHeaderEdit({ card, onDone }: { card: Card; onDone: () => void }) {
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
       <MoneyInput value={name} onChange={(e) => setName(e.target.value)} placeholder="banco/emisor" style={{ width: 130 }} />
       <MoneyInput value={last4} onChange={(e) => setLast4(e.target.value)} placeholder="últimos 4" maxLength={4} style={{ width: 74 }} />
-      <MoneyInput value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="límite" inputMode="decimal" style={{ width: 84, textAlign: 'right' }} />
+      <MoneyAmount value={limit} onChange={setLimit} placeholder="límite" style={{ width: 84, textAlign: 'right' }} />
       <MoneyInput value={cut} onChange={(e) => setCut(e.target.value)} placeholder="corte" inputMode="numeric" style={{ width: 56, textAlign: 'right' }} />
       <MoneyInput value={due} onChange={(e) => setDue(e.target.value)} placeholder="pago" inputMode="numeric" style={{ width: 56, textAlign: 'right' }} />
       <MoneyBtn primary onClick={() => void save()}>ok</MoneyBtn>
@@ -341,30 +341,30 @@ function ChargeActions({ charge, onDone }: { charge: Charge; onDone: () => void 
 }
 
 function ChargeEdit({ charge, onDone }: { charge: Charge; onDone: () => void }) {
-  const [name, setName] = useState(charge.name); const [amount, setAmount] = useState(String(charge.amount))
+  const [name, setName] = useState(charge.name); const [amount, setAmount] = useState<number | null>(Number(charge.amount))
   const [meses, setMeses] = useState(String(charge.meses)); const [start, setStart] = useState(charge.start_month)
   const [kind, setKind] = useState<Charge['kind']>(charge.kind); const [attr, setAttr] = useState(charge.attribution ?? '')
-  const [original, setOriginal] = useState(charge.original_amount != null ? String(charge.original_amount) : '')
-  const [pending, setPending] = useState(charge.pending_override != null ? String(charge.pending_override) : '')
+  const [original, setOriginal] = useState<number | null>(charge.original_amount ?? null)
+  const [pending, setPending] = useState<number | null>(charge.pending_override ?? null)
   async function save() {
     await jsend(`/api/finance/card-charges/${charge.id}`, 'PATCH', {
-      name: name.trim() || charge.name, amount: num(amount), meses: num(meses) || charge.meses,
+      name: name.trim() || charge.name, amount: amount ?? charge.amount, meses: num(meses) || charge.meses,
       start_month: /^\d{4}-\d{2}$/.test(start) ? start : charge.start_month, kind, attribution: attr || null,
-      original_amount: original.trim() ? num(original) : null, pending_override: pending.trim() ? num(pending) : null,
+      original_amount: original, pending_override: pending,
     })
     onDone()
   }
   return (
     <span style={{ display: 'flex', flex: 1, gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
       <MoneyInput value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 80 }} />
-      <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={{ width: 66, textAlign: 'right' }} title="mensualidad" />
+      <MoneyAmount value={amount} onChange={setAmount} style={{ width: 66, textAlign: 'right' }} title="mensualidad" />
       <span style={{ color: '#8a93a8' }}>/</span>
       <MoneyInput value={meses} onChange={(e) => setMeses(e.target.value)} inputMode="numeric" style={{ width: 40, textAlign: 'right' }} title="meses (M)" />
       <MoneyInput value={start} onChange={(e) => setStart(e.target.value)} placeholder="YYYY-MM" style={{ width: 82 }} title="mes inicial" />
       <select value={kind} onChange={(e) => setKind(e.target.value as Charge['kind'])} style={selStyle}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={(e) => setAttr(e.target.value)} style={selStyle}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
-      <MoneyInput value={original} onChange={(e) => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." style={{ width: 84, textAlign: 'right' }} title="monto original de la compra" />
-      <MoneyInput value={pending} onChange={(e) => setPending(e.target.value)} inputMode="decimal" placeholder="pend. real" style={{ width: 96, textAlign: 'right' }} title="saldo pendiente REAL del estado de cuenta — manda sobre el estimado; vacío = usa el estimado" />
+      <MoneyAmount value={original} onChange={setOriginal} placeholder="orig." style={{ width: 84, textAlign: 'right' }} title="monto original de la compra" />
+      <MoneyAmount value={pending} onChange={setPending} placeholder="pend. real" style={{ width: 96, textAlign: 'right' }} title="saldo pendiente REAL del estado de cuenta — manda sobre el estimado; vacío = usa el estimado" />
       <MoneyBtn primary onClick={() => void save()}>ok</MoneyBtn>
       <MoneyBtn onClick={onDone}>✕</MoneyBtn>
     </span>
@@ -374,25 +374,25 @@ const selStyle: React.CSSProperties = { border: `1px solid ${MONEY.rule}`, borde
 
 // ── añadir cargo ──
 function AddCharge({ cardId, defaultMonth, onDone }: { cardId: string; defaultMonth: string; onDone: () => void }) {
-  const [name, setName] = useState(''); const [amount, setAmount] = useState(''); const [meses, setMeses] = useState('')
+  const [name, setName] = useState(''); const [amount, setAmount] = useState<number | null>(null); const [meses, setMeses] = useState('')
   const [start, setStart] = useState(defaultMonth); const [kind, setKind] = useState<Charge['kind']>('personal'); const [attr, setAttr] = useState('')
-  const [original, setOriginal] = useState(''); const [pending, setPending] = useState('')
+  const [original, setOriginal] = useState<number | null>(null); const [pending, setPending] = useState<number | null>(null)
   async function add() {
-    if (!name.trim() || !num(amount) || !num(meses)) return
-    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount: num(amount), meses: num(meses), start_month: start, kind, attribution: attr || null, original_amount: original.trim() ? num(original) : null, pending_override: pending.trim() ? num(pending) : null })
+    if (!name.trim() || amount == null || amount <= 0 || !num(meses)) return
+    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount, meses: num(meses), start_month: start, kind, attribution: attr || null, original_amount: original, pending_override: pending })
     onDone()
   }
   return (
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginTop: 6, borderTop: `1px solid ${MONEY.rule}`, paddingTop: 6 }}>
       <MoneyInput value={name} onChange={(e) => setName(e.target.value)} placeholder="nombre del cargo" style={{ flex: 1, minWidth: 110 }} autoFocus />
-      <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="$/mes" style={{ width: 66, textAlign: 'right' }} />
+      <MoneyAmount value={amount} onChange={setAmount} placeholder="$/mes" style={{ width: 66, textAlign: 'right' }} />
       <span style={{ color: '#8a93a8' }}>/</span>
       <MoneyInput value={meses} onChange={(e) => setMeses(e.target.value)} inputMode="numeric" placeholder="M" style={{ width: 40, textAlign: 'right' }} />
       <MoneyInput value={start} onChange={(e) => setStart(e.target.value)} placeholder="YYYY-MM" style={{ width: 82 }} />
       <select value={kind} onChange={(e) => setKind(e.target.value as Charge['kind'])} style={selStyle}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={(e) => setAttr(e.target.value)} style={selStyle}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
-      <MoneyInput value={original} onChange={(e) => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." style={{ width: 84, textAlign: 'right' }} title="monto original" />
-      <MoneyInput value={pending} onChange={(e) => setPending(e.target.value)} inputMode="decimal" placeholder="pend. real" style={{ width: 96, textAlign: 'right' }} title="saldo pendiente real (opcional)" />
+      <MoneyAmount value={original} onChange={setOriginal} placeholder="orig." style={{ width: 84, textAlign: 'right' }} title="monto original" />
+      <MoneyAmount value={pending} onChange={setPending} placeholder="pend. real" style={{ width: 96, textAlign: 'right' }} title="saldo pendiente real (opcional)" />
       <MoneyBtn primary onClick={() => void add()}>✓</MoneyBtn>
       <MoneyBtn onClick={onDone}>✕</MoneyBtn>
     </div>

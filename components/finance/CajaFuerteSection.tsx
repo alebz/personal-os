@@ -5,6 +5,7 @@ import Mxn from '@/components/Mxn'
 import DrumModal from '@/components/DrumModal'
 import { FundLedger, type FundMovement } from '@/components/finance/FundLedger'
 import { FundMovementControl, type WalletOption } from '@/components/finance/FundMovementControl'
+import { MoneyInput } from '@/components/MoneyInput'
 
 // A fund = a finance_envelopes row with its flow-aware balance + ledger, from /api/finance/funds.
 // Shared by both scopes (Finanzas Alex 'personal', Uptown 'uptown').
@@ -38,17 +39,17 @@ function FundCard({
   const target = fund.target != null ? Number(fund.target) : null
   const pct    = target && target > 0 ? Math.min((saved / target) * 100, 100) : 0
   const [editingMeta, setEditingMeta] = useState(false)
-  const [metaDraft, setMetaDraft]     = useState(target != null ? String(target) : '')
+  const [metaDraft, setMetaDraft]     = useState<number | null>(target)
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft]     = useState(fund.label)
   const [modalOpen, setModalOpen]     = useState(false)
   const foundational = fund.key != null   // caja_fuerte / mantenimiento — never archived or deleted
 
-  useEffect(() => { setMetaDraft(fund.target != null ? String(Number(fund.target)) : '') }, [fund.target])
+  useEffect(() => { setMetaDraft(fund.target != null ? Number(fund.target) : null) }, [fund.target])
   useEffect(() => { setNameDraft(fund.label) }, [fund.label])
 
   function saveMeta() {
-    const t = metaDraft.trim() === '' ? null : parseFloat(metaDraft)
+    const t = metaDraft
     onUpdateTarget(fund.id, t != null && t > 0 ? t : null)
     setEditingMeta(false)
   }
@@ -104,9 +105,9 @@ function FundCard({
       <div className="flex items-center justify-between gap-2">
         {editingMeta ? (
           <div className="flex flex-1 gap-2">
-            <input
-              type="number" value={metaDraft} autoFocus placeholder="Meta (vacío = sin meta)"
-              onChange={e => setMetaDraft(e.target.value)}
+            <MoneyInput
+              value={metaDraft} autoFocus placeholder="Meta (vacío = sin meta)"
+              onChange={setMetaDraft}
               onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditingMeta(false) }}
               className="flex-1 rounded-card border border-border bg-surface-2 px-3 py-1.5 text-secondary text-fg outline-none focus:border-accent/50"
             />
@@ -151,7 +152,7 @@ export function CajaFuerteSection({
   onAportaRetira, onUpdateTarget, onUpdateLabel, onArchive, onRestore, onDelete, onCreate,
 }: { funds: Fund[]; createPlaceholder?: string; accounts?: WalletOption[] } & FundHandlers) {
   const [name, setName] = useState('')
-  const [meta, setMeta] = useState('')
+  const [meta, setMeta] = useState<number | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const section  = funds.filter(f => !f.archived)   // active apartados
   const archived = funds.filter(f => f.archived)     // soft-deleted, ledger preserved
@@ -159,9 +160,9 @@ export function CajaFuerteSection({
 
   function create() {
     if (!name.trim()) return
-    const t = meta.trim() === '' ? null : parseFloat(meta)
+    const t = meta
     onCreate(name.trim(), t != null && t > 0 ? t : null)
-    setName(''); setMeta('')
+    setName(''); setMeta(null)
   }
 
   return (
@@ -178,8 +179,8 @@ export function CajaFuerteSection({
             placeholder={createPlaceholder}
             className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
           />
-          <input
-            type="number" value={meta} onChange={e => setMeta(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
+          <MoneyInput
+            value={meta} onChange={setMeta} onKeyDown={e => e.key === 'Enter' && create()}
             placeholder="Meta (opcional)"
             className="w-36 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
           />

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MoneyChrome, MoneyBar, MONEY, fmtMxn, fmtSigned, MoneyModal, MoneyBtn, MoneyInput, MethodPick } from './money/MoneyChrome'
+import { MoneyChrome, MoneyBar, MONEY, fmtMxn, fmtSigned, MoneyModal, MoneyBtn, MoneyInput, MoneyAmount, MethodPick } from './money/MoneyChrome'
 import MoneyCaja from './money/MoneyCaja'
 import MoneyCreditos from './money/MoneyCreditos'
 
@@ -228,16 +228,16 @@ function StatCard({ label, value, tone, sub, onClick }: { label: string; value: 
 // Tarjeta de saldo editable (Efectivo/Tarjeta) — clic al monto → input → cuadre.
 function WalletCard({ label, value, account, onAdjust }: { label: string; value: number; account: 'efectivo' | 'tarjeta'; onAdjust: (a: 'efectivo' | 'tarjeta', to: number) => void }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  function begin() { setDraft(String(value)); setEditing(true) }
-  function commit() { const n = parseFloat(draft); setEditing(false); if (!isNaN(n) && n !== value) onAdjust(account, n) }
+  const [draft, setDraft] = useState<number | null>(null)
+  function begin() { setDraft(value); setEditing(true) }
+  function commit() { const n = draft; setEditing(false); if (n != null && n !== value) onAdjust(account, n) }
   return (
     <div style={{ flex: 1, minWidth: 0, border: `1px solid ${MONEY.rule}`, borderRadius: 3, background: 'linear-gradient(#fff,#eef5fd)', padding: '6px 9px' }}>
       <div style={{ fontSize: 10, color: '#5a6a86' }}>{label} {account === 'efectivo' ? '💵' : '💳'}</div>
       {editing ? (
-        <input autoFocus type="number" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+        <MoneyAmount autoFocus value={draft} onChange={setDraft} onBlur={commit}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setEditing(false) } }}
-          style={{ width: '100%', border: `1px solid ${MONEY.headTo}`, borderRadius: 3, padding: '1px 4px', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', outline: 'none' }} />
+          style={{ width: '100%', border: `1px solid ${MONEY.headTo}`, fontSize: 16, fontWeight: 700 }} />
       ) : (
         <div onClick={begin} title="Cuadrar saldo" style={{ fontSize: 17, fontWeight: 700, color: MONEY.ink, letterSpacing: -0.4, cursor: 'pointer', marginTop: 1 }}>{fmtMxn(value)}</div>
       )}
@@ -385,19 +385,19 @@ function Check({ on }: { on: boolean }) {
 function IncomeRow({ item, checked, realMonto, realMetodo, onToggle, onSetMonto, onSetMetodo, onUpdate, onDelete }: {
   item: IncomeItem; checked: boolean; realMonto: number; realMetodo: string; onToggle: () => void; onSetMonto: (n: number) => void; onSetMetodo: (m: string) => void; onUpdate: (u: Partial<IncomeItem>) => void; onDelete: () => void
 }) {
-  const [draft, setDraft] = useState(String(realMonto))
+  const [draft, setDraft] = useState<number | null>(realMonto)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(item.nombre)
-  const [base, setBase] = useState(String(item.monto))
+  const [base, setBase] = useState<number | null>(Number(item.monto))
   const [bm, setBm] = useState(normMethod(item.metodo))
-  useEffect(() => { setDraft(String(realMonto)) }, [realMonto])
+  useEffect(() => { setDraft(realMonto) }, [realMonto])
   if (editing) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderBottom: '1px solid #eef2f8', background: '#f5f9ff' }}>
         <MoneyInput autoFocus value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1 }} />
         <MethodPick value={bm} onChange={setBm} compact />
-        <MoneyInput type="number" value={base} onChange={(e) => setBase(e.target.value)} style={{ width: 76 }} />
-        <MoneyBtn primary onClick={() => { if (name.trim() && num(base) > 0) { onUpdate({ nombre: name.trim(), monto: num(base), metodo: bm }); setEditing(false) } }}>ok</MoneyBtn>
+        <MoneyAmount value={base} onChange={setBase} style={{ width: 76 }} />
+        <MoneyBtn primary onClick={() => { if (name.trim() && base != null && base > 0) { onUpdate({ nombre: name.trim(), monto: base, metodo: bm }); setEditing(false) } }}>ok</MoneyBtn>
       </div>
     )
   }
@@ -408,8 +408,8 @@ function IncomeRow({ item, checked, realMonto, realMetodo, onToggle, onSetMonto,
       {checked ? (
         <>
           <MethodPick value={realMetodo} onChange={onSetMetodo} compact />
-          <input type="number" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { const n = parseFloat(draft); if (n > 0) onSetMonto(n); else setDraft(String(realMonto)) }}
-            style={{ width: 82, textAlign: 'right', border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 4px', fontSize: 11, fontFamily: 'inherit', outline: 'none', color: MONEY.up, fontWeight: 700 }} />
+          <MoneyAmount value={draft} onChange={setDraft} onBlur={() => { if (draft != null && draft > 0) onSetMonto(draft); else setDraft(realMonto) }}
+            style={{ width: 82, textAlign: 'right', color: MONEY.up, fontWeight: 700 }} />
         </>
       ) : (
         <span style={{ color: '#5a6a86' }}>{normMethod(item.metodo) === 'efectivo' ? '💵' : '💳'} {fmtMxn(item.monto)}</span>
@@ -434,7 +434,7 @@ function NominaRow({ n }: { n: Nomina }) {
 function CommitRow({ c, month, checked, onToggle, onUpdate, onDelete }: { c: Commitment; month: string; checked: boolean; onToggle: () => void; onUpdate: (u: Partial<Commitment>) => void; onDelete: () => void }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(c.name)
-  const [amt, setAmt] = useState(String(c.amount))
+  const [amt, setAmt] = useState<number | null>(Number(c.amount))
   const [meses, setMeses] = useState(c.meses != null ? String(c.meses) : '')
   const [m, setM] = useState(normMethod(c.metodo))
   const n = installmentNumero(c, month)
@@ -444,8 +444,8 @@ function CommitRow({ c, month, checked, onToggle, onUpdate, onDelete }: { c: Com
         <MoneyInput autoFocus value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 90 }} />
         <MoneyInput type="number" value={meses} onChange={(e) => setMeses(e.target.value)} placeholder="∞" style={{ width: 44 }} />
         <MethodPick value={m} onChange={setM} compact />
-        <MoneyInput type="number" value={amt} onChange={(e) => setAmt(e.target.value)} style={{ width: 76 }} />
-        <MoneyBtn primary onClick={() => { if (name.trim() && num(amt) > 0) { onUpdate({ name: name.trim(), amount: num(amt), meses: meses.trim() === '' ? null : num(meses), metodo: m }); setEditing(false) } }}>ok</MoneyBtn>
+        <MoneyAmount value={amt} onChange={setAmt} style={{ width: 76 }} />
+        <MoneyBtn primary onClick={() => { if (name.trim() && amt != null && amt > 0) { onUpdate({ name: name.trim(), amount: amt, meses: meses.trim() === '' ? null : num(meses), metodo: m }); setEditing(false) } }}>ok</MoneyBtn>
       </div>
     )
   }
@@ -477,52 +477,52 @@ function ExtraRow({ mov, tone, onEdit, onDelete }: { mov: Movement; tone: 'up' |
 
 // ── Add forms ──
 function AddIncomeForm({ onAdd }: { onAdd: (n: string, a: number, m: string) => void }) {
-  const [name, setName] = useState(''); const [amt, setAmt] = useState(''); const [m, setM] = useState<'efectivo' | 'tarjeta'>('tarjeta')
-  const go = () => { if (name.trim() && num(amt) > 0) { onAdd(name.trim(), num(amt), m); setName(''); setAmt('') } }
+  const [name, setName] = useState(''); const [amt, setAmt] = useState<number | null>(null); const [m, setM] = useState<'efectivo' | 'tarjeta'>('tarjeta')
+  const go = () => { if (name.trim() && amt != null && amt > 0) { onAdd(name.trim(), amt, m); setName(''); setAmt(null) } }
   return (
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '5px 0 0' }}>
       <MoneyInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nuevo ingreso…" style={{ flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
       <MethodPick value={m} onChange={setM} compact />
-      <MoneyInput type="number" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="$" style={{ width: 70 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
+      <MoneyAmount value={amt} onChange={setAmt} placeholder="$" style={{ width: 70 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
       <MoneyBtn onClick={go}>+</MoneyBtn>
     </div>
   )
 }
 function AddExtraForm({ placeholder, onAdd }: { placeholder: string; onAdd: (n: string, a: number, m: string) => void }) {
-  const [name, setName] = useState(''); const [amt, setAmt] = useState(''); const [m, setM] = useState<'efectivo' | 'tarjeta'>('tarjeta')
-  const go = () => { if (name.trim() && num(amt) > 0) { onAdd(name.trim(), num(amt), m); setName(''); setAmt('') } }
+  const [name, setName] = useState(''); const [amt, setAmt] = useState<number | null>(null); const [m, setM] = useState<'efectivo' | 'tarjeta'>('tarjeta')
+  const go = () => { if (name.trim() && amt != null && amt > 0) { onAdd(name.trim(), amt, m); setName(''); setAmt(null) } }
   return (
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '5px 0 0' }}>
       <MoneyInput value={name} onChange={(e) => setName(e.target.value)} placeholder={placeholder} style={{ flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
       <MethodPick value={m} onChange={setM} compact />
-      <MoneyInput type="number" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="$" style={{ width: 70 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
+      <MoneyAmount value={amt} onChange={setAmt} placeholder="$" style={{ width: 70 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
       <MoneyBtn onClick={go}>+</MoneyBtn>
     </div>
   )
 }
 function AddCommitmentForm({ onAdd }: { onAdd: (n: string, a: number, meses: number | null, m: string) => void }) {
-  const [name, setName] = useState(''); const [amt, setAmt] = useState(''); const [meses, setMeses] = useState(''); const [m, setM] = useState<'efectivo' | 'tarjeta'>('tarjeta')
-  const go = () => { if (name.trim() && num(amt) > 0) { onAdd(name.trim(), num(amt), meses.trim() === '' ? null : num(meses), m); setName(''); setAmt(''); setMeses('') } }
+  const [name, setName] = useState(''); const [amt, setAmt] = useState<number | null>(null); const [meses, setMeses] = useState(''); const [m, setM] = useState<'efectivo' | 'tarjeta'>('tarjeta')
+  const go = () => { if (name.trim() && amt != null && amt > 0) { onAdd(name.trim(), amt, meses.trim() === '' ? null : num(meses), m); setName(''); setAmt(null); setMeses('') } }
   return (
     <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '5px 0 0', flexWrap: 'wrap' }}>
       <MoneyInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nuevo gasto fijo…" style={{ flex: 1, minWidth: 90 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
       <MoneyInput type="number" value={meses} onChange={(e) => setMeses(e.target.value)} placeholder="∞ meses" style={{ width: 60 }} />
       <MethodPick value={m} onChange={setM} compact />
-      <MoneyInput type="number" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="$/mes" style={{ width: 64 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
+      <MoneyAmount value={amt} onChange={setAmt} placeholder="$/mes" style={{ width: 64 }} onKeyDown={(e) => e.key === 'Enter' && go()} />
       <MoneyBtn onClick={go}>+</MoneyBtn>
     </div>
   )
 }
 
 function EditMovementModal({ mov, onClose, onSave }: { mov: Movement; onClose: () => void; onSave: (d: string, a: number, m: string) => void }) {
-  const [desc, setDesc] = useState(mov.description); const [amt, setAmt] = useState(String(mov.amount)); const [m, setM] = useState(normMethod(mov.metodo))
+  const [desc, setDesc] = useState(mov.description); const [amt, setAmt] = useState<number | null>(Number(mov.amount)); const [m, setM] = useState(normMethod(mov.metodo))
   return (
     <MoneyModal title="Editar movimiento" onClose={onClose}
-      footer={<><MoneyBtn onClick={onClose}>Cancelar</MoneyBtn><MoneyBtn primary disabled={!desc.trim() || num(amt) <= 0} onClick={() => onSave(desc.trim(), num(amt), m)}>Guardar</MoneyBtn></>}>
+      footer={<><MoneyBtn onClick={onClose}>Cancelar</MoneyBtn><MoneyBtn primary disabled={!desc.trim() || amt == null || amt <= 0} onClick={() => onSave(desc.trim(), amt ?? 0, m)}>Guardar</MoneyBtn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#5a6a86' }}>Concepto<MoneyInput autoFocus value={desc} onChange={(e) => setDesc(e.target.value)} /></label>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#5a6a86', flex: 1 }}>Monto<MoneyInput type="number" value={amt} onChange={(e) => setAmt(e.target.value)} /></label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#5a6a86', flex: 1 }}>Monto<MoneyAmount value={amt} onChange={setAmt} /></label>
           <div style={{ paddingBottom: 1 }}><MethodPick value={m} onChange={setM} /></div>
         </div>
       </div>

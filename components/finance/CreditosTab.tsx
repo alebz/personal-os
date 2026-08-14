@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Mxn from '@/components/Mxn'
+import { MoneyInput } from '@/components/MoneyInput'
 
 // ─── Créditos: seguimiento de cargos MSI por tarjeta. Multi-tarjeta (una sección por tarjeta). ────────
 // Datos de F1: /api/finance/cards, /card-charges, /confirm, /status, /adjust, /ledger. El progreso
@@ -234,11 +235,11 @@ function CardSection({ card, month, charges, confirmed, onToggle, onRefresh, onL
 
 // ─── Cuadre (total esperado vs estado de cuenta → ajuste nombrado) ─────────────
 function Cuadre({ cardId, month, expected, onAdjusted }: { cardId: string; month: string; expected: number; onAdjusted: () => void }) {
-  const [note, setNote] = useState(''); const [amt, setAmt] = useState(''); const [open, setOpen] = useState(false)
+  const [note, setNote] = useState(''); const [amt, setAmt] = useState<number | null>(null); const [open, setOpen] = useState(false)
   async function register() {
-    const a = Number(amt); if (!Number.isFinite(a) || a === 0 || !note.trim()) return
+    const a = amt; if (a == null || a === 0 || !note.trim()) return
     await jsend(`/api/finance/cards/${cardId}/adjust`, 'POST', { month, amount: Math.abs(a), note: note.trim(), flow: a < 0 ? 'in' : 'out' })
-    setNote(''); setAmt(''); setOpen(false); onAdjusted()
+    setNote(''); setAmt(null); setOpen(false); onAdjusted()
   }
   return (
     <div className="mt-3 border-t border-border pt-3 text-secondary">
@@ -249,7 +250,7 @@ function Cuadre({ cardId, month, expected, onAdjusted }: { cardId: string; month
       {open ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input value={note} onChange={e => setNote(e.target.value)} placeholder="causa (comisión, cargo suelto…)" className={`flex-1 ${inp}`} />
-          <input value={amt} onChange={e => setAmt(e.target.value)} inputMode="decimal" placeholder="$ dif (− = crédito)" className={`w-28 ${inp} text-right tabular-nums`} />
+          <MoneyInput value={amt} onChange={setAmt} placeholder="$ dif (− = crédito)" className={`w-28 ${inp} text-right tabular-nums`} />
           <button onClick={() => void register()} className="rounded-control bg-accent/15 px-2.5 py-1 font-medium text-accent hover:bg-accent/25">Ajuste</button>
           <button onClick={() => setOpen(false)} className="px-1 text-fg-muted">✕</button>
         </div>
@@ -295,12 +296,12 @@ function Ledger({ cardId, cardName, onClose }: { cardId: string; cardName: strin
 // ─── Editar datos de la tarjeta ───────────────────────────────────────────────
 function CardHeaderEdit({ card, onDone }: { card: Card; onDone: () => void }) {
   const [name, setName] = useState(card.name); const [last4, setLast4] = useState(card.last4 ?? '')
-  const [limit, setLimit] = useState(card.credit_limit != null ? String(card.credit_limit) : '')
+  const [limit, setLimit] = useState<number | null>(card.credit_limit ?? null)
   const [cut, setCut] = useState(card.cut_day != null ? String(card.cut_day) : ''); const [due, setDue] = useState(card.due_day != null ? String(card.due_day) : '')
   async function save() {
     await jsend(`/api/finance/cards/${card.id}`, 'PATCH', {
       name: name.trim() || card.name, last4: last4.trim() || null,
-      credit_limit: limit.trim() ? Number(limit) : null,
+      credit_limit: limit,
       cut_day: cut.trim() ? Number(cut) : null, due_day: due.trim() ? Number(due) : null,
     })
     onDone()
@@ -309,7 +310,7 @@ function CardHeaderEdit({ card, onDone }: { card: Card; onDone: () => void }) {
     <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-border pb-3">
       <input value={name} onChange={e => setName(e.target.value)} placeholder="banco/emisor" className={`w-32 ${inp}`} />
       <input value={last4} onChange={e => setLast4(e.target.value)} placeholder="últimos 4" maxLength={4} className={`w-20 ${inp}`} />
-      <input value={limit} onChange={e => setLimit(e.target.value)} placeholder="límite" inputMode="decimal" className={`w-24 ${inp} text-right`} />
+      <MoneyInput value={limit} onChange={setLimit} placeholder="límite" className={`w-24 ${inp} text-right`} />
       <input value={cut} onChange={e => setCut(e.target.value)} placeholder="corte" inputMode="numeric" className={`w-16 ${inp} text-right`} />
       <input value={due} onChange={e => setDue(e.target.value)} placeholder="pago" inputMode="numeric" className={`w-16 ${inp} text-right`} />
       <button onClick={() => void save()} className="px-1 text-ok" title="Guardar">✓</button>
@@ -338,33 +339,33 @@ function ChargeActions({ charge, onDone }: { charge: Charge; onDone: () => void 
 function month0() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 
 function ChargeEdit({ charge, onDone }: { charge: Charge; onDone: () => void }) {
-  const [name, setName] = useState(charge.name); const [amount, setAmount] = useState(String(charge.amount))
+  const [name, setName] = useState(charge.name); const [amount, setAmount] = useState<number | null>(charge.amount)
   const [meses, setMeses] = useState(String(charge.meses)); const [start, setStart] = useState(charge.start_month)
   const [kind, setKind] = useState(charge.kind); const [attr, setAttr] = useState(charge.attribution ?? '')
-  const [original, setOriginal] = useState(charge.original_amount != null ? String(charge.original_amount) : '')
-  const [pending, setPending] = useState(charge.pending_override != null ? String(charge.pending_override) : '')
+  const [original, setOriginal] = useState<number | null>(charge.original_amount ?? null)
+  const [pending, setPending] = useState<number | null>(charge.pending_override ?? null)
   // estimado que se usaría si NO capturas el real (para saber contra qué comparas al cuadrar)
-  const est = (() => { const o = original.trim() ? Number(original) : charge.meses * Number(amount || 0); return Math.max(0, o - numero({ ...charge, meses: Number(meses) || charge.meses, start_month: /^\d{4}-\d{2}$/.test(start) ? start : charge.start_month }, month0()) * Number(amount || 0)) })()
+  const est = (() => { const o = original != null ? original : charge.meses * (amount ?? 0); return Math.max(0, o - numero({ ...charge, meses: Number(meses) || charge.meses, start_month: /^\d{4}-\d{2}$/.test(start) ? start : charge.start_month }, month0()) * (amount ?? 0)) })()
   async function save() {
     await jsend(`/api/finance/card-charges/${charge.id}`, 'PATCH', {
-      name: name.trim() || charge.name, amount: Number(amount) || 0, meses: Number(meses) || charge.meses,
+      name: name.trim() || charge.name, amount: amount ?? 0, meses: Number(meses) || charge.meses,
       start_month: /^\d{4}-\d{2}$/.test(start) ? start : charge.start_month, kind, attribution: attr || null,
-      original_amount: original.trim() ? Number(original) : null,
-      pending_override: pending.trim() ? Number(pending) : null,
+      original_amount: original,
+      pending_override: pending,
     })
     onDone()
   }
   return (
     <div className="flex flex-1 flex-wrap items-center gap-1.5">
       <input value={name} onChange={e => setName(e.target.value)} className={`flex-1 ${inp}`} />
-      <input value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" className={`w-20 ${inp} text-right`} title="mensualidad" />
+      <MoneyInput value={amount} onChange={setAmount} className={`w-20 ${inp} text-right`} title="mensualidad" />
       <span className="text-label text-fg-muted">/</span>
       <input value={meses} onChange={e => setMeses(e.target.value)} inputMode="numeric" className={`w-12 ${inp} text-right`} title="meses (M)" />
       <input value={start} onChange={e => setStart(e.target.value)} placeholder="YYYY-MM" className={`w-24 ${inp}`} title="mes inicial" />
       <select value={kind} onChange={e => setKind(e.target.value as Charge['kind'])} className={inp}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={e => setAttr(e.target.value)} className={inp}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
-      <input value={original} onChange={e => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." className={`w-24 ${inp} text-right`} title="monto original de la compra" />
-      <input value={pending} onChange={e => setPending(e.target.value)} inputMode="decimal" placeholder={`pend. real (est. ${est.toLocaleString('es-MX', { maximumFractionDigits: 2 })})`} className={`w-40 ${inp} text-right`} title="saldo pendiente REAL del estado de cuenta — manda sobre el estimado; vacío = usa el estimado" />
+      <MoneyInput value={original} onChange={setOriginal} placeholder="orig." className={`w-24 ${inp} text-right`} title="monto original de la compra" />
+      <MoneyInput value={pending} onChange={setPending} placeholder={`pend. real (est. ${est.toLocaleString('es-MX', { maximumFractionDigits: 2 })})`} className={`w-40 ${inp} text-right`} title="saldo pendiente REAL del estado de cuenta — manda sobre el estimado; vacío = usa el estimado" />
       <button onClick={() => void save()} className="px-1 text-ok">✓</button>
       <button onClick={onDone} className="px-1 text-fg-muted">✕</button>
     </div>
@@ -373,25 +374,25 @@ function ChargeEdit({ charge, onDone }: { charge: Charge; onDone: () => void }) 
 
 // ─── Añadir cargo ─────────────────────────────────────────────────────────────
 function AddCharge({ cardId, defaultMonth, onDone }: { cardId: string; defaultMonth: string; onDone: () => void }) {
-  const [name, setName] = useState(''); const [amount, setAmount] = useState(''); const [meses, setMeses] = useState('')
+  const [name, setName] = useState(''); const [amount, setAmount] = useState<number | null>(null); const [meses, setMeses] = useState('')
   const [start, setStart] = useState(defaultMonth); const [kind, setKind] = useState<Charge['kind']>('personal'); const [attr, setAttr] = useState('')
-  const [original, setOriginal] = useState(''); const [pending, setPending] = useState('')
+  const [original, setOriginal] = useState<number | null>(null); const [pending, setPending] = useState<number | null>(null)
   async function add() {
-    if (!name.trim() || !Number(amount) || !Number(meses)) return
-    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount: Number(amount), meses: Number(meses), start_month: start, kind, attribution: attr || null, original_amount: original.trim() ? Number(original) : null, pending_override: pending.trim() ? Number(pending) : null })
+    if (!name.trim() || !amount || !Number(meses)) return
+    await jsend('/api/finance/card-charges', 'POST', { card_id: cardId, name: name.trim(), amount, meses: Number(meses), start_month: start, kind, attribution: attr || null, original_amount: original, pending_override: pending })
     onDone()
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
       <input value={name} onChange={e => setName(e.target.value)} placeholder="nombre del cargo" className={`flex-1 ${inp}`} autoFocus />
-      <input value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" placeholder="$/mes" className={`w-20 ${inp} text-right`} />
+      <MoneyInput value={amount} onChange={setAmount} placeholder="$/mes" className={`w-20 ${inp} text-right`} />
       <span className="text-label text-fg-muted">/</span>
       <input value={meses} onChange={e => setMeses(e.target.value)} inputMode="numeric" placeholder="M" className={`w-12 ${inp} text-right`} />
       <input value={start} onChange={e => setStart(e.target.value)} placeholder="YYYY-MM" className={`w-24 ${inp}`} />
       <select value={kind} onChange={e => setKind(e.target.value as Charge['kind'])} className={inp}><option value="personal">personal</option><option value="attributed">atribuido</option></select>
       <select value={attr} onChange={e => setAttr(e.target.value)} className={inp}><option value="">— etiqueta —</option><option value="andres">Andrés</option><option value="publico">Público</option></select>
-      <input value={original} onChange={e => setOriginal(e.target.value)} inputMode="decimal" placeholder="orig." className={`w-24 ${inp} text-right`} title="monto original de la compra (para derivar el saldo pendiente)" />
-      <input value={pending} onChange={e => setPending(e.target.value)} inputMode="decimal" placeholder="pend. real" className={`w-28 ${inp} text-right`} title="saldo pendiente REAL del estado de cuenta (opcional; manda sobre el estimado)" />
+      <MoneyInput value={original} onChange={setOriginal} placeholder="orig." className={`w-24 ${inp} text-right`} title="monto original de la compra (para derivar el saldo pendiente)" />
+      <MoneyInput value={pending} onChange={setPending} placeholder="pend. real" className={`w-28 ${inp} text-right`} title="saldo pendiente REAL del estado de cuenta (opcional; manda sobre el estimado)" />
       <button onClick={() => void add()} className="px-1 text-ok" title="Añadir">✓</button>
       <button onClick={onDone} className="px-1 text-fg-muted" title="Cancelar">✕</button>
     </div>

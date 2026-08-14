@@ -8,6 +8,7 @@ import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSec
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { FundLedger } from '@/components/finance/FundLedger'
 import DrumModal from '@/components/DrumModal'
+import { MoneyInput } from '@/components/MoneyInput'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import { useUptownRenters, type Renter } from '@/components/uptown/useUptownRenters'
 import { valetSaturdays } from '@/lib/valet'
@@ -164,21 +165,20 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
 function AmountInput({
   value, onSave, className = '',
 }: { value: number; onSave: (n: number) => void; className?: string }) {
-  const [v, setV]       = useState(String(value))
+  const [v, setV]       = useState<number | null>(value)
   const [focused, setFocused] = useState(false)
-  useEffect(() => { if (!focused) setV(String(value)) }, [value, focused])
+  useEffect(() => { if (!focused) setV(value) }, [value, focused])
   function save() {
-    const n = parseFloat(v)
-    if (!isNaN(n) && n >= 0 && n !== value) onSave(n)
-    else setV(String(value))
+    const n = v
+    if (n != null && n >= 0 && n !== value) onSave(n)
+    else setV(value)
     setFocused(false)
   }
   return focused ? (
-    <input
-      type="number"
+    <MoneyInput
       value={v}
       autoFocus
-      onChange={e => setV(e.target.value)}
+      onChange={setV}
       onBlur={save}
       onKeyDown={e => e.key === 'Enter' && save()}
       className={`w-28 rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-right text-body tabular-nums text-fg outline-none ${className}`}
@@ -286,14 +286,14 @@ function RentasSection({ renters, rents, onToggle, onAmount, onMethod, paidCount
 }) {
   const total = rents.reduce((s, r) => s + r.amount, 0)
   const [editId, setEditId] = useState<string | null>(null)
-  const [eName, setEName] = useState(''); const [eLoc, setELoc] = useState(''); const [eRent, setERent] = useState('')
+  const [eName, setEName] = useState(''); const [eLoc, setELoc] = useState(''); const [eRent, setERent] = useState<number | null>(null)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
-  const [nName, setNName] = useState(''); const [nRent, setNRent] = useState('')
+  const [nName, setNName] = useState(''); const [nRent, setNRent] = useState<number | null>(null)
   const dragId = useRef<string | null>(null)
 
-  function startEdit(r: Renter) { setEditId(r.id); setEName(r.name); setELoc(r.location ?? ''); setERent(String(r.rent)) }
-  function saveEdit() { if (editId && eName.trim()) onEditRenter(editId, { name: eName.trim(), location: eLoc.trim() || null, rent: Number(eRent) || 0 }); setEditId(null) }
-  function addNew() { if (!nName.trim()) return; onAddRenter(nName.trim(), Number(nRent) || 0); setNName(''); setNRent('') }
+  function startEdit(r: Renter) { setEditId(r.id); setEName(r.name); setELoc(r.location ?? ''); setERent(r.rent ?? null) }
+  function saveEdit() { if (editId && eName.trim()) onEditRenter(editId, { name: eName.trim(), location: eLoc.trim() || null, rent: eRent ?? 0 }); setEditId(null) }
+  function addNew() { if (!nName.trim()) return; onAddRenter(nName.trim(), nRent ?? 0); setNName(''); setNRent(null) }
   function drop(targetId: string) {
     const from = dragId.current; dragId.current = null
     if (!from || from === targetId) return
@@ -314,7 +314,7 @@ function RentasSection({ renters, rents, onToggle, onAmount, onMethod, paidCount
             <input value={eName} onChange={e => setEName(e.target.value)} placeholder="nombre" className={`flex-1 ${inp}`} autoFocus />
             <input value={eLoc} onChange={e => setELoc(e.target.value)} placeholder="ubicación" className={`w-28 ${inp} text-label`} />
             <span className="text-label text-fg-muted">renta</span>
-            <input value={eRent} onChange={e => setERent(e.target.value)} inputMode="decimal" onKeyDown={e => e.key === 'Enter' && saveEdit()} className={`w-24 ${inp} text-right tabular-nums`} />
+            <MoneyInput value={eRent} onChange={setERent} onKeyDown={e => e.key === 'Enter' && saveEdit()} className={`w-24 ${inp} text-right tabular-nums`} />
             <button onClick={saveEdit} className="px-1 text-ok" title="Guardar">✓</button>
             <button onClick={() => setEditId(null)} className="px-1 text-fg-muted" title="Cancelar">✕</button>
           </div>
@@ -342,7 +342,7 @@ function RentasSection({ renters, rents, onToggle, onAmount, onMethod, paidCount
       })}
       <div className="mt-1 flex items-center gap-2 border-t border-border pt-2">
         <input value={nName} onChange={e => setNName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNew()} placeholder="+ Nuevo inquilino" className={`flex-1 ${inp} py-1`} />
-        <input value={nRent} onChange={e => setNRent(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNew()} inputMode="decimal" placeholder="renta" className={`w-24 ${inp} py-1 text-right tabular-nums`} />
+        <MoneyInput value={nRent} onChange={setNRent} onKeyDown={e => e.key === 'Enter' && addNew()} placeholder="renta" className={`w-24 ${inp} py-1 text-right tabular-nums`} />
         <button onClick={addNew} className="rounded border border-border px-3 py-1 text-body font-medium text-fg hover:border-accent/50">Añadir</button>
       </div>
     </SectionCard>
@@ -360,15 +360,15 @@ function ExtraSection({ title, colorClass = 'text-fg-muted', items, onAdd, onDel
   onAmount: (id: string, amount: number) => void
 }) {
   const [desc, setDesc] = useState('')
-  const [amt, setAmt] = useState('')
+  const [amt, setAmt] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
   const total = items.reduce((s, i) => s + i.amount, 0)
 
   function submit() {
-    const a = parseFloat(amt)
-    if (!desc.trim() || !a || a < 0) return
+    const a = amt
+    if (!desc.trim() || a == null || a <= 0) return
     onAdd(desc.trim(), a)
-    setDesc(''); setAmt(''); setAdding(false)
+    setDesc(''); setAmt(null); setAdding(false)
   }
 
   return (
@@ -395,8 +395,8 @@ function ExtraSection({ title, colorClass = 'text-fg-muted', items, onAdd, onDel
             placeholder="Descripción"
             className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
           />
-          <input
-            type="number" value={amt} onChange={e => setAmt(e.target.value)}
+          <MoneyInput
+            value={amt} onChange={setAmt}
             onKeyDown={e => e.key === 'Enter' && submit()}
             placeholder="Monto"
             className="w-24 rounded-control border border-border bg-surface-2 px-2 py-1 text-secondary text-fg placeholder:text-fg-faint/50 outline-none focus:border-accent/50"
@@ -434,7 +434,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
 
   const [addOpen,      setAddOpen]      = useState(false)
   const [addName,      setAddName]      = useState('')
-  const [addAmount,    setAddAmount]    = useState('')
+  const [addAmount,    setAddAmount]    = useState<number | null>(null)
   const [addMethod,    setAddMethod]    = useState<'cash' | 'card'>('cash')
   const [adding,       setAdding]       = useState(false)
   const [confirmDel,   setConfirmDel]   = useState<string | null>(null)
@@ -457,12 +457,12 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
   async function handleAdd() {
     const name = addName.trim()
     if (!name) return
-    const amount = parseFloat(addAmount) || 0
+    const amount = addAmount ?? 0
     setAdding(true)
     await onAdd(name, amount, addMethod)
     setAdding(false)
     setAddOpen(false)
-    setAddName(''); setAddAmount(''); setAddMethod('cash')
+    setAddName(''); setAddAmount(null); setAddMethod('cash')
   }
 
   async function commitRename(oldCategory: string) {
@@ -545,10 +545,9 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
             className="w-full rounded border border-border bg-surface-2 px-2 py-1 text-body text-fg outline-none placeholder:text-fg-muted/40 focus:border-accent/40"
           />
           <div className="flex gap-2">
-            <input
-              type="number"
+            <MoneyInput
               value={addAmount}
-              onChange={e => setAddAmount(e.target.value)}
+              onChange={setAddAmount}
               onKeyDown={e => { if (e.key === 'Enter') void handleAdd() }}
               placeholder="Monto"
               className="w-28 rounded border border-border bg-surface-2 px-2 py-1 text-right text-body tabular-nums text-fg outline-none placeholder:text-fg-muted/40 focus:border-accent/40"
@@ -564,7 +563,7 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => { setAddOpen(false); setAddName(''); setAddAmount(''); setAddMethod('cash') }}
+              onClick={() => { setAddOpen(false); setAddName(''); setAddAmount(null); setAddMethod('cash') }}
               className="flex-1 rounded border border-border py-1 text-secondary text-fg-muted hover:text-fg"
             >Cancelar</button>
             <button
@@ -669,15 +668,15 @@ function CuentaCard({ label, icon, prompt, saldo, apertura, cobrado, pagado, apa
   onCuadrar: (real: number) => Promise<void>
   onVerAjustes: () => void
 }) {
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState<number | null>(null)
   const [busy, setBusy]   = useState(false)
-  const real = parseFloat(draft)
-  const dif  = !isNaN(real) ? Math.round((real - saldo) * 100) / 100 : null
+  const real = draft
+  const dif  = real != null ? Math.round((real - saldo) * 100) / 100 : null
 
   async function cuadrar() {
-    if (dif == null || Math.abs(dif) < 0.01) { setDraft(''); return }
+    if (real == null || dif == null || Math.abs(dif) < 0.01) { setDraft(null); return }
     setBusy(true)
-    try { await onCuadrar(real); setDraft('') } finally { setBusy(false) }
+    try { await onCuadrar(real); setDraft(null) } finally { setBusy(false) }
   }
 
   return (
@@ -702,9 +701,9 @@ function CuentaCard({ label, icon, prompt, saldo, apertura, cobrado, pagado, apa
       {/* ritual de conciliación — único punto de edición del saldo */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border pt-2 text-secondary">
         <span className="text-fg-muted">{prompt}</span>
-        <input
-          type="number" placeholder="$" value={draft}
-          onChange={e => setDraft(e.target.value)}
+        <MoneyInput
+          placeholder="$" value={draft}
+          onChange={setDraft}
           onKeyDown={e => e.key === 'Enter' && void cuadrar()}
           className="w-24 rounded border border-border bg-surface-2 px-2 py-0.5 text-right tabular-nums text-fg outline-none focus:border-accent/50"
         />
@@ -739,17 +738,17 @@ function UptownCajaFuerteCard({ total, aportadoAmount, aportadoMethod, onAportar
   onOpen: () => void
 }) {
   const [editing, setEditing]   = useState(false)
-  const [amtDraft, setAmtDraft] = useState('')
+  const [amtDraft, setAmtDraft] = useState<number | null>(null)
   const [method, setMethod]     = useState<'cash' | 'card'>(aportadoMethod)
   const [busy, setBusy]         = useState(false)
 
   useEffect(() => { setMethod(aportadoMethod) }, [aportadoMethod])
 
   async function submit() {
-    const n = parseFloat(amtDraft)
-    if (!n || n <= 0) return
+    const n = amtDraft
+    if (n == null || n <= 0) return
     setBusy(true)
-    try { await onAportar(n, method); setEditing(false); setAmtDraft('') } finally { setBusy(false) }
+    try { await onAportar(n, method); setEditing(false); setAmtDraft(null) } finally { setBusy(false) }
   }
 
   const inputCls = 'w-24 rounded border border-border bg-surface-2 px-2 py-0.5 text-right tabular-nums text-fg outline-none focus:border-accent/50'
@@ -769,22 +768,22 @@ function UptownCajaFuerteCard({ total, aportadoAmount, aportadoMethod, onAportar
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-fg-muted">Sin aportar este mes</span>
             <MethodToggle method={method} onChange={setMethod} />
-            <input type="number" value={amtDraft} onChange={e => setAmtDraft(e.target.value)}
+            <MoneyInput value={amtDraft} onChange={setAmtDraft}
               onKeyDown={e => { if (e.key === 'Enter') void submit() }} placeholder="$" className={inputCls} />
             <button onClick={() => void submit()} disabled={busy || !amtDraft} className={okBtn}>Aportar</button>
           </div>
         ) : editing ? (
           <div className="flex flex-wrap items-center gap-2">
             <MethodToggle method={method} onChange={setMethod} />
-            <input type="number" value={amtDraft} autoFocus onChange={e => setAmtDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') void submit(); if (e.key === 'Escape') { setEditing(false); setAmtDraft('') } }} className={inputCls} />
+            <MoneyInput value={amtDraft} autoFocus onChange={setAmtDraft}
+              onKeyDown={e => { if (e.key === 'Enter') void submit(); if (e.key === 'Escape') { setEditing(false); setAmtDraft(null) } }} className={inputCls} />
             <button onClick={() => void submit()} disabled={busy || !amtDraft} className={okBtn}>Guardar</button>
-            <button onClick={() => { setEditing(false); setAmtDraft('') }} className="text-label text-fg-muted hover:text-fg">✕</button>
+            <button onClick={() => { setEditing(false); setAmtDraft(null) }} className="text-label text-fg-muted hover:text-fg">✕</button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-ok">✓ Aportado este mes: <Mxn v={aportadoAmount} /> <span className="text-fg-muted">· {aportadoMethod === 'cash' ? 'efectivo' : 'banco'}</span></span>
-            <button onClick={() => { setEditing(true); setAmtDraft(String(aportadoAmount)) }} className="text-label text-fg-muted hover:text-fg">editar</button>
+            <button onClick={() => { setEditing(true); setAmtDraft(aportadoAmount) }} className="text-label text-fg-muted hover:text-fg">editar</button>
             <button onClick={() => void onQuitar()} className="text-label text-fg-muted hover:text-danger">quitar</button>
           </div>
         )}
@@ -909,14 +908,14 @@ function ValetWeekCard({
   onProviderAmount: (amount: number) => void
 }) {
   const [editingAmt, setEditingAmt] = useState(false)
-  const [amtDraft,   setAmtDraft]   = useState(String(providerAmount))
+  const [amtDraft,   setAmtDraft]   = useState<number | null>(providerAmount)
 
-  useEffect(() => { if (!editingAmt) setAmtDraft(String(providerAmount)) }, [providerAmount, editingAmt])
+  useEffect(() => { if (!editingAmt) setAmtDraft(providerAmount) }, [providerAmount, editingAmt])
 
   function saveAmt() {
-    const n = parseFloat(amtDraft)
-    if (!isNaN(n) && n >= 0 && n !== providerAmount) onProviderAmount(n)
-    else setAmtDraft(String(providerAmount))
+    const n = amtDraft
+    if (n != null && n >= 0 && n !== providerAmount) onProviderAmount(n)
+    else setAmtDraft(providerAmount)
     setEditingAmt(false)
   }
 
@@ -941,9 +940,9 @@ function ValetWeekCard({
         <div className="flex items-center gap-1.5">
           <span className="text-label text-fg-muted">Proveedor</span>
           {editingAmt ? (
-            <input
-              type="number" value={amtDraft} autoFocus
-              onChange={e => setAmtDraft(e.target.value)}
+            <MoneyInput
+              value={amtDraft} autoFocus
+              onChange={setAmtDraft}
               onBlur={saveAmt}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') saveAmt() }}
               className="w-20 rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-right text-secondary tabular-nums text-fg outline-none"
@@ -987,9 +986,9 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
   const [payments, setPayments] = useState<ValetPayment[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
-  const [bankDraft, setBankDraft] = useState('')
+  const [bankDraft, setBankDraft] = useState<number | null>(null)
   const [ledgerOpen, setLedgerOpen] = useState(false)
-  const [pptDraft, setPptDraft] = useState('176')
+  const [pptDraft, setPptDraft] = useState<number | null>(176)
   const saved = Number(nuFund?.saved ?? 0)   // saldo corrido real de la libreta Nu
 
   useEffect(() => {
@@ -1003,7 +1002,7 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
           price_per_point:  Number(data.config?.price_per_point ?? 176),
         }
         setConfig(cfg)
-        setPptDraft(String(cfg.price_per_point))
+        setPptDraft(cfg.price_per_point)
         setPayments(data.payments ?? [])
       })
       .catch(e => setError(String(e)))
@@ -1019,16 +1018,16 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
   // Único punto de edición del saldo: si el banco difiere de la libreta, registra un ajuste NOMBRADO
   // (aportación/retiro sobre el fondo valet_nu). Nunca se edita nu_balance a mano.
   async function registrarAjuste() {
-    const bank = parseFloat(bankDraft)
-    if (isNaN(bank)) return
+    const bank = bankDraft
+    if (bank == null) return
     const delta = Math.round((bank - saved) * 100) / 100
-    if (Math.abs(delta) < 0.01) { setBankDraft(''); return }
+    if (Math.abs(delta) < 0.01) { setBankDraft(null); return }
     await post('/api/finance/funds/movement', {
       key: 'valet_nu',
       flow: delta > 0 ? 'out' : 'in',   // out = aportación (sube el fondo), in = retiro (baja)
       amount: Math.abs(delta), description: 'Ajuste de conciliación', month,
     })
-    setBankDraft('')
+    setBankDraft(null)
     onLedgerChange()
   }
 
@@ -1145,12 +1144,12 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
 
         <div className="flex items-center gap-1.5">
           <span className="text-secondary text-fg-muted">Monto/pt:</span>
-          <input type="number" value={pptDraft}
-            onChange={e => setPptDraft(e.target.value)}
+          <MoneyInput value={pptDraft}
+            onChange={setPptDraft}
             onBlur={() => {
-              const val = parseFloat(pptDraft)
-              if (!isNaN(val) && val > 0 && val !== config.price_per_point) void saveConfig({ price_per_point: val })
-              else setPptDraft(String(config.price_per_point))
+              const val = pptDraft
+              if (val != null && val > 0 && val !== config.price_per_point) void saveConfig({ price_per_point: val })
+              else setPptDraft(config.price_per_point)
             }}
             onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
             className="w-20 rounded border border-border bg-surface-2 px-2 py-0.5 text-right text-secondary tabular-nums text-fg outline-none focus:border-accent/50" />
@@ -1181,13 +1180,13 @@ function ValetTab({ month, nuFund, onLedgerChange }: { month: string; nuFund?: F
             {/* Conciliar: libreta vs banco → Cuadrar registra un ajuste nombrado (único punto de edición) */}
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-control border border-border bg-surface-2 px-3 py-2.5 text-secondary">
               <span className="text-fg-muted">¿Qué dice Nu?</span>
-              <input type="number" placeholder="$ banco" value={bankDraft}
-                onChange={e => setBankDraft(e.target.value)}
+              <MoneyInput placeholder="$ banco" value={bankDraft}
+                onChange={setBankDraft}
                 onKeyDown={e => e.key === 'Enter' && void registrarAjuste()}
                 className="w-28 rounded border border-border bg-surface-1 px-2 py-0.5 text-right tabular-nums text-fg outline-none focus:border-accent/50" />
               {(() => {
-                const bank = parseFloat(bankDraft)
-                if (isNaN(bank) || Math.abs(bank - saved) < 0.01) return null
+                const bank = bankDraft
+                if (bank == null || Math.abs(bank - saved) < 0.01) return null
                 const diff = Math.round((bank - saved) * 100) / 100
                 return (
                   <>

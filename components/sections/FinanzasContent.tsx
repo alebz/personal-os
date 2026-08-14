@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Mxn from '@/components/Mxn'
+import { MoneyInput } from '@/components/MoneyInput'
 import { MethodCell } from '@/components/finance/MethodCell'
 import { PixelIcon } from '@/components/PixelIcon'
 import { CajaFuerteSection, type Fund } from '@/components/finance/CajaFuerteSection'
@@ -275,24 +276,24 @@ function IncomeRow({
   onUpdate: (id: string, u: Partial<IncomeItem>) => void
   onDelete: (id: string) => void
 }) {
-  const [draft, setDraft] = useState(String(realMonto))
+  const [draft, setDraft] = useState<number | null>(realMonto)
   const [editing, setEditing] = useState(false)
   const [name, setName]       = useState(item.nombre)
-  const [baseAmt, setBaseAmt] = useState(String(Number(item.monto)))
+  const [baseAmt, setBaseAmt] = useState<number | null>(Number(item.monto))
   const [baseMetodo, setBaseMetodo] = useState(normMethod(item.metodo))
-  useEffect(() => { setDraft(String(realMonto)) }, [realMonto])
+  useEffect(() => { setDraft(realMonto) }, [realMonto])
 
   function commitDraft() {
-    const n = parseFloat(draft)
-    if (n > 0) onSetMonto(n)
-    else setDraft(String(realMonto))
+    const n = draft
+    if (n != null && n > 0) onSetMonto(n)
+    else setDraft(realMonto)
   }
   function begin() {
-    setName(item.nombre); setBaseAmt(String(Number(item.monto))); setBaseMetodo(normMethod(item.metodo))
+    setName(item.nombre); setBaseAmt(Number(item.monto)); setBaseMetodo(normMethod(item.metodo))
     setEditing(true)
   }
   function save() {
-    const a = parseFloat(baseAmt)
+    const a = baseAmt
     if (!name.trim() || !a || a <= 0) { setEditing(false); return }
     onUpdate(item.id, { nombre: name.trim(), monto: a, metodo: baseMetodo })
     setEditing(false)
@@ -305,7 +306,7 @@ function IncomeRow({
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
           className="min-w-0 flex-1 rounded border border-border bg-surface-2 px-2 py-0.5 text-secondary text-fg outline-none focus:border-accent/50" />
         <MethodSelect value={baseMetodo} onChange={v => setBaseMetodo(normMethod(v))} />
-        <input type="number" value={baseAmt} onChange={e => setBaseAmt(e.target.value)}
+        <MoneyInput value={baseAmt} onChange={setBaseAmt}
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
           className="w-20 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-right text-secondary text-fg outline-none focus:border-accent/50" />
         <button onClick={save} className="text-label font-medium text-ok hover:underline">OK</button>
@@ -329,11 +330,10 @@ function IncomeRow({
       {checked ? (
         <>
           <MethodSelect value={realMetodo} onChange={onSetMetodo} />
-          <input
-            type="number"
+          <MoneyInput
             value={draft}
+            onChange={setDraft}
             onClick={e => e.stopPropagation()}
-            onChange={e => setDraft(e.target.value)}
             onBlur={commitDraft}
             onKeyDown={e => {
               if (e.key === 'Enter') { commitDraft(); (e.target as HTMLElement).blur() }
@@ -372,17 +372,17 @@ function GastoRow({
 }) {
   const [editing, setEditing] = useState(false)
   const [name,   setName]   = useState(commitment.name)
-  const [amt,    setAmt]    = useState(String(Number(commitment.amount)))
+  const [amt,    setAmt]    = useState<number | null>(Number(commitment.amount))
   const [meses,  setMeses]  = useState(commitment.meses ? String(commitment.meses) : '')
   const [metodo, setMetodo] = useState(normMethod(commitment.metodo))
 
   function begin() {
-    setName(commitment.name); setAmt(String(Number(commitment.amount)))
+    setName(commitment.name); setAmt(Number(commitment.amount))
     setMeses(commitment.meses ? String(commitment.meses) : ''); setMetodo(normMethod(commitment.metodo))
     setEditing(true)
   }
   function save() {
-    const a = parseFloat(amt)
+    const a = amt
     if (!name.trim() || !a || a <= 0) { setEditing(false); return }
     const m = meses.trim() ? parseInt(meses, 10) : null
     onUpdate(commitment.id, { name: name.trim(), amount: a, meses: m && m > 0 ? m : null, metodo })
@@ -398,7 +398,7 @@ function GastoRow({
         <input type="number" value={meses} onChange={e => setMeses(e.target.value)} placeholder="∞" title="Nº de pagos (vacío = indefinido)"
           className="w-12 rounded border border-border bg-surface-2 px-1 py-0.5 text-center text-secondary text-fg-muted outline-none focus:border-accent/50" />
         <MethodSelect value={metodo} onChange={v => setMetodo(normMethod(v))} />
-        <input type="number" value={amt} onChange={e => setAmt(e.target.value)}
+        <MoneyInput value={amt} onChange={setAmt}
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
           className="w-20 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-right text-secondary text-fg outline-none focus:border-accent/50" />
         <button onClick={save} className="text-label font-medium text-ok hover:underline">OK</button>
@@ -472,15 +472,15 @@ function AddExtraForm({
   onAdd: (nombre: string, monto: number, metodo: string) => void
 }) {
   const [nombre, setNombre] = useState('')
-  const [monto, setMonto]   = useState('')
+  const [monto, setMonto]   = useState<number | null>(null)
   const [metodo, setMetodo] = useState('efectivo')
 
   function submit() {
-    const n = parseFloat(monto)
+    const n = monto
     if (!nombre.trim() || !n || n <= 0) return
     onAdd(nombre.trim(), n, metodo)
     setNombre('')
-    setMonto('')
+    setMonto(null)
   }
 
   return (
@@ -492,10 +492,9 @@ function AddExtraForm({
         placeholder={placeholder}
         className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
-      <input
-        type="number"
+      <MoneyInput
         value={monto}
-        onChange={e => setMonto(e.target.value)}
+        onChange={setMonto}
         onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="$"
         className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
@@ -529,12 +528,12 @@ function EditModal({
   onClose: () => void
 }) {
   const [desc,   setDesc]   = useState(mv.description)
-  const [monto,  setMonto]  = useState(String(mv.amount))
+  const [monto,  setMonto]  = useState<number | null>(Number(mv.amount))
   const [metodo, setMetodo] = useState(normMethod(mv.metodo))
   const [saving, setSaving] = useState(false)
 
   async function save() {
-    const n = parseFloat(monto)
+    const n = monto
     if (!desc.trim() || !n || n <= 0) return
     setSaving(true)
     try {
@@ -565,10 +564,9 @@ function EditModal({
           className="w-full rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none focus:border-accent/50"
         />
         <div className="flex gap-2">
-          <input
-            type="number"
+          <MoneyInput
             value={monto}
-            onChange={e => setMonto(e.target.value)}
+            onChange={setMonto}
             className="min-w-0 flex-1 rounded-card border border-border bg-surface-2 px-3 py-2 text-body text-fg outline-none focus:border-accent/50"
           />
           <select
@@ -608,16 +606,16 @@ function AddCommitmentForm({
   onAdd: (name: string, amount: number, meses: number | null, metodo: string) => void
 }) {
   const [name,  setName]  = useState('')
-  const [monto, setMonto] = useState('')
+  const [monto, setMonto] = useState<number | null>(null)
   const [meses, setMeses] = useState('')
   const [metodo, setMetodo] = useState('tarjeta')
 
   function submit() {
-    const a = parseFloat(monto)
+    const a = monto
     if (!name.trim() || !a || a <= 0) return
     const m = meses.trim() ? parseInt(meses, 10) : null
     onAdd(name.trim(), a, m && m > 0 ? m : null, metodo)
-    setName(''); setMonto(''); setMeses('')
+    setName(''); setMonto(null); setMeses('')
   }
 
   return (
@@ -627,8 +625,8 @@ function AddCommitmentForm({
         placeholder="Netflix, renta…"
         className="min-w-0 flex-1 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
-      <input
-        type="number" value={monto} onChange={e => setMonto(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
+      <MoneyInput
+        value={monto} onChange={setMonto} onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder="$/mes"
         className="w-20 rounded-control border border-border bg-surface-2 px-2.5 py-1.5 text-secondary text-fg placeholder:text-fg-faint/40 outline-none focus:border-accent/50"
       />
@@ -800,15 +798,15 @@ function PanelTab({
     subNode?: React.ReactNode
   }) {
     const [editing, setEditing] = useState(false)
-    const [draft, setDraft]     = useState('')
+    const [draft, setDraft]     = useState<number | null>(null)
     const skipCommit = useRef(false)
 
-    function begin() { setDraft(String(value)); skipCommit.current = false; setEditing(true) }
+    function begin() { setDraft(value); skipCommit.current = false; setEditing(true) }
     function commit() {
       if (skipCommit.current) { skipCommit.current = false; setEditing(false); return }
       setEditing(false)
-      const v = parseFloat(draft)
-      if (isNaN(v) || v === value) return
+      const v = draft
+      if (v == null || v === value) return
       void onAdjustPosition(account, v, shown)
     }
 
@@ -816,9 +814,9 @@ function PanelTab({
       <div className="rounded-card border border-border bg-surface-1 p-4 shadow-xl shadow-black/20 backdrop-blur-xl dashboard-card">
         <p className="text-label uppercase tracking-wider text-fg-muted">{label}</p>
         {editing ? (
-          <input
-            autoFocus type="number" value={draft}
-            onChange={e => setDraft(e.target.value)}
+          <MoneyInput
+            autoFocus value={draft}
+            onChange={setDraft}
             onBlur={commit}
             onKeyDown={e => {
               if (e.key === 'Enter') e.currentTarget.blur()

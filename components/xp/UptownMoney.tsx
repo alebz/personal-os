@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MoneyChrome, MoneyBar, MONEY, fmtMxn, fmtSigned, MoneyModal, MoneyBtn, MoneyInput } from './money/MoneyChrome'
+import { MoneyChrome, MoneyBar, MONEY, fmtMxn, fmtSigned, MoneyModal, MoneyBtn, MoneyInput, MoneyAmount } from './money/MoneyChrome'
 import MoneyCaja from './money/MoneyCaja'
 import MoneyValet from './money/MoneyValet'
 import { useUptownRenters, type Renter } from '@/components/uptown/useUptownRenters'
@@ -248,9 +248,9 @@ function ConfirmX({ onConfirm, label }: { onConfirm: () => void; label?: string 
   return <button onClick={() => { if (armed) { setArmed(false); onConfirm() } else setArmed(true) }} title={armed ? 'Clic de nuevo' : 'Borrar'} style={{ border: 0, background: 'none', cursor: 'pointer', color: armed ? '#c31212' : '#b7becb', fontWeight: armed ? 700 : 400, fontSize: armed ? 10 : 13, lineHeight: 1, flexShrink: 0, fontFamily: 'inherit' }}>{armed ? (label ?? '¿borrar?') : '×'}</button>
 }
 function AmountInput({ value, tone, onSave }: { value: number; tone?: 'up' | 'down'; onSave: (n: number) => void }) {
-  const [v, setV] = useState(String(value)); useEffect(() => { setV(String(value)) }, [value])
-  return <input type="number" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => { const n = num(v); if (n !== value) onSave(n) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-    style={{ width: 82, textAlign: 'right', border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 4px', fontSize: 11, fontFamily: 'inherit', outline: 'none', color: tone === 'up' ? MONEY.up : tone === 'down' ? MONEY.down : MONEY.ink, fontWeight: 600 }} />
+  // Edición por blur: onChange no-op (no guarda por tecla); al desenfocar lee el crudo y guarda si cambió.
+  return <MoneyAmount value={value} onChange={() => {}} onBlur={(e) => { const n = Number(e.target.value.trim().replace(',', '.')); if (Number.isFinite(n) && n !== value) onSave(n) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+    style={{ width: 82, textAlign: 'right', color: tone === 'up' ? MONEY.up : tone === 'down' ? MONEY.down : MONEY.ink, fontWeight: 600 }} />
 }
 
 // Tarjetas resumen
@@ -264,25 +264,25 @@ function PrevistoCard({ previsto, ingresos, egresos, apartado }: { previsto: num
   )
 }
 function CuentaCard({ label, icon, saldo, apertura, cob, pag, apart, ajuste, onCuadrar, onLedger }: { label: string; icon: string; saldo: number; apertura: number; cob: number; pag: number; apart: number; ajuste: number; onCuadrar: (real: number) => void; onLedger: () => void }) {
-  const [real, setReal] = useState('')
-  const dif = real.trim() === '' ? null : num(real) - saldo
+  const [real, setReal] = useState<number | null>(null)
+  const dif = real == null ? null : real - saldo
   return (
     <div style={{ flex: 1, minWidth: 178, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '6px 9px', background: 'linear-gradient(#fff,#eef5fd)' }}>
       <div style={{ fontSize: 10, color: '#5a6a86' }}>{label} {icon}</div>
       <div style={{ fontSize: 17, fontWeight: 700, color: MONEY.ink, letterSpacing: -0.4 }}>{fmtMxn(saldo)}</div>
       <div style={{ fontSize: 9, color: '#8a93a8', marginBottom: 3 }}>Ap.{fmtMxn(apertura)} +{fmtMxn(cob)} −{fmtMxn(pag)}{apart > 0 && ` ⊙${fmtMxn(apart)}`}{ajuste !== 0 && ` ${ajuste > 0 ? '+' : '−'}${fmtMxn(Math.abs(ajuste))}`}</div>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-        <input type="number" value={real} onChange={(e) => setReal(e.target.value)} placeholder="real…" style={{ width: 60, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 4px', fontSize: 11, fontFamily: 'inherit', outline: 'none' }} />
+        <MoneyAmount value={real} onChange={setReal} placeholder="real…" style={{ width: 60 }} />
         {dif !== null && dif !== 0 && <span style={{ fontSize: 9.5, color: dif > 0 ? MONEY.up : MONEY.down }}>{dif > 0 ? 'sobra' : 'falta'} {fmtMxn(Math.abs(dif))}</span>}
         <span style={{ flex: 1 }} />
-        <MoneyBtn disabled={dif === null || dif === 0} onClick={() => real.trim() !== '' && (onCuadrar(num(real)), setReal(''))}>Cuadrar</MoneyBtn>
+        <MoneyBtn disabled={dif === null || dif === 0} onClick={() => real != null && (onCuadrar(real), setReal(null))}>Cuadrar</MoneyBtn>
       </div>
       <button onClick={onLedger} style={{ ...editLink, marginTop: 3 }}>Ver ajustes</button>
     </div>
   )
 }
 function MantenimientoCard({ total, aportado, method, onAportar, onQuitar, onOpen }: { total: number; aportado: number; method: 'cash' | 'card'; onAportar: (a: number, m: 'cash' | 'card') => void; onQuitar: () => void; onOpen: () => void }) {
-  const [amt, setAmt] = useState(''); const [m, setM] = useState<'cash' | 'card'>('cash')
+  const [amt, setAmt] = useState<number | null>(null); const [m, setM] = useState<'cash' | 'card'>('cash')
   return (
     <div style={{ flex: 1, minWidth: 178, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '6px 9px', background: 'linear-gradient(#fff,#f2f7fd)' }}>
       <div style={{ fontSize: 10, color: '#5a6a86', display: 'flex' }}><span style={{ flex: 1 }}>Caja Fuerte</span><button onClick={onOpen} style={editLink}>abrir →</button></div>
@@ -296,8 +296,8 @@ function MantenimientoCard({ total, aportado, method, onAportar, onQuitar, onOpe
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
           <MethodCC value={m} onChange={setM} />
-          <input type="number" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="apartar" style={{ width: 56, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 4px', fontSize: 11, fontFamily: 'inherit', outline: 'none' }} />
-          <MoneyBtn disabled={num(amt) <= 0} onClick={() => { if (num(amt) > 0) { onAportar(num(amt), m); setAmt('') } }}>Aportar</MoneyBtn>
+          <MoneyAmount value={amt} onChange={setAmt} placeholder="apartar" style={{ width: 56 }} />
+          <MoneyBtn disabled={amt == null || amt <= 0} onClick={() => { if (amt != null && amt > 0) { onAportar(amt, m); setAmt(null) } }}>Aportar</MoneyBtn>
         </div>
       )}
     </div>
@@ -400,14 +400,14 @@ function ExtraRowUI({ it, tone, onUp, onDel }: { it: ExtraItem; tone: 'up' | 'do
 }
 
 function AddExtra({ placeholder, onAdd }: { placeholder: string; onAdd: (d: string, a: number) => void }) {
-  const [d, setD] = useState(''); const [a, setA] = useState('')
-  const go = () => { if (d.trim() && num(a) > 0) { onAdd(d.trim(), num(a)); setD(''); setA('') } }
-  return <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '5px 0 0' }}><MoneyInput value={d} onChange={(e) => setD(e.target.value)} placeholder={placeholder} style={{ flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MoneyInput type="number" value={a} onChange={(e) => setA(e.target.value)} placeholder="$" style={{ width: 70 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MoneyBtn onClick={go}>+</MoneyBtn></div>
+  const [d, setD] = useState(''); const [a, setA] = useState<number | null>(null)
+  const go = () => { if (d.trim() && a != null && a > 0) { onAdd(d.trim(), a); setD(''); setA(null) } }
+  return <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '5px 0 0' }}><MoneyInput value={d} onChange={(e) => setD(e.target.value)} placeholder={placeholder} style={{ flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MoneyAmount value={a} onChange={setA} placeholder="$" style={{ width: 70 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MoneyBtn onClick={go}>+</MoneyBtn></div>
 }
 function AddExpense({ onAdd }: { onAdd: (n: string, a: number, m: 'cash' | 'card') => void }) {
-  const [n, setN] = useState(''); const [a, setA] = useState(''); const [m, setM] = useState<'cash' | 'card'>('cash')
-  const go = () => { if (n.trim() && num(a) > 0) { onAdd(n.trim(), num(a), m); setN(''); setA('') } }
-  return <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '5px 0 0' }}><MoneyInput value={n} onChange={(e) => setN(e.target.value)} placeholder="Nuevo gasto fijo…" style={{ flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MethodCC value={m} onChange={setM} /><MoneyInput type="number" value={a} onChange={(e) => setA(e.target.value)} placeholder="$" style={{ width: 64 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MoneyBtn onClick={go}>+</MoneyBtn></div>
+  const [n, setN] = useState(''); const [a, setA] = useState<number | null>(null); const [m, setM] = useState<'cash' | 'card'>('cash')
+  const go = () => { if (n.trim() && a != null && a > 0) { onAdd(n.trim(), a, m); setN(''); setA(null) } }
+  return <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '5px 0 0' }}><MoneyInput value={n} onChange={(e) => setN(e.target.value)} placeholder="Nuevo gasto fijo…" style={{ flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MethodCC value={m} onChange={setM} /><MoneyAmount value={a} onChange={setA} placeholder="$" style={{ width: 64 }} onKeyDown={(e) => e.key === 'Enter' && go()} /><MoneyBtn onClick={go}>+</MoneyBtn></div>
 }
 
 function LedgerModal({ title, movements, onClose }: { title: string; movements: FundMove[]; onClose: () => void }) {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { MONEY, MoneyBar, MoneyModal, MoneyBtn, MoneyInput, fmtMxn } from './MoneyChrome'
+import { MONEY, MoneyAmount, MoneyBar, MoneyModal, MoneyBtn, MoneyInput, fmtMxn } from './MoneyChrome'
 import { valetSaturdays } from '@/lib/valet'
 
 // VALET en estilo MSN Money. Autocontenido: config (/api/uptown/valet), pagos de inquilinos
@@ -166,24 +166,23 @@ function ConfigRow({ label, type, value, onSave }: { label: string; type: string
   )
 }
 function ProviderAmount({ value, onSave }: { value: number; onSave: (v: number) => void }) {
-  const [v, setV] = useState(String(value))
-  useEffect(() => { setV(String(value)) }, [value])
-  return <input type="number" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => { const n = num(v); if (n > 0 && n !== value) onSave(n) }}
-    style={{ width: 82, textAlign: 'right', border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 4px', fontSize: 11, fontFamily: 'inherit', outline: 'none', color: MONEY.down, fontWeight: 700 }} />
+  // Edición por blur: onChange no-op; al desenfocar lee el crudo y guarda si es válido y cambió.
+  return <MoneyAmount value={value} onChange={() => {}} onBlur={(e) => { const n = Number(e.target.value.trim().replace(',', '.')); if (Number.isFinite(n) && n > 0 && n !== value) onSave(n) }}
+    style={{ width: 82, textAlign: 'right', color: MONEY.down, fontWeight: 700 }} />
 }
 
 function NuModal({ saved, movements, onClose, onCuadrar }: { saved: number; movements: Move[]; onClose: () => void; onCuadrar: (bank: number) => void }) {
-  const [bank, setBank] = useState('')
+  const [bank, setBank] = useState<number | null>(null)
   const chron = [...movements].sort((a, b) => a.date.localeCompare(b.date))
   let run = 0
   const rows = chron.map((m) => { run += m.flow === 'out' ? m.amount : -m.amount; return { ...m, run } }).reverse()
-  const dif = bank.trim() === '' ? null : num(bank) - saved
+  const dif = bank == null ? null : bank - saved
   return (
     <MoneyModal title="Libreta · Cuenta Nu" width={430} onClose={onClose}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#5a6a86', flex: 1 }}>¿Qué dice Nu?<MoneyInput type="number" value={bank} onChange={(e) => setBank(e.target.value)} placeholder={fmtMxn(saved)} /></label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: '#5a6a86', flex: 1 }}>¿Qué dice Nu?<MoneyAmount value={bank} onChange={setBank} placeholder={fmtMxn(saved)} /></label>
         {dif !== null && dif !== 0 && <span style={{ fontSize: 10.5, color: dif > 0 ? MONEY.up : MONEY.down, paddingBottom: 4 }}>{dif > 0 ? 'sobra ' : 'falta '}{fmtMxn(Math.abs(dif))}</span>}
-        <MoneyBtn primary disabled={dif === null || dif === 0} onClick={() => bank.trim() !== '' && onCuadrar(num(bank))}>Cuadrar</MoneyBtn>
+        <MoneyBtn primary disabled={dif === null || dif === 0} onClick={() => bank != null && onCuadrar(bank)}>Cuadrar</MoneyBtn>
       </div>
       <div style={{ border: `1px solid ${MONEY.rule}`, maxHeight: 220, overflowY: 'auto' }}>
         <div style={{ display: 'flex', background: `linear-gradient(${MONEY.barFrom},${MONEY.barTo})`, color: '#fff', fontWeight: 700, fontSize: 10, padding: '2px 7px', position: 'sticky', top: 0 }}>
