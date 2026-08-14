@@ -89,6 +89,7 @@ export default function PublicoContent() {
   const [cOrigin, setCOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false)   // hay borrador de ticket abierto → oculta la barra manual
   const [editVenta, setEditVenta] = useState(false)               // el cierre es solo-lectura (Poster lo llena); esto abre el fallback manual
+  const [propPend, setPropPend] = useState<{ pendiente: number; nivel: 'verde' | 'amarillo' | 'rojo' } | null>(null)   // propina por repartir (pasivo vivo, siempre visible)
   const [cKind, setCKind] = useState<CostKind>(catDefaults('insumo').defaultKind ?? 'variable')
   const [cNote, setCNote] = useState('')
   const cAmtRef = useRef<HTMLInputElement>(null)
@@ -103,10 +104,12 @@ export default function PublicoContent() {
     // Trae el mes visto Y el anterior (para el comparativo). Periodificación: si el mes visto es el EN CURSO,
     // el anterior se acota al MISMO tramo (hasta el mismo día) — comparar parcial vs completo engañaría.
     const cutoffDay = month === currentMonth ? Number(today.slice(8, 10)) : null
-    const [r, pr] = await Promise.all([
+    const [r, pr, pp] = await Promise.all([
       fetch(`/api/publico?month=${month}&today=${capDate}`).then((r) => r.json()).catch(() => null),
       fetch(`/api/publico?month=${prevMonthStr}`).then((r) => r.json()).catch(() => null),
+      fetch('/api/publico/propinas').then((r) => r.json()).catch(() => null),   // pasivo vivo, no mensual
     ])
+    if (pp && typeof pp.pendiente === 'number') setPropPend({ pendiente: pp.pendiente, nivel: pp.nivel })
     if (!r) return
     setVentas(r.ventas ?? [])
     setCostos(r.costos ?? [])
@@ -224,15 +227,21 @@ export default function PublicoContent() {
         </div>
       </header>
 
-      {/* ── Sincronización con Poster POS: heartbeat visible + import manual (que no falle en silencio) ── */}
-      <div className="flex items-center justify-between rounded-card border border-border bg-surface-2 px-3 py-1.5 text-label">
-        <span className={syncStale ? 'text-danger' : 'text-fg-muted'}>
-          {sync?.last_error
-            ? `⚠ Import falló: ${sync.last_error}`
-            : sync?.last_success_at
-              ? `POS · último import ${daysSince === 0 ? 'hoy' : daysSince === 1 ? 'ayer' : `hace ${daysSince} días`}${syncStale ? ' — revisa' : ''}`
-              : 'POS · sin importar aún'}
-        </span>
+      {/* ── FRANJA DE ESTADO (multi-señal, SIEMPRE visible): sync del POS + propina por repartir (pasivo vivo,
+          no mensual → se ve aunque navegues a un mes pasado) + import manual. Una sola tira, no apilar. ── */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-card border border-border bg-surface-2 px-3 py-1.5 text-label">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <span className={syncStale ? 'text-danger' : 'text-fg-muted'}>
+            {sync?.last_error
+              ? `⚠ Import falló: ${sync.last_error}`
+              : sync?.last_success_at
+                ? `POS · último import ${daysSince === 0 ? 'hoy' : daysSince === 1 ? 'ayer' : `hace ${daysSince} días`}${syncStale ? ' — revisa' : ''}`
+                : 'POS · sin importar aún'}
+          </span>
+          {propPend && propPend.pendiente > 0 && (
+            <button onClick={() => setTab('panel')} className="hover:underline" title="ver y repartir en Contenedores" style={{ color: propPend.nivel === 'rojo' ? 'var(--color-danger)' : propPend.nivel === 'amarillo' ? 'var(--color-warn, #b45309)' : 'var(--color-fg-muted)' }}>🪙 debes {mxn(propPend.pendiente)} de propina</button>
+          )}
+        </div>
         <button onClick={() => void importNow()} disabled={importing} className="shrink-0 rounded-control px-2 py-0.5 text-fg-muted transition-colors hover:text-accent disabled:opacity-50">{importing ? 'importando…' : 'importar ahora'}</button>
       </div>
 
@@ -340,7 +349,7 @@ export default function PublicoContent() {
       </>)}
 
       {tab === 'panel' && (
-        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} prevVentas={prevAgg?.ventas ?? null} prevCostos={prevAgg?.costosOper ?? null} prevMonthName={monthName(prevMonthStr)} comparativoPartial={month === currentMonth} onCostChange={load} />
+        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} prevVentas={prevAgg?.ventas ?? null} prevCostos={prevAgg?.costosOper ?? null} prevMonthName={monthName(prevMonthStr)} comparativoPartial={month === currentMonth} propinaPendiente={propPend?.pendiente ?? 0} onCostChange={load} />
       )}
 
       {tab === 'captura' && (
@@ -396,8 +405,8 @@ export default function PublicoContent() {
 // marca su PROCEDENCIA (POS vs manual). Estética arcade: UNA rejilla con divisiones de 1px en el color del
 // día (monocolor, hard steps, sin degradados). El punto de equilibrio es placeholder → llega en Fase 2 con
 // los gastos fijos/nómina (previstos); pintarlo ahora sería una barra basada en nada. Debe caber sin scroll. ──
-function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, prevVentas, prevCostos, prevMonthName, comparativoPartial, onCostChange }: {
-  month: string; ventasMes: number; tarjetaMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; prevVentas: number | null; prevCostos: number | null; prevMonthName: string; comparativoPartial: boolean; onCostChange: () => void
+function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, prevVentas, prevCostos, prevMonthName, comparativoPartial, propinaPendiente, onCostChange }: {
+  month: string; ventasMes: number; tarjetaMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; prevVentas: number | null; prevCostos: number | null; prevMonthName: string; comparativoPartial: boolean; propinaPendiente: number; onCostChange: () => void
 }) {
   const { crt } = useOSSettings()
   const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
@@ -564,7 +573,17 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
       {/* Alerta + qué toca (1/3). Contenido: Fase 5. */}
       <section className="px-3 py-3 lg:col-span-2" style={box}>
         <Head>Alerta · qué toca</Head>
-        {placeholder('Fase 5', 'lo que bloquea y las 2-3 acciones del día.')}
+        {/* Domingo = cierre de semana: nómina y propina se pagan el MISMO día → UN solo ritual, no dos avisos. */}
+        {new Date().getDay() === 0 && (propinaPendiente > 0 || prevTotals.pendiente > 0 || prevTotals.vencido > 0)
+          ? (
+            <div className="rounded-card border p-2 text-secondary" style={{ borderColor: `${dc}66` }}>
+              <div className="font-bold" style={{ color: dc }}>🗓️ Domingo · cierre de semana</div>
+              <div className="mt-1 text-fg-muted">Un solo ritual: <b className="text-fg">paga nómina</b>{(prevTotals.pendiente + prevTotals.vencido) > 0 && <> — <span className="tabular-nums">{mxn(prevTotals.pendiente + prevTotals.vencido)}</span> de previstos</>} y <b className="text-fg">reparte propina</b>{propinaPendiente > 0 && <> — <span className="tabular-nums">{mxn(propinaPendiente)}</span></>}.</div>
+            </div>
+          )
+          : propinaPendiente > 0
+            ? <div className="text-secondary text-fg-muted">🪙 propina por repartir: <b className="tabular-nums text-fg">{mxn(propinaPendiente)}</b> <span className="italic">(se reparte el domingo, con la nómina)</span></div>
+            : placeholder('Fase 5', 'lo que bloquea y las 2-3 acciones del día.')}
       </section>
 
       {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}

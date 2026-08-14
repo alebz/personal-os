@@ -19,7 +19,7 @@ type Flows = {
   socioMovs: { date: string; metodo: string | null; flow: string; amount: number }[]
   traspasos: { fecha: string; origin: string; destino: string; amount: number }[]
   propinas: { date: string; monto: number }[]
-  repartos: { fecha: string; contenedor: string; amount: number }[]
+  repartos: { fecha: string; contenedor: string; amount: number; kind: string }[]
 }
 
 // Flujo neto de un contenedor DESDE una fecha (exclusiva): ventas (efectivo→caja_pos, tarjeta→clip), costos e
@@ -35,7 +35,9 @@ function flowSince(c: Cont, since: string, f: Flows): number {
   for (const m of f.socioMovs) if (m.date > since && m.metodo === c) s += (m.flow === 'in' ? Number(m.amount) : -Number(m.amount))
   for (const t of f.traspasos) if (t.fecha > since) { if (t.origin === c) s -= Number(t.amount); if (t.destino === c) s += Number(t.amount) }
   if (c === 'clip') for (const p of f.propinas) if (p.date > since) s += Number(p.monto)
-  for (const r of f.repartos) if (r.fecha > since && r.contenedor === c) s -= Number(r.amount)
+  // El ARRANQUE (reconciliación) NO sale del efectivo: representa propina repartida ANTES del registro, ya
+  // reflejada en la realidad del contenedor. Solo los repartos NORMALES bajan el saldo.
+  for (const r of f.repartos) if (r.kind !== 'arranque' && r.fecha > since && r.contenedor === c) s -= Number(r.amount)
   return Math.round(s * 100) / 100
 }
 
@@ -46,7 +48,7 @@ async function loadFlows(supabase: ReturnType<typeof createServerClient>): Promi
     supabase.from('publico_ingresos').select('date, origin, amount'),
     supabase.from('finance_envelopes').select('id').eq('scope', 'publico'),
     supabase.from('publico_propinas').select('date, monto'),
-    supabase.from('publico_propina_repartos').select('fecha, contenedor, amount'),
+    supabase.from('publico_propina_repartos').select('fecha, contenedor, amount, kind'),
   ])
   const envIds = (env ?? []).map((e) => e.id)
   const { data: socioMovs } = envIds.length

@@ -15,8 +15,10 @@ type Cont = {
 }
 type Pend = { since: string | null; count: number; total: number; items: { id: string; date: string; concepto: string; amount: number }[] }
 type Comision = { id: string; date: string; amount: number; note: string | null }
-type Reparto = { id: string; fecha: string; amount: number; contenedor: ContKey; nota: string | null }
-type Propinas = { desde: string | null; acumulado: number; repartido: number; pendiente: number; acumuladoHist: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
+type Reparto = { id: string; fecha: string; amount: number; contenedor: ContKey; nota: string | null; kind: string }
+type Nivel = 'verde' | 'amarillo' | 'rojo'
+type Propinas = { acumulado: number; repartido: number; arranque: number; pendiente: number; ultimoReparto: string | null; nivel: Nivel; umbralAmarillo: number; umbralRojo: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
+const NIVEL_COLOR: Record<Nivel, string> = { verde: 'var(--color-fg-muted)', amarillo: 'var(--color-warn, #b45309)', rojo: 'var(--color-danger)' }
 
 const ALERTA_DIAS = 21   // aviso de "hace mucho que no cuadras", análogo al del conteo físico del food cost
 const LABELS: Record<ContKey, string> = { clip: 'CLIP', caja_chica: 'Caja chica', caja_pos: 'Caja POS' }
@@ -125,16 +127,26 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
     await fetch(`/api/publico/propinas?id=${id}`, { method: 'DELETE' })
     setFlash('reparto revertido'); setTimeout(() => setFlash(null), 4000); await load()
   }
+  async function saveUmbral(patch: { propina_umbral_amarillo?: number; propina_umbral_rojo?: number }) {
+    await fetch('/api/publico/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
+    await load()
+  }
 
   const src = (p: string) => <span style={{ opacity: p === 'derivado' ? 1 : 0.5, color: p === 'derivado' ? dc : undefined }}> · {p === 'derivado' ? 'derivado · POS' : 'capturado'}</span>
   const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
   return (
     <div className="space-y-2">
-      {/* TOTAL del negocio = suma de los tres contenedores (el dinero que hay AHORA). */}
-      <div className="flex items-baseline justify-between border-b border-border pb-1">
-        <span className="text-label uppercase tracking-widest text-fg-muted">Total del negocio</span>
-        <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: 20 }}>{total != null ? mxn(total) : '—'}</span>
+      {/* TOTAL EN CAJA = suma de los tres contenedores (el efectivo que hay AHORA). Incluye la propina que
+          le debes al personal, así que se desglosa: de esto $X es propina por repartir · TUYO $Y. */}
+      <div className="border-b border-border pb-1">
+        <div className="flex items-baseline justify-between">
+          <span className="text-label uppercase tracking-widest text-fg-muted">Total en caja</span>
+          <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: 20 }}>{total != null ? mxn(total) : '—'}</span>
+        </div>
+        {total != null && prop && prop.pendiente > 0 && (
+          <div className="mt-0.5 text-right text-label text-fg-muted">de esto <span className="tabular-nums">{mxn(prop.pendiente)}</span> es propina por repartir · <b style={{ color: dc }}>tuyo <span className="tabular-nums">{mxn(Math.round((total - prop.pendiente) * 100) / 100)}</span></b></div>
+        )}
       </div>
 
       {flash && <div className="rounded-card border border-border bg-surface-2 p-1.5 text-label text-fg-muted">{flash}</div>}
@@ -190,23 +202,32 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
         )}
       </div>
 
-      {/* Propinas de tarjeta: caen a CLIP pero son del personal (pasivo). Se acumulan (import de Clip) y se
-          reparten con eventos aparte. El pendiente = acumulado − repartido. NO es venta ni costo. */}
+      {/* Propinas de tarjeta: caen a CLIP pero son del personal (PASIVO). Su PROPIO ledger, desamarrado del
+          cuadre: pendiente = Σ propina caída − Σ repartos (incluido el arranque). Anclado a tu último reparto. */}
       <div>
-        <button onClick={() => setPropOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">
+        <button onClick={() => setPropOpen((o) => !o)} className="text-label hover:text-accent" style={{ color: prop && prop.pendiente > 0 ? NIVEL_COLOR[prop.nivel] : undefined }}>
           {propOpen ? '▲ cerrar propinas' : `🪙 propinas por repartir${prop && prop.pendiente > 0 ? ` (${mxn(prop.pendiente)} pendiente)` : ''}`}
         </button>
         {propOpen && prop && (
           <div className="mt-1 space-y-1.5 rounded-card border border-border bg-surface-2 p-2 text-label">
             <div className="flex items-baseline justify-between border-b border-border pb-1">
-              <span className="text-fg-muted">Pendiente por repartir{prop.desde && <span className="normal-case"> · desde tu cuadre {dayMonth(prop.desde)}</span>}</span>
-              <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: 18 }}>{mxn(prop.pendiente)}</span>
+              <span className="text-fg-muted">Pendiente por repartir{prop.ultimoReparto && <span className="normal-case"> · desde tu reparto {dayMonth(prop.ultimoReparto)}</span>}</span>
+              <span className="tabular-nums" style={{ color: prop.pendiente > 0 ? NIVEL_COLOR[prop.nivel] : dc, fontWeight: 700, fontSize: 18 }}>{mxn(prop.pendiente)}</span>
             </div>
-            <div className="flex justify-between text-fg-muted">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-fg-muted">
               <span>cayó a CLIP <span className="tabular-nums">{mxn(prop.acumulado)}</span></span>
               <span>repartido <span className="tabular-nums">{mxn(prop.repartido)}</span></span>
+              {prop.arranque > 0 && <span title="propina repartida antes de que el sistema registrara (reconciliación, no un reparto real)">arranque <span className="tabular-nums">{mxn(prop.arranque)}</span></span>}
             </div>
-            <div className="text-fg-muted">Es dinero del personal que cae a CLIP. No es venta ni costo — no toca tu utilidad ni el breakeven. Lo de antes de tu último cuadre ya está en el saldo contado.</div>
+            <div className="text-fg-muted">Dinero del personal que cae a CLIP. No es venta ni costo. Es su propio ledger: <b>cuadrar CLIP no lo altera</b>.</div>
+            {/* Umbrales del badge (configurables). amarillo ≈ una semana · rojo ≈ te saltaste un reparto. */}
+            <div className="flex flex-wrap items-center gap-1 border-t border-border pt-1 text-fg-muted">
+              <span>avisar en</span>
+              <span style={{ color: NIVEL_COLOR.amarillo }}>amarillo ≥</span>
+              <MoneyInput value={prop.umbralAmarillo} onChange={() => {}} onBlur={(e) => { const v = Number(e.target.value.trim().replace(',', '.')); if (Number.isFinite(v) && v >= 0 && v !== prop.umbralAmarillo) void saveUmbral({ propina_umbral_amarillo: v }) }} style={{ ...cell, width: 74, textAlign: 'right' }} />
+              <span style={{ color: NIVEL_COLOR.rojo }}>rojo ≥</span>
+              <MoneyInput value={prop.umbralRojo} onChange={() => {}} onBlur={(e) => { const v = Number(e.target.value.trim().replace(',', '.')); if (Number.isFinite(v) && v >= 0 && v !== prop.umbralRojo) void saveUmbral({ propina_umbral_rojo: v }) }} style={{ ...cell, width: 74, textAlign: 'right' }} />
+            </div>
             {prop.porMes.length > 0 && (
               <div className="flex flex-wrap gap-x-3 gap-y-0.5 border-t border-border pt-1 text-fg-muted">
                 <span className="uppercase tracking-wide">histórico:</span>
@@ -233,8 +254,10 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
               <div className="space-y-0.5 border-t border-border pt-1">
                 {prop.repartos.map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2">
-                    <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(r.fecha)}</span> · reparto de {LABELS[r.contenedor]} <span className="tabular-nums text-danger">−{mxn(r.amount)}</span>{r.nota && <span> · {r.nota}</span>}</span>
-                    <button onClick={() => void revertReparto(r.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir este reparto">↩</button>
+                    {r.kind === 'arranque'
+                      ? <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(r.fecha)}</span> · <b>arranque</b> · repartido antes del registro <span className="tabular-nums">−{mxn(r.amount)}</span></span>
+                      : <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(r.fecha)}</span> · reparto de {LABELS[r.contenedor]} <span className="tabular-nums text-danger">−{mxn(r.amount)}</span>{r.nota && <span> · {r.nota}</span>}</span>}
+                    <button onClick={() => void revertReparto(r.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir">↩</button>
                   </div>
                 ))}
               </div>
