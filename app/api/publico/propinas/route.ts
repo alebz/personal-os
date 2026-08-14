@@ -7,17 +7,25 @@ export const runtime = 'nodejs'
 const CONTS = ['clip', 'caja_chica', 'caja_pos']
 const round = (n: number) => Math.round(n * 100) / 100
 
-// GET → resumen de propinas: acumulado (de Clip), repartido, PENDIENTE por repartir, desglose por mes,
-// y la lista de repartos (para revertir). Más el heartbeat del import.
+// GET → resumen de propinas. El PENDIENTE se ancla al último cuadre de CLIP: la propina caída ANTES de ese
+// cuadre ya está reflejada en el saldo contado (se repartiera o no), así que solo cuenta la que cayó DESPUÉS
+// menos los repartos posteriores. Consistente con flowSince (que también acredita la propina desde el cuadre).
+// Así el pendiente es real y automático, sin capturar el histórico de repartos. Devuelve además el histórico
+// acumulado como info y la lista de repartos (para revertir).
 export async function GET() {
   const supabase = createServerClient()
-  const [{ data: props }, { data: repartos }, { data: sync }] = await Promise.all([
+  const [{ data: props }, { data: repartos }, { data: sync }, { data: clipSnap }] = await Promise.all([
     supabase.from('publico_propinas').select('date, month, monto, n_tx'),
     supabase.from('publico_propina_repartos').select('id, fecha, amount, contenedor, nota, created_at').order('fecha', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('publico_propina_sync').select('last_success_at, last_import_to, last_error').eq('id', 'default').maybeSingle(),
+    supabase.from('publico_contenedor_saldos').select('fecha, created_at').eq('contenedor', 'clip').order('fecha', { ascending: false }).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
-  const acumulado = round((props ?? []).reduce((s, p) => s + Number(p.monto), 0))
-  const repartido = round((repartos ?? []).reduce((s, r) => s + Number(r.amount), 0))
+  const desde = clipSnap?.fecha ?? null   // ancla = último cuadre de CLIP (null si aún no hay baseline)
+  const after = (d: string) => desde == null || d > desde
+  // Pendiente anclado (lo que sigue en CLIP sin repartir); histórico = todo desde junio (solo informativo).
+  const acumuladoAncla = round((props ?? []).filter((p) => after(p.date as string)).reduce((s, p) => s + Number(p.monto), 0))
+  const repartidoAncla = round((repartos ?? []).filter((r) => after(r.fecha as string)).reduce((s, r) => s + Number(r.amount), 0))
+  const acumuladoHist = round((props ?? []).reduce((s, p) => s + Number(p.monto), 0))
   const porMesMap = new Map<string, { month: string; monto: number; n: number }>()
   for (const p of props ?? []) {
     const cur = porMesMap.get(p.month as string) ?? { month: p.month as string, monto: 0, n: 0 }
@@ -26,7 +34,8 @@ export async function GET() {
   }
   const porMes = [...porMesMap.values()].filter((m) => m.monto > 0).sort((a, b) => (a.month < b.month ? 1 : -1))
   return NextResponse.json({
-    acumulado, repartido, pendiente: round(acumulado - repartido), porMes,
+    desde, acumulado: acumuladoAncla, repartido: repartidoAncla, pendiente: round(acumuladoAncla - repartidoAncla),
+    acumuladoHist, porMes,
     repartos: (repartos ?? []).map((r) => ({ id: r.id, fecha: r.fecha, amount: Number(r.amount), contenedor: r.contenedor, nota: r.nota })),
     sync: sync ?? null,
   })

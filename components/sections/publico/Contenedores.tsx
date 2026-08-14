@@ -15,7 +15,7 @@ type Cont = {
 type Pend = { since: string | null; count: number; total: number; items: { id: string; date: string; concepto: string; amount: number }[] }
 type Comision = { id: string; date: string; amount: number; note: string | null }
 type Reparto = { id: string; fecha: string; amount: number; contenedor: ContKey; nota: string | null }
-type Propinas = { acumulado: number; repartido: number; pendiente: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
+type Propinas = { desde: string | null; acumulado: number; repartido: number; pendiente: number; acumuladoHist: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
 
 const ALERTA_DIAS = 21   // aviso de "hace mucho que no cuadras", análogo al del conteo físico del food cost
 const LABELS: Record<ContKey, string> = { clip: 'CLIP', caja_chica: 'Caja chica', caja_pos: 'Caja POS' }
@@ -198,17 +198,18 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
         {propOpen && prop && (
           <div className="mt-1 space-y-1.5 rounded-card border border-border bg-surface-2 p-2 text-label">
             <div className="flex items-baseline justify-between border-b border-border pb-1">
-              <span className="text-fg-muted">Pendiente por repartir</span>
+              <span className="text-fg-muted">Pendiente por repartir{prop.desde && <span className="normal-case"> · desde tu cuadre {dayMonth(prop.desde)}</span>}</span>
               <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: 18 }}>{mxn(prop.pendiente)}</span>
             </div>
             <div className="flex justify-between text-fg-muted">
-              <span>acumulado (Clip) <span className="tabular-nums">{mxn(prop.acumulado)}</span></span>
+              <span>cayó a CLIP <span className="tabular-nums">{mxn(prop.acumulado)}</span></span>
               <span>repartido <span className="tabular-nums">{mxn(prop.repartido)}</span></span>
             </div>
-            <div className="text-fg-muted">Es dinero del personal que cae a CLIP. No es venta ni costo — no toca tu utilidad ni el breakeven.</div>
+            <div className="text-fg-muted">Es dinero del personal que cae a CLIP. No es venta ni costo — no toca tu utilidad ni el breakeven. Lo de antes de tu último cuadre ya está en el saldo contado.</div>
             {prop.porMes.length > 0 && (
               <div className="flex flex-wrap gap-x-3 gap-y-0.5 border-t border-border pt-1 text-fg-muted">
-                {prop.porMes.map((m) => <span key={m.month} className="tabular-nums">{m.month.slice(5)}/{m.month.slice(2, 4)}: {mxn(m.monto)}</span>)}
+                <span className="uppercase tracking-wide">histórico:</span>
+                {prop.porMes.map((m) => <span key={m.month} className="tabular-nums">{m.month.slice(5)}/{m.month.slice(2, 4)} {mxn(m.monto)}</span>)}
               </div>
             )}
             {/* Registrar reparto: baja el pendiente y saca el dinero del contenedor elegido (CLIP por defecto). */}
