@@ -54,7 +54,9 @@ export default function PublicoContent() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
-  const [tab, setTab] = useState<'panel' | 'captura' | 'tickets' | 'direccion' | 'fondos' | 'notas'>('panel')
+  const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'fondos' | 'notas'>('panel')
+  const [movView, setMovView] = useState<'capturar' | 'historial'>('capturar')   // Movimientos: el acto vs el archivo
+  const [costoManualOpen, setCostoManualOpen] = useState(false)                    // costo a mano = ocasional, colapsado
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
   const { funds: socioFunds, handlers: socioHandlers } = useCajaFuerte('publico', month)
@@ -219,8 +221,7 @@ export default function PublicoContent() {
         </div>
         <div className="flex gap-1">
           <button onClick={() => setTab('panel')} style={chip(tab === 'panel')}>Panel</button>
-          <button onClick={() => setTab('captura')} style={chip(tab === 'captura')}>Captura</button>
-          <button onClick={() => setTab('tickets')} style={chip(tab === 'tickets')}>Tickets</button>
+          <button onClick={() => setTab('movimientos')} style={chip(tab === 'movimientos')}>Movimientos</button>
           <button onClick={() => setTab('direccion')} style={chip(tab === 'direccion')}>Dirección</button>
           <button onClick={() => setTab('fondos')} style={chip(tab === 'fondos')}>Fondos</button>
           <button onClick={() => setTab('notas')} style={chip(tab === 'notas')}>Notas</button>
@@ -245,8 +246,20 @@ export default function PublicoContent() {
         <button onClick={() => void importNow()} disabled={importing} className="shrink-0 rounded-control px-2 py-0.5 text-fg-muted transition-colors hover:text-accent disabled:opacity-50">{importing ? 'importando…' : 'importar ahora'}</button>
       </div>
 
-      {tab === 'captura' && (<>
-      {/* ── CIERRE DE HOY ── */}
+      {tab === 'movimientos' && (<>
+      {/* MOVIMIENTOS = una familia: CAPTURAR (el acto de registrar) · HISTORIAL (el registro). */}
+      <div className="flex gap-1">
+        <button onClick={() => setMovView('capturar')} style={chip(movView === 'capturar')}>Capturar</button>
+        <button onClick={() => setMovView('historial')} style={chip(movView === 'historial')}>Historial</button>
+      </div>
+
+      {movView === 'capturar' && (<>
+      {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
+      <section className="rounded-card border border-border bg-surface-2 p-3">
+        <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} />
+      </section>
+
+      {/* ── CIERRE DE HOY ── solo lectura (Poster lo llena); fallback tras "corregir a mano" ── */}
       <section className="rounded-card border border-border bg-surface-2 p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -287,11 +300,12 @@ export default function PublicoContent() {
         )}
       </section>
 
-      {/* ── AGREGAR COSTO A MANO ── Se OCULTA cuando hay un borrador de ticket abierto: son dos formas con el
-          mismo vocabulario visual (chips de categoría + $ + desde) y no deben competir en pantalla a la vez. */}
+      {/* ── ＋ COSTO A MANO ── Ocasional (casi todo entra por foto o Poster), COLAPSADO. Oculto si hay borrador. ── */}
       {!ticketDraftOpen && (
-        <section className="rounded-card border border-border bg-surface-2 p-3">
-          <div className="mb-2 text-label uppercase tracking-widest text-fg-muted">Agregar costo a mano</div>
+        <div>
+          <button onClick={() => setCostoManualOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{costoManualOpen ? '▲ cerrar costo a mano' : '＋ costo a mano'}</button>
+          {costoManualOpen && (
+          <section className="mt-1 rounded-card border border-border bg-surface-2 p-3">
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
             {/* Mismo juego de 7 que el ticket: SIN Renta condonada (net-cero, no-operativa, sin recibo → su casa es Previstos). */}
             {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
@@ -322,13 +336,10 @@ export default function PublicoContent() {
             />
             <button onClick={() => void addCosto()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
           </div>
-        </section>
+          </section>
+          )}
+        </div>
       )}
-
-      {/* ── CAPTURAR POR FOTO ── Su propia card: cuando hay borrador, es la única forma visible (la manual se ocultó). */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
-        <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} />
-      </section>
 
       {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
       <section className="rounded-card border border-border p-3">
@@ -345,19 +356,19 @@ export default function PublicoContent() {
           ))}
         </div>
       </section>
+      </>)}
 
+      {movView === 'historial' && (<>
+      {/* ── HISTORIAL = el archivo de tickets (ver, editar, borrar) — sin cambios de funcionalidad ── */}
+      <TicketsArchive />
+      {/* Gestor de alias = MANTENIMIENTO del mapeo aprendido de los tickets (proveedor/insumo → Poster). Vive
+          CON el archivo, no en el acto diario: es limpieza del registro, casi nunca. Ya es un desplegable. */}
+      <AliasManager />
+      </>)}
       </>)}
 
       {tab === 'panel' && (
         <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} prevVentas={prevAgg?.ventas ?? null} prevCostos={prevAgg?.costosOper ?? null} prevMonthName={monthName(prevMonthStr)} comparativoPartial={month === currentMonth} propinaPendiente={propPend?.pendiente ?? 0} onCostChange={load} />
-      )}
-
-      {tab === 'captura' && (
-      <AliasManager />
-      )}
-
-      {tab === 'tickets' && (
-      <TicketsArchive />
       )}
 
       {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
