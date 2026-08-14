@@ -493,11 +493,11 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
           {/* PRECAUCIÓN DE LECTURA: food cost = CONSUMO (recetas del POS), NO compras÷ventas. Surtirse por
               adelantado infla compras/ventas (jun 59%, jul 49%) muy arriba del teórico 31% — es periodificación,
               no food cost. GASTOS y FOOD COST viven en celdas distintas y nunca se dividen entre sí. */}
-          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Food cost teórico{src('pos')}</>} value={fc != null ? `${fc.toFixed(1)}%` : '…'} hint="consumo de recetas · no es gastos ÷ ventas" /></div>
-          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Ticket promedio{src('pos')}</>} value={tp != null ? mxn(tp) : '…'} hint="promedio por recibo · no por persona" /></div>
+          <div style={{ borderBottom: `1px solid ${bord}`, borderRight: `1px solid ${bord}` }}><Metric name={<>Food cost teórico · mes{src('pos')}</>} value={fc != null ? `${fc.toFixed(1)}%` : '…'} hint="consumo de recetas · no es gastos ÷ ventas" /></div>
+          <div style={{ borderBottom: `1px solid ${bord}` }}><Metric name={<>Ticket promedio · mes{src('pos')}</>} value={tp != null ? mxn(tp) : '…'} hint="promedio por recibo · no por persona" /></div>
           {/* Venta por persona: sí capturas comensales (guests_count ≈ 2.4/recibo), así que es un número real y distinto del ticket. */}
-          <div style={{ borderRight: `1px solid ${bord}` }}><Metric name={<>Venta · por persona{src('pos')}</>} value={vp != null ? mxn(vp) : '…'} hint="÷ comensales del recibo" /></div>
-          <div><Metric name={<>Venta · día operado{src('pos')}</>} value={vd != null ? mxn(vd) : '…'} hint={diasOp != null ? `÷ ${diasOp} días con venta · no del calendario` : '÷ días con venta · no del calendario'} /></div>
+          <div style={{ borderRight: `1px solid ${bord}` }}><Metric name={<>Venta · por persona · mes{src('pos')}</>} value={vp != null ? mxn(vp) : '…'} hint="÷ comensales del recibo" /></div>
+          <div><Metric name={<>Venta · día operado · mes{src('pos')}</>} value={vd != null ? mxn(vd) : '…'} hint={diasOp != null ? `÷ ${diasOp} días con venta · no del calendario` : '÷ días con venta · no del calendario'} /></div>
         </div>
         {/* Utilidad (provisional) */}
         <div className="px-3 py-3" style={{ borderTop: `1px solid ${bord}` }}>
@@ -672,10 +672,10 @@ function Direccion() {
           <span className="text-label text-fg-muted">{dayMonth(m.range.from)} → {dayMonth(m.range.to)} · <b className="text-fg">todo, no el mes</b></span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4" style={{ borderTop: `1px solid ${dc}22` }}>
-          <div><KitMetric tone={dc} name={<>Ticket promedio{srcTag('pos', dc)}</>} value={mxn(m.ticketPromedio)} hint="promedio por recibo" /></div>
-          <div><KitMetric tone={dc} name={<>Venta · día operado{srcTag('pos', dc)}</>} value={mxn(m.ventaPorDiaOperado)} hint={`÷ ${m.daysOperated} días operados · no del calendario`} /></div>
-          <div><KitMetric tone={dc} name={<>Recibos{srcTag('pos', dc)}</>} value={String(m.receipts)} hint={`en ${m.daysOperated} días operados`} /></div>
-          <div><KitMetric tone={dc} name={<>Comensales · prom{srcTag('pos', dc)}</>} value={m.guestsPromedio.toFixed(1)} hint="por recibo" /></div>
+          <div><KitMetric tone={dc} name={<>Ticket promedio · histórico{srcTag('pos', dc)}</>} value={mxn(m.ticketPromedio)} hint="promedio por recibo" /></div>
+          <div><KitMetric tone={dc} name={<>Venta · día operado · histórico{srcTag('pos', dc)}</>} value={mxn(m.ventaPorDiaOperado)} hint={`÷ ${m.daysOperated} días operados · no del calendario`} /></div>
+          <div><KitMetric tone={dc} name={<>Recibos · histórico{srcTag('pos', dc)}</>} value={String(m.receipts)} hint={`en ${m.daysOperated} días operados`} /></div>
+          <div><KitMetric tone={dc} name={<>Comensales · prom · histórico{srcTag('pos', dc)}</>} value={m.guestsPromedio.toFixed(1)} hint="por recibo" /></div>
         </div>
         <div className="border-t px-3 py-2 text-label text-fg-muted" style={{ borderColor: `${dc}22` }}>
           <b className="text-fg">{m.daysOperated}</b> días operados de {m.range.calendarDays} de calendario ({closedDays} cerrados). Los promedios por día usan los operados, no el calendario.
