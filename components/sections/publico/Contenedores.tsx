@@ -14,6 +14,8 @@ type Cont = {
 }
 type Pend = { since: string | null; count: number; total: number; items: { id: string; date: string; concepto: string; amount: number }[] }
 type Comision = { id: string; date: string; amount: number; note: string | null }
+type Reparto = { id: string; fecha: string; amount: number; contenedor: ContKey; nota: string | null }
+type Propinas = { acumulado: number; repartido: number; pendiente: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
 
 const ALERTA_DIAS = 21   // aviso de "hace mucho que no cuadras", análogo al del conteo físico del food cost
 const LABELS: Record<ContKey, string> = { clip: 'CLIP', caja_chica: 'Caja chica', caja_pos: 'Caja POS' }
@@ -34,18 +36,23 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   const [com, setCom] = useState<{ amount: string; fecha: string; nota: string }>({ amount: '', fecha: localDate(), nota: '' })
   const [comisiones, setComisiones] = useState<Comision[]>([])
   const [clipSync, setClipSync] = useState<{ last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null>(null)
+  const [prop, setProp] = useState<Propinas | null>(null)
+  const [propOpen, setPropOpen] = useState(false)
+  const [rep, setRep] = useState<{ amount: string; fecha: string; contenedor: ContKey; nota: string }>({ amount: '', fecha: localDate(), contenedor: 'clip', nota: '' })
 
   const load = useCallback(async () => {
-    const [j, p, m, cs] = await Promise.all([
+    const [j, p, m, cs, pr] = await Promise.all([
       fetch('/api/publico/contenedores').then((r) => r.json()).catch(() => null),
       fetch('/api/publico/contenedores/pendientes').then((r) => r.json()).catch(() => null),
       fetch(`/api/publico?month=${month}`).then((r) => r.json()).catch(() => null),
       fetch('/api/publico/clip/import').then((r) => r.json()).catch(() => null),
+      fetch('/api/publico/propinas').then((r) => r.json()).catch(() => null),
     ])
     if (j?.contenedores) { setConts(j.contenedores); setTotal(j.total ?? null) }
     if (p && typeof p.count === 'number') setPend(p)
     if (cs?.sync) setClipSync(cs.sync)
     if (m?.costos) setComisiones((m.costos as { id: string; date: string; amount: number; note: string | null; category: string }[]).filter((c) => c.category === 'comision').map((c) => ({ id: c.id, date: c.date, amount: Number(c.amount), note: c.note })))
+    if (pr && typeof pr.pendiente === 'number') setProp(pr)
   }, [month])
   useEffect(() => { void load() }, [load])
 
@@ -100,6 +107,22 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   async function revertComision(id: string) {
     await fetch(`/api/publico/costo?id=${id}`, { method: 'DELETE' })
     setFlash('comisión revertida'); setTimeout(() => setFlash(null), 4000); await load()
+  }
+
+  // Reparto de propina: baja el pendiente Y saca el dinero del contenedor (vía flowSince). Reversible = borrar.
+  async function registrarReparto() {
+    const amount = parseFloat(rep.amount)
+    if (!Number.isFinite(amount) || amount <= 0) return
+    const resp = await fetch('/api/publico/propinas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fecha: rep.fecha, amount, contenedor: rep.contenedor, nota: rep.nota?.trim() || null }) })
+    const r = await resp.json().catch(() => ({} as { error?: string }))
+    if (!resp.ok || r.error) { setFlash(`reparto: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
+    setFlash(`reparto propina · ${LABELS[rep.contenedor]} −${mxn(amount)}`)
+    setTimeout(() => setFlash(null), 5000)
+    setRep({ ...rep, amount: '', nota: '' }); await load()
+  }
+  async function revertReparto(id: string) {
+    await fetch(`/api/publico/propinas?id=${id}`, { method: 'DELETE' })
+    setFlash('reparto revertido'); setTimeout(() => setFlash(null), 4000); await load()
   }
 
   const src = (p: string) => <span style={{ opacity: p === 'derivado' ? 1 : 0.5, color: p === 'derivado' ? dc : undefined }}> · {p === 'derivado' ? 'derivado · POS' : 'capturado'}</span>
@@ -166,6 +189,58 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
         )}
       </div>
 
+      {/* Propinas de tarjeta: caen a CLIP pero son del personal (pasivo). Se acumulan (import de Clip) y se
+          reparten con eventos aparte. El pendiente = acumulado − repartido. NO es venta ni costo. */}
+      <div>
+        <button onClick={() => setPropOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">
+          {propOpen ? '▲ cerrar propinas' : `🪙 propinas por repartir${prop && prop.pendiente > 0 ? ` (${mxn(prop.pendiente)} pendiente)` : ''}`}
+        </button>
+        {propOpen && prop && (
+          <div className="mt-1 space-y-1.5 rounded-card border border-border bg-surface-2 p-2 text-label">
+            <div className="flex items-baseline justify-between border-b border-border pb-1">
+              <span className="text-fg-muted">Pendiente por repartir</span>
+              <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: 18 }}>{mxn(prop.pendiente)}</span>
+            </div>
+            <div className="flex justify-between text-fg-muted">
+              <span>acumulado (Clip) <span className="tabular-nums">{mxn(prop.acumulado)}</span></span>
+              <span>repartido <span className="tabular-nums">{mxn(prop.repartido)}</span></span>
+            </div>
+            <div className="text-fg-muted">Es dinero del personal que cae a CLIP. No es venta ni costo — no toca tu utilidad ni el breakeven.</div>
+            {prop.porMes.length > 0 && (
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 border-t border-border pt-1 text-fg-muted">
+                {prop.porMes.map((m) => <span key={m.month} className="tabular-nums">{m.month.slice(5)}/{m.month.slice(2, 4)}: {mxn(m.monto)}</span>)}
+              </div>
+            )}
+            {/* Registrar reparto: baja el pendiente y saca el dinero del contenedor elegido (CLIP por defecto). */}
+            <div className="flex flex-wrap items-center gap-1 border-t border-border pt-1">
+              <span className="text-fg-muted">repartí</span>
+              <input value={rep.amount} onChange={(e) => setRep({ ...rep, amount: e.target.value })} inputMode="decimal" placeholder="$ monto" style={{ ...cell, width: 84, textAlign: 'right' }} />
+              <span className="text-fg-muted">de</span>
+              <select value={rep.contenedor} onChange={(e) => setRep({ ...rep, contenedor: e.target.value as ContKey })} style={{ ...cell, width: 96 }}>{CONT_OPTS.map((k) => <option key={k} value={k}>{LABELS[k]}</option>)}</select>
+              <input type="date" value={rep.fecha} onChange={(e) => setRep({ ...rep, fecha: e.target.value })} style={cell} />
+              <input value={rep.nota} onChange={(e) => setRep({ ...rep, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 80 }} />
+              <button onClick={() => void registrarReparto()} className="rounded-control border border-border px-2 py-0.5 font-medium">registrar</button>
+            </div>
+            {/* Heartbeat del import de propinas de Clip. Visible si falla. */}
+            {prop.sync && (prop.sync.last_error
+              ? <div className="text-danger">⚠ Propinas import falló: {prop.sync.last_error}</div>
+              : prop.sync.last_success_at
+                ? <div className="text-fg-muted">Clip · propinas importadas hasta {prop.sync.last_import_to ?? '—'} (entran solas)</div>
+                : <div className="text-fg-muted">Clip · aún sin importar propinas</div>)}
+            {prop.repartos.length > 0 && (
+              <div className="space-y-0.5 border-t border-border pt-1">
+                {prop.repartos.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2">
+                    <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(r.fecha)}</span> · reparto de {LABELS[r.contenedor]} <span className="tabular-nums text-danger">−{mxn(r.amount)}</span>{r.nota && <span> · {r.nota}</span>}</span>
+                    <button onClick={() => void revertReparto(r.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir este reparto">↩</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Pendientes de asignar: compras de Poster (origin desconocido) posteriores al baseline. */}
       {pend && pend.count > 0 && (
         <div className="rounded-card border p-2 text-label" style={{ borderColor: 'var(--color-warn, #b45309)' }}>
@@ -201,6 +276,10 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
               ? <span className="text-label italic text-warn">falta baseline</span>
               : <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: 18 }}>{mxn(c.balance ?? 0)}</span>}
           </div>
+          {/* CLIP trae propina del personal (pasivo). Lo TUYO = saldo − propina por repartir. */}
+          {c.contenedor === 'clip' && !c.needsBaseline && prop && prop.pendiente > 0 && (
+            <div className="text-label text-fg-muted">de esto <span className="tabular-nums">{mxn(prop.pendiente)}</span> es propina por repartir · <b style={{ color: dc }}>tuyo <span className="tabular-nums">{mxn(Math.round(((c.balance ?? 0) - prop.pendiente) * 100) / 100)}</span></b></div>
+          )}
           <div className="mt-0.5 flex items-center justify-between gap-2 text-label">
             {c.needsBaseline
               ? <span className="text-fg-muted italic">cuenta lo que hay hoy para sembrarlo</span>

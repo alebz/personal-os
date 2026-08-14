@@ -18,11 +18,15 @@ type Flows = {
   ingresos: { date: string; origin: string | null; amount: number }[]
   socioMovs: { date: string; metodo: string | null; flow: string; amount: number }[]
   traspasos: { fecha: string; origin: string; destino: string; amount: number }[]
+  propinas: { date: string; monto: number }[]
+  repartos: { fecha: string; contenedor: string; amount: number }[]
 }
 
 // Flujo neto de un contenedor DESDE una fecha (exclusiva): ventas (efectivo→caja_pos, tarjeta→clip), costos e
-// ingresos por origin, aportaciones/retiros de socios por método (aporta=out→resta, retira=in→suma), y
-// TRASPASOS entre contenedores (baja el origen, sube el destino) — net-cero para el negocio.
+// ingresos por origin, aportaciones/retiros de socios por método (aporta=out→resta, retira=in→suma),
+// TRASPASOS entre contenedores (baja el origen, sube el destino), y PROPINAS de tarjeta (ENTRAN a CLIP —
+// caen ahí junto con la venta, aunque no sean venta) menos sus REPARTOS (SALEN del contenedor que las pagó).
+// Sin esto, CLIP quedaba subestimado y la propina aparecía como "sobrante" al cuadrar.
 function flowSince(c: Cont, since: string, f: Flows): number {
   let s = 0
   for (const v of f.ventas) if (v.date > since) s += c === 'caja_pos' ? Number(v.efectivo) : c === 'clip' ? Number(v.tarjeta) : 0
@@ -30,22 +34,26 @@ function flowSince(c: Cont, since: string, f: Flows): number {
   for (const x of f.ingresos) if (x.date > since && x.origin === c) s += Number(x.amount)
   for (const m of f.socioMovs) if (m.date > since && m.metodo === c) s += (m.flow === 'in' ? Number(m.amount) : -Number(m.amount))
   for (const t of f.traspasos) if (t.fecha > since) { if (t.origin === c) s -= Number(t.amount); if (t.destino === c) s += Number(t.amount) }
+  if (c === 'clip') for (const p of f.propinas) if (p.date > since) s += Number(p.monto)
+  for (const r of f.repartos) if (r.fecha > since && r.contenedor === c) s -= Number(r.amount)
   return Math.round(s * 100) / 100
 }
 
 async function loadFlows(supabase: ReturnType<typeof createServerClient>): Promise<Flows> {
-  const [{ data: ventas }, { data: costos }, { data: ingresos }, { data: env }] = await Promise.all([
+  const [{ data: ventas }, { data: costos }, { data: ingresos }, { data: env }, { data: propinas }, { data: repartos }] = await Promise.all([
     supabase.from('publico_ventas').select('date, efectivo, tarjeta'),
     supabase.from('publico_costos').select('date, origin, amount'),
     supabase.from('publico_ingresos').select('date, origin, amount'),
     supabase.from('finance_envelopes').select('id').eq('scope', 'publico'),
+    supabase.from('publico_propinas').select('date, monto'),
+    supabase.from('publico_propina_repartos').select('fecha, contenedor, amount'),
   ])
   const envIds = (env ?? []).map((e) => e.id)
   const { data: socioMovs } = envIds.length
     ? await supabase.from('finance_movements').select('date, metodo, flow, amount').in('envelope_id', envIds).not('metodo', 'is', null)
     : { data: [] }
   const { data: traspasos } = await supabase.from('publico_traspasos').select('fecha, origin, destino, amount')
-  return { ventas: ventas ?? [], costos: costos ?? [], ingresos: ingresos ?? [], socioMovs: socioMovs ?? [], traspasos: traspasos ?? [] }
+  return { ventas: ventas ?? [], costos: costos ?? [], ingresos: ingresos ?? [], socioMovs: socioMovs ?? [], traspasos: traspasos ?? [], propinas: propinas ?? [], repartos: repartos ?? [] }
 }
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
