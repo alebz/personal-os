@@ -47,6 +47,8 @@ function shiftMonthDate(dateStr: string, d: number): string {
 }
 
 export default function PublicoContent() {
+  const { crt } = useOSSettings()
+  const dc = crtDayColor(dayColor(new Date()), crt)   // color del día → headers de sección en el mismo idioma que Panel/Dirección
   const today = localDate()
   const [capDate, setCapDate] = useState(today)          // día que se está capturando (◀ hoy ▶)
   const month = capDate.slice(0, 7)
@@ -258,14 +260,14 @@ export default function PublicoContent() {
       {movView === 'capturar' && (<>
       {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
       <Card>
-        <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} />
+        <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} tone={dc} />
       </Card>
 
       {/* ── CIERRE DE HOY ── solo lectura (Poster lo llena); fallback tras "corregir a mano" ── */}
       <Card>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-label font-bold uppercase tracking-widest text-fg-muted">Cierre</span>
+            <span className="text-label uppercase tracking-widest" style={{ color: dc }}>Cierre</span>
             <button onClick={() => setCapDate((d) => addDays(d, -1))} className="px-1 text-fg-muted hover:text-fg" aria-label="Día anterior">◀</button>
             <button onClick={() => setCapDate(today)} className={`text-secondary ${capDate === today ? 'font-bold text-fg' : 'text-fg-muted'}`}>
               {capDate === today ? 'hoy' : dayLabel(capDate)}
@@ -345,7 +347,7 @@ export default function PublicoContent() {
 
       {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
       <Card>
-        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">{capDate === today ? 'Hoy' : dayLabel(capDate)}</h2>
+        <CardHead tone={dc}>{capDate === today ? 'Hoy' : dayLabel(capDate)}</CardHead>
         {costosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos este día.</p>}
         <div className="space-y-1">
           {costosHoy.map((c) => (
@@ -362,7 +364,7 @@ export default function PublicoContent() {
 
       {movView === 'historial' && (<>
       {/* ── HISTORIAL = el archivo de tickets (ver, editar, borrar) — sin cambios de funcionalidad ── */}
-      <TicketsArchive />
+      <TicketsArchive tone={dc} />
       {/* Gestor de alias = MANTENIMIENTO del mapeo aprendido de los tickets (proveedor/insumo → Poster). Vive
           CON el archivo, no en el acto diario: es limpieza del registro, casi nunca. Ya es un desplegable. */}
       <AliasManager />
@@ -383,7 +385,7 @@ export default function PublicoContent() {
         {/* OTROS INGRESOS (no-POS: subarriendo, etc.) — vive en Fondos, no en Captura: es un evento raro, no
             parte del ritual diario. Suma a la utilidad, nunca a las ventas (food cost intacto). */}
         <Card>
-          <div className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS · {monthName(month)})</span></div>
+          <CardHead tone={dc}>Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS · {monthName(month)})</span></CardHead>
           <div className="flex flex-wrap items-center gap-2">
             <input value={iConcepto} onChange={(e) => setIConcepto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }} />
             <MoneyInput ref={iAmtRef} value={iAmt} onChange={setIAmt} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="$ monto" style={{ ...numInput, width: 120 }} />
@@ -407,7 +409,7 @@ export default function PublicoContent() {
         </BentoRow>
       </div>)}
 
-      {tab === 'notas' && <Notas />}
+      {tab === 'notas' && <Notas tone={dc} />}
     </div>
   )
 }
@@ -651,7 +653,7 @@ function Direccion() {
     <>
       {/* ── GUARDIÁN: cierres después de medianoche rompen el supuesto de "día natural" ── */}
       {m.guardian.count > 0 && (
-        <div className="rounded-card border-2 border-danger bg-danger/10 p-3 text-secondary">
+        <div className="rounded-card border border-danger bg-danger/10 p-3 text-secondary">
           <div className="font-bold text-danger">⚠ {m.guardian.count} recibo(s) cerraron entre 00:00 y 06:00 CDMX</div>
           <div className="mt-1 text-fg-muted">El supuesto de “día natural = getPaymentsReport” asume que se cierra antes de medianoche. Estos cruzan ese límite — revisa si la operación cambió de horario:</div>
           <div className="mt-1 space-y-0.5">
@@ -683,7 +685,7 @@ function Direccion() {
       {/* ── MARGEN TEÓRICO | TOP PRODUCTOS (lado a lado; colapsa a 1 columna en móvil) ── */}
       <BentoRow>
         <Card>
-          <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Margen teórico</h2>
+          <CardHead tone={dc}>Margen teórico</CardHead>
           <div className="grid grid-cols-2 gap-y-1 text-secondary">
             <span className="text-fg-muted">Venta</span><span className="text-right tabular-nums text-ok">{mxn(m.margin.revenue)}</span>
             <span className="text-fg-muted">Costo de receta (teórico)</span><span className="text-right tabular-nums text-danger">−{mxn(m.margin.cost)}</span>
@@ -694,7 +696,7 @@ function Direccion() {
         </Card>
         <Card>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Top productos</h2>
+            <CardHead tone={dc}>Top productos</CardHead>
             <div className="flex gap-1">
               <button onClick={() => setSortBy('revenue')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'revenue' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>facturación</button>
               <button onClick={() => setSortBy('units')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'units' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>unidades</button>
@@ -717,7 +719,7 @@ function Direccion() {
       {/* ── HORAS PICO | DÍA DE LA SEMANA (lado a lado; barras a media anchura con <StatBar>) ── */}
       <BentoRow>
         <Card>
-          <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Horas pico <span className="font-normal normal-case tracking-normal text-fg-muted">(cierre, CDMX)</span></h2>
+          <CardHead tone={dc}>Horas pico <span className="font-normal normal-case tracking-normal text-fg-muted">(cierre, CDMX)</span></CardHead>
           <div className="space-y-1">
             {hoursActive.map((h) => (
               <StatBar key={h.hour} tone={dc} label={`${String(h.hour).padStart(2, '0')}h`} value={h.receipts / maxHour} right={`${h.receipts} · ${mxn(h.revenue)}`} />
@@ -725,7 +727,7 @@ function Direccion() {
           </div>
         </Card>
         <Card>
-          <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Día de la semana</h2>
+          <CardHead tone={dc}>Día de la semana</CardHead>
           <div className="space-y-1">
             {dowOrder.map((d) => {
               const row = m.dow[d]
@@ -757,6 +759,8 @@ const dayLabelShort = (iso: string) => { const [, mm, dd] = iso.split('-'); retu
 type EmpMonth = { month: string; sales: number; empaque: number; pct: number | null }
 
 function FoodCostPanel() {
+  const { crt } = useOSSettings()
+  const dc = crtDayColor(dayColor(new Date()), crt)   // color del día → mismo idioma de headers que el resto de Público
   const [d, setD] = useState<FCData | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [emp, setEmp] = useState<EmpMonth[] | null>(null)
@@ -775,7 +779,7 @@ function FoodCostPanel() {
 
   return (
     <Card>
-      <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Food cost · real vs teórico</h2>
+      <CardHead tone={dc}>Food cost · real vs teórico</CardHead>
 
       {/* Estado de hoy, sin adornos */}
       <div className={`mb-2 rounded-card border p-2 text-label ${d.anyReliable ? 'border-border text-fg-muted' : 'border-warn text-warn'}`}>{d.todayStatus}</div>
@@ -832,7 +836,7 @@ function FoodCostPanel() {
           (cajas, vasos, servilletas); escala con el volumen, por eso se mira como % de ventas. Punto 5. */}
       {emp && emp.some((m) => m.empaque > 0) && (
         <Card pad="sm" className="mt-3" style={{ borderStyle: 'dashed' }}>
-          <div className="mb-1 text-label font-bold uppercase tracking-widest text-fg-muted">Empaque · % de ventas <span className="font-normal normal-case tracking-normal">(no es food cost — lo que se va con la venta)</span></div>
+          <CardHead tone={dc}>Empaque · % de ventas <span className="font-normal normal-case tracking-normal">(no es food cost — lo que se va con la venta)</span></CardHead>
           <div className="space-y-0.5">
             {emp.map((m) => (
               <div key={m.month} className="flex items-baseline justify-between text-secondary">
@@ -878,9 +882,11 @@ function Socios({ funds, handlers }: {
 
 // Reparto = card aparte (va lado a lado con Otros ingresos en el bento de Fondos).
 function Reparto({ splitAlex, onSplit, utilidadOper }: { splitAlex: number; onSplit: (v: number) => void; utilidadOper: number }) {
+  const { crt } = useOSSettings()
+  const dc = crtDayColor(dayColor(new Date()), crt)   // color del día → header en el mismo idioma que Panel/Dirección
   return (
     <Card>
-      <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Reparto</h2>
+      <CardHead tone={dc}>Reparto</CardHead>
       <div className="flex items-center gap-2 text-secondary">
         <span>Alex</span>
         <input

@@ -83,7 +83,7 @@ async function parseResp(resp: Response): Promise<{ ok: boolean; j: { error?: st
 // base64 pesa ~1.33× el binario; el límite de body de Vercel es ~4.5 MB. Cortamos con margen.
 const MAX_B64 = 4_200_000
 
-export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: () => Promise<void> | void; defaultDate: string; onDraftChange?: (open: boolean) => void }) {
+export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSaved: () => Promise<void> | void; defaultDate: string; onDraftChange?: (open: boolean) => void; tone?: string }) {
   const [busy, setBusy] = useState<'extract' | 'confirm' | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [img, setImg] = useState<{ b64?: string; storagePath?: string; media: string } | null>(null)
@@ -239,7 +239,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
           onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true) }}
           onDragLeave={(e) => { e.preventDefault(); setDragging(false) }}
           onDrop={onDrop}
-          className={`-m-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed py-12 text-center transition-colors ${busy === 'extract' ? 'cursor-wait border-border' : dragging ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/60 hover:bg-surface-2'}`}
+          className={`-m-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border border-dashed py-12 text-center transition-colors ${busy === 'extract' ? 'cursor-wait border-border' : dragging ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/60 hover:bg-surface-2'}`}
         >
           <span style={{ fontSize: 42, lineHeight: 1 }}>{busy === 'extract' ? '⏳' : dragging ? '📥' : '📷'}</span>
           <span className="text-base font-bold text-fg">{busy === 'extract' ? 'leyendo el ticket…' : dragging ? 'suelta la foto aquí' : 'Capturar por foto del ticket'}</span>
@@ -252,7 +252,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
       {d && (
         <div className="mt-1 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-label font-bold uppercase tracking-widest text-fg-muted">Borrador del ticket <span className="font-normal normal-case tracking-normal">— revisa y confirma</span></span>
+            <span className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>Borrador del ticket <span className="font-normal normal-case tracking-normal text-fg-muted">— revisa y confirma</span></span>
             <span className={`text-label ${legColor}`}>legibilidad {d.legibilidad}</span>
           </div>
           {d.notas && <Card pad="sm" className="text-label text-fg-muted">📝 {d.notas}</Card>}

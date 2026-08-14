@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Card, inputCell as cell } from './ui'
+import { Card, CardHead, inputCell as cell } from './ui'
 
 // Notas operativas de Público: lista simple (título + cuerpo), ordenable, borrado reversible. Datos del negocio
 // que no viven en ninguna otra parte: RFC, cuentas, contacto del gas, códigos, claves de proveedores.
 // Se guardan en TEXTO PLANO — se avisa explícito. Sin categorías ni etiquetas (a propósito, por ahora).
 type Nota = { id: string; titulo: string; cuerpo: string; sort_order: number }
 
-export function Notas() {
+export function Notas({ tone }: { tone?: string }) {
   const [notas, setNotas] = useState<Nota[]>([])
   const [nt, setNt] = useState(''); const [nc, setNc] = useState('')       // alta: título / cuerpo
   const [editId, setEditId] = useState<string | null>(null)
@@ -51,7 +51,7 @@ export function Notas() {
 
   return (
     <Card className="text-secondary">
-      <div className="mb-1 text-label font-bold uppercase tracking-widest text-fg-muted">Notas <span className="font-normal normal-case tracking-normal">— datos operativos (RFC, cuentas, contacto del gas, códigos, claves)</span></div>
+      <CardHead tone={tone}>Notas <span className="font-normal normal-case tracking-normal">— datos operativos (RFC, cuentas, contacto del gas, códigos, claves)</span></CardHead>
       <div className="mb-2 rounded-card border p-2 text-label text-warn" style={{ borderColor: 'var(--color-warn, #b45309)55', background: 'color-mix(in srgb, var(--color-warn, #b45309) 8%, transparent)' }}>⚠ Se guardan en <b>texto plano</b>. Decide qué metes aquí sabiéndolo.</div>
 
       {/* Alta */}

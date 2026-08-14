@@ -17,7 +17,7 @@ type EditItem = { descripcion: string; cantidad: number | null; unidad: string |
 type EditState = { proveedor: string; fecha: string; subtotal: number | null; impuestos: number | null; total: number | null; category: CostCategory; mixed: boolean; origin: string | null; splits: Record<string, number | null>; items: EditItem[] }
 
 
-export function TicketsArchive() {
+export function TicketsArchive({ tone }: { tone?: string }) {
   const [list, setList] = useState<TicketRow[]>([])
   const [sel, setSel] = useState<string | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
@@ -83,7 +83,7 @@ export function TicketsArchive() {
   return (
     <Card>
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Tickets <span className="font-normal normal-case tracking-normal">· archivo ({list.length})</span></h2>
+        <h2 className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>Tickets <span className="font-normal normal-case tracking-normal text-fg-muted">· archivo ({list.length})</span></h2>
         {sel && <button onClick={() => { setSel(null); setDetail(null); setEd(null) }} className="text-label text-fg-muted hover:text-accent">← volver a la lista</button>}
       </div>
       {flash && <div className="mb-2 rounded-card border border-border bg-surface-1 p-1.5 text-label text-fg-muted">{flash}</div>}
