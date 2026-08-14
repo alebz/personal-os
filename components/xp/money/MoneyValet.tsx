@@ -92,7 +92,7 @@ export default function MoneyValet({ month, onLedgerChange }: { month: string; o
         </div>
         <div style={{ flex: 1, minWidth: 190, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '7px 10px', background: 'linear-gradient(#fff,#f2f7fd)', display: 'flex', flexDirection: 'column', gap: 5 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#5a6a86' }}>Semanas<span style={{ marginLeft: 'auto', fontWeight: 700, color: MONEY.ink }}>{numWeeks}</span></div>
-          <ConfigRow label="Monto / punto" type="number" value={String(ppt)} onSave={(v) => saveConfig({ price_per_point: num(v) })} />
+          <ConfigRow label="Monto / punto" type="number" money value={String(ppt)} onSave={(v) => saveConfig({ price_per_point: num(v) })} />
         </div>
       </div>
 
@@ -154,14 +154,18 @@ function ProgressLine({ label, a, b, down }: { label: string; a: number; b: numb
   )
 }
 
-function ConfigRow({ label, type, value, onSave }: { label: string; type: string; value: string; onSave: (v: string) => void }) {
+// `money`: cuando se pide, renderiza el input de MONTO compartido (formato $). Sin la bandera, el
+// comportamiento genérico queda IDÉNTICO (input crudo type={type}) — no toca a los demás consumidores.
+function ConfigRow({ label, type, value, onSave, money }: { label: string; type: string; value: string; onSave: (v: string) => void; money?: boolean }) {
   const [v, setV] = useState(value)
   useEffect(() => { setV(value) }, [value])
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#5a6a86' }}>
       <span style={{ flex: 1 }}>{label}</span>
-      <input type={type} value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onSave(v)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-        style={{ width: type === 'date' ? 120 : 66, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 5px', fontSize: 11, fontFamily: 'inherit', outline: 'none' }} />
+      {money
+        ? <MoneyAmount value={v === '' ? null : Number(v)} onChange={(n) => setV(n == null ? '' : String(n))} onBlur={() => v !== value && onSave(v)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} style={{ width: 66, textAlign: 'right' }} />
+        : <input type={type} value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onSave(v)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+            style={{ width: type === 'date' ? 120 : 66, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 5px', fontSize: 11, fontFamily: 'inherit', outline: 'none' }} />}
     </div>
   )
 }
