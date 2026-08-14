@@ -88,6 +88,7 @@ export default function PublicoContent() {
   const [cCat, setCCat] = useState<CostCategory>('insumo')          // sticky
   const [cOrigin, setCOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false)   // hay borrador de ticket abierto → oculta la barra manual
+  const [editVenta, setEditVenta] = useState(false)               // el cierre es solo-lectura (Poster lo llena); esto abre el fallback manual
   const [cKind, setCKind] = useState<CostKind>(catDefaults('insumo').defaultKind ?? 'variable')
   const [cNote, setCNote] = useState('')
   const cAmtRef = useRef<HTMLInputElement>(null)
@@ -122,7 +123,7 @@ export default function PublicoContent() {
   }, [month, capDate, currentMonth, prevMonthStr, today])
 
   useEffect(() => { void load() }, [load])
-  useEffect(() => { efectivoRef.current?.focus() }, [])   // autofocus al abrir: el cierre es lo que haces siempre
+  useEffect(() => { setEditVenta(false) }, [capDate])   // al navegar de día, el cierre vuelve a solo-lectura (no arrastra un form de edición)
 
   // Al cambiar categoría, resetea origen+naturaleza a los defaults de ESA categoría (sticky después).
   function pickCat(cat: CostCategory) {
@@ -139,6 +140,7 @@ export default function PublicoContent() {
       body: JSON.stringify({ date: capDate, efectivo: ef || 0, tarjeta: ta || 0 }),
     })
     setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1400)
+    setEditVenta(false)   // guardado → vuelve a solo-lectura
     await load()
   }
 
@@ -249,28 +251,31 @@ export default function PublicoContent() {
           </div>
           {savedFlash && <span className="text-secondary font-medium text-ok">✓ guardado</span>}
         </div>
-        <div className="flex items-end gap-3">
-          <label className="flex-1">
-            <span className="text-label text-fg-muted">Efectivo</span>
-            <MoneyInput
-              ref={efectivoRef} value={efectivo} onChange={setEfectivo}
-              onKeyDown={(e) => { if (e.key === 'Enter') tarjetaRef.current?.focus() }}
-              placeholder="0" style={numInput}
-            />
-          </label>
-          <label className="flex-1">
-            <span className="text-label text-fg-muted">Tarjeta</span>
-            <MoneyInput
-              ref={tarjetaRef} value={tarjeta} onChange={setTarjeta}
-              onKeyDown={(e) => { if (e.key === 'Enter') void saveVenta() }}
-              placeholder="0" style={numInput}
-            />
-          </label>
-          <button onClick={() => void saveVenta()} className="rounded-card bg-[#c0392b] px-4 py-2 font-bold text-white">Guardar</button>
-        </div>
-        <div className="mt-1 text-right text-label text-fg-muted">
-          Total {mxn((efectivo ?? 0) + (tarjeta ?? 0))}
-        </div>
+        {/* Poster llena las ventas solas → esto es SOLO LECTURA. El formulario manual es el fallback (Poster no
+            trajo el día, o quieres corregir), colapsado tras "corregir a mano". Deja de ser el ritual diario. */}
+        {hoyV && !editVenta ? (
+          <div className="flex items-center justify-between gap-2 text-secondary">
+            <span className="text-fg-muted">efectivo <b className="tabular-nums text-fg">{mxn(Number(hoyV.efectivo))}</b> · tarjeta <b className="tabular-nums text-fg">{mxn(Number(hoyV.tarjeta))}</b> · total <b className="tabular-nums text-fg">{mxn(Number(hoyV.efectivo) + Number(hoyV.tarjeta))}</b></span>
+            <button onClick={() => { setEfectivo(Number(hoyV.efectivo) || null); setTarjeta(Number(hoyV.tarjeta) || null); setEditVenta(true) }} className="shrink-0 text-label text-fg-muted underline decoration-dotted hover:text-accent">corregir a mano</button>
+          </div>
+        ) : (
+          <>
+            {!hoyV && <div className="mb-1 text-label text-fg-muted">Sin ventas del POS para este día — captúralas a mano o espera el import.</div>}
+            <div className="flex items-end gap-3">
+              <label className="flex-1">
+                <span className="text-label text-fg-muted">Efectivo</span>
+                <MoneyInput ref={efectivoRef} value={efectivo} onChange={setEfectivo} onKeyDown={(e) => { if (e.key === 'Enter') tarjetaRef.current?.focus() }} placeholder="0" style={numInput} />
+              </label>
+              <label className="flex-1">
+                <span className="text-label text-fg-muted">Tarjeta</span>
+                <MoneyInput ref={tarjetaRef} value={tarjeta} onChange={setTarjeta} onKeyDown={(e) => { if (e.key === 'Enter') void saveVenta() }} placeholder="0" style={numInput} />
+              </label>
+              <button onClick={() => void saveVenta()} className="rounded-card bg-[#c0392b] px-4 py-2 font-bold text-white">Guardar</button>
+              {hoyV && <button onClick={() => setEditVenta(false)} className="text-label text-fg-muted hover:text-accent">cancelar</button>}
+            </div>
+            <div className="mt-1 text-right text-label text-fg-muted">Total {mxn((efectivo ?? 0) + (tarjeta ?? 0))}</div>
+          </>
+        )}
       </section>
 
       {/* ── AGREGAR COSTO A MANO ── Se OCULTA cuando hay un borrador de ticket abierto: son dos formas con el
