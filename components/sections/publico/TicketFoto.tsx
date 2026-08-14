@@ -82,7 +82,7 @@ async function parseResp(resp: Response): Promise<{ ok: boolean; j: { error?: st
 // base64 pesa ~1.33× el binario; el límite de body de Vercel es ~4.5 MB. Cortamos con margen.
 const MAX_B64 = 4_200_000
 
-export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<void> | void; defaultDate: string }) {
+export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: () => Promise<void> | void; defaultDate: string; onDraftChange?: (open: boolean) => void }) {
   const [busy, setBusy] = useState<'extract' | 'confirm' | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [img, setImg] = useState<{ b64?: string; storagePath?: string; media: string } | null>(null)
@@ -94,12 +94,16 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
   const [mixed, setMixed] = useState(false)                 // pago mixto: split del total entre contenedores
   const [splitAmts, setSplitAmts] = useState<Record<string, number | null>>({})
   const [pagoUnread, setPagoUnread] = useState(false)       // el ticket no trajo método de pago legible → elige tú
+  const [overrideOrigin, setOverrideOrigin] = useState(false)  // "cambiar origen": abre los chips cuando el pago YA se leyó
   const [dateApproved, setDateApproved] = useState(false)   // aprobación explícita de una fecha fuera de rango
   const [showPoster, setShowPoster] = useState(false)       // panel "lista para teclear en Poster"
   const fileRef = useRef<HTMLInputElement>(null)
   // Catálogo Poster (solo lectura) para traducir ids del mapeo a nombres en la lista lista-para-teclear.
   const [cat2, setCat2] = useState<PosterCatalog | null>(null)
   useEffect(() => { if (cat2) return; fetch('/api/publico/poster/catalog').then((r) => r.json()).then((j) => { if (!j.error) setCat2(j) }).catch(() => {}) }, [cat2])
+  // Avisa al padre si hay un borrador abierto → oculta la barra de alta manual (no compiten en pantalla).
+  const draftOpen = d != null
+  useEffect(() => { onDraftChange?.(draftOpen); return () => { onDraftChange?.(false) } }, [draftOpen, onDraftChange])
 
   // Guardián de fecha: futuro o >60 días atrás = sospechosa. Una fecha mal leída ensucia el food cost de
   // dos meses sin hacer ruido, así que no deja confirmar hasta que la corrijas o la apruebes.
@@ -108,14 +112,14 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
   const dateSuspect = !!d?.fecha && (d.fecha > todayLocal || d.fecha < floor60)
   const dateBlocked = dateSuspect && !dateApproved
 
-  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); setMixed(false); setSplitAmts({}); setPagoUnread(false); if (fileRef.current) fileRef.current.value = '' }
+  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); setMixed(false); setSplitAmts({}); setPagoUnread(false); setOverrideOrigin(false); if (fileRef.current) fileRef.current.value = '' }
 
   // Resuelve el origen del pago desde el desglose leído del ticket. Reglas FIJAS del negocio (sin alias):
   // efectivo → caja chica, tarjeta → CLIP. Dos montos → pago mixto ya prendido; uno → ese contenedor; ninguno
   // legible → no adivina, marca pagoUnread para que el humano elija (mismo criterio que "sin mapear").
   function resolvePago(draft: FotoDraft) {
     const ef = draft.pagoEfectivo ?? 0, tj = draft.pagoTarjeta ?? 0
-    setMixed(false); setSplitAmts({}); setPagoUnread(false)
+    setMixed(false); setSplitAmts({}); setPagoUnread(false); setOverrideOrigin(false)
     if (ef > 0 && tj > 0) { setMixed(true); setSplitAmts({ caja_chica: ef, clip: tj }) }
     else if (ef > 0) setOrigin('caja_chica')
     else if (tj > 0) setOrigin('clip')
@@ -288,28 +292,40 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
           </div>
           {reconMismatch && reconTarget != null && <div className="text-right text-label text-warn">las líneas suman {mxn(itemsSum)} · {reconLabel} {mxn(reconTarget)} — diferencia {mxn(Math.abs(reconDiff))} {reconDiff > 0 ? 'de más en líneas' : 'de menos en líneas'} — revisa</div>}
 
-          {/* Categoría + origen del roll-up */}
+          {/* Categoría (su propia fila) */}
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
             <span className="text-label text-fg-muted">Categoría</span>
             {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
               <button key={c.key} onClick={() => { setCat(c.key); setOrigin(catDefaults(c.key).defaultOrigin) }} style={fotoChip(cat === c.key)}>{c.label}</button>
             ))}
-            <span className="ml-2 text-label text-fg-muted">desde</span>
-            {!mixed && ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => { setOrigin(ct.key); setPagoUnread(false) }} style={fotoChip(!pagoUnread && origin === ct.key)}>{ct.label}</button>))}
-            <button onClick={() => { setMixed((m) => !m); setPagoUnread(false) }} style={fotoChip(mixed)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
           </div>
 
-          {/* Método de pago LEÍDO del ticket (regla fija: efectivo→caja chica, tarjeta→CLIP). El origen llega
-              pre-resuelto; tú solo confirmas o corriges. Si no se leyó, no adivina y te pide elegir. */}
-          {pagoLeido && (
-            <div className="text-label text-fg-muted">
-              💳 pago del ticket: {(d.pagoEfectivo ?? 0) > 0 && <>efectivo {mxn(d.pagoEfectivo!)} <span className="text-ok">→ caja chica</span></>}
-              {(d.pagoEfectivo ?? 0) > 0 && (d.pagoTarjeta ?? 0) > 0 && ' · '}
-              {(d.pagoTarjeta ?? 0) > 0 && <>tarjeta {mxn(d.pagoTarjeta!)}{d.pagoUltimos4 ? ` ••${d.pagoUltimos4}` : ''} <span className="text-ok">→ CLIP</span></>}
+          {/* Origen del pago. Si el ticket YA lo resolvió (regla fija: efectivo→caja chica, tarjeta→CLIP), la
+              línea de pago es la CONFIRMACIÓN y los chips se colapsan tras "cambiar origen" — no se elige lo ya
+              resuelto. Si NO se leyó, los chips salen prominentes como la elección pendiente que son. */}
+          {pagoLeido && !overrideOrigin && !mixed ? (
+            <div className="flex flex-wrap items-center gap-2 text-label text-fg-muted">
+              <span>💳 pago del ticket: {(d.pagoEfectivo ?? 0) > 0 && <>efectivo {mxn(d.pagoEfectivo!)} <span className="text-ok">→ caja chica</span></>}
+                {(d.pagoEfectivo ?? 0) > 0 && (d.pagoTarjeta ?? 0) > 0 && ' · '}
+                {(d.pagoTarjeta ?? 0) > 0 && <>tarjeta {mxn(d.pagoTarjeta!)}{d.pagoUltimos4 ? ` ••${d.pagoUltimos4}` : ''} <span className="text-ok">→ CLIP</span></>}</span>
+              <button onClick={() => setOverrideOrigin(true)} className="underline decoration-dotted hover:text-accent">cambiar origen</button>
+              <button onClick={() => { setMixed(true); setPagoUnread(false) }} className="underline decoration-dotted hover:text-accent">pago mixto</button>
+            </div>
+          ) : !mixed ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-label text-fg-muted">desde</span>
+              {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => { setOrigin(ct.key); setPagoUnread(false) }} style={fotoChip(!pagoUnread && origin === ct.key)}>{ct.label}</button>))}
+              <button onClick={() => { setMixed(true); setPagoUnread(false) }} style={fotoChip(false)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
+              {pagoLeido && overrideOrigin && <button onClick={() => setOverrideOrigin(false)} className="text-label text-fg-muted underline decoration-dotted hover:text-accent">↩ usar el leído</button>}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-label text-fg-muted">desde</span>
+              <button onClick={() => setMixed(false)} style={fotoChip(true)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
             </div>
           )}
           {pagoMismatch && <div className="text-label text-warn">⚠ el pago leído suma {mxn(pagoSum)} pero el total es {mxn(totalNum)} — diferencia {mxn(Math.abs(pagoDiff))} — revisa</div>}
-          {pagoUnread && <div className="rounded-card border border-warn bg-warn/10 p-2 text-label text-warn">⚠ No se leyó el método de pago del ticket. Elige el origen arriba — no se adivinó.</div>}
+          {pagoUnread && !mixed && <div className="rounded-card border border-warn bg-warn/10 p-2 text-label text-warn">⚠ No se leyó el método de pago del ticket. Elige el origen arriba — no se adivinó.</div>}
 
           {/* PAGO MIXTO: monto por contenedor; deben sumar EXACTO al total del ticket o no deja confirmar. */}
           {mixed && (

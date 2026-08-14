@@ -87,6 +87,7 @@ export default function PublicoContent() {
   const [cAmt, setCAmt] = useState<number | null>(null)
   const [cCat, setCCat] = useState<CostCategory>('insumo')          // sticky
   const [cOrigin, setCOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
+  const [ticketDraftOpen, setTicketDraftOpen] = useState(false)   // hay borrador de ticket abierto → oculta la barra manual
   const [cKind, setCKind] = useState<CostKind>(catDefaults('insumo').defaultKind ?? 'variable')
   const [cNote, setCNote] = useState('')
   const cAmtRef = useRef<HTMLInputElement>(null)
@@ -272,38 +273,47 @@ export default function PublicoContent() {
         </div>
       </section>
 
-      {/* ── AGREGAR COSTO ── */}
+      {/* ── AGREGAR COSTO A MANO ── Se OCULTA cuando hay un borrador de ticket abierto: son dos formas con el
+          mismo vocabulario visual (chips de categoría + $ + desde) y no deben competir en pantalla a la vez. */}
+      {!ticketDraftOpen && (
+        <section className="rounded-card border border-border bg-surface-2 p-3">
+          <div className="mb-2 text-label uppercase tracking-widest text-fg-muted">Agregar costo a mano</div>
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {/* Mismo juego de 7 que el ticket: SIN Renta condonada (net-cero, no-operativa, sin recibo → su casa es Previstos). */}
+            {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
+              <button key={c.key} onClick={() => pickCat(c.key)} style={chip(cCat === c.key)}>{c.label}</button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <MoneyInput
+              ref={cAmtRef} value={cAmt} onChange={setCAmt}
+              onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }}
+              placeholder="$ monto" style={{ ...numInput, width: 120 }}
+            />
+            <span className="text-label text-fg-muted">desde</span>
+            {ORIGIN_OPTIONS.map((ct) => (
+              <button key={ct.label} onClick={() => setCOrigin(ct.key)} style={chip(cOrigin === ct.key)}>{ct.label}</button>
+            ))}
+            {catDefaults(cCat).defaultKind !== null && (
+              <button
+                onClick={() => setCKind((k) => (k === 'fijo' ? 'variable' : 'fijo'))}
+                className="text-label text-fg-muted underline decoration-dotted"
+                title="fijo/variable (para el punto de equilibrio); tap para cambiar"
+              >{cKind}</button>
+            )}
+            <input
+              value={cNote} onChange={(e) => setCNote(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }}
+              placeholder="nota (opc)" style={{ ...numInput, flex: 1, minWidth: 90, fontSize: 14 }}
+            />
+            <button onClick={() => void addCosto()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
+          </div>
+        </section>
+      )}
+
+      {/* ── CAPTURAR POR FOTO ── Su propia card: cuando hay borrador, es la única forma visible (la manual se ocultó). */}
       <section className="rounded-card border border-border bg-surface-2 p-3">
-        <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          {COST_CATEGORIES.map((c) => (
-            <button key={c.key} onClick={() => pickCat(c.key)} style={chip(cCat === c.key)}>{c.label}</button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <MoneyInput
-            ref={cAmtRef} value={cAmt} onChange={setCAmt}
-            onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }}
-            placeholder="$ monto" style={{ ...numInput, width: 120 }}
-          />
-          <span className="text-label text-fg-muted">desde</span>
-          {ORIGIN_OPTIONS.map((ct) => (
-            <button key={ct.label} onClick={() => setCOrigin(ct.key)} style={chip(cOrigin === ct.key)}>{ct.label}</button>
-          ))}
-          {catDefaults(cCat).defaultKind !== null && (
-            <button
-              onClick={() => setCKind((k) => (k === 'fijo' ? 'variable' : 'fijo'))}
-              className="text-label text-fg-muted underline decoration-dotted"
-              title="fijo/variable (para el punto de equilibrio); tap para cambiar"
-            >{cKind}</button>
-          )}
-          <input
-            value={cNote} onChange={(e) => setCNote(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }}
-            placeholder="nota (opc)" style={{ ...numInput, flex: 1, minWidth: 90, fontSize: 14 }}
-          />
-          <button onClick={() => void addCosto()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
-        </div>
-        <div className="mt-2 border-t border-border pt-2"><TicketFoto onSaved={load} defaultDate={capDate} /></div>
+        <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} />
       </section>
 
       {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
