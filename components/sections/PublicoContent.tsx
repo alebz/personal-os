@@ -14,7 +14,7 @@ import {
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
 import { Notas } from './publico/Notas'
-import { Card, CardHead, Metric as KitMetric, srcTag } from './publico/ui'
+import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow } from './publico/ui'
 import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
 import { Contenedores } from './publico/Contenedores'
@@ -376,7 +376,10 @@ export default function PublicoContent() {
       {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
 
       {tab === 'fondos' && (<div className="space-y-3">
-        <Socios funds={socioFunds} handlers={socioHandlers} splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
+        <Socios funds={socioFunds} handlers={socioHandlers} />
+        {/* Reparto | Otros ingresos lado a lado (colapsan a 1 col en móvil). */}
+        <BentoRow>
+        <Reparto splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
         {/* OTROS INGRESOS (no-POS: subarriendo, etc.) — vive en Fondos, no en Captura: es un evento raro, no
             parte del ritual diario. Suma a la utilidad, nunca a las ventas (food cost intacto). */}
         <Card>
@@ -401,6 +404,7 @@ export default function PublicoContent() {
             </div>
           )}
         </Card>
+        </BentoRow>
       </div>)}
 
       {tab === 'notas' && <Notas />}
@@ -616,20 +620,9 @@ type Metrics = {
   guardian: { count: number; receipts: Array<{ id: string; date: string; time: string; sum: number }> }
 }
 
-function Bar({ value, max, label, right }: { value: number; max: number; label: string; right: string }) {
-  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0
-  return (
-    <div className="flex items-center gap-2 text-secondary">
-      <span className="w-10 shrink-0 text-fg-muted">{label}</span>
-      <div className="h-4 flex-1 overflow-hidden rounded bg-surface-active">
-        <div className="h-full rounded bg-[#c0392b]" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="w-24 shrink-0 text-right tabular-nums text-fg-muted">{right}</span>
-    </div>
-  )
-}
-
 function Direccion() {
+  const { crt } = useOSSettings()
+  const dc = crtDayColor(dayColor(new Date()), crt)   // color del día → las métricas hablan el mismo idioma que el Panel
   const [m, setM] = useState<Metrics | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'revenue' | 'units'>('revenue')
@@ -669,79 +662,78 @@ function Direccion() {
         </div>
       )}
 
-      {/* ── RESUMEN ── */}
-      <Card>
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Dirección</h2>
-          <span className="text-label text-fg-muted">{dayMonth(m.range.from)} → {dayMonth(m.range.to)}</span>
+      {/* ── RESUMEN — métricas del HISTÓRICO con <Metric>. Rango CLARÍSIMO: Dirección cubre TODO el histórico
+          (no el mes del Panel); ahora que comparten componente visual es fácil confundirlos. ── */}
+      <Card emphasis="hero" tone={dc} pad="none">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2 px-3 pt-3">
+          <CardHead tone={dc}>Dirección · histórico completo</CardHead>
+          <span className="text-label text-fg-muted">{dayMonth(m.range.from)} → {dayMonth(m.range.to)} · <b className="text-fg">todo, no el mes</b></span>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-secondary sm:grid-cols-4">
-          <div><div className="text-label text-fg-muted">Ticket promedio</div><div className="text-lg font-bold tabular-nums">{mxn(m.ticketPromedio)}</div></div>
-          <div><div className="text-label text-fg-muted">Venta / día operado</div><div className="text-lg font-bold tabular-nums">{mxn(m.ventaPorDiaOperado)}</div></div>
-          <div><div className="text-label text-fg-muted">Recibos</div><div className="text-lg font-bold tabular-nums">{m.receipts}</div></div>
-          <div><div className="text-label text-fg-muted">Comensales prom.</div><div className="text-lg font-bold tabular-nums">{m.guestsPromedio.toFixed(1)}</div></div>
+        <div className="grid grid-cols-2 sm:grid-cols-4" style={{ borderTop: `1px solid ${dc}22` }}>
+          <div><KitMetric tone={dc} name={<>Ticket promedio{srcTag('pos', dc)}</>} value={mxn(m.ticketPromedio)} hint="promedio por recibo" /></div>
+          <div><KitMetric tone={dc} name={<>Venta · día operado{srcTag('pos', dc)}</>} value={mxn(m.ventaPorDiaOperado)} hint={`÷ ${m.daysOperated} días operados · no del calendario`} /></div>
+          <div><KitMetric tone={dc} name={<>Recibos{srcTag('pos', dc)}</>} value={String(m.receipts)} hint={`en ${m.daysOperated} días operados`} /></div>
+          <div><KitMetric tone={dc} name={<>Comensales · prom{srcTag('pos', dc)}</>} value={m.guestsPromedio.toFixed(1)} hint="por recibo" /></div>
         </div>
-        <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">
-          <b className="text-fg">{m.daysOperated}</b> días operados de {m.range.calendarDays} de calendario ({closedDays} cerrados). Los promedios por día usan los {m.daysOperated} operados, no el calendario.
+        <div className="border-t px-3 py-2 text-label text-fg-muted" style={{ borderColor: `${dc}22` }}>
+          <b className="text-fg">{m.daysOperated}</b> días operados de {m.range.calendarDays} de calendario ({closedDays} cerrados). Los promedios por día usan los operados, no el calendario.
         </div>
       </Card>
 
-      {/* ── MARGEN TEÓRICO (food cost de las recetas del POS) ── */}
-      <Card>
-        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Margen teórico</h2>
-        <div className="grid grid-cols-2 gap-y-1 text-secondary">
-          <span className="text-fg-muted">Venta</span><span className="text-right tabular-nums text-ok">{mxn(m.margin.revenue)}</span>
-          <span className="text-fg-muted">Costo de receta (teórico)</span><span className="text-right tabular-nums text-danger">−{mxn(m.margin.cost)}</span>
-          <span className="font-medium text-fg">Utilidad bruta teórica</span><span className="text-right font-medium tabular-nums text-ok">{mxn(m.margin.profit)}</span>
-          <span className="font-bold text-fg">Margen</span><span className="text-right font-bold tabular-nums">{m.margin.pct.toFixed(1)}%</span>
-        </div>
-        <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">Teórico = product_cost de las recetas. El real (vs compras) llega en F4.</div>
-      </Card>
-
-      {/* ── TOP PRODUCTOS ── */}
-      <Card>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Top productos</h2>
-          <div className="flex gap-1">
-            <button onClick={() => setSortBy('revenue')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'revenue' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>facturación</button>
-            <button onClick={() => setSortBy('units')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'units' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>unidades</button>
+      {/* ── MARGEN TEÓRICO | TOP PRODUCTOS (lado a lado; colapsa a 1 columna en móvil) ── */}
+      <BentoRow>
+        <Card>
+          <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Margen teórico</h2>
+          <div className="grid grid-cols-2 gap-y-1 text-secondary">
+            <span className="text-fg-muted">Venta</span><span className="text-right tabular-nums text-ok">{mxn(m.margin.revenue)}</span>
+            <span className="text-fg-muted">Costo de receta (teórico)</span><span className="text-right tabular-nums text-danger">−{mxn(m.margin.cost)}</span>
+            <span className="font-medium text-fg">Utilidad bruta teórica</span><span className="text-right font-medium tabular-nums text-ok">{mxn(m.margin.profit)}</span>
+            <span className="font-bold text-fg">Margen</span><span className="text-right font-bold tabular-nums">{m.margin.pct.toFixed(1)}%</span>
           </div>
-        </div>
-        <div className="space-y-1.5">
-          {products.map((p) => (
-            <div key={p.id} className="text-secondary">
-              <div className="flex items-baseline justify-between">
-                <span className="truncate pr-2">{p.name}</span>
-                <span className="shrink-0 tabular-nums text-fg-muted">{p.units.toFixed(0)} uds · <span className="text-fg">{mxn(p.revenue)}</span> · {p.margin.toFixed(0)}%</span>
-              </div>
-              <div className="mt-0.5 h-1.5 overflow-hidden rounded bg-surface-active">
-                <div className="h-full rounded bg-[#c0392b]" style={{ width: `${((sortBy === 'revenue' ? p.revenue : p.units) / maxProd) * 100}%` }} />
-              </div>
+          <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">Teórico = product_cost de las recetas. El real (vs compras) llega en F4.</div>
+        </Card>
+        <Card>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Top productos</h2>
+            <div className="flex gap-1">
+              <button onClick={() => setSortBy('revenue')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'revenue' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>facturación</button>
+              <button onClick={() => setSortBy('units')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'units' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>unidades</button>
             </div>
-          ))}
-        </div>
-      </Card>
+          </div>
+          <div className="space-y-1.5">
+            {products.map((p) => (
+              <div key={p.id} className="text-secondary">
+                <div className="flex items-baseline justify-between">
+                  <span className="truncate pr-2">{p.name}</span>
+                  <span className="shrink-0 tabular-nums text-fg-muted">{p.units.toFixed(0)} uds · <span className="text-fg">{mxn(p.revenue)}</span> · {p.margin.toFixed(0)}%</span>
+                </div>
+                <StatBar tone={dc} value={(sortBy === 'revenue' ? p.revenue : p.units) / maxProd} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </BentoRow>
 
-      {/* ── HORAS PICO ── */}
-      <Card>
-        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Horas pico <span className="font-normal normal-case tracking-normal text-fg-muted">(cierre, CDMX)</span></h2>
-        <div className="space-y-1">
-          {hoursActive.map((h) => (
-            <Bar key={h.hour} label={`${String(h.hour).padStart(2, '0')}h`} value={h.receipts} max={maxHour} right={`${h.receipts} · ${mxn(h.revenue)}`} />
-          ))}
-        </div>
-      </Card>
-
-      {/* ── DÍA DE LA SEMANA ── */}
-      <Card>
-        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Día de la semana</h2>
-        <div className="space-y-1">
-          {dowOrder.map((d) => {
-            const row = m.dow[d]
-            return <Bar key={d} label={row.label} value={row.receipts} max={maxDow} right={`${row.receipts} · ${mxn(row.revenue)}`} />
-          })}
-        </div>
-      </Card>
+      {/* ── HORAS PICO | DÍA DE LA SEMANA (lado a lado; barras a media anchura con <StatBar>) ── */}
+      <BentoRow>
+        <Card>
+          <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Horas pico <span className="font-normal normal-case tracking-normal text-fg-muted">(cierre, CDMX)</span></h2>
+          <div className="space-y-1">
+            {hoursActive.map((h) => (
+              <StatBar key={h.hour} tone={dc} label={`${String(h.hour).padStart(2, '0')}h`} value={h.receipts / maxHour} right={`${h.receipts} · ${mxn(h.revenue)}`} />
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Día de la semana</h2>
+          <div className="space-y-1">
+            {dowOrder.map((d) => {
+              const row = m.dow[d]
+              return <StatBar key={d} tone={dc} label={row.label} value={row.receipts / maxDow} right={`${row.receipts} · ${mxn(row.revenue)}`} />
+            })}
+          </div>
+        </Card>
+      </BentoRow>
     </>
   )
 }
@@ -859,17 +851,14 @@ function FoodCostPanel() {
 // ── Socios (F2): las dos libretas (reusan FundLedger/FundMovementControl) + % de reparto configurable
 // + reparto sugerido de la utilidad (SOLO LECTURA — guía, no crea asientos; el % es provisional). El
 // origen (contenedor) se captura en cada aportación/retiro para el cuadre de F5. ──
-function Socios({ funds, handlers, splitAlex, onSplit, utilidadOper }: {
+// Alex | Andrés lado a lado (cards idénticas, el caso de libro del bento). Colapsa a 1 col en móvil.
+function Socios({ funds, handlers }: {
   funds: Fund[]
   handlers: ReturnType<typeof useCajaFuerte>['handlers']
-  splitAlex: number
-  onSplit: (v: number) => void
-  utilidadOper: number
 }) {
-  const socios = [{ key: 'socio_alex', pct: splitAlex }, { key: 'socio_andres', pct: 100 - splitAlex }]
   return (
-    <>
-      {socios.map(({ key }) => {
+    <BentoRow>
+      {['socio_alex', 'socio_andres'].map((key) => {
         const f = funds.find((x) => x.key === key)
         if (!f) return <p key={key} className="text-secondary italic text-fg-muted">Falta el fondo {key} — ¿corriste la migración 0053?</p>
         return (
@@ -883,23 +872,28 @@ function Socios({ funds, handlers, splitAlex, onSplit, utilidadOper }: {
           </Card>
         )
       })}
+    </BentoRow>
+  )
+}
 
-      <Card>
-        <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Reparto</h2>
-        <div className="flex items-center gap-2 text-secondary">
-          <span>Alex</span>
-          <input
-            type="number" min={0} max={100} value={splitAlex} onChange={(e) => onSplit(Number(e.target.value))}
-            className="w-16 rounded border border-border bg-surface-base px-2 py-1 text-right tabular-nums"
-          />
-          <span className="text-fg-muted">% · Andrés {100 - splitAlex}%</span>
-        </div>
-        <div className="mt-2 border-t border-border pt-2 text-secondary">
-          <div className="text-label text-fg-muted">Reparto sugerido de la utilidad del mes ({mxn(utilidadOper)}) — guía, no crea asientos:</div>
-          <div className="mt-1 flex justify-between"><span>Alex ({splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * splitAlex / 100)}</span></div>
-          <div className="flex justify-between"><span>Andrés ({100 - splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * (100 - splitAlex) / 100)}</span></div>
-        </div>
-      </Card>
-    </>
+// Reparto = card aparte (va lado a lado con Otros ingresos en el bento de Fondos).
+function Reparto({ splitAlex, onSplit, utilidadOper }: { splitAlex: number; onSplit: (v: number) => void; utilidadOper: number }) {
+  return (
+    <Card>
+      <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Reparto</h2>
+      <div className="flex items-center gap-2 text-secondary">
+        <span>Alex</span>
+        <input
+          type="number" min={0} max={100} value={splitAlex} onChange={(e) => onSplit(Number(e.target.value))}
+          className="w-16 rounded border border-border bg-surface-base px-2 py-1 text-right tabular-nums"
+        />
+        <span className="text-fg-muted">% · Andrés {100 - splitAlex}%</span>
+      </div>
+      <div className="mt-2 border-t border-border pt-2 text-secondary">
+        <div className="text-label text-fg-muted">Reparto sugerido de la utilidad del mes ({mxn(utilidadOper)}) — guía, no crea asientos:</div>
+        <div className="mt-1 flex justify-between"><span>Alex ({splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * splitAlex / 100)}</span></div>
+        <div className="flex justify-between"><span>Andrés ({100 - splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * (100 - splitAlex) / 100)}</span></div>
+      </div>
+    </Card>
   )
 }
