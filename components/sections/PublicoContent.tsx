@@ -13,6 +13,7 @@ import {
 } from '@/lib/publico'
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
+import { Notas } from './publico/Notas'
 import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
 import { Contenedores } from './publico/Contenedores'
@@ -401,11 +402,7 @@ export default function PublicoContent() {
         </section>
       </div>)}
 
-      {tab === 'notas' && (
-        <section className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-fg-muted">
-          Notas — datos operativos del negocio. (Pestaña nueva; su contenido llega en una fase próxima.)
-        </section>
-      )}
+      {tab === 'notas' && <Notas />}
     </div>
   )
 }
@@ -486,11 +483,8 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
   // real en desktop (lg:grid-cols-6). Los bloques aún sin datos NO se esconden: se muestran con su leyenda.
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
-      {/* Línea dinámica — ancho completo (es texto, necesita renglón largo). Contenido: Fase 5. */}
-      <div className="flex flex-wrap items-center gap-x-2 px-3 py-2 text-secondary lg:col-span-6" style={box}>
-        <span className="text-label uppercase tracking-widest" style={{ color: dc }}>Línea dinámica</span>
-        <span className="text-fg-muted italic">Fase 5 — leerá tus datos (ventas, costos, previstos) y escribirá la frase que importa hoy.</span>
-      </div>
+      {/* LÍNEA DINÁMICA (Fase 5) — OCULTA hasta que exista: un bloque vacío no aporta. La Fase 5 (que "me lleve
+          de la mano" leyendo mis datos) sigue PENDIENTE, no cancelada. Reaparece cuando se construya. */}
 
       {/* Fila asimétrica: MÉTRICAS + punto de equilibrio (2/3, el bloque hero) · alerta + qué toca (1/3). */}
       <section className="lg:col-span-4" style={box}>
