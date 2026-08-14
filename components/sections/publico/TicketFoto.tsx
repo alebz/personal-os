@@ -98,6 +98,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
   const [overrideOrigin, setOverrideOrigin] = useState(false)  // "cambiar origen": abre los chips cuando el pago YA se leyó
   const [dateApproved, setDateApproved] = useState(false)   // aprobación explícita de una fecha fuera de rango
   const [showPoster, setShowPoster] = useState(false)       // panel "lista para teclear en Poster"
+  const [dragging, setDragging] = useState(false)           // arrastrando una foto sobre la card (dropzone)
   const fileRef = useRef<HTMLInputElement>(null)
   // Catálogo Poster (solo lectura) para traducir ids del mapeo a nombres en la lista lista-para-teclear.
   const [cat2, setCat2] = useState<PosterCatalog | null>(null)
@@ -127,8 +128,8 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
     else setPagoUnread(true)
   }
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return
+  // Procesa UNA foto de ticket, venga del picker o de un ARRASTRE (AirDrop → soltar en la card, sin picker).
+  async function handleFile(file: File) {
     setErr(null); setBusy('extract'); setD(null)
     try {
       // VÍA NUEVA: sube la foto DIRECTO a Storage (sin el límite de 4.5 MB de Vercel), y manda solo la RUTA.
@@ -168,6 +169,9 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
     } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'no se pudo leer la foto') }
     finally { setBusy((b) => (b === 'extract' ? null : b)) }
   }
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (file) void handleFile(file) }
+  // Arrastre: soltar una imagen sobre la card la procesa directo (mi flujo = AirDrop iPhone→iMac → soltar aquí).
+  function onDrop(e: React.DragEvent) { e.preventDefault(); setDragging(false); const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith('image/')); if (file) void handleFile(file) }
 
   function patch(p: Partial<FotoDraft>) { setD((cur) => (cur ? { ...cur, ...p } : cur)) }
   function patchItem(i: number, p: Partial<FotoItem>) { setD((cur) => (cur ? { ...cur, items: cur.items.map((it, k) => (k === i ? { ...it, ...p } : it)) } : cur)) }
@@ -227,12 +231,21 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
     <div>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden" />
       {!d && (
-        <div className="flex items-center gap-2">
-          <button onClick={() => fileRef.current?.click()} disabled={busy === 'extract'} className="rounded-card border border-border px-3 py-1.5 text-secondary font-medium disabled:opacity-50">
-            {busy === 'extract' ? 'leyendo el ticket…' : '📷 Capturar por foto del ticket'}
-          </button>
-          <span className="text-label text-fg-muted">la IA propone, tú confirmas</span>
+        <>
+        {/* ZONA DE ARRASTRE = la card completa (-m-3 la extiende a los bordes). Acción PRIMARIA: grande, centrada,
+            con aire. Soltar la foto (AirDrop iPhone→iMac) la procesa directo, sin picker. El drag se ve. */}
+        <div
+          onClick={() => busy !== 'extract' && fileRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true) }}
+          onDragLeave={(e) => { e.preventDefault(); setDragging(false) }}
+          onDrop={onDrop}
+          className={`-m-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed py-12 text-center transition-colors ${busy === 'extract' ? 'cursor-wait border-border' : dragging ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/60 hover:bg-surface-2'}`}
+        >
+          <span style={{ fontSize: 42, lineHeight: 1 }}>{busy === 'extract' ? '⏳' : dragging ? '📥' : '📷'}</span>
+          <span className="text-base font-bold text-fg">{busy === 'extract' ? 'leyendo el ticket…' : dragging ? 'suelta la foto aquí' : 'Capturar por foto del ticket'}</span>
+          <span className="text-label text-fg-muted">arrastra la foto (AirDrop) o haz clic · la IA propone, tú confirmas</span>
         </div>
+        </>
       )}
       {err && <div className="mt-2 text-secondary text-danger">⚠ {err}</div>}
 
