@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { MONEY, MoneyBar, MoneyModal, MoneyBtn, MoneyInput, fmtMxn } from './MoneyChrome'
+import { MONEY, MoneyBar, MoneyModal, MoneyBtn, MoneyInput, MoneyAmount, fmtMxn } from './MoneyChrome'
 
 // CAJA FUERTE (apartados) en estilo MSN Money. Autocontenido: lee /api/finance/funds?scope=personal y
 // hace todas las ops de fondo (crear, aportar[flow out], retirar[flow in], editar meta/nombre, archivar,
@@ -95,7 +95,7 @@ function FundRow({ fund, onOpen, onRename, onMeta, onArchive, onDelete }: {
   const [editName, setEditName] = useState(false)
   const [name, setName] = useState(fund.label)
   const [editMeta, setEditMeta] = useState(false)
-  const [meta, setMeta] = useState(fund.target != null ? String(fund.target) : '')
+  const [meta, setMeta] = useState<number | null>(fund.target ?? null)
   const [armDel, setArmDel] = useState(false)
   useEffect(() => { if (!armDel) return; const t = setTimeout(() => setArmDel(false), 3000); return () => clearTimeout(t) }, [armDel])
 
@@ -127,9 +127,8 @@ function FundRow({ fund, onOpen, onRename, onMeta, onArchive, onDelete }: {
         <MoneyBtn onClick={onOpen}>Libreta →</MoneyBtn>
         {editMeta ? (
           <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-            <input autoFocus type="number" value={meta} onChange={(e) => setMeta(e.target.value)} placeholder="meta"
-              style={{ width: 74, border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '1px 5px', fontSize: 11, fontFamily: 'inherit', outline: 'none' }} />
-            <MoneyBtn onClick={() => { setEditMeta(false); onMeta(meta.trim() === '' ? null : num(meta)) }}>ok</MoneyBtn>
+            <MoneyAmount autoFocus value={meta} onChange={setMeta} placeholder="meta" style={{ width: 74 }} />
+            <MoneyBtn onClick={() => { setEditMeta(false); onMeta(meta) }}>ok</MoneyBtn>
           </span>
         ) : (
           <button onClick={() => setEditMeta(true)} style={linkBtn}>{fund.target != null ? 'Cambiar meta' : 'Poner meta'}</button>
@@ -149,13 +148,13 @@ const linkBtn: React.CSSProperties = { border: 0, background: 'none', cursor: 'p
 
 function CreateFundModal({ onClose, onCreate, placeholder }: { onClose: () => void; onCreate: (label: string, target: number | null) => void; placeholder: string }) {
   const [label, setLabel] = useState('')
-  const [target, setTarget] = useState('')
+  const [target, setTarget] = useState<number | null>(null)
   return (
     <MoneyModal title="Nuevo apartado" onClose={onClose}
-      footer={<><MoneyBtn onClick={onClose}>Cancelar</MoneyBtn><MoneyBtn primary disabled={!label.trim()} onClick={() => label.trim() && onCreate(label.trim(), target.trim() === '' ? null : num(target))}>Crear</MoneyBtn></>}>
+      footer={<><MoneyBtn onClick={onClose}>Cancelar</MoneyBtn><MoneyBtn primary disabled={!label.trim()} onClick={() => label.trim() && onCreate(label.trim(), target)}>Crear</MoneyBtn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label style={lbl}>Nombre<MoneyInput autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder={placeholder} /></label>
-        <label style={lbl}>Meta (opcional)<MoneyInput type="number" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="sin meta" /></label>
+        <label style={lbl}>Meta (opcional)<MoneyAmount value={target} onChange={setTarget} placeholder="sin meta" /></label>
       </div>
     </MoneyModal>
   )
@@ -166,15 +165,15 @@ function LibretaModal({ fund, accounts, onClose, onAporta, onRetira, onDelete }:
   fund: Fund; accounts: WalletOption[]; onClose: () => void; onAporta: (d: string, a: number, mt: string) => void; onRetira: (d: string, a: number, mt: string) => void; onDelete: () => void
 }) {
   const [desc, setDesc] = useState('')
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState<number | null>(null)
   const [metodo, setMetodo] = useState<string>(accounts[0].value)   // origen/destino de la transferencia (VISIBLE, default 1ª cuenta)
   const [desc2, setDesc2] = useState(true)   // orden fecha desc
   const canDelete = fund.key == null && fund.movements.length === 0
 
   function doMove(fn: (d: string, a: number, mt: string) => void) {
-    const a = num(amount); if (a <= 0) return
+    const a = amount; if (a == null || a <= 0) return
     fn(desc.trim() || (fn === onAporta ? 'Aportación' : 'Retiro'), a, metodo)
-    setDesc(''); setAmount('')
+    setDesc(''); setAmount(null)
   }
 
   // saldo corrido cronológico (out = entrada +, in = salida −)
@@ -199,7 +198,7 @@ function LibretaModal({ fund, accounts, onClose, onAporta, onRetira, onDelete }:
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9 }}>
         <label style={{ ...lbl, flex: 1 }}>Concepto<MoneyInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="opcional" /></label>
-        <label style={{ ...lbl, width: 92 }}>Monto<MoneyInput type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" /></label>
+        <label style={{ ...lbl, width: 92 }}>Monto<MoneyAmount value={amount} onChange={setAmount} placeholder="0" /></label>
         <MoneyBtn primary onClick={() => doMove(onAporta)}>Aportar</MoneyBtn>
         <MoneyBtn onClick={() => doMove(onRetira)}>Retirar</MoneyBtn>
       </div>

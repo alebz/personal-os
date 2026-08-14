@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { mxn } from '@/components/Mxn'
+import { MoneyInput } from '@/components/MoneyInput'
 import { dayMonth, localDate } from './util'
 
 type HistCuadre = { tipo: 'cuadre'; fecha: string; contado: number; esperado: number | null; diferencia: number | null; nota: string | null; baseline: boolean }
@@ -26,19 +27,19 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   const [total, setTotal] = useState<number | null>(null)
   const [openC, setOpenC] = useState<string | null>(null)   // contenedor con el cuadre abierto
   const [histC, setHistC] = useState<string | null>(null)   // contenedor con el historial abierto
-  const [val, setVal] = useState('')
+  const [val, setVal] = useState<number | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [pend, setPend] = useState<Pend | null>(null)       // compras Poster sin contenedor tras el baseline
   const [pendOpen, setPendOpen] = useState(false)
   const [traOpen, setTraOpen] = useState(false)             // formulario de traspaso
-  const [tr, setTr] = useState<{ origin: ContKey; destino: ContKey; amount: string; fecha: string; nota: string }>({ origin: 'caja_pos', destino: 'caja_chica', amount: '', fecha: localDate(), nota: '' })
+  const [tr, setTr] = useState<{ origin: ContKey; destino: ContKey; amount: number | null; fecha: string; nota: string }>({ origin: 'caja_pos', destino: 'caja_chica', amount: null, fecha: localDate(), nota: '' })
   const [comOpen, setComOpen] = useState(false)             // formulario de comisión Clip
-  const [com, setCom] = useState<{ amount: string; fecha: string; nota: string }>({ amount: '', fecha: localDate(), nota: '' })
+  const [com, setCom] = useState<{ amount: number | null; fecha: string; nota: string }>({ amount: null, fecha: localDate(), nota: '' })
   const [comisiones, setComisiones] = useState<Comision[]>([])
   const [clipSync, setClipSync] = useState<{ last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null>(null)
   const [prop, setProp] = useState<Propinas | null>(null)
   const [propOpen, setPropOpen] = useState(false)
-  const [rep, setRep] = useState<{ amount: string; fecha: string; contenedor: ContKey; nota: string }>({ amount: '', fecha: localDate(), contenedor: 'clip', nota: '' })
+  const [rep, setRep] = useState<{ amount: number | null; fecha: string; contenedor: ContKey; nota: string }>({ amount: null, fecha: localDate(), contenedor: 'clip', nota: '' })
 
   const load = useCallback(async () => {
     const [j, p, m, cs, pr] = await Promise.all([
@@ -66,25 +67,25 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   }
 
   async function cuadrar(c: Cont) {
-    const contado = parseFloat(val)
-    if (!Number.isFinite(contado)) return
+    const contado = val
+    if (contado == null || !Number.isFinite(contado)) return
     const resp = await fetch('/api/publico/contenedores', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contenedor: c.contenedor, contado }) })
     const r = await resp.json().catch(() => ({} as { error?: string }))
     if (!resp.ok || r.error) { setFlash(`${c.label}: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
     setFlash(r.baseline ? `${c.label}: baseline sembrado` : r.delta === 0 ? `${c.label}: cuadra exacto` : `${c.label}: ajuste ${r.delta > 0 ? '+' : ''}${mxn(Math.abs(r.delta))}`)
     setTimeout(() => setFlash(null), 5000)
-    setOpenC(null); setVal(''); await load()
+    setOpenC(null); setVal(null); await load()
   }
 
   async function traspasar() {
-    const amount = parseFloat(tr.amount)
-    if (!Number.isFinite(amount) || amount <= 0 || tr.origin === tr.destino) return
+    const amount = tr.amount
+    if (amount == null || !Number.isFinite(amount) || amount <= 0 || tr.origin === tr.destino) return
     const resp = await fetch('/api/publico/contenedores/traspaso', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ origin: tr.origin, destino: tr.destino, amount, fecha: tr.fecha, nota: tr.nota }) })
     const r = await resp.json().catch(() => ({} as { error?: string }))
     if (!resp.ok || r.error) { setFlash(`traspaso: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
     setFlash(`traspaso ${LABELS[tr.origin]} → ${LABELS[tr.destino]} · ${mxn(amount)}`)
     setTimeout(() => setFlash(null), 5000)
-    setTraOpen(false); setTr({ ...tr, amount: '', nota: '' }); await load()
+    setTraOpen(false); setTr({ ...tr, amount: null, nota: '' }); await load()
   }
 
   async function revertTraspaso(id: string) {
@@ -95,14 +96,14 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   // Comisión de Clip: CLIP es la cuenta del negocio; Clip solo descuenta su fee. Se registra como un COSTO real
   // (categoría comisión, origen CLIP) → baja el saldo de CLIP y la utilidad. Reversible = borrar el costo.
   async function registrarComision() {
-    const amount = parseFloat(com.amount)
-    if (!Number.isFinite(amount) || amount <= 0) return
+    const amount = com.amount
+    if (amount == null || !Number.isFinite(amount) || amount <= 0) return
     const resp = await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: com.fecha, category: 'comision', cost_kind: 'variable', origin: 'clip', amount, note: com.nota?.trim() || 'Comisión Clip' }) })
     const r = await resp.json().catch(() => ({} as { error?: string }))
     if (!resp.ok || r.error) { setFlash(`comisión: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
     setFlash(`comisión Clip · CLIP −${mxn(amount)}`)
     setTimeout(() => setFlash(null), 5000)
-    setComOpen(false); setCom({ ...com, amount: '', nota: '' }); await load()
+    setComOpen(false); setCom({ ...com, amount: null, nota: '' }); await load()
   }
   async function revertComision(id: string) {
     await fetch(`/api/publico/costo?id=${id}`, { method: 'DELETE' })
@@ -111,14 +112,14 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
 
   // Reparto de propina: baja el pendiente Y saca el dinero del contenedor (vía flowSince). Reversible = borrar.
   async function registrarReparto() {
-    const amount = parseFloat(rep.amount)
-    if (!Number.isFinite(amount) || amount <= 0) return
+    const amount = rep.amount
+    if (amount == null || !Number.isFinite(amount) || amount <= 0) return
     const resp = await fetch('/api/publico/propinas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fecha: rep.fecha, amount, contenedor: rep.contenedor, nota: rep.nota?.trim() || null }) })
     const r = await resp.json().catch(() => ({} as { error?: string }))
     if (!resp.ok || r.error) { setFlash(`reparto: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
     setFlash(`reparto propina · ${LABELS[rep.contenedor]} −${mxn(amount)}`)
     setTimeout(() => setFlash(null), 5000)
-    setRep({ ...rep, amount: '', nota: '' }); await load()
+    setRep({ ...rep, amount: null, nota: '' }); await load()
   }
   async function revertReparto(id: string) {
     await fetch(`/api/publico/propinas?id=${id}`, { method: 'DELETE' })
@@ -147,7 +148,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
             <select value={tr.origin} onChange={(e) => setTr({ ...tr, origin: e.target.value as ContKey })} style={{ ...cell, width: 100 }}>{CONT_OPTS.map((k) => <option key={k} value={k}>{LABELS[k]}</option>)}</select>
             <span className="text-fg-muted">a</span>
             <select value={tr.destino} onChange={(e) => setTr({ ...tr, destino: e.target.value as ContKey })} style={{ ...cell, width: 100 }}>{CONT_OPTS.map((k) => <option key={k} value={k}>{LABELS[k]}</option>)}</select>
-            <input value={tr.amount} onChange={(e) => setTr({ ...tr, amount: e.target.value })} inputMode="decimal" placeholder="$ monto" style={{ ...cell, width: 84, textAlign: 'right' }} />
+            <MoneyInput value={tr.amount} onChange={(v) => setTr({ ...tr, amount: v })} placeholder="$ monto" style={{ ...cell, width: 84, textAlign: 'right' }} />
             <input type="date" value={tr.fecha} onChange={(e) => setTr({ ...tr, fecha: e.target.value })} style={cell} />
             <input value={tr.nota} onChange={(e) => setTr({ ...tr, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 80 }} />
             <button onClick={() => void traspasar()} disabled={tr.origin === tr.destino} className="rounded-control border border-border px-2 py-0.5 font-medium disabled:opacity-40">traspasar</button>
@@ -163,7 +164,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
           <div className="mt-1 space-y-1 rounded-card border border-border bg-surface-2 p-2 text-label">
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-fg-muted">CLIP −</span>
-              <input value={com.amount} onChange={(e) => setCom({ ...com, amount: e.target.value })} inputMode="decimal" placeholder="$ comisión" style={{ ...cell, width: 90, textAlign: 'right' }} />
+              <MoneyInput value={com.amount} onChange={(v) => setCom({ ...com, amount: v })} placeholder="$ comisión" style={{ ...cell, width: 90, textAlign: 'right' }} />
               <input type="date" value={com.fecha} onChange={(e) => setCom({ ...com, fecha: e.target.value })} style={cell} />
               <input value={com.nota} onChange={(e) => setCom({ ...com, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 80 }} />
               <button onClick={() => void registrarComision()} className="rounded-control border border-border px-2 py-0.5 font-medium">registrar</button>
@@ -215,7 +216,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
             {/* Registrar reparto: baja el pendiente y saca el dinero del contenedor elegido (CLIP por defecto). */}
             <div className="flex flex-wrap items-center gap-1 border-t border-border pt-1">
               <span className="text-fg-muted">repartí</span>
-              <input value={rep.amount} onChange={(e) => setRep({ ...rep, amount: e.target.value })} inputMode="decimal" placeholder="$ monto" style={{ ...cell, width: 84, textAlign: 'right' }} />
+              <MoneyInput value={rep.amount} onChange={(v) => setRep({ ...rep, amount: v })} placeholder="$ monto" style={{ ...cell, width: 84, textAlign: 'right' }} />
               <span className="text-fg-muted">de</span>
               <select value={rep.contenedor} onChange={(e) => setRep({ ...rep, contenedor: e.target.value as ContKey })} style={{ ...cell, width: 96 }}>{CONT_OPTS.map((k) => <option key={k} value={k}>{LABELS[k]}</option>)}</select>
               <input type="date" value={rep.fecha} onChange={(e) => setRep({ ...rep, fecha: e.target.value })} style={cell} />
@@ -287,14 +288,14 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
               : <span className={c.diasSinCuadrar != null && c.diasSinCuadrar >= ALERTA_DIAS ? 'text-warn' : 'text-fg-muted'}>{c.diasSinCuadrar === 0 ? 'cuadrado hoy' : `sin cuadrar hace ${c.diasSinCuadrar} día${c.diasSinCuadrar === 1 ? '' : 's'}`}</span>}
             <div className="flex gap-2">
               {c.historial.length > 0 && <button onClick={() => setHistC(histC === c.contenedor ? null : c.contenedor)} className="text-fg-muted hover:text-accent">{histC === c.contenedor ? 'ocultar' : `historial (${c.historial.length})`}</button>}
-              <button onClick={() => { setOpenC(openC === c.contenedor ? null : c.contenedor); setVal('') }} className="text-fg-muted hover:text-accent">{openC === c.contenedor ? 'cerrar' : c.needsBaseline ? 'sembrar' : 'cuadrar'}</button>
+              <button onClick={() => { setOpenC(openC === c.contenedor ? null : c.contenedor); setVal(null) }} className="text-fg-muted hover:text-accent">{openC === c.contenedor ? 'cerrar' : c.needsBaseline ? 'sembrar' : 'cuadrar'}</button>
             </div>
           </div>
           {openC === c.contenedor && (
             <div className="mt-1 flex items-center gap-2 text-label">
               {!c.needsBaseline && c.contenedor === 'caja_pos' && <span className="text-fg-muted">el sistema espera <b className="tabular-nums" style={{ color: dc }}>{mxn(c.balance ?? 0)}</b> ·</span>}
               <span className="text-fg-muted">cuenta:</span>
-              <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void cuadrar(c) }} inputMode="decimal" placeholder="$ real" style={{ ...cell, width: 90, textAlign: 'right' }} autoFocus />
+              <MoneyInput value={val} onChange={setVal} onKeyDown={(e) => { if (e.key === 'Enter') void cuadrar(c) }} placeholder="$ real" style={{ ...cell, width: 90, textAlign: 'right' }} autoFocus />
               <button onClick={() => void cuadrar(c)} className="rounded-control border border-border px-2 py-0.5 font-medium">{c.needsBaseline ? 'sembrar' : 'cuadrar'}</button>
             </div>
           )}

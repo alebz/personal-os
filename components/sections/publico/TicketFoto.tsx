@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { mxn } from '@/components/Mxn'
+import { MoneyInput } from '@/components/MoneyInput'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, type CostCategory, type OriginKey } from '@/lib/publico'
 import { localDate, addDays, type PosterCatalog } from './util'
 
@@ -269,7 +270,7 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
                   <input value={it.unidad ?? ''} onChange={(e) => patchItem(i, { unidad: e.target.value.trim() || null })} style={{ ...cell, width: 44 }} placeholder="u" title="unidad de la cantidad (PZA, KG, G, L…) — la barra de mapeo la convierte a la unidad base de Poster" />
                   {/* P.U. DERIVADO (importe ÷ cantidad), read-only: el importe es la fuente de verdad, el P.U. nunca. */}
                   <span style={{ ...cell, width: 64, textAlign: 'right', opacity: 0.6, background: 'transparent', fontVariantNumeric: 'tabular-nums' }} title="P.U. derivado = importe ÷ cantidad (no editable)">{it.cantidad ? (it.importe / it.cantidad).toFixed(2) : '—'}</span>
-                  <NumInput value={it.importe} onChange={(v) => patchItem(i, { importe: v ?? 0 })} style={{ ...cell, width: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} placeholder="importe" />
+                  <MoneyInput value={it.importe} onChange={(v) => patchItem(i, { importe: v ?? 0 })} style={{ ...cell, width: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} placeholder="importe" />
                   <button onClick={() => patchItem(i, { es_descuento: !it.es_descuento })} style={fotoChip(it.es_descuento)} title="marca si es cupón/descuento">desc</button>
                   <button onClick={() => delItem(i)} className="px-1 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar línea">✕</button>
                 </div>
@@ -281,9 +282,9 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
 
           {/* Totales */}
           <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 border-t border-border pt-2 text-label">
-            <label className="flex items-center gap-1"><span className="text-fg-muted">Subtotal</span><NumInput value={d.subtotal} onChange={(v) => patch({ subtotal: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
-            <label className="flex items-center gap-1"><span className="text-fg-muted">Impuestos</span><NumInput value={d.impuestos} onChange={(v) => patch({ impuestos: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
-            <label className="flex items-center gap-1"><span className="font-bold text-fg">Total</span><NumInput value={d.total} onChange={(v) => patch({ total: v })} style={{ ...cell, width: 96, textAlign: 'right', fontSize: 15, fontWeight: 700 }} /></label>
+            <label className="flex items-center gap-1"><span className="text-fg-muted">Subtotal</span><MoneyInput value={d.subtotal} onChange={(v) => patch({ subtotal: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
+            <label className="flex items-center gap-1"><span className="text-fg-muted">Impuestos</span><MoneyInput value={d.impuestos} onChange={(v) => patch({ impuestos: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
+            <label className="flex items-center gap-1"><span className="font-bold text-fg">Total</span><MoneyInput value={d.total} onChange={(v) => patch({ total: v })} style={{ ...cell, width: 96, textAlign: 'right', fontSize: 14, fontWeight: 700 }} /></label>
           </div>
           {reconMismatch && reconTarget != null && <div className="text-right text-label text-warn">las líneas suman {mxn(itemsSum)} · {reconLabel} {mxn(reconTarget)} — diferencia {mxn(Math.abs(reconDiff))} {reconDiff > 0 ? 'de más en líneas' : 'de menos en líneas'} — revisa</div>}
 
@@ -317,7 +318,7 @@ export function TicketFoto({ onSaved, defaultDate }: { onSaved: () => Promise<vo
                 {ORIGIN_OPTIONS.map((o) => (
                   <label key={o.label} className="flex items-center gap-1 text-label">
                     <span className="text-fg-muted">{o.label}</span>
-                    <NumInput value={splitAmts[splitKey(o.key)] ?? null} onChange={(v) => setSplitAmts((s) => ({ ...s, [splitKey(o.key)]: v }))} style={{ ...cell, width: 84, textAlign: 'right' }} placeholder="0" />
+                    <MoneyInput value={splitAmts[splitKey(o.key)] ?? null} onChange={(v) => setSplitAmts((s) => ({ ...s, [splitKey(o.key)]: v }))} style={{ ...cell, width: 84, textAlign: 'right' }} placeholder="0" />
                   </label>
                 ))}
               </div>

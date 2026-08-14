@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { mxn } from '@/components/Mxn'
+import { MoneyInput } from '@/components/MoneyInput'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
 import { FundLedger } from '@/components/finance/FundLedger'
 import { FundMovementControl, type WalletOption } from '@/components/finance/FundMovementControl'
@@ -66,8 +67,8 @@ export default function PublicoContent() {
   }
 
   // ── Ventas (cierre del día) ──
-  const [efectivo, setEfectivo] = useState('')
-  const [tarjeta, setTarjeta] = useState('')
+  const [efectivo, setEfectivo] = useState<number | null>(null)
+  const [tarjeta, setTarjeta] = useState<number | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const efectivoRef = useRef<HTMLInputElement>(null)
   const tarjetaRef = useRef<HTMLInputElement>(null)
@@ -83,7 +84,7 @@ export default function PublicoContent() {
   }
 
   // ── Costo (adder burst) ──
-  const [cAmt, setCAmt] = useState('')
+  const [cAmt, setCAmt] = useState<number | null>(null)
   const [cCat, setCCat] = useState<CostCategory>('insumo')          // sticky
   const [cOrigin, setCOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
   const [cKind, setCKind] = useState<CostKind>(catDefaults('insumo').defaultKind ?? 'variable')
@@ -92,7 +93,7 @@ export default function PublicoContent() {
 
   // ── Otros ingresos (no-POS: subarriendo Ameno, etc.) ──
   const [iConcepto, setIConcepto] = useState('')
-  const [iAmt, setIAmt] = useState('')
+  const [iAmt, setIAmt] = useState<number | null>(null)
   const [iOrigin, setIOrigin] = useState<OriginKey>('clip')
   const iAmtRef = useRef<HTMLInputElement>(null)
 
@@ -109,8 +110,8 @@ export default function PublicoContent() {
     setCostos(r.costos ?? [])
     setIngresos(r.ingresos ?? [])
     const hoy: Venta | null = r.ventas?.find((v: Venta) => v.date === capDate) ?? null
-    setEfectivo(hoy && hoy.efectivo ? String(hoy.efectivo) : '')
-    setTarjeta(hoy && hoy.tarjeta ? String(hoy.tarjeta) : '')
+    setEfectivo(hoy && hoy.efectivo ? Number(hoy.efectivo) : null)
+    setTarjeta(hoy && hoy.tarjeta ? Number(hoy.tarjeta) : null)
     if (pr && Array.isArray(pr.ventas)) {
       const inPer = (d: string) => cutoffDay == null || Number(d.slice(8, 10)) <= cutoffDay
       const pv = (pr.ventas as Venta[]).filter((v) => inPer(v.date)).reduce((s, v) => s + Number(v.efectivo) + Number(v.tarjeta), 0)
@@ -130,7 +131,7 @@ export default function PublicoContent() {
   }
 
   async function saveVenta() {
-    const ef = parseFloat(efectivo || '0'), ta = parseFloat(tarjeta || '0')
+    const ef = efectivo ?? 0, ta = tarjeta ?? 0
     if ((!ef && !ta) || ef < 0 || ta < 0) return
     await fetch('/api/publico/venta', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -141,10 +142,10 @@ export default function PublicoContent() {
   }
 
   async function addCosto() {
-    const a = parseFloat(cAmt)
-    if (!a || a <= 0) return
+    const a = cAmt
+    if (a == null || a <= 0) return
     const note = cNote
-    setCAmt(''); setCNote('')            // limpia YA (antes del await): tecleo rápido en burst NO concatena montos
+    setCAmt(null); setCNote('')            // limpia YA (antes del await): tecleo rápido en burst NO concatena montos
     await fetch('/api/publico/costo', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ date: capDate, category: cCat, cost_kind: catDefaults(cCat).defaultKind === null ? null : cKind, origin: cOrigin, amount: a, note: note || null }),
@@ -158,10 +159,10 @@ export default function PublicoContent() {
   }
 
   async function addIngreso() {
-    const a = parseFloat(iAmt)
-    if (!iConcepto.trim() || !a || a <= 0) return
+    const a = iAmt
+    if (!iConcepto.trim() || a == null || a <= 0) return
     const concepto = iConcepto.trim()
-    setIConcepto(''); setIAmt('')         // limpia YA (antes del await): burst no concatena
+    setIConcepto(''); setIAmt(null)         // limpia YA (antes del await): burst no concatena
     await fetch('/api/publico/ingreso', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ date: capDate, concepto, amount: a, origin: iOrigin }),
@@ -194,7 +195,7 @@ export default function PublicoContent() {
     background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap',
   })
   const numInput: React.CSSProperties = {
-    width: '100%', padding: '8px 10px', fontSize: 18, fontVariantNumeric: 'tabular-nums',
+    width: '100%', padding: '8px 10px', fontSize: 14, fontVariantNumeric: 'tabular-nums',
     borderRadius: 8, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit',
   }
 
@@ -250,24 +251,24 @@ export default function PublicoContent() {
         <div className="flex items-end gap-3">
           <label className="flex-1">
             <span className="text-label text-fg-muted">Efectivo</span>
-            <input
-              ref={efectivoRef} value={efectivo} onChange={(e) => setEfectivo(e.target.value)}
+            <MoneyInput
+              ref={efectivoRef} value={efectivo} onChange={setEfectivo}
               onKeyDown={(e) => { if (e.key === 'Enter') tarjetaRef.current?.focus() }}
-              inputMode="decimal" placeholder="0" style={numInput}
+              placeholder="0" style={numInput}
             />
           </label>
           <label className="flex-1">
             <span className="text-label text-fg-muted">Tarjeta</span>
-            <input
-              ref={tarjetaRef} value={tarjeta} onChange={(e) => setTarjeta(e.target.value)}
+            <MoneyInput
+              ref={tarjetaRef} value={tarjeta} onChange={setTarjeta}
               onKeyDown={(e) => { if (e.key === 'Enter') void saveVenta() }}
-              inputMode="decimal" placeholder="0" style={numInput}
+              placeholder="0" style={numInput}
             />
           </label>
           <button onClick={() => void saveVenta()} className="rounded-card bg-[#c0392b] px-4 py-2 font-bold text-white">Guardar</button>
         </div>
         <div className="mt-1 text-right text-label text-fg-muted">
-          Total {mxn((parseFloat(efectivo || '0') || 0) + (parseFloat(tarjeta || '0') || 0))}
+          Total {mxn((efectivo ?? 0) + (tarjeta ?? 0))}
         </div>
       </section>
 
@@ -279,10 +280,10 @@ export default function PublicoContent() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={cAmtRef} value={cAmt} onChange={(e) => setCAmt(e.target.value)}
+          <MoneyInput
+            ref={cAmtRef} value={cAmt} onChange={setCAmt}
             onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }}
-            inputMode="decimal" placeholder="$ monto" style={{ ...numInput, width: 120, fontSize: 16 }}
+            placeholder="$ monto" style={{ ...numInput, width: 120 }}
           />
           <span className="text-label text-fg-muted">desde</span>
           {ORIGIN_OPTIONS.map((ct) => (
@@ -345,7 +346,7 @@ export default function PublicoContent() {
           <div className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS · {monthName(month)})</span></div>
           <div className="flex flex-wrap items-center gap-2">
             <input value={iConcepto} onChange={(e) => setIConcepto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }} />
-            <input ref={iAmtRef} value={iAmt} onChange={(e) => setIAmt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} inputMode="decimal" placeholder="$ monto" style={{ ...numInput, width: 120, fontSize: 16 }} />
+            <MoneyInput ref={iAmtRef} value={iAmt} onChange={setIAmt} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="$ monto" style={{ ...numInput, width: 120 }} />
             <span className="text-label text-fg-muted">a</span>
             {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setIOrigin(ct.key)} style={chip(iOrigin === ct.key)}>{ct.label}</button>))}
             <button onClick={() => void addIngreso()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>

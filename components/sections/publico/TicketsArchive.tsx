@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { mxn } from '@/components/Mxn'
+import { MoneyInput } from '@/components/MoneyInput'
 import { COST_CATEGORIES, ORIGIN_OPTIONS, originLabel, catDefaults, type CostCategory } from '@/lib/publico'
 import { dayMonth } from './util'
 
@@ -12,7 +13,7 @@ type Scan = { id: string; proveedor: string; fecha: string; subtotal: number | n
 type Detail = { scan: Scan; items: Item[]; costos: Costo[]; imageUrl: string | null }
 
 type EditItem = { descripcion: string; cantidad: number | null; unidad: string | null; importe: number; es_descuento: boolean; descripcion_raw: string | null; precio_unitario: number | null; codigo: string | null }
-type EditState = { proveedor: string; fecha: string; subtotal: string; impuestos: string; total: string; category: CostCategory; mixed: boolean; origin: string | null; splits: Record<string, string>; items: EditItem[] }
+type EditState = { proveedor: string; fecha: string; subtotal: number | null; impuestos: number | null; total: number | null; category: CostCategory; mixed: boolean; origin: string | null; splits: Record<string, number | null>; items: EditItem[] }
 
 const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
@@ -38,12 +39,12 @@ export function TicketsArchive() {
 
   function startEdit(d: Detail) {
     const mixed = d.costos.length > 1
-    const splits: Record<string, string> = {}
-    for (const c of d.costos) if (c.origin) splits[c.origin] = String(c.amount)
+    const splits: Record<string, number | null> = {}
+    for (const c of d.costos) if (c.origin) splits[c.origin] = c.amount
     setEd({
       proveedor: d.scan.proveedor, fecha: d.scan.fecha,
-      subtotal: d.scan.subtotal != null ? String(d.scan.subtotal) : '', impuestos: d.scan.impuestos != null ? String(d.scan.impuestos) : '',
-      total: String(d.scan.total), category: (d.costos[0]?.category as CostCategory) ?? 'insumo',
+      subtotal: d.scan.subtotal ?? null, impuestos: d.scan.impuestos ?? null,
+      total: d.scan.total ?? null, category: (d.costos[0]?.category as CostCategory) ?? 'insumo',
       mixed, origin: mixed ? null : (d.costos[0]?.origin ?? null), splits,
       items: d.items.map((i) => ({ descripcion: i.descripcion, cantidad: i.cantidad, unidad: i.unidad, importe: i.importe, es_descuento: i.es_descuento, descripcion_raw: i.descripcion_raw, precio_unitario: i.precio_unitario, codigo: i.id ? null : null })),
     })
@@ -54,11 +55,11 @@ export function TicketsArchive() {
     setBusy(true); setFlash(null)
     const body: Record<string, unknown> = {
       proveedor: ed.proveedor, fecha: ed.fecha,
-      subtotal: ed.subtotal ? Number(ed.subtotal) : null, impuestos: ed.impuestos ? Number(ed.impuestos) : null, total: Number(ed.total),
+      subtotal: ed.subtotal, impuestos: ed.impuestos, total: ed.total ?? 0,
       category: ed.category, cost_kind: catDefaults(ed.category).defaultKind,
       items: ed.items.map((i) => ({ ...i, precio_unitario: i.cantidad ? i.importe / i.cantidad : null })),
     }
-    if (ed.mixed) body.origins = ORIGIN_OPTIONS.map((o) => ({ origin: o.key, amount: Number(ed.splits[o.key ?? 'sin'] ?? 0) })).filter((s) => s.amount > 0)
+    if (ed.mixed) body.origins = ORIGIN_OPTIONS.map((o) => ({ origin: o.key, amount: ed.splits[o.key ?? ''] ?? 0 })).filter((s) => s.amount > 0)
     else body.origin = ed.origin
     const r = await fetch(`/api/publico/tickets/${sel}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     const j = await r.json().catch(() => ({} as { error?: string }))
@@ -153,16 +154,16 @@ export function TicketsArchive() {
             <select value={ed.category} onChange={(e) => setEd({ ...ed, category: e.target.value as CostCategory })} style={{ ...cell, width: 120 }}>{COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
           </div>
           <div className="flex flex-wrap items-center gap-1 text-label text-fg-muted">
-            <span>subtotal</span><input value={ed.subtotal} onChange={(e) => setEd({ ...ed, subtotal: e.target.value })} inputMode="decimal" style={{ ...cell, width: 84, textAlign: 'right' }} />
-            <span>IVA</span><input value={ed.impuestos} onChange={(e) => setEd({ ...ed, impuestos: e.target.value })} inputMode="decimal" style={{ ...cell, width: 84, textAlign: 'right' }} />
-            <span>total</span><input value={ed.total} onChange={(e) => setEd({ ...ed, total: e.target.value })} inputMode="decimal" style={{ ...cell, width: 90, textAlign: 'right' }} />
+            <span>subtotal</span><MoneyInput value={ed.subtotal} onChange={(v) => setEd({ ...ed, subtotal: v })} style={{ ...cell, width: 84, textAlign: 'right' }} />
+            <span>IVA</span><MoneyInput value={ed.impuestos} onChange={(v) => setEd({ ...ed, impuestos: v })} style={{ ...cell, width: 84, textAlign: 'right' }} />
+            <span>total</span><MoneyInput value={ed.total} onChange={(v) => setEd({ ...ed, total: v })} style={{ ...cell, width: 90, textAlign: 'right' }} />
           </div>
           {/* Origen: simple (chips) o mixto (montos por contenedor, deben sumar el total) */}
           <div className="flex flex-wrap items-center gap-1 text-label">
             <span className="text-fg-muted">pagado:</span>
             {!ed.mixed && ORIGIN_OPTIONS.map((o) => <button key={o.label} onClick={() => setEd({ ...ed, origin: o.key })} style={{ ...cell, ...(ed.origin === o.key ? { borderColor: 'var(--color-accent)', fontWeight: 700 } : {}) }}>{o.label}</button>)}
             {ed.mixed && ORIGIN_OPTIONS.filter((o) => o.key).map((o) => (
-              <label key={o.label} className="flex items-center gap-1 text-fg-muted">{o.label}<input value={ed.splits[o.key ?? ''] ?? ''} onChange={(e) => setEd({ ...ed, splits: { ...ed.splits, [o.key ?? '']: e.target.value } })} inputMode="decimal" style={{ ...cell, width: 74, textAlign: 'right' }} /></label>
+              <label key={o.label} className="flex items-center gap-1 text-fg-muted">{o.label}<MoneyInput value={ed.splits[o.key ?? ''] ?? null} onChange={(v) => setEd({ ...ed, splits: { ...ed.splits, [o.key ?? '']: v } })} style={{ ...cell, width: 74, textAlign: 'right' }} /></label>
             ))}
             <button onClick={() => setEd({ ...ed, mixed: !ed.mixed })} className="text-fg-muted underline decoration-dotted">{ed.mixed ? 'pago simple' : 'pago mixto'}</button>
           </div>
@@ -172,7 +173,7 @@ export function TicketsArchive() {
               <div key={idx} className="flex items-center gap-1">
                 <input value={it.descripcion} onChange={(e) => setItem(idx, { descripcion: e.target.value })} style={{ ...cell, flex: 1, minWidth: 120 }} />
                 <input value={it.cantidad ?? ''} onChange={(e) => setItem(idx, { cantidad: e.target.value ? Number(e.target.value) : null })} placeholder="cant" inputMode="decimal" style={{ ...cell, width: 56, textAlign: 'right' }} />
-                <input value={it.importe} onChange={(e) => setItem(idx, { importe: Number(e.target.value) })} inputMode="decimal" style={{ ...cell, width: 80, textAlign: 'right' }} />
+                <MoneyInput value={it.importe} onChange={(v) => setItem(idx, { importe: v ?? 0 })} style={{ ...cell, width: 80, textAlign: 'right' }} />
                 <button onClick={() => setEd({ ...ed, items: ed.items.filter((_, k) => k !== idx) })} className="px-1 text-fg-muted hover:text-danger" aria-label="quitar línea">✕</button>
               </div>
             ))}

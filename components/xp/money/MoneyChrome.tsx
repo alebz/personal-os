@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CerebroButterfly } from '../CerebroButterfly'
+import { MoneyInput as SharedMoney } from '@/components/MoneyInput'
 
 // MSN MONEY 2003 — el "kit" de época compartido por Finanzas y Uptown (misma familia). Chrome de portal:
 // cabecera azul mariposa+Money, tabs de folder, y el RIEL DE MERCADO (el corazón de época): USD/MXN
@@ -202,9 +203,14 @@ export function MoneyBtn({ children, onClick, primary, danger, disabled }: { chi
   )
 }
 
-// Input de texto/número Money.
+// Input de texto/número Money (presentacional: string in/out). Para MONTOS usa MoneyAmount.
 export function MoneyInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} style={{ border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit', outline: 'none', width: '100%', ...props.style }} />
+}
+
+// Input de MONTO de XP: estilo Money + el núcleo compartido (formato $ al desenfocar, crudo al editar, sin NaN).
+export function MoneyAmount({ style, ...props }: Parameters<typeof SharedMoney>[0]) {
+  return <SharedMoney {...props} style={{ border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit', outline: 'none', width: '100%', ...style }} />
 }
 
 // Toggle de método efectivo/tarjeta (los únicos dos, canon del arcade).

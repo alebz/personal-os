@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { mxn } from '@/components/Mxn'
+import { MoneyInput } from '@/components/MoneyInput'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, originLabel, OPERATING_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
 import { nthOccurrence, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
 import { localDate, dayMonth, dayLabel } from './util'
@@ -40,7 +41,7 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
   const [paidOpen, setPaidOpen] = useState(false)   // desplegable de PAGADOS (archivo)
   const [editKey, setEditKey] = useState<string | null>(null)   // fila con su editor de definición abierto
   const [manage, setManage] = useState(false)
-  const [amtBuf, setAmtBuf] = useState<Record<string, string>>({})   // buffer de monto por ocurrencia
+  const [amtBuf, setAmtBuf] = useState<Record<string, number | null>>({})   // buffer de monto por ocurrencia
   const [undo, setUndo] = useState<{ previsto_id: string; ocurrencia: string; label: string } | null>(null)
   const dragId = useRef<string | null>(null)
 
@@ -112,7 +113,7 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
     if (it.kind === 'card') return cardPay(it, on)
     const previsto_id = it.previstoId!
     if (on) {
-      const amt = Number(amtBuf[it.key] ?? it.amount)
+      const amt = amtBuf[it.key] ?? it.amount
       await fetch('/api/publico/previstos/pay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ previsto_id, ocurrencia: it.occ, amount: amt > 0 ? amt : undefined }) })
       setUndo({ previsto_id, ocurrencia: it.occ, label: it.concepto })
       setTimeout(() => setUndo((c) => (c?.previsto_id === previsto_id && c?.ocurrencia === it.occ ? null : c)), 7000)
@@ -158,7 +159,7 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
     const p = it.previstoId ? prev.find((x) => x.id === it.previstoId) : undefined
     const recur = RECUR.has(it.frecuencia)
     const dueTxt = recur ? dayLabel(it.occ) : dayMonth(it.occ)   // recurrente muestra el día de la semana
-    const amtVal = amtBuf[it.key] ?? String(it.amount)
+    const amtVal = it.key in amtBuf ? amtBuf[it.key] : it.amount
     const editing = editKey === it.key
     return (
       <div key={it.key}>
@@ -172,10 +173,10 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
           </span>
           <span className={`shrink-0 text-label ${it.paid ? 'text-ok' : it.overdue ? 'text-danger' : 'text-fg-muted'}`}>{it.paid ? `✓ ${dueTxt}` : `${it.overdue ? 'vencido' : 'vence'} ${dueTxt}`}</span>
           {it.kind === 'manual'
-            ? <input value={amtVal} onChange={(e) => setAmtBuf((b) => ({ ...b, [it.key]: e.target.value }))}
-                onBlur={() => { if (it.paid) { const v = Number(amtBuf[it.key] ?? it.amount); if (v > 0 && Math.abs(v - it.amount) > 0.001) void patchAmount(it, v) } }}
+            ? <MoneyInput value={amtVal} onChange={(v) => setAmtBuf((b) => ({ ...b, [it.key]: v }))}
+                onBlur={() => { if (it.paid) { const v = amtBuf[it.key] ?? it.amount; if (v != null && v > 0 && Math.abs(v - it.amount) > 0.001) void patchAmount(it, v) } }}
                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                inputMode="decimal" title="monto de esta ocurrencia (editable)" style={{ ...cell, width: 74, textAlign: 'right' }} />
+                title="monto de esta ocurrencia (editable)" style={{ ...cell, width: 74, textAlign: 'right' }} />
             : <span className="shrink-0 tabular-nums text-danger">−{mxn(it.amount)}</span>}
           {/* Editar / borrar EL PREVISTO — aparte del checkbox de pago (son cosas distintas, punto 7). */}
           {it.kind === 'manual' && p && (
@@ -247,7 +248,8 @@ function PrevFields({ p, onPatch, cell }: { p: Prev; onPatch: (id: string, f: Re
       <input defaultValue={p.concepto} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== p.concepto) onPatch(p.id, { concepto: e.target.value.trim() }) }} style={{ ...cell, flex: 1, minWidth: 120 }} />
       <select value={p.categoria} onChange={(e) => onPatch(p.id, { categoria: e.target.value, origin: catDefaults(e.target.value as CostCategory).defaultOrigin })} style={{ ...cell, width: 110 }}>{COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
       <select value={p.origin ?? ''} onChange={(e) => onPatch(p.id, { origin: e.target.value || null })} style={{ ...cell, width: 100 }}>{ORIGIN_OPTIONS.map((o) => <option key={o.label} value={o.key ?? ''}>{o.label}</option>)}</select>
-      <input defaultValue={p.amount} onBlur={(e) => { const v = Number(e.target.value); if (v > 0 && v !== p.amount) onPatch(p.id, { amount: v }) }} inputMode="decimal" title="monto" style={{ ...cell, width: 76, textAlign: 'right' }} />
+      {/* Edición rápida por blur: onChange no-op (no PATCH por tecla); se guarda al desenfocar leyendo el crudo. */}
+      <MoneyInput value={p.amount} onChange={() => {}} onBlur={(e) => { const v = Number(e.target.value.trim().replace(',', '.')); if (v > 0 && v !== p.amount) onPatch(p.id, { amount: v }) }} title="monto" style={{ ...cell, width: 76, textAlign: 'right' }} />
       <select value={p.frecuencia} onChange={(e) => onPatch(p.id, { frecuencia: e.target.value })} style={{ ...cell, width: 100 }}>{FRECS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
       <label className="flex items-center gap-1 text-label text-fg-muted">día<input type="date" defaultValue={p.anchor_date} onBlur={(e) => { if (e.target.value && e.target.value !== p.anchor_date) onPatch(p.id, { anchor_date: e.target.value }) }} style={cell} /></label>
       <input defaultValue={p.ocurrencias ?? ''} onBlur={(e) => onPatch(p.id, { ocurrencias: e.target.value ? Number(e.target.value) : null })} placeholder="N/M" title="cuántos pagos en total; vacío = perpetuo" style={{ ...cell, width: 56, textAlign: 'right' }} />
@@ -264,15 +266,15 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
   // salían mal). '' = sin elegir; el alta se bloquea hasta que se escoja una categoría real.
   const [cat, setCat] = useState<CostCategory | ''>('')
   const [origin, setOrigin] = useState<OriginKey>(null)
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState<number | null>(null)
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual')
   const [anchor, setAnchor] = useState(localDate())
   const [ocur, setOcur] = useState('')
 
   async function add() {
-    const a = parseFloat(amount); if (!concepto.trim() || !a || a <= 0 || !cat) return   // categoría obligatoria
+    const a = amount; if (!concepto.trim() || a == null || a <= 0 || !cat) return   // categoría obligatoria
     await fetch('/api/publico/previstos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ concepto: concepto.trim(), categoria: cat, origin, amount: a, frecuencia, anchor_date: anchor, ocurrencias: ocur ? Number(ocur) : null }) })
-    setConcepto(''); setCat(''); setOrigin(null); setAmount(''); setOcur(''); onAdd()
+    setConcepto(''); setCat(''); setOrigin(null); setAmount(null); setOcur(''); onAdd()
   }
 
   return (
@@ -285,7 +287,7 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
           {COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
         <select value={origin ?? ''} onChange={(e) => setOrigin((e.target.value || null) as OriginKey)} style={{ ...cell, width: 100 }}>{ORIGIN_OPTIONS.map((o) => <option key={o.label} value={o.key ?? ''}>{o.label}</option>)}</select>
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="$ monto" style={{ ...cell, width: 80, textAlign: 'right' }} />
+        <MoneyInput value={amount} onChange={setAmount} placeholder="$ monto" style={{ ...cell, width: 80, textAlign: 'right' }} />
         <select value={frecuencia} onChange={(e) => setFrecuencia(e.target.value as Frecuencia)} style={{ ...cell, width: 100 }}>{FRECS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
         <label className="flex items-center gap-1 text-label text-fg-muted">1er vence<input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} style={cell} /></label>
         <input value={ocur} onChange={(e) => setOcur(e.target.value)} inputMode="numeric" placeholder="N de M (opc)" title="cuántos pagos en total; vacío = perpetuo" style={{ ...cell, width: 90, textAlign: 'right' }} />

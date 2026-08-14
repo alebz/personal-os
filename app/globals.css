@@ -116,12 +116,12 @@ input::placeholder { color: var(--color-fg-faint); opacity: 1; }   /* was #55555
 
 input, textarea {
   font-family: var(--os-font) !important;   /* follow the Mono toggle — form controls don't inherit font-family, so inputs/placeholders were stuck on system sans regardless of the toggle */
-  font-size: 14px !important;
+  font-size: 13px;   /* default SIN !important: cada componente (cell de arcade, clases de XP a 11px, tamaños inline) puede pisarlo. El !important de antes clavaba TODO a 14px y se veía enorme/desbordado, sobre todo en XP. */
 }
 
 input::placeholder, textarea::placeholder {
   font-family: var(--os-font) !important;   /* follow the Mono toggle — form controls don't inherit font-family, so inputs/placeholders were stuck on system sans regardless of the toggle */
-  font-size: 14px !important;
+  font-size: inherit;   /* el placeholder sigue el tamaño del input, sin forzarlo */
 }
 
 /* ── View Transitions ────────────────────────────────────────────────────────── */
