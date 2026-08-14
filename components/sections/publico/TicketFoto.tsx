@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { mxn } from '@/components/Mxn'
 import { MoneyInput } from '@/components/MoneyInput'
+import { Card, inputCell as cell } from './ui'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, type CostCategory, type OriginKey } from '@/lib/publico'
 import { localDate, addDays, type PosterCatalog } from './util'
 
@@ -220,7 +221,6 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
   }
 
   const legColor = d?.legibilidad === 'alta' ? 'text-ok' : d?.legibilidad === 'baja' ? 'text-danger' : 'text-fg-muted'
-  const cell: React.CSSProperties = { padding: '4px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
   const fotoChip = (on: boolean): React.CSSProperties => ({ padding: '2px 8px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
 
   return (
@@ -242,7 +242,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
             <span className="text-label font-bold uppercase tracking-widest text-fg-muted">Borrador del ticket <span className="font-normal normal-case tracking-normal">— revisa y confirma</span></span>
             <span className={`text-label ${legColor}`}>legibilidad {d.legibilidad}</span>
           </div>
-          {d.notas && <div className="rounded-card border border-border bg-surface-2 p-2 text-label text-fg-muted">📝 {d.notas}</div>}
+          {d.notas && <Card pad="sm" className="text-label text-fg-muted">📝 {d.notas}</Card>}
 
           {/* Proveedor + fecha */}
           <div className="flex flex-wrap items-end gap-2">
@@ -329,7 +329,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
 
           {/* PAGO MIXTO: monto por contenedor; deben sumar EXACTO al total del ticket o no deja confirmar. */}
           {mixed && (
-            <div className="space-y-1 rounded-card border border-border bg-surface-2 p-2">
+            <Card pad="sm" className="space-y-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {ORIGIN_OPTIONS.map((o) => (
                   <label key={o.label} className="flex items-center gap-1 text-label">
@@ -342,7 +342,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
                 contenedores {mxn(splitSum)} · total {mxn(totalNum)}
                 {splitBlocked ? (totalNum <= 0 ? ' — captura el total primero' : ` — faltan ${mxn(totalNum - splitSum)} para cuadrar`) : ' ✓ cuadra'}
               </div>
-            </div>
+            </Card>
           )}
 
           {/* Lista lista-para-teclear en Poster (Fase 0 — NO escribe al POS; solo te la ordena para copiarla al
@@ -376,13 +376,13 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
               }
               return (
                 <div className="mt-2 space-y-2 text-label">
-                  <div className="rounded-card border border-border bg-surface-2 p-2">
+                  <Card pad="sm">
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5">
                       <span><span className="text-fg-muted">Proveedor:</span> {supMapped ? <b>{supMapped.name}</b> : <span className="text-warn">⚠ sin mapear en Poster</span>}</span>
                       <span><span className="text-fg-muted">Fecha:</span> {d.fecha}</span>
                       <span className="text-fg-muted">Almacén: elígelo en Poster</span>
                     </div>
-                  </div>
+                  </Card>
                   {toStock.length > 0 && (
                     <div>
                       <div className="mb-1 flex items-center justify-between text-fg-muted"><span>Van a inventario ({toStock.length})</span><span className="normal-case">neto sin IVA →</span></div>
@@ -421,9 +421,9 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange }: { onSaved: (
                       ⚠ {ivaSinDefinir} {ivaSinDefinir === 1 ? 'línea' : 'líneas'} sin tasa de IVA definida. No se adivina: defínela en 🏷 Alias aprendidos (0% alimentos · 16% bebidas/limpieza) y el neto se recalcula.
                     </div>
                   )}
-                  <div className="rounded-card border border-border bg-surface-2 p-2 text-fg-muted">
+                  <Card pad="sm" className="text-fg-muted">
                     El neto es POR LÍNEA con su tasa (alimentos 0% · bebidas/procesados 16%). Poster valúa el costo con el neto — entra ESTOS montos para no inflar ni subestimar el food cost.
-                  </div>
+                  </Card>
                   {!cat2 && <div className="text-fg-muted italic">Cargando catálogo de Poster…</div>}
                 </div>
               )

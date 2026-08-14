@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { mxn } from '@/components/Mxn'
+import { Card, inputCell as cell } from './ui'
 import { type PosterCatalog } from './util'
 
 // Propone el ×factor parseando el peso del NOMBRE y convirtiéndolo a la unidad base del ingrediente de Poster.
@@ -87,7 +88,6 @@ export function AliasManager() {
   }
 
   const total = sup.length + prod.length
-  const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
   const fotoChipSmall = (on: boolean): React.CSSProperties => ({ padding: '2px 7px', borderRadius: 999, fontSize: 11, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
 
   // "Sin mapear" = va a inventario pero aún sin ingrediente de Poster (los "solo panel" NO cuentan: es a propósito).
@@ -105,7 +105,7 @@ export function AliasManager() {
     .sort((a, b) => (isUnmapped(a) === isUnmapped(b) ? (b.importe_acumulado - a.importe_acumulado) : isUnmapped(a) ? -1 : 1))
 
   return (
-    <section className="rounded-card border border-border p-3">
+    <Card>
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between text-label font-bold uppercase tracking-widest text-fg-muted">
         <span>🏷 Alias aprendidos {open && total > 0 && <span className="font-normal normal-case tracking-normal">· {total}</span>}</span>
         <span>{open ? '▲' : '▼'}</span>
@@ -116,10 +116,10 @@ export function AliasManager() {
           {!loading && total === 0 && <p className="text-secondary italic text-fg-muted">Aún no hay alias. Se aprenden cuando corriges un ticket.</p>}
 
           {undo && (
-            <div className="flex items-center justify-between rounded-card border border-border bg-surface-2 p-2 text-label">
+            <Card pad="sm" className="flex items-center justify-between text-label">
               <span className="text-fg-muted">Borré <b className="text-fg">{undo.label}</b> (se puede reconstruir del historial).</span>
               <button onClick={() => void doUndo()} className="rounded-control border border-border px-3 py-0.5 font-bold text-accent hover:bg-surface-1">↩ deshacer</button>
-            </div>
+            </Card>
           )}
 
           {/* Consolidación: fusión DESTRUCTIVA de hermanas por stem. Muestra qué se une y pide confirmación. */}
@@ -223,6 +223,6 @@ export function AliasManager() {
           </div>)}
         </div>
       )}
-    </section>
+    </Card>
   )
 }

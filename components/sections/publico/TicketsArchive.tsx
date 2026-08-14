@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { mxn } from '@/components/Mxn'
 import { MoneyInput } from '@/components/MoneyInput'
+import { Card, inputCell as cell } from './ui'
 import { COST_CATEGORIES, ORIGIN_OPTIONS, originLabel, catDefaults, type CostCategory } from '@/lib/publico'
 import { dayMonth } from './util'
 
@@ -15,7 +16,6 @@ type Detail = { scan: Scan; items: Item[]; costos: Costo[]; imageUrl: string | n
 type EditItem = { descripcion: string; cantidad: number | null; unidad: string | null; importe: number; es_descuento: boolean; descripcion_raw: string | null; precio_unitario: number | null; codigo: string | null }
 type EditState = { proveedor: string; fecha: string; subtotal: number | null; impuestos: number | null; total: number | null; category: CostCategory; mixed: boolean; origin: string | null; splits: Record<string, number | null>; items: EditItem[] }
 
-const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
 export function TicketsArchive() {
   const [list, setList] = useState<TicketRow[]>([])
@@ -81,7 +81,7 @@ export function TicketsArchive() {
   const setItem = (idx: number, p: Partial<EditItem>) => setEd((e) => (e ? { ...e, items: e.items.map((it, k) => (k === idx ? { ...it, ...p } : it)) } : e))
 
   return (
-    <section className="rounded-card border border-border bg-surface-2 p-3">
+    <Card>
       <div className="mb-2 flex items-baseline justify-between">
         <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Tickets <span className="font-normal normal-case tracking-normal">· archivo ({list.length})</span></h2>
         {sel && <button onClick={() => { setSel(null); setDetail(null); setEd(null) }} className="text-label text-fg-muted hover:text-accent">← volver a la lista</button>}
@@ -185,6 +185,6 @@ export function TicketsArchive() {
           </div>
         </div>
       )}
-    </section>
+    </Card>
   )
 }

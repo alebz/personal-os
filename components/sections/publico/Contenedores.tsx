@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { mxn } from '@/components/Mxn'
 import { MoneyInput } from '@/components/MoneyInput'
+import { Card, inputCell as cell } from './ui'
 import { dayMonth, localDate } from './util'
 
 type HistCuadre = { tipo: 'cuadre'; fecha: string; contado: number; esperado: number | null; diferencia: number | null; nota: string | null; baseline: boolean }
@@ -133,7 +134,6 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   }
 
   const src = (p: string) => <span style={{ opacity: p === 'derivado' ? 1 : 0.5, color: p === 'derivado' ? dc : undefined }}> · {p === 'derivado' ? 'derivado · POS' : 'capturado'}</span>
-  const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
   return (
     <div className="space-y-2">
@@ -155,7 +155,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
       <div>
         <button onClick={() => setTraOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{traOpen ? '▲ cerrar traspaso' : '⇄ traspasar entre contenedores'}</button>
         {traOpen && (
-          <div className="mt-1 flex flex-wrap items-center gap-1 rounded-card border border-border bg-surface-2 p-2 text-label">
+          <Card pad="sm" className="mt-1 flex flex-wrap items-center gap-1 text-label">
             <span className="text-fg-muted">de</span>
             <select value={tr.origin} onChange={(e) => setTr({ ...tr, origin: e.target.value as ContKey })} style={{ ...cell, width: 100 }}>{CONT_OPTS.map((k) => <option key={k} value={k}>{LABELS[k]}</option>)}</select>
             <span className="text-fg-muted">a</span>
@@ -165,7 +165,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
             <input value={tr.nota} onChange={(e) => setTr({ ...tr, nota: e.target.value })} placeholder="nota (opc)" style={{ ...cell, flex: 1, minWidth: 80 }} />
             <button onClick={() => void traspasar()} disabled={tr.origin === tr.destino} className="rounded-control border border-border px-2 py-0.5 font-medium disabled:opacity-40">traspasar</button>
             {tr.origin === tr.destino && <span className="text-warn">origen y destino iguales</span>}
-          </div>
+          </Card>
         )}
       </div>
 
@@ -173,7 +173,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
       <div>
         <button onClick={() => setComOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{comOpen ? '▲ cerrar comisión' : `%  registrar comisión de Clip${comisiones.length ? ` (${comisiones.length} este mes · ${mxn(comisiones.reduce((s, x) => s + x.amount, 0))})` : ''}`}</button>
         {comOpen && (
-          <div className="mt-1 space-y-1 rounded-card border border-border bg-surface-2 p-2 text-label">
+          <Card pad="sm" className="mt-1 space-y-1 text-label">
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-fg-muted">CLIP −</span>
               <MoneyInput value={com.amount} onChange={(v) => setCom({ ...com, amount: v })} placeholder="$ comisión" style={{ ...cell, width: 90, textAlign: 'right' }} />
@@ -198,7 +198,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         )}
       </div>
 
@@ -209,7 +209,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
           {propOpen ? '▲ cerrar propinas' : `🪙 propinas por repartir${prop && prop.pendiente > 0 ? ` (${mxn(prop.pendiente)} pendiente)` : ''}`}
         </button>
         {propOpen && prop && (
-          <div className="mt-1 space-y-1.5 rounded-card border border-border bg-surface-2 p-2 text-label">
+          <Card pad="sm" className="mt-1 space-y-1.5 text-label">
             <div className="flex items-baseline justify-between border-b border-border pb-1">
               <span className="text-fg-muted">Pendiente por repartir{prop.ultimoReparto && <span className="normal-case"> · desde tu reparto {dayMonth(prop.ultimoReparto)}</span>}</span>
               <span className="tabular-nums" style={{ color: prop.pendiente > 0 ? NIVEL_COLOR[prop.nivel] : dc, fontWeight: 700, fontSize: 18 }}>{mxn(prop.pendiente)}</span>
@@ -262,7 +262,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         )}
       </div>
 

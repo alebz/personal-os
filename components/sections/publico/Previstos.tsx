@@ -5,6 +5,7 @@ import { mxn } from '@/components/Mxn'
 import { MoneyInput } from '@/components/MoneyInput'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, originLabel, OPERATING_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
 import { nthOccurrence, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
+import { Card, inputCell as cell } from './ui'
 import { localDate, dayMonth, dayLabel } from './util'
 
 const FRECS: { key: Frecuencia; label: string }[] = [
@@ -151,7 +152,6 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
     await fetch('/api/publico/previstos/reorder', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids }) }); await load()
   }
 
-  const cell: React.CSSProperties = { padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
   // Fila de UNA ocurrencia: checkbox reversible (desmarcar borra el costo) + monto editable por ocurrencia +
   // editar/borrar EL PREVISTO (definición), en controles SEPARADOS del checkbox (punto 7).
@@ -187,13 +187,13 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
           )}
         </div>
         {editing && p && (
-          <div className="mb-1 ml-6 mt-1 rounded-card border border-border bg-surface-2 p-2">
+          <Card pad="sm" className="mb-1 ml-6 mt-1">
             <PrevFields p={p} onPatch={patch} cell={cell} />
             <div className="mt-1 flex items-center gap-3 text-label">
               <button onClick={() => { void patch(p.id, { archived: true }); setEditKey(null) }} className="text-fg-muted hover:text-accent" title="archivar: detiene la generación, conserva el historial">archivar</button>
               <button onClick={() => setEditKey(null)} className="text-fg-muted hover:text-accent">listo</button>
             </div>
-          </div>
+          </Card>
         )}
       </div>
     )
@@ -202,10 +202,10 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
   return (
     <div className="space-y-2">
       {undo && (
-        <div className="flex items-center justify-between rounded-card border border-border bg-surface-2 p-2 text-label">
+        <Card pad="sm" className="flex items-center justify-between text-label">
           <span className="text-fg-muted">Pagado <b className="text-fg">{undo.label}</b> · creó el costo.</span>
           <button onClick={() => void doUndo()} className="rounded-control border border-border px-2 py-0.5 font-bold text-accent">↩ deshacer</button>
-        </div>
+        </Card>
       )}
       {/* PENDIENTES — siempre visibles (accionables): vencidos primero en rojo, luego los que vienen. */}
       {occItems.length === 0 && <div className="text-secondary italic text-fg-muted">Sin previstos. Agrégalos con ＋.</div>}
@@ -280,7 +280,7 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
   return (
     <div className="mt-2 space-y-2">
       {/* Alta */}
-      <div className="flex flex-wrap items-center gap-1 rounded-card border border-border bg-surface-2 p-2">
+      <Card pad="sm" className="flex flex-wrap items-center gap-1">
         <input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="concepto (ej. Suscripción Poster)" style={{ ...cell, flex: 1, minWidth: 140 }} />
         <select value={cat} onChange={(e) => { const c = e.target.value as CostCategory | ''; setCat(c); setOrigin(c ? catDefaults(c).defaultOrigin : null) }} style={{ ...cell, width: 110, ...(cat ? {} : { color: 'var(--color-warn, #b45309)' }) }}>
           <option value="">categoría…</option>
@@ -292,7 +292,7 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
         <label className="flex items-center gap-1 text-label text-fg-muted">1er vence<input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} style={cell} /></label>
         <input value={ocur} onChange={(e) => setOcur(e.target.value)} inputMode="numeric" placeholder="N de M (opc)" title="cuántos pagos en total; vacío = perpetuo" style={{ ...cell, width: 90, textAlign: 'right' }} />
         <button onClick={() => void add()} disabled={!cat} className="rounded-card border border-border px-3 py-1 font-medium disabled:opacity-40" title={cat ? '' : 'elige una categoría primero'}>Agregar</button>
-      </div>
+      </Card>
       {/* Lista editable + arrastre */}
       <div className="space-y-1">
         {prev.map((p) => (

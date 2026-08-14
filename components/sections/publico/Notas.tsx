@@ -1,12 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { Card, inputCell as cell } from './ui'
 
 // Notas operativas de Público: lista simple (título + cuerpo), ordenable, borrado reversible. Datos del negocio
 // que no viven en ninguna otra parte: RFC, cuentas, contacto del gas, códigos, claves de proveedores.
 // Se guardan en TEXTO PLANO — se avisa explícito. Sin categorías ni etiquetas (a propósito, por ahora).
 type Nota = { id: string; titulo: string; cuerpo: string; sort_order: number }
-const cell: React.CSSProperties = { padding: '4px 8px', fontSize: 13, borderRadius: 6, border: '1px solid var(--color-border, #cbd2e0)', background: 'var(--color-surface-base, #fff)', color: 'inherit' }
 
 export function Notas() {
   const [notas, setNotas] = useState<Nota[]>([])
@@ -50,16 +50,16 @@ export function Notas() {
   }
 
   return (
-    <section className="rounded-card border border-border bg-surface-2 p-3 text-secondary">
+    <Card className="text-secondary">
       <div className="mb-1 text-label font-bold uppercase tracking-widest text-fg-muted">Notas <span className="font-normal normal-case tracking-normal">— datos operativos (RFC, cuentas, contacto del gas, códigos, claves)</span></div>
       <div className="mb-2 rounded-card border p-2 text-label text-warn" style={{ borderColor: 'var(--color-warn, #b45309)55', background: 'color-mix(in srgb, var(--color-warn, #b45309) 8%, transparent)' }}>⚠ Se guardan en <b>texto plano</b>. Decide qué metes aquí sabiéndolo.</div>
 
       {/* Alta */}
-      <div className="space-y-1 rounded-card border border-border p-2">
+      <Card pad="sm" className="space-y-1">
         <input value={nt} onChange={(e) => setNt(e.target.value)} placeholder="Título (ej. RFC · Cuenta BBVA · Gas)" style={{ ...cell, width: '100%' }} />
         <textarea value={nc} onChange={(e) => setNc(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void add() }} placeholder="Contenido…" rows={2} style={{ ...cell, width: '100%', resize: 'vertical', fontFamily: 'inherit' }} />
         <div className="flex justify-end"><button onClick={() => void add()} className="rounded-card border border-border px-3 py-1 font-medium">Agregar nota</button></div>
-      </div>
+      </Card>
 
       {flash && (
         <div className="mt-2 flex items-center justify-between rounded-card border border-border bg-surface-active p-1.5 text-label text-fg-muted">
@@ -72,7 +72,7 @@ export function Notas() {
       <div className="mt-2 space-y-1.5">
         {notas.length === 0 && <div className="italic text-fg-muted">Sin notas aún.</div>}
         {notas.map((n, i) => (
-          <div key={n.id} className="group rounded-card border border-border p-2">
+          <Card key={n.id} pad="sm" className="group">
             {editId === n.id ? (
               <div className="space-y-1">
                 <input value={et} onChange={(e) => setEt(e.target.value)} placeholder="Título" style={{ ...cell, width: '100%' }} autoFocus />
@@ -96,9 +96,9 @@ export function Notas() {
                 {n.cuerpo && <div className="mt-0.5 whitespace-pre-wrap text-fg-muted">{n.cuerpo}</div>}
               </>
             )}
-          </div>
+          </Card>
         ))}
       </div>
-    </section>
+    </Card>
   )
 }

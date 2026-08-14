@@ -14,6 +14,7 @@ import {
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
 import { Notas } from './publico/Notas'
+import { Card, CardHead, Metric as KitMetric, srcTag } from './publico/ui'
 import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
 import { Contenedores } from './publico/Contenedores'
@@ -256,12 +257,12 @@ export default function PublicoContent() {
 
       {movView === 'capturar' && (<>
       {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
+      <Card>
         <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} />
-      </section>
+      </Card>
 
       {/* ── CIERRE DE HOY ── solo lectura (Poster lo llena); fallback tras "corregir a mano" ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
+      <Card>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-label font-bold uppercase tracking-widest text-fg-muted">Cierre</span>
@@ -299,14 +300,14 @@ export default function PublicoContent() {
             <div className="mt-1 text-right text-label text-fg-muted">Total {mxn((efectivo ?? 0) + (tarjeta ?? 0))}</div>
           </>
         )}
-      </section>
+      </Card>
 
       {/* ── ＋ COSTO A MANO ── Ocasional (casi todo entra por foto o Poster), COLAPSADO. Oculto si hay borrador. ── */}
       {!ticketDraftOpen && (
         <div>
           <button onClick={() => setCostoManualOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{costoManualOpen ? '▲ cerrar costo a mano' : '＋ costo a mano'}</button>
           {costoManualOpen && (
-          <section className="mt-1 rounded-card border border-border bg-surface-2 p-3">
+          <Card className="mt-1">
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
             {/* Mismo juego de 7 que el ticket: SIN Renta condonada (net-cero, no-operativa, sin recibo → su casa es Previstos). */}
             {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
@@ -337,13 +338,13 @@ export default function PublicoContent() {
             />
             <button onClick={() => void addCosto()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
           </div>
-          </section>
+          </Card>
           )}
         </div>
       )}
 
       {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
-      <section className="rounded-card border border-border p-3">
+      <Card>
         <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">{capDate === today ? 'Hoy' : dayLabel(capDate)}</h2>
         {costosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos este día.</p>}
         <div className="space-y-1">
@@ -356,7 +357,7 @@ export default function PublicoContent() {
             </div>
           ))}
         </div>
-      </section>
+      </Card>
       </>)}
 
       {movView === 'historial' && (<>
@@ -378,7 +379,7 @@ export default function PublicoContent() {
         <Socios funds={socioFunds} handlers={socioHandlers} splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
         {/* OTROS INGRESOS (no-POS: subarriendo, etc.) — vive en Fondos, no en Captura: es un evento raro, no
             parte del ritual diario. Suma a la utilidad, nunca a las ventas (food cost intacto). */}
-        <section className="rounded-card border border-border bg-surface-2 p-3">
+        <Card>
           <div className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS · {monthName(month)})</span></div>
           <div className="flex flex-wrap items-center gap-2">
             <input value={iConcepto} onChange={(e) => setIConcepto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }} />
@@ -399,7 +400,7 @@ export default function PublicoContent() {
               ))}
             </div>
           )}
-        </section>
+        </Card>
       </div>)}
 
       {tab === 'notas' && <Notas />}
@@ -454,21 +455,11 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
   }, [month])
 
   const bord = `${dc}22`                                // divisiones de 1px, color del día tenue
-  const box: React.CSSProperties = { border: `1px solid ${dc}44`, borderRadius: 8, background: 'var(--color-surface-1)' }   // bloque bento; surface-1 = card fill al 85% (legible sobre el sim)
-  // PROCEDENCIA en la etiqueta (no en badge aparte): "· pos" en el color del día (dato cierto del POS),
-  // "· manual" en gris apagado (lo tecleaste tú). Se lee de un vistazo qué dio el POS y qué capturaste.
-  const src = (s: 'pos' | 'manual') => <span style={s === 'pos' ? { color: dc } : { opacity: 0.5 }}> · {s}</span>
-  const Head = ({ children }: { children: React.ReactNode }) => <div className="mb-2 text-label uppercase tracking-widest" style={{ color: dc }}>{children}</div>
-  const Metric = ({ name, value, big, hint, delta }: { name: React.ReactNode; value: string; big?: boolean; hint?: string; delta?: React.ReactNode }) => (
-    <div style={{ padding: '10px 12px' }}>
-      <div className="text-label uppercase tracking-widest text-fg-muted">{name}</div>
-      <div className="flex items-baseline gap-1.5">
-        <span className="tabular-nums" style={{ color: dc, fontWeight: 700, fontSize: big ? 26 : 20, marginTop: 2 }}>{value}</span>
-        {delta}
-      </div>
-      {hint && <div className="mt-0.5 text-fg-muted" style={{ fontSize: 10, lineHeight: 1.25 }}>{hint}</div>}
-    </div>
-  )
+  // Head/Metric/src del Panel = envoltorios delgados que inyectan el color del día sobre el KIT compartido
+  // (components/sections/publico/ui). La fuente única vive en el kit; aquí solo se pinta con `dc`.
+  const src = (s: 'pos' | 'manual') => srcTag(s, dc)
+  const Head = ({ children }: { children: React.ReactNode }) => <CardHead tone={dc}>{children}</CardHead>
+  const Metric = (p: Omit<Parameters<typeof KitMetric>[0], 'tone'>) => <KitMetric {...p} tone={dc} />
   // Delta vs mes anterior (mismo tramo si el mes está en curso). goodUp: si subir es bueno (ventas/utilidad) o
   // malo (gastos). null si no hay base comparable (primer mes, o sin datos previos).
   const deltaBadge = (cur: number, prev: number | null, goodUp: boolean) => {
@@ -487,7 +478,7 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
           de la mano" leyendo mis datos) sigue PENDIENTE, no cancelada. Reaparece cuando se construya. */}
 
       {/* Fila asimétrica: MÉTRICAS + punto de equilibrio (2/3, el bloque hero) · alerta + qué toca (1/3). */}
-      <section className="lg:col-span-4" style={box}>
+      <Card emphasis="hero" tone={dc} pad="none" className="lg:col-span-4">
         <div className="px-3 pt-3"><Head>Métricas · {monthName(month)} {(prevVentas != null || prevCostos != null) && <span className="font-normal normal-case tracking-normal text-fg-muted">· ▲▼ vs {prevMonthName}{comparativoPartial ? ' (mismo tramo)' : ''}</span>}</Head></div>
         <div className="grid grid-cols-1 sm:grid-cols-2" style={{ borderTop: `1px solid ${bord}` }}>
           {/* Par de caras: VENTAS (POS, cierto) y GASTOS (manual, incompleto) — mismo peso visual, procedencia honesta. */}
@@ -573,10 +564,10 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
             )
           })()}
         </div>
-      </section>
+      </Card>
 
       {/* Alerta + qué toca (1/3). Contenido: Fase 5. */}
-      <section className="px-3 py-3 lg:col-span-2" style={box}>
+      <Card emphasis="hero" tone={dc} pad="none" className="px-3 py-3 lg:col-span-2">
         <Head>Alerta · qué toca</Head>
         {/* Domingo = cierre de semana: nómina y propina se pagan el MISMO día → UN solo ritual, no dos avisos. */}
         {new Date().getDay() === 0 && (propinaPendiente > 0 || prevTotals.pendiente > 0 || prevTotals.vencido > 0)
@@ -589,23 +580,23 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
           : propinaPendiente > 0
             ? <div className="text-secondary text-fg-muted">🪙 propina por repartir: <b className="tabular-nums text-fg">{mxn(propinaPendiente)}</b> <span className="italic">(se reparte el domingo, con la nómina)</span></div>
             : placeholder('Fase 5', 'lo que bloquea y las 2-3 acciones del día.')}
-      </section>
+      </Card>
 
       {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}
-      <section className="px-3 py-3 lg:col-span-3" style={box}>
+      <Card emphasis="hero" tone={dc} pad="none" className="px-3 py-3 lg:col-span-3">
         <Head>Gastos previstos {(prevTotals.pendiente > 0 || prevTotals.vencido > 0) && (
           <span className="font-normal normal-case tracking-normal text-fg-muted">· pendiente <b className="tabular-nums text-fg">{mxn(prevTotals.pendiente)}</b>{prevTotals.vencido > 0 && <span className="text-danger"> · vencido <b className="tabular-nums">{mxn(prevTotals.vencido)}</b></span>}</span>
         )}</Head>
         <Previstos month={month} onFaltan={setFaltan} onFixed={setFixed} onRentaCond={setRentaCond} onTotals={setPrevTotals} onCostChange={onCostChange} />
-      </section>
-      <section className="px-3 py-3 lg:col-span-3" style={box}>
+      </Card>
+      <Card emphasis="hero" tone={dc} pad="none" className="px-3 py-3 lg:col-span-3">
         <Head>Contenedores</Head>
         {/* Los contenedores son el dinero que hay AHORA (efectivo físico + derivado), no un saldo mensual. En un
             mes pasado no aplican: mostrarlos bajo "junio" implicaría que son de junio, y no lo son. Se ocultan. */}
         {isCurrentMonth
           ? <Contenedores dc={dc} month={month} />
           : <div className="text-secondary italic text-fg-muted">Los saldos son de <b>hoy</b>, no de un mes pasado. Vuelve al mes en curso para verlos y cuadrarlos.</div>}
-      </section>
+      </Card>
     </div>
   )
 }
@@ -652,8 +643,8 @@ function Direccion() {
     return () => { alive = false }
   }, [])
 
-  if (err) return <div className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-danger">⚠ {err}</div>
-  if (!m) return <div className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-fg-muted">Cargando dirección…</div>
+  if (err) return <Card className="text-secondary text-danger">⚠ {err}</Card>
+  if (!m) return <Card className="text-secondary text-fg-muted">Cargando dirección…</Card>
 
   const products = [...m.topProducts].sort((a, b) => (sortBy === 'revenue' ? b.revenue - a.revenue : b.units - a.units)).slice(0, 8)
   const maxProd = Math.max(1, ...products.map((p) => (sortBy === 'revenue' ? p.revenue : p.units)))
@@ -679,7 +670,7 @@ function Direccion() {
       )}
 
       {/* ── RESUMEN ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
+      <Card>
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Dirección</h2>
           <span className="text-label text-fg-muted">{dayMonth(m.range.from)} → {dayMonth(m.range.to)}</span>
@@ -693,10 +684,10 @@ function Direccion() {
         <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">
           <b className="text-fg">{m.daysOperated}</b> días operados de {m.range.calendarDays} de calendario ({closedDays} cerrados). Los promedios por día usan los {m.daysOperated} operados, no el calendario.
         </div>
-      </section>
+      </Card>
 
       {/* ── MARGEN TEÓRICO (food cost de las recetas del POS) ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
+      <Card>
         <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Margen teórico</h2>
         <div className="grid grid-cols-2 gap-y-1 text-secondary">
           <span className="text-fg-muted">Venta</span><span className="text-right tabular-nums text-ok">{mxn(m.margin.revenue)}</span>
@@ -705,10 +696,10 @@ function Direccion() {
           <span className="font-bold text-fg">Margen</span><span className="text-right font-bold tabular-nums">{m.margin.pct.toFixed(1)}%</span>
         </div>
         <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">Teórico = product_cost de las recetas. El real (vs compras) llega en F4.</div>
-      </section>
+      </Card>
 
       {/* ── TOP PRODUCTOS ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
+      <Card>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-label font-bold uppercase tracking-widest text-fg-muted">Top productos</h2>
           <div className="flex gap-1">
@@ -729,20 +720,20 @@ function Direccion() {
             </div>
           ))}
         </div>
-      </section>
+      </Card>
 
       {/* ── HORAS PICO ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
+      <Card>
         <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Horas pico <span className="font-normal normal-case tracking-normal text-fg-muted">(cierre, CDMX)</span></h2>
         <div className="space-y-1">
           {hoursActive.map((h) => (
             <Bar key={h.hour} label={`${String(h.hour).padStart(2, '0')}h`} value={h.receipts} max={maxHour} right={`${h.receipts} · ${mxn(h.revenue)}`} />
           ))}
         </div>
-      </section>
+      </Card>
 
       {/* ── DÍA DE LA SEMANA ── */}
-      <section className="rounded-card border border-border bg-surface-2 p-3">
+      <Card>
         <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Día de la semana</h2>
         <div className="space-y-1">
           {dowOrder.map((d) => {
@@ -750,7 +741,7 @@ function Direccion() {
             return <Bar key={d} label={row.label} value={row.receipts} max={maxDow} right={`${row.receipts} · ${mxn(row.revenue)}`} />
           })}
         </div>
-      </section>
+      </Card>
     </>
   )
 }
@@ -787,11 +778,11 @@ function FoodCostPanel() {
     return () => { alive = false }
   }, [])
 
-  if (err) return <section className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-danger">⚠ {err}</section>
-  if (!d) return <section className="rounded-card border border-border bg-surface-2 p-3 text-secondary text-fg-muted">Cargando food cost…</section>
+  if (err) return <Card className="text-secondary text-danger">⚠ {err}</Card>
+  if (!d) return <Card className="text-secondary text-fg-muted">Cargando food cost…</Card>
 
   return (
-    <section className="rounded-card border border-border bg-surface-2 p-3">
+    <Card>
       <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Food cost · real vs teórico</h2>
 
       {/* Estado de hoy, sin adornos */}
@@ -810,7 +801,7 @@ function FoodCostPanel() {
           // hallazgo del negocio (mezcla drift + compras no escritas al perpetuo). Badge y gap amortiguados.
           const b = p.contaminated ? { dot: '🟠', label: `reconciliación · ${p.days} días`, cls: 'text-warn' } : KIND_BADGE[p.kind]
           return (
-            <div key={i} className="rounded-card border border-border p-2">
+            <Card key={i} pad="sm">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-fg">{dayLabelShort(p.from)} → {dayLabelShort(p.to)}</span>
                 <span className={`text-label ${b.cls}`}>{b.dot} {b.label}</span>
@@ -827,7 +818,7 @@ function FoodCostPanel() {
                 {p.kind === 'abierto' && <span className="italic text-fg-muted">real pendiente de conteo</span>}
               </div>
               {p.note && <div className="mt-1 text-label text-fg-muted">{p.note}</div>}
-            </div>
+            </Card>
           )
         })}
       </div>
@@ -848,7 +839,7 @@ function FoodCostPanel() {
       {/* EMPAQUE · % de ventas — SEPARADO del food cost (no es consumo de receta). Es lo que se va CON la venta
           (cajas, vasos, servilletas); escala con el volumen, por eso se mira como % de ventas. Punto 5. */}
       {emp && emp.some((m) => m.empaque > 0) && (
-        <div className="mt-3 rounded-card border border-border p-2" style={{ borderStyle: 'dashed' }}>
+        <Card pad="sm" className="mt-3" style={{ borderStyle: 'dashed' }}>
           <div className="mb-1 text-label font-bold uppercase tracking-widest text-fg-muted">Empaque · % de ventas <span className="font-normal normal-case tracking-normal">(no es food cost — lo que se va con la venta)</span></div>
           <div className="space-y-0.5">
             {emp.map((m) => (
@@ -859,9 +850,9 @@ function FoodCostPanel() {
             ))}
           </div>
           <div className="mt-1 text-label text-fg-muted">Sube = sirves más (bien) o el empaque se encareció (revisar). Nunca se suma al food cost.</div>
-        </div>
+        </Card>
       )}
-    </section>
+    </Card>
   )
 }
 
@@ -882,18 +873,18 @@ function Socios({ funds, handlers, splitAlex, onSplit, utilidadOper }: {
         const f = funds.find((x) => x.key === key)
         if (!f) return <p key={key} className="text-secondary italic text-fg-muted">Falta el fondo {key} — ¿corriste la migración 0053?</p>
         return (
-          <section key={key} className="rounded-card border border-border bg-surface-2 p-3">
+          <Card key={key}>
             <div className="mb-2 flex items-baseline justify-between">
               <h2 className="text-base font-bold">{f.label}</h2>
               <span className="text-secondary text-fg-muted">saldo <span className="font-bold tabular-nums text-fg">{mxn(f.saved)}</span></span>
             </div>
             <FundMovementControl accounts={SOCIO_ACCOUNTS} hint="Aportar entra · Retirar sale" onSubmit={(flow, desc, amount, metodo) => handlers.onAportaRetira(f.id, flow, desc, amount, metodo)} />
             <div className="mt-3"><FundLedger movements={f.movements} /></div>
-          </section>
+          </Card>
         )
       })}
 
-      <section className="rounded-card border border-border p-3">
+      <Card>
         <h2 className="mb-2 text-label font-bold uppercase tracking-widest text-fg-muted">Reparto</h2>
         <div className="flex items-center gap-2 text-secondary">
           <span>Alex</span>
@@ -908,7 +899,7 @@ function Socios({ funds, handlers, splitAlex, onSplit, utilidadOper }: {
           <div className="mt-1 flex justify-between"><span>Alex ({splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * splitAlex / 100)}</span></div>
           <div className="flex justify-between"><span>Andrés ({100 - splitAlex}%)</span><span className="tabular-nums">{mxn(utilidadOper * (100 - splitAlex) / 100)}</span></div>
         </div>
-      </section>
+      </Card>
     </>
   )
 }
