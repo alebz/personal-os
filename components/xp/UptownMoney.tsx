@@ -108,9 +108,9 @@ export default function UptownMoney() {
   const setCount = (renter: string, paid: number, total: number) => { setPaidCounts((p) => ({ ...p, [renter]: { paid, total } })); post('/api/uptown/renter-counts', { renter, paid_count: paid, total_months: total }) }
   // Reordenar inquilinos (drag): mueve el arrastrado antes del destino y persiste el nuevo orden.
   const dragRent = useRef<string | null>(null)
-  const [newName, setNewName] = useState(''); const [newRent, setNewRent] = useState('')
+  const [newName, setNewName] = useState(''); const [newRent, setNewRent] = useState<number | null>(null)
   const dropRent = (targetId: string) => { const from = dragRent.current; dragRent.current = null; if (!from || from === targetId) return; const ids = rents.map((r) => r.renter); const fi = ids.indexOf(from), ti = ids.indexOf(targetId); if (fi < 0 || ti < 0) return; ids.splice(ti, 0, ids.splice(fi, 1)[0]); void reorderRenters(ids) }
-  const addNewRent = () => { if (!newName.trim()) return; void addRenter(newName.trim(), num(newRent)); setNewName(''); setNewRent('') }
+  const addNewRent = () => { if (!newName.trim()) return; void addRenter(newName.trim(), newRent ?? 0); setNewName(''); setNewRent(null) }
   const upExpense = (e: ExpenseRow, u: Partial<ExpenseRow>) => { const ne = { ...e, ...u }; setExpenses((es) => es.map((x) => (x.category === e.category ? ne : x))); post('/api/uptown/expense', { month, category: e.category, amount: ne.amount, paid: ne.paid, method: ne.method }) }
   const addExpense = (name: string, amount: number, method: 'cash' | 'card') => post('/api/uptown/fixed-expenses', { category: name, amount, method, month_start: month }).then(() => loadMonth(month))
   const delExpense = (category: string) => del('/api/uptown/fixed-expenses', { category, month_from: month }).then(() => loadMonth(month))
@@ -190,7 +190,7 @@ export default function UptownMoney() {
                   drag={{ onDragStart: () => { dragRent.current = r.renter }, onDrop: () => dropRent(r.renter) }} />)}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 9px' }}>
                   <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addNewRent()} placeholder="+ Nuevo inquilino" style={{ ...miniN, flex: 1, width: 'auto', textAlign: 'left' }} />
-                  <input value={newRent} onChange={(e) => setNewRent(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addNewRent()} placeholder="renta" style={{ ...miniN, width: 70 }} />
+                  <MoneyAmount value={newRent} onChange={setNewRent} onKeyDown={(e) => e.key === 'Enter' && addNewRent()} placeholder="renta" style={{ ...miniN, width: 70 }} />
                   <MoneyBtn onClick={addNewRent}>Añadir</MoneyBtn>
                 </div>
               </Table>
@@ -313,17 +313,17 @@ function RentRowUI({ row, count, onUp, onCount, renter, onEdit, onDel, drag }: {
   const c = count ?? { paid: 0, total: 12 }
   const [editC, setEditC] = useState(false); const [p, setP] = useState(String(c.paid)); const [t, setT] = useState(String(c.total))
   useEffect(() => { setP(String(c.paid)); setT(String(c.total)) }, [c.paid, c.total])
-  const [edit, setEdit] = useState(false); const [eN, setEN] = useState(''); const [eL, setEL] = useState(''); const [eR, setER] = useState('')
+  const [edit, setEdit] = useState(false); const [eN, setEN] = useState(''); const [eL, setEL] = useState(''); const [eR, setER] = useState<number | null>(null)
   const [conf, setConf] = useState(false)
-  function startEdit() { setEN(renter?.name ?? ''); setEL(renter?.location ?? ''); setER(String(renter?.rent ?? 0)); setEdit(true) }
-  function save() { if (eN.trim()) onEdit({ name: eN.trim(), location: eL.trim() || null, rent: num(eR) }); setEdit(false) }
+  function startEdit() { setEN(renter?.name ?? ''); setEL(renter?.location ?? ''); setER(renter?.rent ?? 0); setEdit(true) }
+  function save() { if (eN.trim()) onEdit({ name: eN.trim(), location: eL.trim() || null, rent: eR ?? 0 }); setEdit(false) }
 
   if (edit) return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderBottom: '1px solid #eef2f8' }}>
       <input value={eN} onChange={(e) => setEN(e.target.value)} placeholder="nombre" style={{ ...miniN, flex: 1, width: 'auto', textAlign: 'left' }} autoFocus />
       <input value={eL} onChange={(e) => setEL(e.target.value)} placeholder="ubicación" style={{ ...miniN, width: 84, textAlign: 'left' }} />
       <span style={{ fontSize: 9.5, color: '#8a93a8' }}>renta</span>
-      <input value={eR} onChange={(e) => setER(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} style={{ ...miniN, width: 62 }} />
+      <MoneyAmount value={eR} onChange={setER} onKeyDown={(e) => e.key === 'Enter' && save()} style={{ ...miniN, width: 62 }} />
       <button onClick={save} style={editLink}>ok</button>
       <button onClick={() => setEdit(false)} style={{ ...editLink, color: '#8a93a8' }}>✕</button>
     </div>
