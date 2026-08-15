@@ -21,6 +21,7 @@ type Body = {
   subtotal?: number | null; descuento?: number | null; impuestos?: number | null; total?: number
   legibilidad?: string | null; notas?: string | null
   category?: string; cost_kind?: string | null; origin?: string | null
+  folio?: string | null   // folio/nº de nota del proveedor (opcional) — se guarda en el roll-up
   origins?: Array<{ origin?: string | null; amount?: number }>   // PAGO MIXTO: split del total entre contenedores
   items?: InItem[]
   imageBase64?: string; mediaType?: string
@@ -111,7 +112,10 @@ export async function POST(req: NextRequest) {
   }
 
   // 3) Roll-up en publico_costos: una fila por contenedor si hay pago mixto, si no una sola (el P&L suma amount).
-  const base = { scope: 'publico', date: b.fecha, month: b.fecha.slice(0, 7), category: b.category, cost_kind, note: proveedor, ticket_scan_id: scanId }
+  // note conserva el proveedor (compat Historial); proveedor/folio se guardan en sus columnas (habilita el
+  // autocompletar/sugerencia y el folio pedido). Aditivo: no cambia lo que ya se leía.
+  const folio = (b.folio ?? '').trim() || null
+  const base = { scope: 'publico', date: b.fecha, month: b.fecha.slice(0, 7), category: b.category, cost_kind, note: proveedor, proveedor, folio, ticket_scan_id: scanId }
   const costoRows = splits
     ? splits.map((s) => ({ ...base, origin: s.origin, amount: s.amount }))
     : [{ ...base, origin: b.origin ?? null, amount: total }]

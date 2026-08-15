@@ -87,6 +87,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
   const [busy, setBusy] = useState<'extract' | 'confirm' | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [img, setImg] = useState<{ b64?: string; storagePath?: string; media: string } | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)   // objectURL de la foto tomada → visible en el confirm para cotejar
   const [raw, setRaw] = useState<unknown>(null)
   const [model, setModel] = useState<string | null>(null)
   const [d, setD] = useState<FotoDraft | null>(null)
@@ -99,10 +100,15 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
   const [dateApproved, setDateApproved] = useState(false)   // aprobación explícita de una fecha fuera de rango
   const [showPoster, setShowPoster] = useState(false)       // panel "lista para teclear en Poster"
   const [dragging, setDragging] = useState(false)           // arrastrando una foto sobre la card (dropzone)
+  const [manual, setManual] = useState(false)               // borrador SIN foto (gasto a mano): mismo confirm, sin extracción
+  const [folio, setFolio] = useState('')                    // folio/nº de nota del proveedor (opcional)
+  const [provs, setProvs] = useState<{ nombre: string; categoria: string }[]>([])  // historial: autocompletar + sugerir categoría
   const fileRef = useRef<HTMLInputElement>(null)
   // Catálogo Poster (solo lectura) para traducir ids del mapeo a nombres en la lista lista-para-teclear.
   const [cat2, setCat2] = useState<PosterCatalog | null>(null)
   useEffect(() => { if (cat2) return; fetch('/api/publico/poster/catalog').then((r) => r.json()).then((j) => { if (!j.error) setCat2(j) }).catch(() => {}) }, [cat2])
+  // Proveedores ya usados (ayudas 1 y 2): autocompletar el campo + sugerir su categoría más frecuente.
+  useEffect(() => { fetch('/api/publico/proveedores').then((r) => r.json()).then((j) => { if (Array.isArray(j.proveedores)) setProvs(j.proveedores) }).catch(() => {}) }, [])
   // Avisa al padre si hay un borrador abierto → oculta la barra de alta manual (no compiten en pantalla).
   const draftOpen = d != null
   useEffect(() => { onDraftChange?.(draftOpen); return () => { onDraftChange?.(false) } }, [draftOpen, onDraftChange])
@@ -114,7 +120,28 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
   const dateSuspect = !!d?.fecha && (d.fecha > todayLocal || d.fecha < floor60)
   const dateBlocked = dateSuspect && !dateApproved
 
-  function reset() { setImg(null); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); setMixed(false); setSplitAmts({}); setPagoUnread(false); setOverrideOrigin(false); if (fileRef.current) fileRef.current.value = '' }
+  function reset() { setImg(null); setPreview((old) => { if (old) URL.revokeObjectURL(old); return null }); setRaw(null); setModel(null); setD(null); setErr(null); setBusy(null); setDateApproved(false); setMixed(false); setSplitAmts({}); setPagoUnread(false); setOverrideOrigin(false); setManual(false); setFolio(''); if (fileRef.current) fileRef.current.value = '' }
+
+  // Gasto A MANO = un ticket sin foto: abre el MISMO borrador de confirmación, vacío con un renglón en blanco.
+  // Todo el resto (categoría, renglones, pago, guardián de fecha) se reutiliza tal cual. Legibilidad 'alta'
+  // porque lo teclea un humano (no hay lectura que dudar). El total lo da la suma de renglones.
+  function startManual() {
+    reset(); setManual(true)
+    setD({
+      proveedor: '', proveedor_raw: '', proveedor_rfc: null, sucursal: null, fecha: defaultDate, moneda: 'MXN',
+      subtotal: null, descuento: null, impuestos: null, total: null, legibilidad: 'alta', notas: null,
+      items: [{ codigo: null, descripcion: '', descripcion_raw: null, cantidad: null, unidad: null, precio_unitario: null, importe: 0, es_descuento: false }],
+      proveedorAliased: false,
+    })
+    setCat('insumo'); setOrigin(catDefaults('insumo').defaultOrigin)
+  }
+
+  // Al escribir/elegir un proveedor conocido, sugiere su categoría más frecuente (la marca; tú puedes cambiarla).
+  function onProveedor(v: string) {
+    patch({ proveedor: v })
+    const hit = provs.find((p) => p.nombre.toLowerCase() === v.trim().toLowerCase())
+    if (hit && COST_CATEGORIES.some((c) => c.key === hit.categoria)) { setCat(hit.categoria as CostCategory); setOrigin(catDefaults(hit.categoria as CostCategory).defaultOrigin) }
+  }
 
   // Resuelve el origen del pago desde el desglose leído del ticket. Reglas FIJAS del negocio (sin alias):
   // efectivo → caja chica, tarjeta → CLIP. Dos montos → pago mixto ya prendido; uno → ese contenedor; ninguno
@@ -130,7 +157,8 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
 
   // Procesa UNA foto de ticket, venga del picker o de un ARRASTRE (AirDrop → soltar en la card, sin picker).
   async function handleFile(file: File) {
-    setErr(null); setBusy('extract'); setD(null)
+    setErr(null); setBusy('extract'); setD(null); setManual(false)
+    setPreview((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file) })   // foto visible para cotejar
     try {
       // VÍA NUEVA: sube la foto DIRECTO a Storage (sin el límite de 4.5 MB de Vercel), y manda solo la RUTA.
       // HEIC de cualquier tamaño incluido — el server la baja y convierte, sin depender del navegador. Punto A.
@@ -207,8 +235,10 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           raw, model, proveedor: d.proveedor, proveedor_raw: d.proveedor_raw, fecha: d.fecha,
-          subtotal: d.subtotal, descuento: d.descuento, impuestos: d.impuestos, total: d.total,
-          legibilidad: d.legibilidad, notas: d.notas, category: cat, cost_kind: catDefaults(cat).defaultKind,
+          subtotal: manual ? null : d.subtotal, descuento: d.descuento, impuestos: manual ? null : d.impuestos,
+          // Manual: el total ES la suma de renglones (no hay total impreso que copiar). Con foto: el total leído.
+          total: manual ? Math.round(itemsSum * 100) / 100 : d.total,
+          legibilidad: d.legibilidad, notas: d.notas, category: cat, cost_kind: catDefaults(cat).defaultKind, folio: folio || null,
           // Pago simple: un solo origin. Pago mixto: split del total entre contenedores (una fila por cada uno).
           origin: mixed ? null : origin,
           origins: mixed ? ORIGIN_OPTIONS.map((o) => ({ origin: o.key, amount: splitAmts[splitKey(o.key)] ?? 0 })).filter((s) => s.amount > 0) : undefined,
@@ -245,6 +275,11 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
           <span className="text-base font-bold text-fg">{busy === 'extract' ? 'leyendo el ticket…' : dragging ? 'suelta la foto aquí' : 'Capturar por foto del ticket'}</span>
           <span className="text-label text-fg-muted">arrastra la foto (AirDrop) o haz clic · la IA propone, tú confirmas</span>
         </div>
+        {/* Alternativa SIN foto: el MISMO borrador, vacío, para teclear el gasto y sus renglones a mano.
+            mt-6 (no mt-3): el dropzone de arriba usa -m-3, cuyo margen inferior negativo se come 12px del gap. */}
+        <button onClick={startManual} disabled={busy === 'extract'} className="mt-6 flex w-full items-center justify-center gap-2 rounded-card border border-border py-2.5 text-secondary text-fg-muted transition-colors hover:border-accent/60 hover:text-fg disabled:opacity-50">
+          <span style={{ fontSize: 16 }}>＋</span> Registrar a mano <span className="text-label opacity-70">— sin foto, con renglones</span>
+        </button>
         </>
       )}
       {err && <div className="mt-2 text-secondary text-danger">{err}</div>}
@@ -252,19 +287,30 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
       {d && (
         <div className="mt-1 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>Borrador del ticket <span className="font-normal normal-case tracking-normal text-fg-muted">— revisa y confirma</span></span>
-            <span className={`text-label ${legColor}`}>legibilidad {d.legibilidad}</span>
+            <span className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>{manual ? 'Registro a mano' : 'Borrador del ticket'} <span className="font-normal normal-case tracking-normal text-fg-muted">— revisa y confirma</span></span>
+            {!manual && <span className={`text-label ${legColor}`}>legibilidad {d.legibilidad}</span>}
           </div>
+          {/* La FOTO digitalizada, visible para cotejar cantidades/precios contra el borrador antes de confirmar. */}
+          {preview && (
+            <a href={preview} target="_blank" rel="noreferrer" className="block" title="toca para ver la foto completa">
+              <img src={preview} alt="ticket" className="max-h-72 w-full rounded-card border border-border object-contain" />
+            </a>
+          )}
           {d.notas && <Card pad="sm" className="text-label text-fg-muted">{d.notas}</Card>}
 
-          {/* Proveedor + fecha */}
+          {/* Proveedor + folio + fecha */}
+          <datalist id="publico-proveedores">{provs.map((p) => <option key={p.nombre} value={p.nombre} />)}</datalist>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex-1">
-              <span className="text-label text-fg-muted">Proveedor {d.proveedorAliased && <span className="text-ok">· alias aplicado</span>}{!d.proveedorAliased && d.proveedor_raw && <span className="text-fg-muted"> · IA: {d.proveedor_raw}</span>}</span>
-              <input value={d.proveedor} onChange={(e) => patch({ proveedor: e.target.value })} style={{ ...cell, width: '100%', fontSize: 15 }} />
+            <label className="min-w-[160px] flex-1">
+              <span className="text-label text-fg-muted">{manual ? 'Proveedor / concepto' : 'Proveedor'} {d.proveedorAliased && <span className="text-ok">· alias aplicado</span>}{!d.proveedorAliased && d.proveedor_raw && <span className="text-fg-muted"> · IA: {d.proveedor_raw}</span>}</span>
+              <input list="publico-proveedores" value={d.proveedor} onChange={(e) => onProveedor(e.target.value)} placeholder={manual ? 'ej. Ferretería El Tornillo, Arreglo sillas…' : undefined} style={{ ...cell, width: '100%', fontSize: 15 }} />
             </label>
             <label>
-              <span className="text-label text-fg-muted">Fecha <span className="text-warn">· verifica</span></span>
+              <span className="text-label text-fg-muted">Folio <span className="normal-case opacity-60">· opc</span></span>
+              <input value={folio} onChange={(e) => setFolio(e.target.value)} placeholder="#" style={{ ...cell, width: 90, fontSize: 15 }} />
+            </label>
+            <label>
+              <span className="text-label text-fg-muted">Fecha {!manual && <span className="text-warn">· verifica</span>}</span>
               <input type="date" value={d.fecha ?? ''} onChange={(e) => { setDateApproved(false); patch({ fecha: e.target.value }) }} style={{ ...cell, fontSize: 15, borderColor: dateBlocked ? 'var(--color-danger)' : undefined }} />
             </label>
           </div>
@@ -297,17 +343,27 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
             <button onClick={() => setD((cur) => (cur ? { ...cur, items: [...cur.items, { codigo: null, descripcion: '', descripcion_raw: null, cantidad: null, unidad: null, precio_unitario: null, importe: 0, es_descuento: false }] } : cur))} className="text-label text-fg-muted hover:text-accent">＋ línea</button>
           </div>
 
-          {/* Totales */}
+          {/* Totales. Con foto: subtotal/IVA/total editables + reconciliación contra las líneas. Manual: el total
+              ES la suma de los renglones (no hay total impreso), así que se muestra derivado, no se teclea aparte. */}
+          {!manual ? (<>
           <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 border-t border-border pt-2 text-label">
             <label className="flex items-center gap-1"><span className="text-fg-muted">Subtotal</span><MoneyInput value={d.subtotal} onChange={(v) => patch({ subtotal: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
             <label className="flex items-center gap-1"><span className="text-fg-muted">Impuestos</span><MoneyInput value={d.impuestos} onChange={(v) => patch({ impuestos: v })} style={{ ...cell, width: 80, textAlign: 'right' }} /></label>
             <label className="flex items-center gap-1"><span className="font-bold text-fg">Total</span><MoneyInput value={d.total} onChange={(v) => patch({ total: v })} style={{ ...cell, width: 96, textAlign: 'right', fontSize: 14, fontWeight: 700 }} /></label>
           </div>
           {reconMismatch && reconTarget != null && <div className="text-right text-label text-warn">las líneas suman {mxn(itemsSum)} · {reconLabel} {mxn(reconTarget)} — diferencia {mxn(Math.abs(reconDiff))} {reconDiff > 0 ? 'de más en líneas' : 'de menos en líneas'} — revisa</div>}
+          </>) : (
+          <div className="flex items-center justify-end gap-2 border-t border-border pt-2">
+            <span className="font-bold text-fg">Total</span>
+            <span className="tabular-nums text-base font-bold" style={{ color: tone ?? 'var(--color-accent)' }}>{mxn(itemsSum)}</span>
+            <span className="text-label text-fg-muted">= suma de renglones</span>
+          </div>
+          )}
 
           {/* Categoría (su propia fila) */}
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
             <span className="text-label text-fg-muted">Categoría</span>
+            {(() => { const h = provs.find((p) => p.nombre.toLowerCase() === (d.proveedor ?? '').trim().toLowerCase()); return h && h.categoria === cat ? <span className="text-label text-ok" title={`la más usada con ${h.nombre}`}>· sugerida por historial</span> : null })()}
             {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
               <button key={c.key} onClick={() => { setCat(c.key); setOrigin(catDefaults(c.key).defaultOrigin) }} style={fotoChip(cat === c.key)}>{c.label}</button>
             ))}
@@ -359,8 +415,9 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
           )}
 
           {/* Lista lista-para-teclear en Poster (Fase 0 — NO escribe al POS; solo te la ordena para copiarla al
-              formulario de compra). Los renglones sin mapear o marcados "no toca stock" caen a solo-panel y avisan. */}
-          <div className="border-t border-border pt-2">
+              formulario de compra). Los renglones sin mapear o marcados "no toca stock" caen a solo-panel y avisan.
+              Solo con foto: en un registro a mano no hay extracción/mapeo que copiar. */}
+          {!manual && (<div className="border-t border-border pt-2">
             <button onClick={() => setShowPoster((s) => !s)} className="flex w-full items-center justify-between text-label font-bold uppercase tracking-widest text-fg-muted">
               <span>Para teclear en Poster <span className="font-normal normal-case tracking-normal">— compra de inventario</span></span>
               <span>{showPoster ? '▲' : '▼'}</span>
@@ -441,11 +498,11 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                 </div>
               )
             })()}
-          </div>
+          </div>)}
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <button onClick={reset} disabled={busy === 'confirm'} className="rounded-card px-3 py-1.5 text-secondary text-fg-muted hover:text-fg disabled:opacity-50">Descartar</button>
-            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked || splitBlocked || pagoUnread} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : splitBlocked ? 'Los contenedores deben sumar exacto al total' : pagoUnread ? 'Elige el origen del pago (no se pudo leer del ticket)' : undefined} style={{ background: tone ?? 'var(--color-accent)' }} className="rounded-card px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
+            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked || splitBlocked || pagoUnread || !d.proveedor.trim() || (manual && itemsSum <= 0)} title={!d.proveedor.trim() ? (manual ? 'Escribe el proveedor o concepto' : 'Falta el proveedor') : (manual && itemsSum <= 0) ? 'Agrega al menos un renglón con importe' : dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : splitBlocked ? 'Los contenedores deben sumar exacto al total' : pagoUnread ? 'Elige el origen del pago (no se pudo leer del ticket)' : undefined} style={{ background: tone ?? 'var(--color-accent)' }} className="rounded-card px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
           </div>
         </div>
       )}

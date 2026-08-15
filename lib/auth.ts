@@ -56,14 +56,33 @@ function safeEqual(a: string, b: string): boolean {
 
 // --- Session token: `<payload>.<signature>` ----------------------------------
 
+// Alcance de la sesión: 'full' = Alex (todo el OS) · 'captura' = Andrés (SOLO /captura + APIs de captura).
+export type SessionScope = 'full' | 'captura'
+
 /** Create a signed session token valid for SESSION_TTL_SECONDS. */
-export async function createSessionToken(): Promise<string> {
+export async function createSessionToken(scope: SessionScope = 'full'): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   const payload = base64urlEncodeString(
-    JSON.stringify({ iat: now, exp: now + SESSION_TTL_SECONDS })
+    JSON.stringify({ iat: now, exp: now + SESSION_TTL_SECONDS, scope })
   )
   const sig = await hmac(payload)
   return `${payload}.${sig}`
+}
+
+/** Verifica firma + expiry y DEVUELVE el scope (o null si inválida). Tokens viejos sin scope = 'full'. */
+export async function getSessionScope(token: string | undefined): Promise<SessionScope | null> {
+  if (!token) return null
+  const dot = token.lastIndexOf('.')
+  if (dot <= 0) return null
+  const payload = token.slice(0, dot)
+  if (!safeEqual(token.slice(dot + 1), await hmac(payload))) return null
+  try {
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    if (typeof decoded.exp !== 'number' || Math.floor(Date.now() / 1000) >= decoded.exp) return null
+    return decoded.scope === 'captura' ? 'captura' : 'full'
+  } catch {
+    return null
+  }
 }
 
 /** Verify a session token's signature and expiry. */

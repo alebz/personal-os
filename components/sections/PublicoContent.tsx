@@ -8,7 +8,7 @@ import { FundLedger } from '@/components/finance/FundLedger'
 import { FundMovementControl, type WalletOption } from '@/components/finance/FundMovementControl'
 import type { Fund } from '@/components/finance/CajaFuerteSection'
 import {
-  COST_CATEGORIES, catDefaults, originLabel, ORIGIN_OPTIONS, CONTAINERS, OPERATING_CATEGORIES,
+  catDefaults, originLabel, ORIGIN_OPTIONS, CONTAINERS, OPERATING_CATEGORIES,
   type CostCategory, type OriginKey, type CostKind,
 } from '@/lib/publico'
 import { TicketFoto } from './publico/TicketFoto'
@@ -61,7 +61,6 @@ export default function PublicoContent() {
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
   const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'fondos' | 'notas'>('panel')
   const [movView, setMovView] = useState<'capturar' | 'historial' | 'inventario' | 'cierre'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
-  const [costoManualOpen, setCostoManualOpen] = useState(false)                    // costo a mano = ocasional, colapsado
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
   const { funds: socioFunds, handlers: socioHandlers } = useCajaFuerte('publico', month)
@@ -90,19 +89,9 @@ export default function PublicoContent() {
     finally { setImporting(false) }
   }
 
-  // ── Costo (adder burst) ──
-  const [cAmt, setCAmt] = useState<number | null>(null)
-  const [cCat, setCCat] = useState<CostCategory>('insumo')          // sticky
-  const [cOrigin, setCOrigin] = useState<OriginKey>(catDefaults('insumo').defaultOrigin)
-  const [ticketDraftOpen, setTicketDraftOpen] = useState(false)   // hay borrador de ticket abierto → oculta la barra manual
+  // El alta manual vive ahora dentro de TicketFoto (un capturador: foto o a mano, ambos con renglones).
   const [editVenta, setEditVenta] = useState(false)               // el cierre es solo-lectura (Poster lo llena); esto abre el fallback manual
   const [propPend, setPropPend] = useState<{ pendiente: number; nivel: 'verde' | 'amarillo' | 'rojo' } | null>(null)   // propina por repartir (pasivo vivo, siempre visible)
-  const [cKind, setCKind] = useState<CostKind>(catDefaults('insumo').defaultKind ?? 'variable')
-  const [cNote, setCNote] = useState('')
-  const [cFecha, setCFecha] = useState(today)                       // fecha del gasto (default día visto, editable — tickets que capturas después)
-  const [cProv, setCProv] = useState('')                            // proveedor (opcional)
-  const [cFolio, setCFolio] = useState('')                          // folio (opcional)
-  const cAmtRef = useRef<HTMLInputElement>(null)
 
   // ── Otros ingresos (no-POS: subarriendo Ameno, etc.) ──
   const [iConcepto, setIConcepto] = useState('')
@@ -139,12 +128,6 @@ export default function PublicoContent() {
   useEffect(() => { setEditVenta(false) }, [capDate])   // al navegar de día, el cierre vuelve a solo-lectura (no arrastra un form de edición)
 
   // Al cambiar categoría, resetea origen+naturaleza a los defaults de ESA categoría (sticky después).
-  function pickCat(cat: CostCategory) {
-    const d = catDefaults(cat)
-    setCCat(cat); setCOrigin(d.defaultOrigin); setCKind(d.defaultKind ?? 'variable')
-    cAmtRef.current?.focus()
-  }
-
   async function saveVenta() {
     const ef = efectivo ?? 0, ta = tarjeta ?? 0
     if ((!ef && !ta) || ef < 0 || ta < 0) return
@@ -155,16 +138,6 @@ export default function PublicoContent() {
     setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1400)
     setEditVenta(false)   // guardado → vuelve a solo-lectura
     await load()
-  }
-
-  async function addCosto() {
-    const a = cAmt
-    if (a == null || a <= 0) return
-    const body = { date: cFecha, category: cCat, cost_kind: catDefaults(cCat).defaultKind === null ? null : cKind, origin: cOrigin, amount: a, note: cNote || null, proveedor: cProv || null, folio: cFolio || null }
-    setCAmt(null); setCNote(''); setCProv(''); setCFolio(''); setCFecha(today)   // limpia YA (antes del await): burst no concatena
-    await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-    await load()
-    cAmtRef.current?.focus()             // burst: listo para el siguiente (categoría/origen quedan sticky)
   }
 
   async function delCosto(id: string) {
@@ -280,74 +253,10 @@ export default function PublicoContent() {
       {movView === 'capturar' && (<>
       {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
       <Card>
-        <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} tone={dc} />
+        <TicketFoto onSaved={load} defaultDate={capDate} tone={dc} />
       </Card>
 
-      {/* ── COSTO A MANO ── Card en forma. Ocasional (casi todo entra por foto o Poster), colapsada. Oculto si hay borrador. ── */}
-      {!ticketDraftOpen && (
-        <Card>
-          <button onClick={() => setCostoManualOpen((o) => !o)} className="flex w-full items-center gap-3 text-left">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-card border font-bold" style={{ fontSize: 18, color: dc, borderColor: `${dc}66` }}>$</span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-bold text-fg">Costo a mano</span>
-              <span className="block text-label text-fg-muted">gasto sin ticket — mantenimiento, servicios, valet…</span>
-            </span>
-            <span className="shrink-0 text-fg-muted">{costoManualOpen ? '▲' : '＋'}</span>
-          </button>
-          {costoManualOpen && (
-            <div className="mt-3 space-y-3 border-t border-border pt-3">
-              <div>
-                <div className="mb-1 text-label uppercase tracking-widest text-fg-muted">Categoría</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {/* Mismo juego que el ticket: SIN Renta condonada (net-cero, no-operativa → su casa es Previstos). */}
-                  {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
-                    <button key={c.key} onClick={() => pickCat(c.key)} style={chip(cCat === c.key)}>{c.label}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-end gap-4">
-                <label className="block">
-                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Fecha</span>
-                  <input type="date" value={cFecha} max={today} onChange={(e) => setCFecha(e.target.value)} style={{ ...numInput, width: 150 }} />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Monto</span>
-                  <MoneyInput ref={cAmtRef} value={cAmt} onChange={setCAmt} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="$ 0" style={{ ...numInput, width: 140 }} />
-                </label>
-                <div>
-                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Desde</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setCOrigin(ct.key)} style={chip(cOrigin === ct.key)}>{ct.label}</button>))}
-                  </div>
-                </div>
-                {catDefaults(cCat).defaultKind !== null && (
-                  <div>
-                    <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Tipo</span>
-                    <button onClick={() => setCKind((k) => (k === 'fijo' ? 'variable' : 'fijo'))} title="fijo/variable (para el punto de equilibrio)" className="rounded-control border border-border px-3 py-1.5 text-label capitalize text-fg hover:border-accent">{cKind}</button>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-wrap items-end gap-4">
-                <label className="block">
-                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Proveedor <span className="normal-case text-fg-muted opacity-60">· opc</span></span>
-                  <input value={cProv} onChange={(e) => setCProv(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="ej. Ferretería El Tornillo" style={{ ...numInput, width: 240 }} />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Folio <span className="normal-case text-fg-muted opacity-60">· opc</span></span>
-                  <input value={cFolio} onChange={(e) => setCFolio(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="#" style={{ ...numInput, width: 130 }} />
-                </label>
-              </div>
-              <label className="block">
-                <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Nota</span>
-                <input value={cNote} onChange={(e) => setCNote(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="ej. Arreglo de las sillas tejidas" style={{ ...numInput }} />
-              </label>
-              <div className="flex justify-end">
-                <button onClick={() => void addCosto()} style={{ background: dc }} className="rounded-card px-5 py-2 font-bold text-white">Guardar costo</button>
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
+      {/* El alta manual se fusionó con la foto: TicketFoto trae "Registrar a mano" (mismo borrador, con renglones). */}
 
       {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
       <Card>
