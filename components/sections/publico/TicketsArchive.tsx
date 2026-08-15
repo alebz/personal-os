@@ -8,6 +8,8 @@ import { COST_CATEGORIES, ORIGIN_OPTIONS, originLabel, catDefaults, type CostCat
 import { dayMonth } from './util'
 
 type TicketRow = { id: string; proveedor: string; fecha: string; total: number; legibilidad: string; image_path: string | null; starred?: boolean }
+type Suelto = { id: string; date: string; category: string; origin: string | null; amount: number; note: string | null; source: string | null }
+type Mov = { kind: 'ticket'; id: string; date: string; label: string; amount: number; t: TicketRow } | { kind: 'suelto'; id: string; date: string; label: string; amount: number; s: Suelto }
 type Item = { id: string; pos: number; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean }
 type Costo = { id: string; date: string; category: string; origin: string | null; amount: number; cost_kind: string | null }
 type Scan = { id: string; proveedor: string; fecha: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number; legibilidad: string; notas: string | null }
@@ -19,6 +21,7 @@ type EditState = { proveedor: string; fecha: string; subtotal: number | null; im
 
 export function TicketsArchive({ tone }: { tone?: string }) {
   const [list, setList] = useState<TicketRow[]>([])
+  const [sueltos, setSueltos] = useState<Suelto[]>([])
   const [sel, setSel] = useState<string | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [ed, setEd] = useState<EditState | null>(null)
@@ -29,24 +32,37 @@ export function TicketsArchive({ tone }: { tone?: string }) {
   const [q, setQ] = useState('')                                     // filtrar por proveedor
   const [openFilter, setOpenFilter] = useState(false)
   const [starOnly, setStarOnly] = useState(false)
+  const [limit, setLimit] = useState(40)   // regla de oro del OS: top N + "ver más", nada de scroll interno
 
   async function toggleStar(t: TicketRow) {
     setList((prev) => prev.map((x) => (x.id === t.id ? { ...x, starred: !x.starred } : x)))   // optimista
     await fetch(`/api/publico/tickets/${t.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ starred: !t.starred }) })
   }
 
-  const shown = list
-    .filter((t) => !q.trim() || t.proveedor.toLowerCase().includes(q.trim().toLowerCase()))
-    .filter((t) => !starOnly || t.starred)
-    .slice()
+  async function delSuelto(s: Suelto) {
+    if (!window.confirm(`¿Eliminar "${s.note || s.category}" (${mxn(s.amount)})?`)) return
+    setSueltos((prev) => prev.filter((x) => x.id !== s.id))   // optimista
+    await fetch(`/api/publico/costo?id=${s.id}`, { method: 'DELETE' })
+    setFlash('Movimiento eliminado')
+  }
+
+  // Historial = tickets + movimientos SIN ticket (a mano / Poster), unificados y ordenados por fecha.
+  const movs: Mov[] = [
+    ...list.map((t): Mov => ({ kind: 'ticket', id: t.id, date: t.fecha, label: t.proveedor, amount: Number(t.total), t })),
+    ...sueltos.map((s): Mov => ({ kind: 'suelto', id: s.id, date: s.date, label: s.note || s.category, amount: Number(s.amount), s })),
+  ]
+  const shown = movs
+    .filter((m) => !q.trim() || m.label.toLowerCase().includes(q.trim().toLowerCase()))
+    .filter((m) => !starOnly || (m.kind === 'ticket' && m.t.starred))
     .sort((a, b) => {
-      const d = sortBy === 'fecha' ? a.fecha.localeCompare(b.fecha) : Number(a.total) - Number(b.total)
+      const d = sortBy === 'fecha' ? a.date.localeCompare(b.date) : a.amount - b.amount
       return asc ? d : -d
     })
 
   const loadList = useCallback(async () => {
     const j = await fetch('/api/publico/tickets').then((r) => r.json()).catch(() => null)
     if (j?.tickets) setList(j.tickets)
+    if (j?.sueltos) setSueltos(j.sueltos)
   }, [])
   useEffect(() => { void loadList() }, [loadList])
 
@@ -102,7 +118,7 @@ export function TicketsArchive({ tone }: { tone?: string }) {
   return (
     <Card>
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>Tickets <span className="font-normal normal-case tracking-normal text-fg-muted">· archivo ({list.length})</span></h2>
+        <h2 className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>Movimientos <span className="font-normal normal-case tracking-normal text-fg-muted">· archivo ({movs.length})</span></h2>
         {sel && <button onClick={() => { setSel(null); setDetail(null); setEd(null) }} className="text-label text-fg-muted hover:text-accent">← volver a la lista</button>}
       </div>
       {flash && <div className="mb-2 rounded-card border border-border bg-surface-1 p-1.5 text-label text-fg-muted">{flash}</div>}
@@ -110,29 +126,37 @@ export function TicketsArchive({ tone }: { tone?: string }) {
       {/* LISTA */}
       {!sel && (<>
         {/* Barra: filtrar (proveedor) · acomodar (fecha/monto) · dirección */}
-        {list.length > 0 && (
+        {movs.length > 0 && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5 text-label">
             <button onClick={() => setOpenFilter((o) => !o)} className={`rounded-control border px-2 py-0.5 ${openFilter || q ? 'border-accent text-accent' : 'border-border text-fg-muted hover:text-accent'}`}>⛃ Filtrar</button>
             <button onClick={() => setSortBy((s) => (s === 'fecha' ? 'monto' : 'fecha'))} className="rounded-control border border-border px-2 py-0.5 text-fg-muted hover:text-accent">Acomodar: <b className="text-fg">{sortBy === 'fecha' ? 'Fecha' : 'Monto'}</b></button>
             <button onClick={() => setAsc((a) => !a)} title={asc ? 'Ascendente' : 'Descendente (más reciente/mayor arriba)'} className="rounded-control border border-border px-2 py-0.5 text-fg-muted hover:text-accent">{asc ? '↑' : '↓'}</button>
             <button onClick={() => setStarOnly((s) => !s)} title="solo marcados" className={`rounded-control border px-2 py-0.5 ${starOnly ? 'border-warn text-warn' : 'border-border text-fg-muted hover:text-accent'}`}>{starOnly ? '★' : '☆'}</button>
-            {openFilter && <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="proveedor…" style={{ ...cell }} className="flex-1" />}
-            <span className="ml-auto text-fg-muted">{shown.length}/{list.length}</span>
+            {openFilter && <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar (proveedor o nota)…" style={{ ...cell }} className="flex-1" />}
+            <span className="ml-auto text-fg-muted">{shown.length}/{movs.length}</span>
           </div>
         )}
         {shown.length === 0
-          ? <p className="text-secondary italic text-fg-muted">{list.length === 0 ? 'Aún no hay tickets. Captúralos desde la pestaña Captura.' : 'Ningún ticket coincide con el filtro.'}</p>
+          ? <p className="text-secondary italic text-fg-muted">{movs.length === 0 ? 'Aún no hay movimientos.' : 'Ninguno coincide con el filtro.'}</p>
           : <div className="space-y-1">
-              {shown.map((t) => (
-                <div key={t.id} className="flex items-center gap-1 rounded-control border border-border bg-surface-1 px-1.5 py-1 text-secondary hover:border-accent">
-                  <button onClick={() => void toggleStar(t)} title={t.starred ? 'Quitar marcador' : 'Marcar'} className={`shrink-0 px-0.5 ${t.starred ? 'text-warn' : 'text-fg-muted/40 hover:text-warn'}`}>{t.starred ? '★' : '☆'}</button>
-                  <button onClick={() => void open(t.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                    <span className="flex-1 truncate"><b className="text-fg">{t.proveedor}</b> · {dayMonth(t.fecha)}</span>
-                    {t.image_path && <span className="text-label text-fg-muted">📎</span>}
-                    <span className="tabular-nums text-danger">−{mxn(Number(t.total))}</span>
+              {shown.slice(0, limit).map((m) => m.kind === 'ticket' ? (
+                <div key={m.id} className="flex items-center gap-1 rounded-control border border-border bg-surface-1 px-1.5 py-1 text-secondary hover:border-accent">
+                  <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} className={`shrink-0 px-0.5 ${m.t.starred ? 'text-warn' : 'text-fg-muted/40 hover:text-warn'}`}>{m.t.starred ? '★' : '☆'}</button>
+                  <button onClick={() => void open(m.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                    <span className="flex-1 truncate"><b className="text-fg">{m.t.proveedor}</b> · {dayMonth(m.t.fecha)}</span>
+                    {m.t.image_path && <span className="text-label text-fg-muted">📎</span>}
+                    <span className="tabular-nums text-danger">−{mxn(Number(m.t.total))}</span>
                   </button>
                 </div>
+              ) : (
+                <div key={m.id} className="flex items-center gap-2 rounded-control border border-dashed border-border bg-surface-1 px-2 py-1 text-secondary">
+                  <span className="shrink-0 text-fg-muted" title={m.s.source === 'poster' ? 'Importado de Poster' : 'Capturado a mano'}>{m.s.source === 'poster' ? '⇩' : '✎'}</span>
+                  <span className="min-w-0 flex-1 truncate"><b className="text-fg">{m.s.note || m.s.category}</b> · {dayMonth(m.s.date)} <span className="text-fg-muted">· {m.s.category}</span></span>
+                  <span className="tabular-nums text-danger">−{mxn(Number(m.s.amount))}</span>
+                  {m.s.source !== 'poster' && <button onClick={() => void delSuelto(m.s)} title="Eliminar" className="shrink-0 text-fg-muted hover:text-danger">🗑</button>}
+                </div>
               ))}
+              {shown.length > limit && <button onClick={() => setLimit((l) => l + 40)} className="w-full rounded-control border border-dashed border-border px-2 py-1 text-label text-fg-muted hover:text-accent">ver {shown.length - limit} más</button>}
             </div>}
       </>)}
 
