@@ -236,13 +236,13 @@ export default function PublicoContent() {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
           <span className={syncStale ? 'text-danger' : 'text-fg-muted'}>
             {sync?.last_error
-              ? `⚠ Import falló: ${sync.last_error}`
+              ? `Import falló: ${sync.last_error}`
               : sync?.last_success_at
                 ? `POS · último import ${daysSince === 0 ? 'hoy' : daysSince === 1 ? 'ayer' : `hace ${daysSince} días`}${syncStale ? ' — revisa' : ''}`
                 : 'POS · sin importar aún'}
           </span>
           {propPend && propPend.pendiente > 0 && (
-            <button onClick={() => setTab('panel')} className="hover:underline" title="ver y repartir en Contenedores" style={{ color: propPend.nivel === 'rojo' ? 'var(--color-danger)' : propPend.nivel === 'amarillo' ? 'var(--color-warn, #b45309)' : 'var(--color-fg-muted)' }}>🪙 debes {mxn(propPend.pendiente)} de propina</button>
+            <button onClick={() => setTab('panel')} className="hover:underline" title="ver y repartir en Contenedores" style={{ color: propPend.nivel === 'rojo' ? 'var(--color-danger)' : propPend.nivel === 'amarillo' ? 'var(--color-warn, #b45309)' : 'var(--color-fg-muted)' }}>debes {mxn(propPend.pendiente)} de propina</button>
           )}
         </div>
         <button onClick={() => void importNow()} disabled={importing} className="shrink-0 rounded-control px-2 py-0.5 text-fg-muted transition-colors hover:text-accent disabled:opacity-50">{importing ? 'importando…' : 'importar ahora'}</button>
@@ -533,7 +533,7 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
               restan hasta marcarse pagados; el mes en curso además tiene compras por capturar. Lo decimos claro. */}
           {(faltan > 0 || isCurrentMonth) && (
             <div className="mt-1 text-label text-warn" style={{ lineHeight: 1.3 }}>
-              ⚠ se ve alta —{faltan > 0 && <> aún no resta <b className="tabular-nums">{mxn(faltan)}</b> de nómina/fijos sin marcar como pagados</>}{faltan > 0 && isCurrentMonth && ' ·'}{isCurrentMonth && ' compras del mes aún por capturar'}. La real será menor.
+              se ve alta —{faltan > 0 && <> aún no resta <b className="tabular-nums">{mxn(faltan)}</b> de nómina/fijos sin marcar como pagados</>}{faltan > 0 && isCurrentMonth && ' ·'}{isCurrentMonth && ' compras del mes aún por capturar'}. La real será menor.
             </div>
           )}
           {(otrosIngresosMes > 0 || rentaCondonadaMes > 0 || reinversionMes > 0) && (
@@ -600,12 +600,12 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
         {new Date().getDay() === 0 && (propinaPendiente > 0 || prevTotals.pendiente > 0 || prevTotals.vencido > 0)
           ? (
             <div className="rounded-card border p-2 text-secondary" style={{ borderColor: `${dc}66` }}>
-              <div className="font-bold" style={{ color: dc }}>🗓️ Domingo · cierre de semana</div>
+              <div className="font-bold" style={{ color: dc }}>Domingo · cierre de semana</div>
               <div className="mt-1 text-fg-muted">Un solo ritual: <b className="text-fg">paga nómina</b>{(prevTotals.pendiente + prevTotals.vencido) > 0 && <> — <span className="tabular-nums">{mxn(prevTotals.pendiente + prevTotals.vencido)}</span> de previstos</>} y <b className="text-fg">reparte propina</b>{propinaPendiente > 0 && <> — <span className="tabular-nums">{mxn(propinaPendiente)}</span></>}.</div>
             </div>
           )
           : propinaPendiente > 0
-            ? <div className="text-secondary text-fg-muted">🪙 propina por repartir: <b className="tabular-nums text-fg">{mxn(propinaPendiente)}</b> <span className="italic">(se reparte el domingo, con la nómina)</span></div>
+            ? <div className="text-secondary text-fg-muted">propina por repartir: <b className="tabular-nums text-fg">{mxn(propinaPendiente)}</b> <span className="italic">(se reparte el domingo, con la nómina)</span></div>
             : placeholder('Fase 5', 'lo que bloquea y las 2-3 acciones del día.')}
       </Card>
 
@@ -662,7 +662,7 @@ function Direccion() {
     return () => { alive = false }
   }, [])
 
-  if (err) return <Card className="text-secondary text-danger">⚠ {err}</Card>
+  if (err) return <Card className="text-secondary text-danger">{err}</Card>
   if (!m) return <Card className="text-secondary text-fg-muted">Cargando dirección…</Card>
 
   const products = [...m.topProducts].sort((a, b) => (sortBy === 'revenue' ? b.revenue - a.revenue : b.units - a.units)).slice(0, 8)
@@ -678,7 +678,7 @@ function Direccion() {
       {/* ── GUARDIÁN: cierres después de medianoche rompen el supuesto de "día natural" ── */}
       {m.guardian.count > 0 && (
         <div className="rounded-card border border-danger bg-danger/10 p-3 text-secondary">
-          <div className="font-bold text-danger">⚠ {m.guardian.count} recibo(s) cerraron entre 00:00 y 06:00 CDMX</div>
+          <div className="font-bold text-danger">{m.guardian.count} recibo(s) cerraron entre 00:00 y 06:00 CDMX</div>
           <div className="mt-1 text-fg-muted">El supuesto de “día natural = getPaymentsReport” asume que se cierra antes de medianoche. Estos cruzan ese límite — revisa si la operación cambió de horario:</div>
           <div className="mt-1 space-y-0.5">
             {m.guardian.receipts.map((r) => (
@@ -792,9 +792,9 @@ type FCPeriod = { from: string; to: string; kind: 'arranque' | 'confiable' | 'ab
 type FCData = { theoreticalByMonth: FCMonth[]; periods: FCPeriod[]; lastCountDate: string | null; daysSinceCount: number | null; countAlert: boolean; anyReliable: boolean; todayStatus: string }
 
 const KIND_BADGE: Record<FCPeriod['kind'], { dot: string; label: string; cls: string }> = {
-  confiable: { dot: '🟢', label: 'acotado por conteos', cls: 'text-ok' },
-  arranque: { dot: '🟡', label: 'arranque del sistema', cls: 'text-warn' },
-  abierto: { dot: '⚪', label: 'en curso · sin conteo', cls: 'text-fg-muted' },
+  confiable: { dot: '●', label: 'acotado por conteos', cls: 'text-ok' },
+  arranque: { dot: '◐', label: 'arranque del sistema', cls: 'text-warn' },
+  abierto: { dot: '○', label: 'en curso · sin conteo', cls: 'text-fg-muted' },
 }
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const monthLabel = (m: string) => { const [y, mm] = m.split('-'); return `${MESES[Number(mm) - 1]} ${y}` }
@@ -818,7 +818,7 @@ function FoodCostPanel() {
     return () => { alive = false }
   }, [])
 
-  if (err) return <Card className="text-secondary text-danger">⚠ {err}</Card>
+  if (err) return <Card className="text-secondary text-danger">{err}</Card>
   if (!d) return <Card className="text-secondary text-fg-muted">Cargando food cost…</Card>
 
   return (
@@ -830,7 +830,7 @@ function FoodCostPanel() {
 
       {/* Aviso de conteo accionable */}
       {d.countAlert && (
-        <div className="mb-2 rounded-card border border-danger bg-danger/10 p-2 text-label text-danger">🧮 Último conteo físico hace {d.daysSinceCount} días ({d.lastCountDate}). Hacer un conteo desbloquea el food cost real de este periodo.</div>
+        <div className="mb-2 rounded-card border border-danger bg-danger/10 p-2 text-label text-danger">Último conteo físico hace {d.daysSinceCount} días ({d.lastCountDate}). Hacer un conteo desbloquea el food cost real de este periodo.</div>
       )}
 
       {/* Real por PERIODO entre conteos (la métrica) */}
@@ -839,7 +839,7 @@ function FoodCostPanel() {
         {d.periods.map((p, i) => {
           // Un 'confiable' demasiado largo se presenta como RECONCILIACIÓN, no como merma: el gap no es un
           // hallazgo del negocio (mezcla drift + compras no escritas al perpetuo). Badge y gap amortiguados.
-          const b = p.contaminated ? { dot: '🟠', label: `reconciliación · ${p.days} días`, cls: 'text-warn' } : KIND_BADGE[p.kind]
+          const b = p.contaminated ? { dot: '◑', label: `reconciliación · ${p.days} días`, cls: 'text-warn' } : KIND_BADGE[p.kind]
           return (
             <Card key={i} pad="sm">
               <div className="flex items-center justify-between">
@@ -874,7 +874,7 @@ function FoodCostPanel() {
         ))}
       </div>
 
-      <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">El gap (real − teórico) es merma + sobre-porción + desperdicio + robo. Solo es legítimo en periodos 🟢 cerrados entre dos conteos físicos.</div>
+      <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">El gap (real − teórico) es merma + sobre-porción + desperdicio + robo. Solo es legítimo en periodos cerrados entre dos conteos físicos.</div>
 
       {/* EMPAQUE · % de ventas — SEPARADO del food cost (no es consumo de receta). Es lo que se va CON la venta
           (cajas, vasos, servilletas); escala con el volumen, por eso se mira como % de ventas. Punto 5. */}

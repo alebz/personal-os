@@ -153,7 +153,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
 
       {/* Traspaso entre contenedores: baja uno, sube el otro, mismo importe. Net-cero, no toca utilidad. */}
       <div>
-        <button onClick={() => setTraOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{traOpen ? '▲ cerrar traspaso' : '⇄ traspasar entre contenedores'}</button>
+        <button onClick={() => setTraOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{traOpen ? '▲ cerrar traspaso' : '↔ traspasar entre contenedores'}</button>
         {traOpen && (
           <Card pad="sm" className="mt-1 flex flex-wrap items-center gap-1 text-label">
             <span className="text-fg-muted">de</span>
@@ -184,7 +184,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
             <div className="text-fg-muted">Baja el saldo de CLIP y la utilidad (es un costo real). El margen del breakeven ya la estima aparte por tasa.</div>
             {/* Heartbeat del import de Clip (settlements): la fee REAL entra sola. Visible si falla (#4). */}
             {clipSync && (clipSync.last_error
-              ? <div className="text-danger">⚠ Clip import falló: {clipSync.last_error}</div>
+              ? <div className="text-danger">Clip import falló: {clipSync.last_error}</div>
               : clipSync.last_success_at
                 ? <div className="text-fg-muted">Clip · settlements importados hasta {clipSync.last_import_to ?? '—'} (la fee real entra sola)</div>
                 : <div className="text-fg-muted">Clip · aún sin importar settlements (configura las credenciales)</div>)}
@@ -193,7 +193,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
                 {comisiones.map((x) => (
                   <div key={x.id} className="flex items-center justify-between gap-2">
                     <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(x.date)}</span> · {x.note} <span className="tabular-nums text-danger">−{mxn(x.amount)}</span></span>
-                    <button onClick={() => void revertComision(x.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir esta comisión">↩</button>
+                    <button onClick={() => void revertComision(x.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir esta comisión">←</button>
                   </div>
                 ))}
               </div>
@@ -206,7 +206,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
           cuadre: pendiente = Σ propina caída − Σ repartos (incluido el arranque). Anclado a tu último reparto. */}
       <div>
         <button onClick={() => setPropOpen((o) => !o)} className="text-label hover:text-accent" style={{ color: prop && prop.pendiente > 0 ? NIVEL_COLOR[prop.nivel] : undefined }}>
-          {propOpen ? '▲ cerrar propinas' : `🪙 propinas por repartir${prop && prop.pendiente > 0 ? ` (${mxn(prop.pendiente)} pendiente)` : ''}`}
+          {propOpen ? '▲ cerrar propinas' : `propinas por repartir${prop && prop.pendiente > 0 ? ` (${mxn(prop.pendiente)} pendiente)` : ''}`}
         </button>
         {propOpen && prop && (
           <Card pad="sm" className="mt-1 space-y-1.5 text-label">
@@ -246,7 +246,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
             </div>
             {/* Heartbeat del import de propinas de Clip. Visible si falla. */}
             {prop.sync && (prop.sync.last_error
-              ? <div className="text-danger">⚠ Propinas import falló: {prop.sync.last_error}</div>
+              ? <div className="text-danger">Propinas import falló: {prop.sync.last_error}</div>
               : prop.sync.last_success_at
                 ? <div className="text-fg-muted">Clip · propinas importadas hasta {prop.sync.last_import_to ?? '—'} (entran solas)</div>
                 : <div className="text-fg-muted">Clip · aún sin importar propinas</div>)}
@@ -257,7 +257,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
                     {r.kind === 'arranque'
                       ? <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(r.fecha)}</span> · <b>arranque</b> · repartido antes del registro <span className="tabular-nums">−{mxn(r.amount)}</span></span>
                       : <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(r.fecha)}</span> · reparto de {LABELS[r.contenedor]} <span className="tabular-nums text-danger">−{mxn(r.amount)}</span>{r.nota && <span> · {r.nota}</span>}</span>}
-                    <button onClick={() => void revertReparto(r.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir">↩</button>
+                    <button onClick={() => void revertReparto(r.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir">←</button>
                   </div>
                 ))}
               </div>
@@ -271,7 +271,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
         <div className="rounded-card border p-2 text-label" style={{ borderColor: 'var(--color-warn, #b45309)' }}>
           <div className="flex items-center justify-between gap-2">
             <button onClick={() => setPendOpen((o) => !o)} className="text-left text-warn hover:underline">
-              ⚠ <b>{pend.count}</b> compra{pend.count === 1 ? '' : 's'} sin contenedor (<b className="tabular-nums">{mxn(pend.total)}</b>) tras el baseline
+              <b>{pend.count}</b> compra{pend.count === 1 ? '' : 's'} sin contenedor (<b className="tabular-nums">{mxn(pend.total)}</b>) tras el baseline
             </button>
             <div className="flex shrink-0 gap-1">
               <span className="text-fg-muted">todas →</span>
@@ -334,7 +334,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
               ) : (
                 <div key={`t${i}`} className="flex items-center justify-between gap-2">
                   <span className="text-fg-muted"><span className="tabular-nums">{dayMonth(h.fecha)}</span> · <b style={{ color: dc }}>traspaso</b> {h.direccion === 'sale' ? '→' : '←'} {LABELS[h.otro as ContKey]} <span className="tabular-nums">{h.direccion === 'sale' ? '−' : '+'}{mxn(h.amount)}</span>{h.nota && <span> · {h.nota}</span>}</span>
-                  <button onClick={() => void revertTraspaso(h.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir este traspaso">↩</button>
+                  <button onClick={() => void revertTraspaso(h.id)} className="shrink-0 text-fg-muted hover:text-danger" title="revertir este traspaso">←</button>
                 </div>
               ))}
             </div>

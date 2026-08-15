@@ -241,13 +241,13 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
           onDrop={onDrop}
           className={`-m-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border border-dashed py-12 text-center transition-colors ${busy === 'extract' ? 'cursor-wait border-border' : dragging ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/60 hover:bg-surface-2'}`}
         >
-          <span style={{ fontSize: 42, lineHeight: 1 }}>{busy === 'extract' ? '⏳' : dragging ? '📥' : '📷'}</span>
+          <span style={{ fontSize: 42, lineHeight: 1 }}>{busy === 'extract' ? '…' : dragging ? '↓' : '＋'}</span>
           <span className="text-base font-bold text-fg">{busy === 'extract' ? 'leyendo el ticket…' : dragging ? 'suelta la foto aquí' : 'Capturar por foto del ticket'}</span>
           <span className="text-label text-fg-muted">arrastra la foto (AirDrop) o haz clic · la IA propone, tú confirmas</span>
         </div>
         </>
       )}
-      {err && <div className="mt-2 text-secondary text-danger">⚠ {err}</div>}
+      {err && <div className="mt-2 text-secondary text-danger">{err}</div>}
 
       {d && (
         <div className="mt-1 space-y-2">
@@ -255,7 +255,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
             <span className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>Borrador del ticket <span className="font-normal normal-case tracking-normal text-fg-muted">— revisa y confirma</span></span>
             <span className={`text-label ${legColor}`}>legibilidad {d.legibilidad}</span>
           </div>
-          {d.notas && <Card pad="sm" className="text-label text-fg-muted">📝 {d.notas}</Card>}
+          {d.notas && <Card pad="sm" className="text-label text-fg-muted">{d.notas}</Card>}
 
           {/* Proveedor + fecha */}
           <div className="flex flex-wrap items-end gap-2">
@@ -270,7 +270,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
           </div>
           {dateSuspect && (
             <div className="flex items-center justify-between gap-2 rounded-card border border-danger bg-danger/10 p-2 text-label">
-              <span className="text-danger">⚠ La fecha {d.fecha} está fuera de rango ({d.fecha! > todayLocal ? 'en el futuro' : 'más de 60 días atrás'}). Corrígela arriba, o apruébala si es correcta.</span>
+              <span className="text-danger">La fecha {d.fecha} está fuera de rango ({d.fecha! > todayLocal ? 'en el futuro' : 'más de 60 días atrás'}). Corrígela arriba, o apruébala si es correcta.</span>
               <button onClick={() => setDateApproved(true)} disabled={dateApproved} className="shrink-0 rounded-control border border-danger px-2 py-0.5 text-danger disabled:opacity-50">{dateApproved ? '✓ aprobada' : 'Aprobar fecha'}</button>
             </div>
           )}
@@ -282,7 +282,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                 <div className="group flex items-center gap-1" style={it.discrepancia ? { outline: '1px solid var(--color-danger)', outlineOffset: 2, borderRadius: 6 } : undefined}>
                   <input value={it.descripcion} onChange={(e) => patchItem(i, { descripcion: e.target.value })} style={{ ...cell, flex: 1, minWidth: 100 }} title={it.descripcion_raw && it.descripcion_raw !== it.descripcion ? `IA: ${it.descripcion_raw}` : undefined} placeholder="descripción" />
                   {it.aliased && <span className="text-ok" title="alias aplicado">✓</span>}
-                  {it.pesoVariable && <span title="peso variable — la cantidad es el peso leído del ticket">⚖</span>}
+                  {it.pesoVariable && <span title="peso variable — la cantidad es el peso leído del ticket">≈</span>}
                   <NumInput value={it.cantidad ?? null} onChange={(v) => patchItem(i, { cantidad: v })} style={{ ...cell, width: 46, textAlign: 'right' }} placeholder="cant" />
                   <input value={it.unidad ?? ''} onChange={(e) => patchItem(i, { unidad: e.target.value.trim() || null })} style={{ ...cell, width: 44 }} placeholder="u" title="unidad de la cantidad (PZA, KG, G, L…) — la barra de mapeo la convierte a la unidad base de Poster" />
                   {/* P.U. DERIVADO (importe ÷ cantidad), read-only: el importe es la fuente de verdad, el P.U. nunca. */}
@@ -291,7 +291,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                   <button onClick={() => patchItem(i, { es_descuento: !it.es_descuento })} style={fotoChip(it.es_descuento)} title="marca si es cupón/descuento">desc</button>
                   <button onClick={() => delItem(i)} className="px-1 opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar línea">✕</button>
                 </div>
-                {it.discrepancia && <div className="mt-0.5 pl-1 text-label text-danger">⚠ dato dudoso: {it.discrepancia} — verifícalo, no se ajustó solo.</div>}
+                {it.discrepancia && <div className="mt-0.5 pl-1 text-label text-danger">dato dudoso: {it.discrepancia} — verifícalo, no se ajustó solo.</div>}
               </div>
             ))}
             <button onClick={() => setD((cur) => (cur ? { ...cur, items: [...cur.items, { codigo: null, descripcion: '', descripcion_raw: null, cantidad: null, unidad: null, precio_unitario: null, importe: 0, es_descuento: false }] } : cur))} className="text-label text-fg-muted hover:text-accent">＋ línea</button>
@@ -318,7 +318,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
               resuelto. Si NO se leyó, los chips salen prominentes como la elección pendiente que son. */}
           {pagoLeido && !overrideOrigin && !mixed ? (
             <div className="flex flex-wrap items-center gap-2 text-label text-fg-muted">
-              <span>💳 pago del ticket: {(d.pagoEfectivo ?? 0) > 0 && <>efectivo {mxn(d.pagoEfectivo!)} <span className="text-ok">→ caja chica</span></>}
+              <span>pago del ticket: {(d.pagoEfectivo ?? 0) > 0 && <>efectivo {mxn(d.pagoEfectivo!)} <span className="text-ok">→ caja chica</span></>}
                 {(d.pagoEfectivo ?? 0) > 0 && (d.pagoTarjeta ?? 0) > 0 && ' · '}
                 {(d.pagoTarjeta ?? 0) > 0 && <>tarjeta {mxn(d.pagoTarjeta!)}{d.pagoUltimos4 ? ` ••${d.pagoUltimos4}` : ''} <span className="text-ok">→ CLIP</span></>}</span>
               <button onClick={() => setOverrideOrigin(true)} className="underline decoration-dotted hover:text-accent">cambiar origen</button>
@@ -329,7 +329,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
               <span className="text-label text-fg-muted">desde</span>
               {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => { setOrigin(ct.key); setPagoUnread(false) }} style={fotoChip(!pagoUnread && origin === ct.key)}>{ct.label}</button>))}
               <button onClick={() => { setMixed(true); setPagoUnread(false) }} style={fotoChip(false)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
-              {pagoLeido && overrideOrigin && <button onClick={() => setOverrideOrigin(false)} className="text-label text-fg-muted underline decoration-dotted hover:text-accent">↩ usar el leído</button>}
+              {pagoLeido && overrideOrigin && <button onClick={() => setOverrideOrigin(false)} className="text-label text-fg-muted underline decoration-dotted hover:text-accent">← usar el leído</button>}
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5">
@@ -337,8 +337,8 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
               <button onClick={() => setMixed(false)} style={fotoChip(true)} title="gasto pagado desde 2+ contenedores">pago mixto</button>
             </div>
           )}
-          {pagoMismatch && <div className="text-label text-warn">⚠ el pago leído suma {mxn(pagoSum)} pero el total es {mxn(totalNum)} — diferencia {mxn(Math.abs(pagoDiff))} — revisa</div>}
-          {pagoUnread && !mixed && <div className="rounded-card border border-warn bg-warn/10 p-2 text-label text-warn">⚠ No se leyó el método de pago del ticket. Elige el origen arriba — no se adivinó.</div>}
+          {pagoMismatch && <div className="text-label text-warn">el pago leído suma {mxn(pagoSum)} pero el total es {mxn(totalNum)} — diferencia {mxn(Math.abs(pagoDiff))} — revisa</div>}
+          {pagoUnread && !mixed && <div className="rounded-card border border-warn bg-warn/10 p-2 text-label text-warn">No se leyó el método de pago del ticket. Elige el origen arriba — no se adivinó.</div>}
 
           {/* PAGO MIXTO: monto por contenedor; deben sumar EXACTO al total del ticket o no deja confirmar. */}
           {mixed && (
@@ -362,7 +362,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
               formulario de compra). Los renglones sin mapear o marcados "no toca stock" caen a solo-panel y avisan. */}
           <div className="border-t border-border pt-2">
             <button onClick={() => setShowPoster((s) => !s)} className="flex w-full items-center justify-between text-label font-bold uppercase tracking-widest text-fg-muted">
-              <span>📋 Para teclear en Poster <span className="font-normal normal-case tracking-normal">— compra de inventario</span></span>
+              <span>Para teclear en Poster <span className="font-normal normal-case tracking-normal">— compra de inventario</span></span>
               <span>{showPoster ? '▲' : '▼'}</span>
             </button>
             {showPoster && (() => {
@@ -391,7 +391,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                 <div className="mt-2 space-y-2 text-label">
                   <Card pad="sm">
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-                      <span><span className="text-fg-muted">Proveedor:</span> {supMapped ? <b>{supMapped.name}</b> : <span className="text-warn">⚠ sin mapear en Poster</span>}</span>
+                      <span><span className="text-fg-muted">Proveedor:</span> {supMapped ? <b>{supMapped.name}</b> : <span className="text-warn">sin mapear en Poster</span>}</span>
                       <span><span className="text-fg-muted">Fecha:</span> {d.fecha}</span>
                       <span className="text-fg-muted">Almacén: elígelo en Poster</span>
                     </div>
@@ -404,11 +404,11 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                           <div key={k} className="flex items-center justify-between gap-2">
                             <span className="truncate">{r.name}</span>
                             <span className="shrink-0 tabular-nums">
-                              {r.num != null ? `${r.num} ${r.unit}` : <span className="text-warn">⚠ falta factor</span>}
+                              {r.num != null ? `${r.num} ${r.unit}` : <span className="text-warn">falta factor</span>}
                               {' · '}
                               {r.net != null
                                 ? <><b>{mxn(r.net)}</b> <span className="text-fg-muted">{r.tasa === 0 ? '(0%)' : `(−${Math.round((r.tasa ?? 0) * 100)}%)`}</span></>
-                                : <span className="text-warn">⚠ IVA sin definir · {mxn(r.it.importe)}</span>}
+                                : <span className="text-warn">IVA sin definir · {mxn(r.it.importe)}</span>}
                             </span>
                           </div>
                         ))}
@@ -426,12 +426,12 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                           </div>
                         ))}
                       </div>
-                      <div className="mt-1 text-fg-muted">Los &quot;sin mapear&quot; se enlazan en 🏷 Alias aprendidos. Nunca se adivinan.</div>
+                      <div className="mt-1 text-fg-muted">Los &quot;sin mapear&quot; se enlazan en Alias aprendidos. Nunca se adivinan.</div>
                     </div>
                   )}
                   {ivaSinDefinir > 0 && (
                     <div className="rounded-card border border-warn/40 bg-warn/10 p-2 text-warn">
-                      ⚠ {ivaSinDefinir} {ivaSinDefinir === 1 ? 'línea' : 'líneas'} sin tasa de IVA definida. No se adivina: defínela en 🏷 Alias aprendidos (0% alimentos · 16% bebidas/limpieza) y el neto se recalcula.
+                      {ivaSinDefinir} {ivaSinDefinir === 1 ? 'línea' : 'líneas'} sin tasa de IVA definida. No se adivina: defínela en Alias aprendidos (0% alimentos · 16% bebidas/limpieza) y el neto se recalcula.
                     </div>
                   )}
                   <Card pad="sm" className="text-fg-muted">

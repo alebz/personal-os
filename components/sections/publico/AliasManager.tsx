@@ -107,7 +107,7 @@ export function AliasManager() {
   return (
     <Card>
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between text-label font-bold uppercase tracking-widest text-fg-muted">
-        <span>🏷 Alias aprendidos {open && total > 0 && <span className="font-normal normal-case tracking-normal">· {total}</span>}</span>
+        <span>Alias aprendidos {open && total > 0 && <span className="font-normal normal-case tracking-normal">· {total}</span>}</span>
         <span>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
@@ -118,7 +118,7 @@ export function AliasManager() {
           {undo && (
             <Card pad="sm" className="flex items-center justify-between text-label">
               <span className="text-fg-muted">Borré <b className="text-fg">{undo.label}</b> (se puede reconstruir del historial).</span>
-              <button onClick={() => void doUndo()} className="rounded-control border border-border px-3 py-0.5 font-bold text-accent hover:bg-surface-1">↩ deshacer</button>
+              <button onClick={() => void doUndo()} className="rounded-control border border-border px-3 py-0.5 font-bold text-accent hover:bg-surface-1">← deshacer</button>
             </Card>
           )}
 
@@ -129,7 +129,7 @@ export function AliasManager() {
             const vecSum = s.veces + sib.reduce((a, x) => a + x.veces, 0)
             return (
               <div className="rounded-card border border-warn bg-warn/10 p-3 text-label">
-                <div className="font-bold text-warn">⚖ Consolidar peso variable — comparten stem “{s.raw_stem}”</div>
+                <div className="font-bold text-warn">≈ Consolidar peso variable — comparten stem “{s.raw_stem}”</div>
                 <div className="mt-1 text-fg-muted">Se fusionan en <b>1 fila</b> (queda “{s.descripcion}”), sumando acumulados a ${impSum.toFixed(2)} en {vecSum} ticket(s). Esto BORRA {sib.length} fila(s):</div>
                 <ul className="mt-1 list-disc pl-5">
                   {sib.map((x) => <li key={x.raw_norm}><span className="text-fg-muted">{x.raw_norm}</span> · {mxn(x.importe_acumulado)} · {x.veces}t</li>)}
@@ -151,10 +151,10 @@ export function AliasManager() {
                   <span className="text-fg-muted">→</span>
                   <input defaultValue={a.proveedor} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== a.proveedor) void saveSup({ raw_norm: a.raw_norm, proveedor: e.target.value.trim() }) }} style={{ ...cell, flex: 1 }} />
                   <select value={a.poster_supplier_id ?? ''} onChange={(e) => void patchAlias('supplier', a.raw_norm, { poster_supplier_id: e.target.value === '' ? null : Number(e.target.value) })} style={{ ...cell, width: 150 }} title="Proveedor en Poster (createSupply exige uno)">
-                    <option value="">⚠ Poster: sin mapear</option>
+                    <option value="">Poster: sin mapear</option>
                     {(cat?.suppliers ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
-                  <button onClick={() => void del('supplier', a.raw_norm, { mapped: a.poster_supplier_id != null, label: a.proveedor })} className="ml-2 border-l border-border pl-2 text-fg-muted hover:text-danger" title="Borrar (con deshacer)" aria-label="Borrar">🗑</button>
+                  <button onClick={() => void del('supplier', a.raw_norm, { mapped: a.poster_supplier_id != null, label: a.proveedor })} className="ml-2 border-l border-border pl-2 text-fg-muted hover:text-danger" title="Borrar (con deshacer)" aria-label="Borrar">✕</button>
                 </div>
               ))}
             </div>
@@ -195,11 +195,11 @@ export function AliasManager() {
                       if (id != null && kind === 'ing' && a.factor_a_base == null) { const f = proposeFactorClient(a.descripcion, cat?.ingredients.find((i) => i.id === id)?.unit); if (f != null) fields.factor_a_base = f }
                       void patchAlias('product', a.raw_norm, fields)
                     }} style={{ ...cell, width: 168 }} title="Destino en Poster: INGREDIENTE (insumo de receta) o MERCANCÍA (reventa embotellada). Marca cuál es cuál.">
-                      <option value="">⚠ Poster: sin mapear</option>
-                      <optgroup label="🥕 Ingredientes (receta)">
+                      <option value="">Poster: sin mapear</option>
+                      <optgroup label="Ingredientes (receta)">
                         {(cat?.ingredients ?? []).map((i) => <option key={`ing${i.id}`} value={`ing:${i.id}`}>{i.name} ({i.unit})</option>)}
                       </optgroup>
-                      <optgroup label="🥤 Mercancía (reventa)">
+                      <optgroup label="Mercancía (reventa)">
                         {(cat?.merchandise ?? []).map((m) => <option key={`prod${m.id}`} value={`prod:${m.id}`}>{m.name}</option>)}
                       </optgroup>
                     </select>
@@ -209,14 +209,14 @@ export function AliasManager() {
                       <option value="0">IVA 0%</option>
                       <option value="0.16">IVA 16%</option>
                     </select>
-                    {sharedN > 1 && <span className="shrink-0 text-label text-fg-muted" title={`${sharedN} alias distintos apuntan a ${ing?.name ?? 'este ingrediente'} — está permitido`}>⇢{sharedN}</span>}
+                    {sharedN > 1 && <span className="shrink-0 text-label text-fg-muted" title={`${sharedN} alias distintos apuntan a ${ing?.name ?? 'este ingrediente'} — está permitido`}>→{sharedN}</span>}
                   </>) : (
                     <span className="text-label text-fg-muted italic">no va a inventario</span>
                   )}
-                  {a.toca_stock && <button onClick={() => void togglePesoVariable(a)} style={fotoChipSmall(a.peso_variable)} title="peso variable: el peso va en el nombre y cambia cada compra. Consolida las hermanas por stem y toma el peso leído como cantidad.">⚖ peso var</button>}
+                  {a.toca_stock && <button onClick={() => void togglePesoVariable(a)} style={fotoChipSmall(a.peso_variable)} title="peso variable: el peso va en el nombre y cambia cada compra. Consolida las hermanas por stem y toma el peso leído como cantidad.">≈ peso var</button>}
                   <button onClick={() => void patchAlias('product', a.raw_norm, { toca_stock: !a.toca_stock })} style={fotoChipSmall(a.toca_stock)} title="¿esta línea entra al inventario de Poster?">{a.toca_stock ? 'stock' : 'solo panel'}</button>
                   {/* Borrar SEPARADO de los controles de edición (borde + margen) para no apretarlo por error. */}
-                  <button onClick={() => void del('product', a.raw_norm, { mapped: a.poster_ingredient_id != null || a.peso_variable || a.factor_a_base != null, label: a.descripcion })} className="ml-2 border-l border-border pl-2 text-fg-muted hover:text-danger" title="Borrar (con deshacer)" aria-label="Borrar">🗑</button>
+                  <button onClick={() => void del('product', a.raw_norm, { mapped: a.poster_ingredient_id != null || a.peso_variable || a.factor_a_base != null, label: a.descripcion })} className="ml-2 border-l border-border pl-2 text-fg-muted hover:text-danger" title="Borrar (con deshacer)" aria-label="Borrar">✕</button>
                 </div>
               )})}
             </div>

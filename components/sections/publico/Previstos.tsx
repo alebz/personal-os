@@ -181,8 +181,8 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
           {/* Editar / borrar EL PREVISTO — aparte del checkbox de pago (son cosas distintas, punto 7). */}
           {it.kind === 'manual' && p && (
             <span className="flex shrink-0 gap-1 text-label opacity-0 transition-opacity group-hover:opacity-100">
-              <button onClick={() => setEditKey(editing ? null : it.key)} className="text-fg-muted hover:text-accent" title="editar este previsto (concepto, monto, categoría, frecuencia, día…)">✎</button>
-              <button onClick={() => { if (window.confirm(`¿Eliminar el previsto "${p.concepto}"? Deja de generar ocurrencias; los pagos ya hechos se conservan.`)) void del(p.id) }} className="text-fg-muted hover:text-danger" title="eliminar este previsto" aria-label="Eliminar">🗑</button>
+              <button onClick={() => setEditKey(editing ? null : it.key)} className="text-label text-fg-muted hover:text-accent" title="editar este previsto (concepto, monto, categoría, frecuencia, día…)">editar</button>
+              <button onClick={() => { if (window.confirm(`¿Eliminar el previsto "${p.concepto}"? Deja de generar ocurrencias; los pagos ya hechos se conservan.`)) void del(p.id) }} className="text-fg-muted hover:text-danger" title="eliminar este previsto" aria-label="Eliminar">✕</button>
             </span>
           )}
         </div>
@@ -204,7 +204,7 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
       {undo && (
         <Card pad="sm" className="flex items-center justify-between text-label">
           <span className="text-fg-muted">Pagado <b className="text-fg">{undo.label}</b> · creó el costo.</span>
-          <button onClick={() => void doUndo()} className="rounded-control border border-border px-2 py-0.5 font-bold text-accent">↩ deshacer</button>
+          <button onClick={() => void doUndo()} className="rounded-control border border-border px-2 py-0.5 font-bold text-accent">← deshacer</button>
         </Card>
       )}
       {/* PENDIENTES — siempre visibles (accionables): vencidos primero en rojo, luego los que vienen. */}
@@ -232,7 +232,7 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
         {manage && <Manage prev={prev.filter((p) => !p.archived)} onAdd={load} onPatch={patch} onDel={del} onDrop={onDrop} dragId={dragId} cell={cell} />}
         {manage && prev.some((p) => p.archived) && (
           <div className="mt-2 text-label text-fg-muted">
-            Archivados: {prev.filter((p) => p.archived).map((p) => <button key={p.id} onClick={() => void patch(p.id, { archived: false })} className="mr-2 underline hover:text-accent">{p.concepto} ↩</button>)}
+            Archivados: {prev.filter((p) => p.archived).map((p) => <button key={p.id} onClick={() => void patch(p.id, { archived: false })} className="mr-2 underline hover:text-accent">{p.concepto} ←</button>)}
           </div>
         )}
       </div>
@@ -300,7 +300,7 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
             <span className="cursor-grab text-fg-muted" title="arrastra para reordenar">⠿</span>
             <div className="flex-1"><PrevFields p={p} onPatch={onPatch} cell={cell} /></div>
             <button onClick={() => onPatch(p.id, { archived: true })} className="text-label text-fg-muted hover:text-accent" title="archivar (detiene generación, conserva historial)">archivar</button>
-            <button onClick={() => { if (window.confirm(`¿Eliminar "${p.concepto}"? (el historial de costos ya creados se conserva)`)) onDel(p.id) }} className="px-1 text-fg-muted hover:text-danger" aria-label="Eliminar">🗑</button>
+            <button onClick={() => { if (window.confirm(`¿Eliminar "${p.concepto}"? (el historial de costos ya creados se conserva)`)) onDel(p.id) }} className="px-1 text-fg-muted hover:text-danger" aria-label="Eliminar">✕</button>
           </div>
         ))}
         <div className="text-label text-fg-muted">{originLabel('clip')} = CLIP · el contenedor viene precargado del default de la categoría, editable. Los de <b>tarjeta · Créditos</b> no se editan aquí.</div>

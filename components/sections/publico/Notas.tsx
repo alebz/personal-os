@@ -52,7 +52,7 @@ export function Notas({ tone }: { tone?: string }) {
   return (
     <Card className="text-secondary">
       <CardHead tone={tone}>Notas <span className="font-normal normal-case tracking-normal">— datos operativos (RFC, cuentas, contacto del gas, códigos, claves)</span></CardHead>
-      <div className="mb-2 rounded-card border p-2 text-label text-warn" style={{ borderColor: 'var(--color-warn, #b45309)55', background: 'color-mix(in srgb, var(--color-warn, #b45309) 8%, transparent)' }}>⚠ Se guardan en <b>texto plano</b>. Decide qué metes aquí sabiéndolo.</div>
+      <div className="mb-2 rounded-card border p-2 text-label text-warn" style={{ borderColor: 'var(--color-warn, #b45309)55', background: 'color-mix(in srgb, var(--color-warn, #b45309) 8%, transparent)' }}>Se guardan en <b>texto plano</b>. Decide qué metes aquí sabiéndolo.</div>
 
       {/* Alta */}
       <Card pad="sm" className="space-y-1">
