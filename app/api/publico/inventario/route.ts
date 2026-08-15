@@ -34,12 +34,16 @@ export async function GET() {
     poster<PosterIng>('menu.getIngredients'),
     poster<Storage>('storage.getStorages'),
     poster<Prepack>('menu.getPrepacks'),
-    supabase.from('publico_insumo_unidades').select('ingredient_id, count_units').then((r) => r.data ?? []),
+    supabase.from('publico_insumo_unidades').select('ingredient_id, count_units, categoria, sort_order').then((r) => r.data ?? []),
   ])
-  const unitsById = new Map<string, CountUnit[]>()
-  for (const u of savedUnits as Array<{ ingredient_id: number; count_units: CountUnit[] }>) unitsById.set(String(u.ingredient_id), Array.isArray(u.count_units) ? u.count_units : [])
+  const unitsById = new Map<string, CountUnit[]>(), catById = new Map<string, string>(), orderById = new Map<string, number>()
+  for (const u of savedUnits as Array<{ ingredient_id: number; count_units: CountUnit[]; categoria: string | null; sort_order: number | null }>) {
+    unitsById.set(String(u.ingredient_id), Array.isArray(u.count_units) ? u.count_units : [])
+    if (u.categoria) catById.set(String(u.ingredient_id), u.categoria)
+    orderById.set(String(u.ingredient_id), u.sort_order ?? 0)
+  }
 
-  // Almacén primario de cada insumo (donde aparece primero) → cada uno se lista UNA vez, donde lo caminas.
+  // Almacén primario de cada insumo (el DEFAULT de categoría cuando no la fijaste tú).
   const storageOf = new Map<string, string>()
   const storageName = new Map<string, string>()
   for (const s of storages) {
@@ -49,42 +53,38 @@ export async function GET() {
     for (const l of lo) { const iid = String(l.ingredient_id); if (!storageOf.has(iid)) storageOf.set(iid, sid) }
   }
 
-  // Agrupar insumos por almacén (los sin almacén caen en "Otros").
-  const groups = new Map<string, { id: string; name: string; ingredients: Array<Record<string, unknown>> }>()
-  const ensure = (sid: string, name: string) => { if (!groups.has(sid)) groups.set(sid, { id: sid, name, ingredients: [] }); return groups.get(sid)! }
+  // Cada item con su categoría (tuya si la fijaste, si no el almacén de Poster) y su orden.
+  type Row = { item: Record<string, unknown>; group: string; order: number }
+  const rows: Row[] = []
   for (const ing of ings) {
     const iid = String(ing.ingredient_id)
-    const sid = storageOf.get(iid) ?? 'otros'
-    const g = ensure(sid, storageName.get(sid) ?? 'Otros')
-    g.ingredients.push({
-      id: Number(ing.ingredient_id),
-      name: ing.ingredient_name,
-      baseUnit: ing.ingredient_unit,
-      unitCost: Number(ing.prime_cost || 0) / 10_000,   // menu.getIngredients.prime_cost viene en diezmilésimas de peso (÷10000 = $/base). OJO: getStorageLeftovers lo da en centavos (÷100) — escalas distintas entre endpoints de Poster
-      barcode: ing.ingredient_barcode || null,
-      countUnits: unitsById.get(iid) ?? [],
+    rows.push({
+      group: catById.get(iid) ?? storageName.get(storageOf.get(iid) ?? '') ?? 'Otros', order: orderById.get(iid) ?? 0,
+      item: { id: Number(ing.ingredient_id), name: ing.ingredient_name, baseUnit: ing.ingredient_unit, unitCost: Number(ing.prime_cost || 0) / 10_000, barcode: ing.ingredient_barcode || null, countUnits: unitsById.get(iid) ?? [], categoria: catById.get(iid) ?? null, sortOrder: orderById.get(iid) ?? 0 },
     })
   }
-  // PREPARADOS: los prepacks como item propio (id negativo). Van en su propio grupo.
-  if (prepacks.length) {
-    const g = ensure('preparados', 'Preparados')
-    for (const p of prepacks) {
-      const pid = String(-Number(p.product_id))
-      g.ingredients.push({
-        id: -Number(p.product_id),
-        name: p.product_name,
-        baseUnit: PREPACK_UNIT[String(p.product_id)] ?? 'pza',
-        unitCost: Number(p.cost || 0) / 100,   // cost del prepack en centavos; si la salsa sale rara la recalculamos de su receta
-        barcode: null,
-        countUnits: unitsById.get(pid) ?? [],
-      })
-    }
+  for (const p of prepacks) {
+    const pid = String(-Number(p.product_id))
+    rows.push({
+      group: catById.get(pid) ?? 'Preparados', order: orderById.get(pid) ?? 0,
+      item: { id: -Number(p.product_id), name: p.product_name, baseUnit: PREPACK_UNIT[String(p.product_id)] ?? 'pza', unitCost: Number(p.cost || 0) / 100, barcode: null, countUnits: unitsById.get(pid) ?? [], categoria: catById.get(pid) ?? null, sortOrder: orderById.get(pid) ?? 0 },
+    })
   }
-  for (const g of groups.values()) g.ingredients.sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'))
+
+  // Agrupar por categoría. Items por sort_order → nombre. Grupos por su MENOR orden → nombre (así reordenar items reordena grupos).
+  const gmap = new Map<string, { ingredients: Record<string, unknown>[]; minOrder: number }>()
+  for (const r of rows) {
+    const g = gmap.get(r.group) ?? { ingredients: [], minOrder: Infinity }
+    g.ingredients.push(r.item); g.minOrder = Math.min(g.minOrder, r.order); gmap.set(r.group, g)
+  }
+  const groups = [...gmap.entries()]
+    .map(([name, g]) => ({ id: name, name, minOrder: g.minOrder, ingredients: g.ingredients.sort((a, b) => (Number(a.sortOrder) - Number(b.sortOrder)) || String(a.name).localeCompare(String(b.name), 'es')) }))
+    .sort((a, b) => (a.minOrder - b.minOrder) || a.name.localeCompare(b.name, 'es'))
+    .map(({ id, name, ingredients }) => ({ id, name, ingredients }))
 
   const { data: last } = await supabase.from('publico_conteos').select('id, fecha').order('fecha', { ascending: false }).limit(1).maybeSingle()
 
-  return NextResponse.json({ storages: [...groups.values()], lastConteo: last ?? null })
+  return NextResponse.json({ storages: groups, lastConteo: last ?? null })
 }
 
 export async function POST(req: NextRequest) {
@@ -107,18 +107,30 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  let b: { ingredient_id?: number; count_units?: CountUnit[] }
+  let b: { ingredient_id?: number; count_units?: CountUnit[]; categoria?: string | null; sort_order?: number; reorder?: Array<{ ingredient_id: number; sort_order: number }> }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'JSON inválido' }, { status: 400 }) }
-  if (b.ingredient_id == null || !Array.isArray(b.count_units)) return NextResponse.json({ error: 'ingredient_id y count_units requeridos' }, { status: 400 })
-
-  // Sanea: label no vacío + factor > 0.
-  const clean = b.count_units
-    .map((u) => ({ label: String(u.label ?? '').trim(), factor: Number(u.factor) }))
-    .filter((u) => u.label && Number.isFinite(u.factor) && u.factor > 0)
-
   const supabase = createServerClient()
-  const { error } = await supabase.from('publico_insumo_unidades')
-    .upsert({ ingredient_id: b.ingredient_id, count_units: clean, updated_at: new Date().toISOString() }, { onConflict: 'ingredient_id' })
+  const now = new Date().toISOString()
+
+  // REORDER en lote: cada item su nuevo sort_order (solo esa columna; el upsert de Supabase toca solo lo que mando).
+  if (Array.isArray(b.reorder)) {
+    const rows = b.reorder.filter((r) => r.ingredient_id != null && Number.isFinite(r.sort_order))
+      .map((r) => ({ ingredient_id: r.ingredient_id, sort_order: r.sort_order, updated_at: now }))
+    if (rows.length) {
+      const { error } = await supabase.from('publico_insumo_unidades').upsert(rows, { onConflict: 'ingredient_id' })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true })
+  }
+
+  if (b.ingredient_id == null) return NextResponse.json({ error: 'ingredient_id requerido' }, { status: 400 })
+  // Update parcial: solo las columnas que llegan (unidades / categoría / orden). El resto no se toca.
+  const rec: Record<string, unknown> = { ingredient_id: b.ingredient_id, updated_at: now }
+  if (Array.isArray(b.count_units)) rec.count_units = b.count_units.map((u) => ({ label: String(u.label ?? '').trim(), factor: Number(u.factor) })).filter((u) => u.label && Number.isFinite(u.factor) && u.factor > 0)
+  if (b.categoria !== undefined) rec.categoria = b.categoria?.trim() || null
+  if (b.sort_order !== undefined) rec.sort_order = b.sort_order
+
+  const { error } = await supabase.from('publico_insumo_unidades').upsert(rec, { onConflict: 'ingredient_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

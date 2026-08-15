@@ -8,7 +8,7 @@ import { Card, CardHead, inputCell as cell } from './ui'
 // (caja/lata/base), el sistema convierte y valúa solo. Dos vistas: CONTAR (el acto) · UNIDADES (definir una vez).
 
 type CountUnit = { label: string; factor: number }
-type Ing = { id: number; name: string; baseUnit: string; unitCost: number; barcode: string | null; countUnits: CountUnit[] }
+type Ing = { id: number; name: string; baseUnit: string; unitCost: number; barcode: string | null; countUnits: CountUnit[]; categoria?: string | null; sortOrder?: number }
 type Group = { id: string; name: string; ingredients: Ing[] }
 type Data = { storages: Group[]; lastConteo: { id: string; fecha: string } | null }
 
@@ -18,7 +18,7 @@ const todayMX = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Americ
 
 export function Inventario({ tone }: { tone?: string }) {
   const [data, setData] = useState<Data | null>(null)
-  const [view, setView] = useState<'contar' | 'unidades'>('contar')
+  const [view, setView] = useState<'contar' | 'organizar' | 'unidades'>('contar')
   const [counts, setCounts] = useState<Record<number, Record<string, number>>>({})   // ing.id → unitLabel → qty
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
@@ -67,15 +67,16 @@ export function Inventario({ tone }: { tone?: string }) {
       {/* Cabecera: vistas + estado */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1">
-          <button onClick={() => setView('contar')} className={`rounded-control px-2.5 py-1 text-label font-bold ${view === 'contar' ? 'bg-accent text-white' : 'text-fg-muted'}`}>Contar</button>
-          <button onClick={() => setView('unidades')} className={`rounded-control px-2.5 py-1 text-label font-bold ${view === 'unidades' ? 'bg-accent text-white' : 'text-fg-muted'}`}>Unidades</button>
+          {(['contar', 'organizar', 'unidades'] as const).map((v) => (
+            <button key={v} onClick={() => setView(v)} className={`rounded-control px-2.5 py-1 text-label font-bold capitalize ${view === v ? 'bg-accent text-white' : 'text-fg-muted'}`}>{v}</button>
+          ))}
         </div>
         <span className="text-label text-fg-muted">{data.lastConteo ? `último conteo · ${data.lastConteo.fecha}` : 'sin conteos aún'}</span>
       </div>
 
-      {view === 'contar'
-        ? <Contar data={data} counts={counts} setCount={setCount} baseTotal={baseTotal} tone={tone} />
-        : <Unidades ingredients={allIngs} onSaved={load} tone={tone} />}
+      {view === 'contar' && <Contar data={data} counts={counts} setCount={setCount} baseTotal={baseTotal} tone={tone} />}
+      {view === 'organizar' && <Organizar data={data} onReload={load} tone={tone} />}
+      {view === 'unidades' && <Unidades ingredients={allIngs} onSaved={load} tone={tone} />}
 
       {/* Barra fija de total + guardar (solo al contar) */}
       {view === 'contar' && (
@@ -139,6 +140,67 @@ function Contar({ data, counts, setCount, baseTotal, tone }: {
           </div>
         </Card>
       ))}
+    </div>
+  )
+}
+
+// ── ORGANIZAR (tu categoría + tu orden) ─────────────────────────────────────────
+// Arrastra en escritorio, flechas ↑↓ en cualquier lado. Tras cualquier movimiento se reasigna el orden GLOBAL
+// en una sola llamada en lote. Escribir una categoría mueve el insumo de grupo (recarga → reagrupa).
+function Organizar({ data, onReload, tone }: { data: Data; onReload: () => void; tone?: string }) {
+  const [groups, setGroups] = useState<Group[]>(data.storages)
+  const [dragId, setDragId] = useState<number | null>(null)
+  useEffect(() => { setGroups(data.storages) }, [data])
+  const cats = useMemo(() => [...new Set(data.storages.map((g) => g.name))], [data])
+
+  const patch = (body: object) => fetch('/api/publico/inventario', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  function persistOrder(next: Group[]) {
+    setGroups(next)
+    void patch({ reorder: next.flatMap((g) => g.ingredients).map((it, i) => ({ ingredient_id: it.id, sort_order: i })) })
+  }
+  function move(gi: number, ii: number, dir: -1 | 1) {
+    const j = ii + dir; if (j < 0 || j >= groups[gi].ingredients.length) return
+    const next = groups.map((g) => ({ ...g, ingredients: [...g.ingredients] }))
+    const arr = next[gi].ingredients;[arr[ii], arr[j]] = [arr[j], arr[ii]]
+    persistOrder(next)
+  }
+  function drop(gi: number, targetIi: number) {
+    if (dragId == null) return
+    const next = groups.map((g) => ({ ...g, ingredients: [...g.ingredients] }))
+    const arr = next[gi].ingredients
+    const from = arr.findIndex((x) => x.id === dragId)
+    setDragId(null)
+    if (from < 0 || from === targetIi) return
+    const [moved] = arr.splice(from, 1); arr.splice(targetIi, 0, moved)
+    persistOrder(next)
+  }
+  async function setCat(id: number, categoria: string) { await patch({ ingredient_id: id, categoria }); onReload() }
+
+  return (
+    <div className="space-y-3">
+      <div className="text-label text-fg-muted">Arrastra (o ↑↓) para el orden de tu recorrido · escribe una categoría para mover el insumo de grupo.</div>
+      {groups.map((g, gi) => (
+        <Card key={g.id}>
+          <CardHead tone={tone}>{g.name} <span className="font-normal normal-case tracking-normal text-fg-muted">· {g.ingredients.length}</span></CardHead>
+          <div>
+            {g.ingredients.map((ing, ii) => (
+              <div key={ing.id} draggable onDragStart={() => setDragId(ing.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => drop(gi, ii)}
+                className="flex items-center gap-2 border-t border-border/50 py-1 first:border-0">
+                <span className="cursor-grab select-none text-fg-muted" title="arrastrar">⋮⋮</span>
+                <span className="flex flex-col leading-none">
+                  <button onClick={() => move(gi, ii, -1)} disabled={ii === 0} className="text-fg-muted hover:text-accent disabled:opacity-20" style={{ fontSize: 9 }}>▲</button>
+                  <button onClick={() => move(gi, ii, +1)} disabled={ii === g.ingredients.length - 1} className="text-fg-muted hover:text-accent disabled:opacity-20" style={{ fontSize: 9 }}>▼</button>
+                </span>
+                <span className="min-w-0 flex-1 truncate text-fg">{ing.name}</span>
+                <input list="inv-cats" defaultValue={ing.categoria ?? g.name}
+                  onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== (ing.categoria ?? g.name)) void setCat(ing.id, v) }}
+                  className="w-32 shrink-0 rounded-control border border-border bg-surface-2 px-1.5 py-0.5 text-label text-fg outline-none" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+      <datalist id="inv-cats">{cats.map((c) => <option key={c} value={c} />)}</datalist>
     </div>
   )
 }
