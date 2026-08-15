@@ -49,7 +49,7 @@ const VALET_PROVIDER_WEEK = 2_800
 
 interface RentRow    { renter: string;   amount: number; paid: boolean; method: 'cash' | 'card' }
 interface ExpenseRow { category: string; amount: number; paid: boolean; method: 'cash' | 'card' }
-interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 'cash' | 'card' }
+interface NominaRow  { week_num: number; amount: number; paid: boolean; method: 'cash' | 'card' | 'mixed'; cash_amount: number; card_amount: number }
 interface ExtraItem  { id: string; description: string; amount: number; method: 'cash' | 'card' }
 
 type ValetStatus = 'pending' | 'paid'
@@ -123,7 +123,7 @@ function mergeExpenses(db: ExpenseRow[], month: string): ExpenseRow[] {
 }
 function mergeNomina(db: NominaRow[], month: string): NominaRow[] {
   const sats = saturdaysInMonth(month)
-  return sats.map(s => db.find(n => n.week_num === s.num) ?? { week_num: s.num, amount: 6_000, paid: false, method: 'cash' as const })
+  return sats.map(s => db.find(n => n.week_num === s.num) ?? { week_num: s.num, amount: 6_000, paid: false, method: 'cash' as const, cash_amount: 0, card_amount: 0 })
 }
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -163,8 +163,8 @@ function PaidToggle({ paid, onChange }: { paid: boolean; onChange: (v: boolean) 
 // ─── AmountInput ──────────────────────────────────────────────────────────────
 
 function AmountInput({
-  value, onSave, className = '',
-}: { value: number; onSave: (n: number) => void; className?: string }) {
+  value, onSave, className = '', widthClass = 'w-28',
+}: { value: number; onSave: (n: number) => void; className?: string; widthClass?: string }) {
   const [v, setV]       = useState<number | null>(value)
   const [focused, setFocused] = useState(false)
   useEffect(() => { if (!focused) setV(value) }, [value, focused])
@@ -181,12 +181,12 @@ function AmountInput({
       onChange={setV}
       onBlur={save}
       onKeyDown={e => e.key === 'Enter' && save()}
-      className={`w-28 rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-right text-body tabular-nums text-fg outline-none ${className}`}
+      className={`${widthClass} rounded border border-accent/50 bg-surface-2 px-1 py-0.5 text-right text-body tabular-nums text-fg outline-none ${className}`}
     />
   ) : (
     <button
       onClick={() => setFocused(true)}
-      className={`w-28 rounded border border-transparent px-1 py-0.5 text-right text-body tabular-nums text-fg hover:border-border ${className}`}
+      className={`${widthClass} rounded border border-transparent px-1 py-0.5 text-right text-body tabular-nums text-fg hover:border-border ${className}`}
     >
       <Mxn v={value} />
     </button>
@@ -229,6 +229,28 @@ function MethodToggle({ method, onChange }: { method: 'cash' | 'card'; onChange:
         <PixelIcon kind={method === 'cash' ? 'cash' : 'card'} />
       </button>
     </MethodCell>
+  )
+}
+
+// ─── NominaMethodToggle ───────────────────────────────────────────────────────
+// Como MethodToggle pero con un TERCER estado 'mixed' (efectivo + tarjeta). Cicla ef → tj → mixto.
+// En mixto muestra los dos íconos: la fila abre dos montos, uno por método.
+function NominaMethodToggle({ method, onChange }: { method: 'cash' | 'card' | 'mixed'; onChange: (m: 'cash' | 'card' | 'mixed') => void }) {
+  const next = method === 'cash' ? 'card' : method === 'card' ? 'mixed' : 'cash'
+  const title = method === 'cash' ? 'Efectivo — click: tarjeta'
+    : method === 'card' ? 'Tarjeta — click: mixto (efectivo + tarjeta)'
+    : 'Mixto (efectivo + tarjeta) — click: efectivo'
+  return (
+    <button
+      onClick={() => onChange(next)}
+      title={title}
+      className="flex shrink-0 items-center justify-center gap-px opacity-60 transition-opacity hover:opacity-100"
+      style={{ minWidth: 20 }}
+    >
+      {method === 'mixed'
+        ? <><PixelIcon kind="cash" /><PixelIcon kind="card" /></>
+        : <PixelIcon kind={method === 'cash' ? 'cash' : 'card'} />}
+    </button>
   )
 }
 
@@ -585,12 +607,13 @@ function GastosFijosSection({ expenses, month, onToggle, onAmount, onMethod, onA
 
 // ─── NominaSection ────────────────────────────────────────────────────────────
 
-function NominaSection({ nomina, month, onToggle, onAmount, onMethod }: {
+function NominaSection({ nomina, month, onToggle, onAmount, onMethod, onSplit }: {
   nomina: NominaRow[]
   month: string
   onToggle: (week: number, paid: boolean) => void
   onAmount: (week: number, amount: number) => void
-  onMethod: (week: number, method: 'cash' | 'card') => void
+  onMethod: (week: number, method: 'cash' | 'card' | 'mixed') => void
+  onSplit: (week: number, cash: number, card: number) => void
 }) {
   const sats = saturdaysInMonth(month)
   const total = nomina.filter(n => n.paid).reduce((s, n) => s + n.amount, 0)
@@ -606,8 +629,18 @@ function NominaSection({ nomina, month, onToggle, onAmount, onMethod }: {
               Semana {row.week_num}
             </span>
             {label && <span className="text-label text-fg-muted/50">{label}</span>}
-            <MethodToggle method={row.method} onChange={m => onMethod(row.week_num, m)} />
-            <AmountInput value={row.amount} onSave={n => onAmount(row.week_num, n)} />
+            <NominaMethodToggle method={row.method} onChange={m => onMethod(row.week_num, m)} />
+            {row.method === 'mixed' ? (
+              // Pago mixto: un monto por método. El total (efectivo + tarjeta) es lo que se suma a la nómina.
+              <div className="flex items-center gap-1">
+                <span className="text-label text-fg-muted/50">Ef</span>
+                <AmountInput value={row.cash_amount} widthClass="w-20" onSave={n => onSplit(row.week_num, n, row.card_amount)} />
+                <span className="text-label text-fg-muted/50">TJ</span>
+                <AmountInput value={row.card_amount} widthClass="w-20" onSave={n => onSplit(row.week_num, row.cash_amount, n)} />
+              </div>
+            ) : (
+              <AmountInput value={row.amount} onSave={n => onAmount(row.week_num, n)} />
+            )}
           </div>
         )
       })}
@@ -1407,10 +1440,22 @@ function UptownArcade() {
     await del(`/api/uptown/extra-expenses/${id}`)
   }
 
-  async function setNominaMethod(week_num: number, method: 'cash' | 'card') {
-    setNomina(prev => prev.map(n => n.week_num === week_num ? { ...n, method } : n))
+  async function setNominaMethod(week_num: number, method: 'cash' | 'card' | 'mixed') {
     const row = nomina.find(n => n.week_num === week_num)
-    await post('/api/uptown/nomina', { month, week_num, method, amount: row?.amount ?? 0, paid: row?.paid ?? false })
+    const amount = row?.amount ?? 0
+    let cash_amount = row?.cash_amount ?? 0, card_amount = row?.card_amount ?? 0
+    // Al pasar a mixto por primera vez, siembra el total en efectivo (0 en tarjeta) para no perder el monto.
+    if (method === 'mixed' && cash_amount + card_amount === 0) { cash_amount = amount; card_amount = 0 }
+    setNomina(prev => prev.map(n => n.week_num === week_num ? { ...n, method, cash_amount, card_amount } : n))
+    await post('/api/uptown/nomina', { month, week_num, method, amount, cash_amount, card_amount, paid: row?.paid ?? false })
+    window.dispatchEvent(new CustomEvent('finance:refresh'))
+  }
+
+  async function setNominaSplit(week_num: number, cash_amount: number, card_amount: number) {
+    const amount = cash_amount + card_amount
+    setNomina(prev => prev.map(n => n.week_num === week_num ? { ...n, method: 'mixed', cash_amount, card_amount, amount } : n))
+    const row = nomina.find(n => n.week_num === week_num)
+    await post('/api/uptown/nomina', { month, week_num, method: 'mixed', cash_amount, card_amount, paid: row?.paid ?? false })
     window.dispatchEvent(new CustomEvent('finance:refresh'))
   }
 
@@ -1631,7 +1676,7 @@ function UptownArcade() {
                 />
                 <NominaSection
                   nomina={nomina} month={month}
-                  onToggle={toggleNomina} onAmount={setNominaAmount} onMethod={setNominaMethod}
+                  onToggle={toggleNomina} onAmount={setNominaAmount} onMethod={setNominaMethod} onSplit={setNominaSplit}
                 />
                 <ExtraSection
                   title="Gastos Extra" colorClass="text-danger"
