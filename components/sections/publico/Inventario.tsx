@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react'
 import { mxn } from '@/components/Mxn'
 import { Card, CardHead, inputCell as cell } from './ui'
 
@@ -14,6 +14,20 @@ type Data = { storages: Group[]; lastConteo: { id: string; fecha: string } | nul
 
 const BASE = '__base__'
 const num = (v: string) => { const n = Number(v.replace(',', '.')); return Number.isFinite(n) ? n : 0 }
+
+// Input numérico que SÍ deja teclear decimales: mientras escribes conserva el texto crudo ("2." , "0.5", "2,5")
+// en un buffer local — el bug era derivar el value del número parseado, que borraba el punto en cada tecla.
+function NumCell({ value, onChange, onBlur, className, style, placeholder = '0' }: {
+  value: number | null; onChange: (v: number) => void; onBlur?: () => void; className?: string; style?: CSSProperties; placeholder?: string
+}) {
+  const [buf, setBuf] = useState<string | null>(null)
+  return (
+    <input inputMode="decimal" placeholder={placeholder} className={className} style={style}
+      value={buf ?? (value ? String(value) : '')}
+      onChange={(e) => { setBuf(e.target.value); onChange(num(e.target.value)) }}
+      onBlur={() => { setBuf(null); onBlur?.() }} />
+  )
+}
 const todayMX = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
 
 export function Inventario({ tone }: { tone?: string }) {
@@ -122,8 +136,8 @@ function Contar({ data, counts, setCount, baseTotal, tone }: {
                       const key = u.factor === 1 && u.label === ing.baseUnit ? BASE : u.label
                       return (
                         <label key={u.label} className="flex items-center gap-1 rounded-control border border-border bg-surface-2 px-1.5 py-0.5">
-                          <input inputMode="decimal" value={c?.[key] ? String(c[key]) : ''} onChange={(e) => setCount(ing.id, key, num(e.target.value))}
-                            placeholder="0" className="w-9 bg-transparent text-right tabular-nums text-fg outline-none" style={{ fontSize: 13 }} />
+                          <NumCell value={c?.[key] ?? null} onChange={(v) => setCount(ing.id, key, v)}
+                            className="w-9 bg-transparent text-right tabular-nums text-fg outline-none" style={{ fontSize: 13 }} />
                           <span className="text-label text-fg-muted">{u.label}</span>
                         </label>
                       )
@@ -250,7 +264,7 @@ function UnitRow({ ing, onSave }: { ing: Ing; onSave: (id: number, units: CountU
           <span key={i} className="flex items-center gap-1 rounded-control border border-border bg-surface-2 px-1.5 py-0.5 text-label">
             <input value={u.label} onChange={(e) => setUnits((p) => p.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} onBlur={() => commit(units)} placeholder="caja" className="w-14 bg-transparent text-fg outline-none" />
             <span className="text-fg-muted">=</span>
-            <input inputMode="decimal" value={String(u.factor || '')} onChange={(e) => setUnits((p) => p.map((x, j) => j === i ? { ...x, factor: num(e.target.value) } : x))} onBlur={() => commit(units)} placeholder="0" className="w-10 bg-transparent text-right tabular-nums text-fg outline-none" />
+            <NumCell value={u.factor || null} onChange={(v) => setUnits((p) => p.map((x, j) => j === i ? { ...x, factor: v } : x))} onBlur={() => commit(units)} className="w-10 bg-transparent text-right tabular-nums text-fg outline-none" />
             <span className="text-fg-muted">{ing.baseUnit}</span>
             <button onClick={() => commit(units.filter((_, j) => j !== i))} className="ml-0.5 text-fg-muted hover:text-danger">×</button>
           </span>
