@@ -230,23 +230,6 @@ export default function PublicoContent() {
         <TabBar value={tab} onChange={setTab} rounded="rounded-full" pill tabs={[['panel', 'Panel'], ['movimientos', 'Movimientos'], ['direccion', 'Dirección'], ['fondos', 'Fondos'], ['notas', 'Notas']] as const} />
       </header>
 
-      {/* ── FRANJA DE ESTADO (multi-señal, SIEMPRE visible): sync del POS + propina por repartir (pasivo vivo,
-          no mensual → se ve aunque navegues a un mes pasado) + import manual. Una sola tira, no apilar. ── */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-card border border-border bg-surface-2 px-3 py-1.5 text-label">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-          <span className={syncStale ? 'text-danger' : 'text-fg-muted'}>
-            {sync?.last_error
-              ? `Import falló: ${sync.last_error}`
-              : sync?.last_success_at
-                ? `POS · último import ${daysSince === 0 ? 'hoy' : daysSince === 1 ? 'ayer' : `hace ${daysSince} días`}${syncStale ? ' — revisa' : ''}`
-                : 'POS · sin importar aún'}
-          </span>
-          {propPend && propPend.pendiente > 0 && (
-            <button onClick={() => setTab('panel')} className="hover:underline" title="ver y repartir en Contenedores" style={{ color: propPend.nivel === 'rojo' ? 'var(--color-danger)' : propPend.nivel === 'amarillo' ? 'var(--color-warn, #b45309)' : 'var(--color-fg-muted)' }}>debes {mxn(propPend.pendiente)} de propina</button>
-          )}
-        </div>
-        <button onClick={() => void importNow()} disabled={importing} className="shrink-0 rounded-control px-2 py-0.5 text-fg-muted transition-colors hover:text-accent disabled:opacity-50">{importing ? 'importando…' : 'importar ahora'}</button>
-      </div>
 
       {tab === 'movimientos' && (<>
       {/* MOVIMIENTOS = una familia: CAPTURAR (el acto de registrar) · HISTORIAL (el registro). */}
@@ -431,6 +414,24 @@ export default function PublicoContent() {
       </div>)}
 
       {tab === 'notas' && <Notas tone={dc} />}
+
+      {/* ── FRANJA DE ESTADO (al FONDO, siempre visible en toda sección): sync del POS + propina por repartir
+          (pasivo vivo) + import manual. Pie de página de utilidad, no compite con el contenido de arriba. ── */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-card border border-border bg-surface-2 px-3 py-1.5 text-label">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <span className={syncStale ? 'text-danger' : 'text-fg-muted'}>
+            {sync?.last_error
+              ? `Import falló: ${sync.last_error}`
+              : sync?.last_success_at
+                ? `POS · último import ${daysSince === 0 ? 'hoy' : daysSince === 1 ? 'ayer' : `hace ${daysSince} días`}${syncStale ? ' — revisa' : ''}`
+                : 'POS · sin importar aún'}
+          </span>
+          {propPend && propPend.pendiente > 0 && (
+            <button onClick={() => setTab('panel')} className="hover:underline" title="ver y repartir en Contenedores" style={{ color: propPend.nivel === 'rojo' ? 'var(--color-danger)' : propPend.nivel === 'amarillo' ? 'var(--color-warn, #b45309)' : 'var(--color-fg-muted)' }}>debes {mxn(propPend.pendiente)} de propina</button>
+          )}
+        </div>
+        <button onClick={() => void importNow()} disabled={importing} className="shrink-0 rounded-control px-2 py-0.5 text-fg-muted transition-colors hover:text-accent disabled:opacity-50">{importing ? 'importando…' : 'importar ahora'}</button>
+      </div>
     </div>
   )
 }
