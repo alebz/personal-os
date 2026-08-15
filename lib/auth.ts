@@ -3,8 +3,10 @@
 
 export const SESSION_COOKIE = 'session'
 
-// Session lifetime: 30 days.
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30
+// Session lifetime: 10 años — en la práctica "hasta que cierres sesión". El logout borra la cookie (tu forma
+// de cancelar, por dispositivo). No hay revocación por-token; para invalidar TODAS las sesiones de golpe
+// (tuyas y de Andrés) se rota AUTH_SECRET en Vercel.
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365 * 10
 
 function getSecret(): string {
   const secret = process.env.AUTH_SECRET
