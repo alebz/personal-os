@@ -791,6 +791,9 @@ function Direccion() {
 type FCMonth = { month: string; sales: number; theoreticalPct: number }
 type FCPeriod = { from: string; to: string; kind: 'arranque' | 'confiable' | 'abierto'; sales: number; theoreticalPct: number; realPct: number | null; gapPct: number | null; startupAdjustment?: number; contaminated?: boolean; days?: number; note?: string }
 type FCData = { theoreticalByMonth: FCMonth[]; periods: FCPeriod[]; lastCountDate: string | null; daysSinceCount: number | null; countAlert: boolean; anyReliable: boolean; todayStatus: string }
+// Food cost real POR TUS CONTEOS (endpoint /foodcost-real): (inv inicial + compras − inv final) ÷ ventas.
+type FCRealPeriod = { from: string; to: string; days: number; kind: 'confiable' | 'abierto'; invIni: number; invFin: number | null; compras: number; ventas: number; consumo: number | null; realPct: number | null; note?: string }
+type FCReal = { periods: FCRealPeriod[]; counts: Array<{ id: string; fecha: string; value: number }>; status: string }
 
 const KIND_BADGE: Record<FCPeriod['kind'], { dot: string; label: string; cls: string }> = {
   confiable: { dot: '●', label: 'acotado por conteos', cls: 'text-ok' },
@@ -809,6 +812,7 @@ function FoodCostPanel() {
   const [d, setD] = useState<FCData | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [emp, setEmp] = useState<EmpMonth[] | null>(null)
+  const [real, setReal] = useState<FCReal | null>(null)   // food cost real por TUS conteos (100% del OS)
   useEffect(() => {
     let alive = true
     fetch('/api/publico/foodcost').then((r) => r.json())
@@ -816,6 +820,8 @@ function FoodCostPanel() {
       .catch(() => alive && setErr('No se pudo cargar el food cost'))
     fetch('/api/publico/empaque').then((r) => r.json())
       .then((j) => { if (alive && j.byMonth) setEmp(j.byMonth) }).catch(() => {})
+    fetch('/api/publico/foodcost-real').then((r) => r.json())
+      .then((j) => { if (alive && j.periods) setReal(j) }).catch(() => {})
     return () => { alive = false }
   }, [])
 
@@ -825,6 +831,21 @@ function FoodCostPanel() {
   return (
     <Card>
       <CardHead tone={dc}>Food cost · real vs teórico</CardHead>
+
+      {/* ── REAL POR TUS CONTEOS — 100% del OS (inv inicial + compras − inv final) ÷ ventas, sin el perpetuo de Poster ── */}
+      <div className="mb-3 rounded-card border p-2" style={{ borderColor: `${dc}44` }}>
+        <div className="mb-1 text-label uppercase tracking-widest" style={{ color: dc }}>Real · por tus conteos</div>
+        {(real?.periods.filter((p) => p.kind === 'confiable').length ?? 0) === 0
+          ? <div className="text-label text-fg-muted">{real?.status ?? 'Cargando…'}</div>
+          : <div className="space-y-1">
+              {real!.periods.filter((p) => p.kind === 'confiable').map((p, i) => (
+                <div key={i} className="flex flex-wrap items-baseline justify-between gap-x-2 text-secondary">
+                  <span className="text-fg-muted">{dayLabelShort(p.from)} → {dayLabelShort(p.to)} <span className="opacity-60">· {p.days}d</span></span>
+                  <span className="text-label text-fg-muted">consumo {mxn(p.consumo!)} ÷ ventas {mxn(p.ventas)} = <b className="tabular-nums" style={{ color: dc }}>{p.realPct!.toFixed(1)}%</b></span>
+                </div>
+              ))}
+            </div>}
+      </div>
 
       {/* Estado de hoy, sin adornos */}
       <div className={`mb-2 rounded-card border p-2 text-label ${d.anyReliable ? 'border-border text-fg-muted' : 'border-warn text-warn'}`}>{d.todayStatus}</div>
