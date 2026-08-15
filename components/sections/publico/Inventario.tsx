@@ -150,6 +150,7 @@ function Contar({ data, counts, setCount, baseTotal, tone }: {
 function Organizar({ data, onReload, tone }: { data: Data; onReload: () => void; tone?: string }) {
   const [groups, setGroups] = useState<Group[]>(data.storages)
   const [dragId, setDragId] = useState<number | null>(null)
+  const [creating, setCreating] = useState<number | null>(null)   // insumo al que se le está creando una categoría nueva
   useEffect(() => { setGroups(data.storages) }, [data])
   const cats = useMemo(() => [...new Set(data.storages.map((g) => g.name))], [data])
 
@@ -192,15 +193,23 @@ function Organizar({ data, onReload, tone }: { data: Data; onReload: () => void;
                   <button onClick={() => move(gi, ii, +1)} disabled={ii === g.ingredients.length - 1} className="text-fg-muted hover:text-accent disabled:opacity-20" style={{ fontSize: 9 }}>▼</button>
                 </span>
                 <span className="min-w-0 flex-1 truncate text-fg">{ing.name}</span>
-                <input list="inv-cats" defaultValue={ing.categoria ?? g.name}
-                  onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== (ing.categoria ?? g.name)) void setCat(ing.id, v) }}
-                  className="w-32 shrink-0 rounded-control border border-border bg-surface-2 px-1.5 py-0.5 text-label text-fg outline-none" />
+                {creating === ing.id ? (
+                  <input autoFocus placeholder="nueva categoría…" onBlur={() => setCreating(null)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { const v = (e.target as HTMLInputElement).value.trim(); if (v) void setCat(ing.id, v); setCreating(null) } if (e.key === 'Escape') setCreating(null) }}
+                    className="w-36 shrink-0 rounded-control border border-accent bg-surface-2 px-1.5 py-0.5 text-label text-fg outline-none" />
+                ) : (
+                  <select value={ing.categoria ?? g.name}
+                    onChange={(e) => { if (e.target.value === '__new__') setCreating(ing.id); else void setCat(ing.id, e.target.value) }}
+                    className="w-36 shrink-0 rounded-control border border-border bg-surface-2 px-1.5 py-0.5 text-label text-fg outline-none">
+                    {(cats.includes(ing.categoria ?? g.name) ? cats : [ing.categoria ?? g.name, ...cats]).map((c) => <option key={c} value={c}>{c}</option>)}
+                    <option value="__new__">＋ nueva categoría…</option>
+                  </select>
+                )}
               </div>
             ))}
           </div>
         </Card>
       ))}
-      <datalist id="inv-cats">{cats.map((c) => <option key={c} value={c} />)}</datalist>
     </div>
   )
 }

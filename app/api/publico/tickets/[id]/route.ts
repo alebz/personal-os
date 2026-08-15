@@ -59,6 +59,7 @@ type EditBody = {
   legibilidad?: string | null; notas?: string | null
   category?: string; cost_kind?: string | null; origin?: string | null; origins?: Array<{ origin?: string | null; amount?: number }>
   items?: EditItem[]
+  starred?: boolean
 }
 
 // PATCH /api/publico/tickets/[id] — EDITAR = des-confirmar + re-confirmar atómico. Reemplaza cabecera + líneas,
@@ -72,6 +73,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const supabase = createServerClient()
     const { data: scan } = await supabase.from('ticket_scans').select('id').eq('id', id).maybeSingle()
     if (!scan) return NextResponse.json({ error: 'ticket no existe' }, { status: 404 })
+
+    // Toggle ⭐ ligero: si solo llega `starred` (sin re-editar el ticket), marca y ya.
+    if (b.starred !== undefined && b.proveedor === undefined) {
+      const { error } = await supabase.from('ticket_scans').update({ starred: !!b.starred }).eq('id', id)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true })
+    }
 
     const proveedor = (b.proveedor ?? '').trim()
     if (!proveedor) return NextResponse.json({ error: 'proveedor requerido' }, { status: 400 })
