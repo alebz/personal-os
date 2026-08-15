@@ -233,23 +233,19 @@ function MethodToggle({ method, onChange }: { method: 'cash' | 'card'; onChange:
 }
 
 // ─── NominaMethodToggle ───────────────────────────────────────────────────────
-// Como MethodToggle pero con un TERCER estado 'mixed' (efectivo + tarjeta). Cicla ef → tj → mixto.
-// En mixto muestra los dos íconos: la fila abre dos montos, uno por método.
+// Chip ETIQUETADO (no ícono cripto) para que se vea la forma de pago y que es clickeable. Cicla el TERCER
+// estado 'mixed': Ef → TJ → Ef+TJ. Al llegar a Ef+TJ la fila abre dos montos, uno por método.
 function NominaMethodToggle({ method, onChange }: { method: 'cash' | 'card' | 'mixed'; onChange: (m: 'cash' | 'card' | 'mixed') => void }) {
   const next = method === 'cash' ? 'card' : method === 'card' ? 'mixed' : 'cash'
-  const title = method === 'cash' ? 'Efectivo — click: tarjeta'
-    : method === 'card' ? 'Tarjeta — click: mixto (efectivo + tarjeta)'
-    : 'Mixto (efectivo + tarjeta) — click: efectivo'
+  const label = method === 'cash' ? 'Ef' : method === 'card' ? 'TJ' : 'Ef+TJ'
+  const style = method === 'cash' ? 'bg-warn/15 text-warn' : method === 'card' ? 'bg-accent/15 text-accent' : 'bg-ok/15 text-ok'
   return (
     <button
       onClick={() => onChange(next)}
-      title={title}
-      className="flex shrink-0 items-center justify-center gap-px opacity-60 transition-opacity hover:opacity-100"
-      style={{ minWidth: 20 }}
+      title="Forma de pago — click para cambiar: efectivo → tarjeta → mixto"
+      className={`shrink-0 rounded px-1.5 py-0.5 text-label font-bold tabular-nums transition hover:brightness-125 ${style}`}
     >
-      {method === 'mixed'
-        ? <><PixelIcon kind="cash" /><PixelIcon kind="card" /></>
-        : <PixelIcon kind={method === 'cash' ? 'cash' : 'card'} />}
+      {label}
     </button>
   )
 }
