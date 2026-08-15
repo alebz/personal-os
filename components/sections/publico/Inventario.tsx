@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react'
 import { mxn } from '@/components/Mxn'
-import { Card, CardHead, inputCell as cell } from './ui'
+import { Card, CardHead, TabBar, inputCell as cell } from './ui'
 
 // INVENTARIO — el conteo físico del domingo, dueño en el OS. Anti-pendejos: cuentas en las unidades que VES
 // (caja/lata/base), el sistema convierte y valúa solo. Dos vistas: CONTAR (el acto) · UNIDADES (definir una vez).
@@ -80,11 +80,7 @@ export function Inventario({ tone }: { tone?: string }) {
     <div className="space-y-2">
       {/* Cabecera: vistas + estado */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1">
-          {(['contar', 'organizar', 'unidades'] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={`rounded-control px-2.5 py-1 text-label font-bold capitalize ${view === v ? 'bg-accent text-white' : 'text-fg-muted'}`}>{v}</button>
-          ))}
-        </div>
+        <TabBar value={view} onChange={setView} tabs={[['contar', 'Contar'], ['organizar', 'Organizar'], ['unidades', 'Unidades']] as const} />
         <span className="text-label text-fg-muted">{data.lastConteo ? `último conteo · ${data.lastConteo.fecha}` : 'sin conteos aún'}</span>
       </div>
 

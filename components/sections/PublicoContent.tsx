@@ -15,7 +15,7 @@ import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
 import { Notas } from './publico/Notas'
 import { Inventario } from './publico/Inventario'
-import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow } from './publico/ui'
+import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow, TabBar } from './publico/ui'
 import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
 import { Contenedores } from './publico/Contenedores'
@@ -202,11 +202,13 @@ export default function PublicoContent() {
   const daysSince = lastOk ? Math.floor((Date.now() - lastOk.getTime()) / 86400000) : null
   const syncStale = !!sync?.last_error || daysSince == null || daysSince >= 2   // avisa si falló o lleva ≥2 días sin traer nada
 
-  // Activo = COLOR DEL DÍA (monocolor). Antes era #c0392b hardcodeado, que rompía el monocolor de la sección.
+  // Chip de selección (categoría/origen), MISMO lenguaje que los tabs de Uptown: activo = relleno sutil de
+  // superficie + texto fg (no un color brillante). Antes era #c0392b / dc lleno, que rompía el estilo del OS.
   const chip = (on: boolean): React.CSSProperties => ({
-    padding: '3px 9px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid',
-    borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)',
-    background: on ? dc : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap',
+    padding: '3px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid',
+    borderColor: 'var(--color-border, #cbd2e0)',
+    background: on ? 'var(--color-surface-active)' : 'transparent',
+    color: on ? 'var(--color-fg)' : 'var(--color-fg-muted)', fontWeight: on ? 600 : 400, whiteSpace: 'nowrap',
   })
   const numInput: React.CSSProperties = {
     width: '100%', padding: '8px 10px', fontSize: 14, fontVariantNumeric: 'tabular-nums',
@@ -225,13 +227,7 @@ export default function PublicoContent() {
             <button onClick={() => { if (month < currentMonth) setCapDate((d) => { const n = shiftMonthDate(d, 1); return n > today ? today : n }) }} disabled={month >= currentMonth} className="px-1 text-fg-muted hover:text-fg disabled:opacity-30" aria-label="Mes siguiente">›</button>
           </div>
         </div>
-        <div className="flex gap-1">
-          <button onClick={() => setTab('panel')} style={chip(tab === 'panel')}>Panel</button>
-          <button onClick={() => setTab('movimientos')} style={chip(tab === 'movimientos')}>Movimientos</button>
-          <button onClick={() => setTab('direccion')} style={chip(tab === 'direccion')}>Dirección</button>
-          <button onClick={() => setTab('fondos')} style={chip(tab === 'fondos')}>Fondos</button>
-          <button onClick={() => setTab('notas')} style={chip(tab === 'notas')}>Notas</button>
-        </div>
+        <TabBar value={tab} onChange={setTab} rounded="rounded-full" pill tabs={[['panel', 'Panel'], ['movimientos', 'Movimientos'], ['direccion', 'Dirección'], ['fondos', 'Fondos'], ['notas', 'Notas']] as const} />
       </header>
 
       {/* ── FRANJA DE ESTADO (multi-señal, SIEMPRE visible): sync del POS + propina por repartir (pasivo vivo,
@@ -254,12 +250,7 @@ export default function PublicoContent() {
 
       {tab === 'movimientos' && (<>
       {/* MOVIMIENTOS = una familia: CAPTURAR (el acto de registrar) · HISTORIAL (el registro). */}
-      <div className="flex gap-1">
-        <button onClick={() => setMovView('capturar')} style={chip(movView === 'capturar')}>Capturar</button>
-        <button onClick={() => setMovView('historial')} style={chip(movView === 'historial')}>Historial</button>
-        <button onClick={() => setMovView('inventario')} style={chip(movView === 'inventario')}>Inventario</button>
-        <button onClick={() => setMovView('cierre')} style={chip(movView === 'cierre')}>Cierre</button>
-      </div>
+      <TabBar value={movView} onChange={setMovView} tabs={[['capturar', 'Capturar'], ['historial', 'Historial'], ['inventario', 'Inventario'], ['cierre', 'Cierre']] as const} />
 
       {movView === 'inventario' && <Inventario tone={dc} />}
 

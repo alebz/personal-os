@@ -38,6 +38,25 @@ export function Card({ emphasis = 'default', tone, pad = 'md', className = '', s
   return <div className={`dashboard-card rounded-card border border-border shadow-lg shadow-black/10 backdrop-blur-xl ${PAD[pad]} ${className}`} style={style}>{children}</div>
 }
 
+// TABBAR — segmented control, MISMO lenguaje que Uptown: tabs dentro de un contenedor con borde redondeado;
+// el activo con relleno SUTIL de superficie (bg-surface-active) + texto fg, no un color brillante. Inactivo =
+// gris con hover a fg. Reemplaza los "pills" sueltos de colores que rompían el estilo del OS.
+export function TabBar<T extends string>({ tabs, value, onChange, rounded = 'rounded-card', pill = false, className = '' }: {
+  tabs: ReadonlyArray<readonly [T, string]>; value: T; onChange: (v: T) => void; rounded?: string; pill?: boolean; className?: string
+}) {
+  const btnR = pill ? 'rounded-full' : 'rounded-control'
+  return (
+    <div className={`flex w-fit shrink-0 gap-1 ${rounded} border border-border bg-surface-1 p-1 backdrop-blur-xl ${className}`}>
+      {tabs.map(([key, label]) => (
+        <button key={key} onClick={() => onChange(key)}
+          className={`${btnR} px-4 py-1.5 text-body transition-colors ${value === key ? 'bg-surface-active font-medium text-fg' : 'text-fg-muted hover:text-fg'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // CARDHEAD — encabezado de sección (label mayúsculas tracking). `tone` lo pinta de acento (día); sin tone, gris.
 export function CardHead({ tone, children }: { tone?: string; children: React.ReactNode }) {
   return <div className="mb-2 text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>{children}</div>
