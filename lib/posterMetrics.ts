@@ -1,4 +1,5 @@
 import { todayMX } from '@/lib/posterImport'
+import { bucketOf, isBeverage, type CostBucket } from '@/lib/publico/foodClass'
 
 // Métricas de dirección de Público Gourmet sobre dash.getTransactions (recibo por recibo) + menu.getProducts
 // (nombres, cacheados). Agrupa SIEMPRE por día natural CDMX, igual que getPaymentsReport (que ya cuadró al
@@ -31,17 +32,26 @@ type PosterTx = {
   products?: Array<{ product_id: string; num: string; payed_sum: string; product_cost: string; product_profit: string }>
 }
 
-// Caché de nombres de producto en memoria (por instancia caliente). El menú cambia rara vez; TTL corto basta.
-let productCache: { at: number; names: Record<string, string> } | null = null
-async function loadProductNames(token: string): Promise<Record<string, string>> {
+// Caché de meta de producto en memoria (por instancia caliente). El menú cambia rara vez; TTL corto basta.
+// names = product_id→nombre · prodCat = product_id→category_id (para clasificar food/bev) · catName = category_id→nombre.
+type ProductMeta = { names: Record<string, string>; prodCat: Record<string, string>; catName: Record<string, string> }
+let productCache: { at: number; meta: ProductMeta } | null = null
+async function loadProductMeta(token: string): Promise<ProductMeta> {
   const now = Date.now()
-  if (productCache && now - productCache.at < 10 * 60_000) return productCache.names
-  const list: PosterProduct[] = await fetch(`https://joinposter.com/api/menu.getProducts?format=json&token=${encodeURIComponent(token)}`, { cache: 'no-store' })
-    .then((r) => r.json()).then((d) => d.response ?? []).catch(() => [])
-  const names: Record<string, string> = {}
-  for (const p of list) names[p.product_id] = p.product_name
-  productCache = { at: now, names }
-  return names
+  if (productCache && now - productCache.at < 10 * 60_000) return productCache.meta
+  const [list, cats] = await Promise.all([
+    fetch(`https://joinposter.com/api/menu.getProducts?format=json&token=${encodeURIComponent(token)}`, { cache: 'no-store' })
+      .then((r) => r.json()).then((d) => (d.response ?? []) as Array<{ product_id: string; product_name: string; menu_category_id?: string }>).catch(() => []),
+    fetch(`https://joinposter.com/api/menu.getCategories?format=json&token=${encodeURIComponent(token)}`, { cache: 'no-store' })
+      .then((r) => r.json()).then((d) => (d.response ?? []) as Array<{ category_id: string; category_name: string }>).catch(() => []),
+  ])
+  const names: Record<string, string> = {}, prodCat: Record<string, string> = {}
+  for (const p of list) { names[p.product_id] = p.product_name; prodCat[p.product_id] = String(p.menu_category_id ?? '') }
+  const catName: Record<string, string> = {}
+  for (const c of cats) catName[c.category_id] = c.category_name
+  const meta: ProductMeta = { names, prodCat, catName }
+  productCache = { at: now, meta }
+  return meta
 }
 
 const pesos = (v: unknown) => Number(v ?? 0) / 100
@@ -49,6 +59,12 @@ const pesos = (v: unknown) => Number(v ?? 0) / 100
 export type ProductStat = { id: string; name: string; units: number; revenue: number; cost: number; profit: number; margin: number }
 export type HourStat = { hour: number; receipts: number; revenue: number }
 export type DowStat = { dow: number; label: string; receipts: number; revenue: number }
+export type DowRecord = { dow: number; label: string; best: number; date: string | null }   // mejor día SUELTO de cada weekday
+export type CatCost = { categoryId: string; name: string; bucket: CostBucket; revenue: number; cost: number; pct: number }   // costo teórico por categoría de menú
+export type Bucket = { revenue: number; cost: number; pct: number }
+// Desglose del costo de producto teórico: comida, bebida (reventa + preparada) y el TECHO prime (todo el COGS).
+// prime = comida + bebida + otro sobre venta total → es el blend de hoy; alimenta el breakeven, no se mueve.
+export type CostBuckets = { food: Bucket; bevEnv: Bucket; bevPrep: Bucket; beverage: Bucket; otro: Bucket; prime: Bucket }
 export type LateReceipt = { id: string; date: string; time: string; sum: number }
 export type Metrics = {
   ok: true
@@ -63,6 +79,9 @@ export type Metrics = {
   topProducts: ProductStat[]
   hours: HourStat[]
   dow: DowStat[]
+  dowRecord: DowRecord[]                // el mejor día suelto de cada weekday (para la línea "tu mejor jueves")
+  costByCategory: CatCost[]             // costo teórico por categoría de menú, ordenado por venta (el hallazgo accionable)
+  costBuckets: CostBuckets              // comida / bebida / prime — el resumen que vive encima de las categorías
   guardian: { count: number; receipts: LateReceipt[] }   // cierres 00:00–05:59 CDMX: rompen el supuesto de "día natural"
 }
 export type MetricsResult = Metrics | { ok: false; error: string; status: number }
@@ -80,8 +99,8 @@ export async function computeMetrics(from: string, to?: string): Promise<Metrics
   if (!token) return { ok: false, error: 'POSTER_TOKEN no configurado', status: 400 }
   const end = to ?? todayMX()
 
-  const [names, txRaw] = await Promise.all([
-    loadProductNames(token),
+  const [{ names, prodCat, catName }, txRaw] = await Promise.all([
+    loadProductMeta(token),
     fetch(`https://joinposter.com/api/dash.getTransactions?format=json&token=${encodeURIComponent(token)}&date_from=${from.replace(/-/g, '')}&date_to=${end.replace(/-/g, '')}&include_products=true`, { cache: 'no-store' })
       .then((r) => r.json()).catch(() => ({} as Record<string, unknown>)),
   ])
@@ -96,6 +115,7 @@ export async function computeMetrics(from: string, to?: string): Promise<Metrics
   const prod = new Map<string, ProductStat>()
   const hours: HourStat[] = Array.from({ length: 24 }, (_, hour) => ({ hour, receipts: 0, revenue: 0 }))
   const dow: DowStat[] = Array.from({ length: 7 }, (_, d) => ({ dow: d, label: DOW[d], receipts: 0, revenue: 0 }))
+  const byDate = new Map<string, { revenue: number; dow: number }>()   // venta de CADA día → récord por-día-único
   const late: LateReceipt[] = []
 
   for (const t of txs) {
@@ -107,6 +127,7 @@ export async function computeMetrics(from: string, to?: string): Promise<Metrics
     profit += pesos(t.total_profit)
     hours[hour].receipts++; hours[hour].revenue += venta
     dow[wd].receipts++; dow[wd].revenue += venta
+    const bd = byDate.get(date) ?? { revenue: 0, dow: wd }; bd.revenue += venta; byDate.set(date, bd)
     // GUARDIÁN: un cierre entre 00:00 y 05:59 CDMX significa que la operación cruzó la medianoche y el
     // supuesto de "día natural = getPaymentsReport" dejó de valer. Se marca para que sea visible.
     if (hour < 6) late.push({ id: t.transaction_id, date, time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`, sum: venta })
@@ -123,8 +144,41 @@ export async function computeMetrics(from: string, to?: string): Promise<Metrics
   const topProducts = [...prod.values()]
     .map((s) => ({ ...s, margin: s.revenue > 0 ? (s.profit / s.revenue) * 100 : 0 }))
     .sort((a, b) => b.revenue - a.revenue)
+
+  // COSTO TEÓRICO POR CATEGORÍA — cada producto lleva su categoría; se agrega venta+costo por categoría. Aquí
+  // sale el hallazgo accionable (entradas cuestan casi el doble que pizza) que el blend escondía.
+  const catAgg = new Map<string, { revenue: number; cost: number }>()
+  for (const s of prod.values()) {
+    const cid = prodCat[s.id] ?? ''
+    const e = catAgg.get(cid) ?? { revenue: 0, cost: 0 }; e.revenue += s.revenue; e.cost += s.cost; catAgg.set(cid, e)
+  }
+  const costByCategory: CatCost[] = [...catAgg.entries()]
+    .map(([categoryId, v]) => ({ categoryId, name: catName[categoryId] ?? 'Sin categoría', bucket: bucketOf(categoryId), revenue: v.revenue, cost: v.cost, pct: v.revenue ? (v.cost / v.revenue) * 100 : 0 }))
+    .sort((a, b) => b.revenue - a.revenue)
+  // Cubetas: comida / bebida (reventa + preparada) / prime (todo = el blend, alimenta el breakeven).
+  const bucketSum = (pred: (b: CostBucket) => boolean) => {
+    let revenue = 0, cost = 0
+    for (const c of costByCategory) if (pred(c.bucket)) { revenue += c.revenue; cost += c.cost }
+    return { revenue, cost, pct: revenue ? (cost / revenue) * 100 : 0 }
+  }
+  const costBuckets: CostBuckets = {
+    food: bucketSum((b) => b === 'food'),
+    bevEnv: bucketSum((b) => b === 'bev_env'),
+    bevPrep: bucketSum((b) => b === 'bev_prep'),
+    beverage: bucketSum(isBeverage),
+    otro: bucketSum((b) => b === 'otro'),
+    prime: bucketSum(() => true),
+  }
+
   const receipts = txs.length
   const daysOperated = daySet.size
+  // RÉCORD por día de la semana: el MEJOR día suelto de cada weekday (no el agregado). Alimenta la línea
+  // "ayer cerraste en $X — tu mejor jueves": el motor compara la venta de ayer contra este máximo.
+  const dowRecord: DowRecord[] = Array.from({ length: 7 }, (_, d) => ({ dow: d, label: DOW[d], best: 0, date: null as string | null }))
+  for (const [date, bd] of byDate) {
+    const r = dowRecord[bd.dow]
+    if (bd.revenue > r.best) { r.best = bd.revenue; r.date = date }
+  }
   // Bloque de margen ligado a los números que ya confías: venta = Σ sum (misma base que getPaymentsReport),
   // utilidad = Σ total_profit (el profit propio de Poster), y costo = venta − utilidad para que SIEMPRE
   // cuadre venta − costo = utilidad. (Sumar product_cost por línea da ~1% menos por redondeo de impuesto;
@@ -142,6 +196,9 @@ export async function computeMetrics(from: string, to?: string): Promise<Metrics
     topProducts,
     hours,
     dow,
+    dowRecord,
+    costByCategory,
+    costBuckets,
     guardian: { count: late.length, receipts: late.sort((a, b) => a.date.localeCompare(b.date)) },
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { mxn } from '@/components/Mxn'
 import { MoneyInput } from '@/components/MoneyInput'
 import { useCajaFuerte } from '@/components/finance/useCajaFuerte'
@@ -618,9 +618,12 @@ type Metrics = {
   daysOperated: number; receipts: number; ventaTotal: number; ticketPromedio: number
   ventaPorDiaOperado: number; guestsPromedio: number
   margin: { revenue: number; cost: number; profit: number; pct: number }
+  costByCategory: Array<{ categoryId: string; name: string; bucket: string; revenue: number; cost: number; pct: number }>
+  costBuckets: { food: Bucket; bevEnv: Bucket; bevPrep: Bucket; beverage: Bucket; otro: Bucket; prime: Bucket }
   topProducts: ProductStat[]; hours: HourStat[]; dow: DowStat[]
   guardian: { count: number; receipts: Array<{ id: string; date: string; time: string; sum: number }> }
 }
+type Bucket = { revenue: number; cost: number; pct: number }
 
 function Direccion() {
   const { crt } = useOSSettings()
@@ -685,14 +688,34 @@ function Direccion() {
       {/* ── MARGEN TEÓRICO | TOP PRODUCTOS (lado a lado; colapsa a 1 columna en móvil) ── */}
       <BentoRow>
         <Card>
-          <CardHead tone={dc}>Margen teórico</CardHead>
-          <div className="grid grid-cols-2 gap-y-1 text-secondary">
-            <span className="text-fg-muted">Venta</span><span className="text-right tabular-nums text-ok">{mxn(m.margin.revenue)}</span>
-            <span className="text-fg-muted">Costo de receta (teórico)</span><span className="text-right tabular-nums text-danger">−{mxn(m.margin.cost)}</span>
-            <span className="font-medium text-fg">Utilidad bruta teórica</span><span className="text-right font-medium tabular-nums text-ok">{mxn(m.margin.profit)}</span>
-            <span className="font-bold text-fg">Margen</span><span className="text-right font-bold tabular-nums">{m.margin.pct.toFixed(1)}%</span>
+          <CardHead tone={dc}>Costo teórico por categoría</CardHead>
+          {/* RESUMEN encima: comida / bebida / prime. El food cost deja de estar inflado por la bebida. */}
+          <div className="mb-1 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-secondary">
+            <span>Comida <b className="tabular-nums text-fg">{m.costBuckets.food.pct.toFixed(1)}%</b></span>
+            <span>Bebida <b className="tabular-nums text-fg">{m.costBuckets.beverage.pct.toFixed(1)}%</b></span>
+            <span>Prime <b className="tabular-nums" style={{ color: dc }}>{m.costBuckets.prime.pct.toFixed(1)}%</b></span>
           </div>
-          <div className="mt-2 border-t border-border pt-2 text-label text-fg-muted">Teórico = product_cost de las recetas. El real (vs compras) llega en F4.</div>
+          <div className="mb-2 text-label text-fg-muted">prime = COGS combinado (comida + bebida) · la nómina va aparte en los fijos del breakeven</div>
+          {/* POR CATEGORÍA, ordenada por venta. Aquí se ve que entradas cuesta casi el doble que pizza. */}
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 text-label">
+            <span className="text-fg-muted">Categoría</span>
+            <span className="text-right text-fg-muted">Venta</span>
+            <span className="text-right text-fg-muted">Costo</span>
+            <span className="text-right text-fg-muted">%</span>
+            {m.costByCategory.map((c) => (
+              <Fragment key={c.categoryId || c.name}>
+                <span className="truncate text-secondary">{c.name}</span>
+                <span className="text-right tabular-nums text-fg-muted">{mxn(c.revenue)}</span>
+                <span className="text-right tabular-nums text-fg-muted">{mxn(c.cost)}</span>
+                <span className="text-right font-medium tabular-nums text-fg">{c.pct.toFixed(1)}%</span>
+              </Fragment>
+            ))}
+            <span className="border-t border-border pt-1 font-medium text-fg">Total · prime</span>
+            <span className="border-t border-border pt-1 text-right tabular-nums text-fg-muted">{mxn(m.costBuckets.prime.revenue)}</span>
+            <span className="border-t border-border pt-1 text-right tabular-nums text-fg-muted">{mxn(m.costBuckets.prime.cost)}</span>
+            <span className="border-t border-border pt-1 text-right font-bold tabular-nums" style={{ color: dc }}>{m.costBuckets.prime.pct.toFixed(1)}%</span>
+          </div>
+          <div className="mt-2 text-label text-fg-muted">Teórico = product_cost de las recetas. Comida y bebida por separado; la reventa embotellada por su costo unitario. El real (entre conteos) llega en F4.</div>
         </Card>
         <Card>
           <div className="mb-2 flex items-center justify-between">
