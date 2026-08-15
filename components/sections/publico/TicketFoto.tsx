@@ -225,7 +225,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
   }
 
   const legColor = d?.legibilidad === 'alta' ? 'text-ok' : d?.legibilidad === 'baja' ? 'text-danger' : 'text-fg-muted'
-  const fotoChip = (on: boolean): React.CSSProperties => ({ padding: '2px 8px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
+  const fotoChip = (on: boolean): React.CSSProperties => ({ padding: '2px 8px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? (tone ?? 'var(--color-accent)') : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
 
   return (
     <div>
@@ -445,7 +445,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <button onClick={reset} disabled={busy === 'confirm'} className="rounded-card px-3 py-1.5 text-secondary text-fg-muted hover:text-fg disabled:opacity-50">Descartar</button>
-            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked || splitBlocked || pagoUnread} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : splitBlocked ? 'Los contenedores deben sumar exacto al total' : pagoUnread ? 'Elige el origen del pago (no se pudo leer del ticket)' : undefined} className="rounded-card bg-[#c0392b] px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
+            <button onClick={() => void confirm()} disabled={busy === 'confirm' || dateBlocked || splitBlocked || pagoUnread} title={dateBlocked ? 'Corrige o aprueba la fecha fuera de rango' : splitBlocked ? 'Los contenedores deben sumar exacto al total' : pagoUnread ? 'Elige el origen del pago (no se pudo leer del ticket)' : undefined} style={{ background: tone ?? 'var(--color-accent)' }} className="rounded-card px-4 py-1.5 text-secondary font-bold text-white disabled:opacity-50">{busy === 'confirm' ? 'guardando…' : 'Confirmar gasto'}</button>
           </div>
         </div>
       )}

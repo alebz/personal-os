@@ -60,7 +60,7 @@ export default function PublicoContent() {
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
   const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'fondos' | 'notas'>('panel')
-  const [movView, setMovView] = useState<'capturar' | 'historial' | 'inventario'>('capturar')   // Movimientos: el acto vs el archivo vs el conteo
+  const [movView, setMovView] = useState<'capturar' | 'historial' | 'inventario' | 'cierre'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
   const [costoManualOpen, setCostoManualOpen] = useState(false)                    // costo a mano = ocasional, colapsado
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
@@ -99,6 +99,9 @@ export default function PublicoContent() {
   const [propPend, setPropPend] = useState<{ pendiente: number; nivel: 'verde' | 'amarillo' | 'rojo' } | null>(null)   // propina por repartir (pasivo vivo, siempre visible)
   const [cKind, setCKind] = useState<CostKind>(catDefaults('insumo').defaultKind ?? 'variable')
   const [cNote, setCNote] = useState('')
+  const [cFecha, setCFecha] = useState(today)                       // fecha del gasto (default día visto, editable — tickets que capturas después)
+  const [cProv, setCProv] = useState('')                            // proveedor (opcional)
+  const [cFolio, setCFolio] = useState('')                          // folio (opcional)
   const cAmtRef = useRef<HTMLInputElement>(null)
 
   // ── Otros ingresos (no-POS: subarriendo Ameno, etc.) ──
@@ -157,12 +160,9 @@ export default function PublicoContent() {
   async function addCosto() {
     const a = cAmt
     if (a == null || a <= 0) return
-    const note = cNote
-    setCAmt(null); setCNote('')            // limpia YA (antes del await): tecleo rápido en burst NO concatena montos
-    await fetch('/api/publico/costo', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ date: capDate, category: cCat, cost_kind: catDefaults(cCat).defaultKind === null ? null : cKind, origin: cOrigin, amount: a, note: note || null }),
-    })
+    const body = { date: cFecha, category: cCat, cost_kind: catDefaults(cCat).defaultKind === null ? null : cKind, origin: cOrigin, amount: a, note: cNote || null, proveedor: cProv || null, folio: cFolio || null }
+    setCAmt(null); setCNote(''); setCProv(''); setCFolio(''); setCFecha(today)   // limpia YA (antes del await): burst no concatena
+    await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     await load()
     cAmtRef.current?.focus()             // burst: listo para el siguiente (categoría/origen quedan sticky)
   }
@@ -202,10 +202,11 @@ export default function PublicoContent() {
   const daysSince = lastOk ? Math.floor((Date.now() - lastOk.getTime()) / 86400000) : null
   const syncStale = !!sync?.last_error || daysSince == null || daysSince >= 2   // avisa si falló o lleva ≥2 días sin traer nada
 
+  // Activo = COLOR DEL DÍA (monocolor). Antes era #c0392b hardcodeado, que rompía el monocolor de la sección.
   const chip = (on: boolean): React.CSSProperties => ({
     padding: '3px 9px', borderRadius: 999, fontSize: 12, cursor: 'pointer', border: '1px solid',
     borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)',
-    background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap',
+    background: on ? dc : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap',
   })
   const numInput: React.CSSProperties = {
     width: '100%', padding: '8px 10px', fontSize: 14, fontVariantNumeric: 'tabular-nums',
@@ -257,9 +258,50 @@ export default function PublicoContent() {
         <button onClick={() => setMovView('capturar')} style={chip(movView === 'capturar')}>Capturar</button>
         <button onClick={() => setMovView('historial')} style={chip(movView === 'historial')}>Historial</button>
         <button onClick={() => setMovView('inventario')} style={chip(movView === 'inventario')}>Inventario</button>
+        <button onClick={() => setMovView('cierre')} style={chip(movView === 'cierre')}>Cierre</button>
       </div>
 
       {movView === 'inventario' && <Inventario tone={dc} />}
+
+      {/* ── CIERRE = CUADRE del POS (fuera de Capturar). Las ventas entran solas de Poster; esto es para corregir/cuadrar un día. ── */}
+      {movView === 'cierre' && (
+        <Card>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-label uppercase tracking-widest" style={{ color: dc }}>Cierre del POS</span>
+              <button onClick={() => setCapDate((d) => addDays(d, -1))} className="px-1 text-fg-muted hover:text-fg" aria-label="Día anterior">◀</button>
+              <button onClick={() => setCapDate(today)} className={`text-secondary ${capDate === today ? 'font-bold text-fg' : 'text-fg-muted'}`}>{capDate === today ? 'hoy' : dayLabel(capDate)}</button>
+              <button onClick={() => setCapDate((d) => addDays(d, +1) > today ? today : addDays(d, +1))} className="px-1 text-fg-muted hover:text-fg" aria-label="Día siguiente">▶</button>
+              {hoyV && <span className={`rounded px-1.5 py-0.5 text-label font-medium ${hoyV.source === 'poster' ? 'bg-accent/15 text-accent' : 'bg-surface-active text-fg-muted'}`} title={hoyV.source === 'poster' ? 'Importado del POS' : 'Capturado a mano'}>{hoyV.source === 'poster' ? 'POS' : 'manual'}</span>}
+            </div>
+            {savedFlash && <span className="text-secondary font-medium text-ok">guardado</span>}
+          </div>
+          <div className="mb-3 text-label text-fg-muted">Las ventas del POS entran solas de Poster. Esto es para <b className="text-fg">cuadrar</b> un día — corregirlo o capturarlo a mano si el import no llegó.</div>
+          {hoyV && !editVenta ? (
+            <div className="flex items-center justify-between gap-2 text-secondary">
+              <span className="text-fg-muted">efectivo <b className="tabular-nums text-fg">{mxn(Number(hoyV.efectivo))}</b> · tarjeta <b className="tabular-nums text-fg">{mxn(Number(hoyV.tarjeta))}</b> · total <b className="tabular-nums text-fg">{mxn(Number(hoyV.efectivo) + Number(hoyV.tarjeta))}</b></span>
+              <button onClick={() => { setEfectivo(Number(hoyV.efectivo) || null); setTarjeta(Number(hoyV.tarjeta) || null); setEditVenta(true) }} className="shrink-0 text-label text-fg-muted underline decoration-dotted hover:text-accent">corregir a mano</button>
+            </div>
+          ) : (
+            <>
+              {!hoyV && <div className="mb-1 text-label text-fg-muted">Sin ventas del POS para este día — captúralas a mano o espera el import.</div>}
+              <div className="flex items-end gap-3">
+                <label className="flex-1">
+                  <span className="text-label text-fg-muted">Efectivo</span>
+                  <MoneyInput ref={efectivoRef} value={efectivo} onChange={setEfectivo} onKeyDown={(e) => { if (e.key === 'Enter') tarjetaRef.current?.focus() }} placeholder="0" style={numInput} />
+                </label>
+                <label className="flex-1">
+                  <span className="text-label text-fg-muted">Tarjeta</span>
+                  <MoneyInput ref={tarjetaRef} value={tarjeta} onChange={setTarjeta} onKeyDown={(e) => { if (e.key === 'Enter') void saveVenta() }} placeholder="0" style={numInput} />
+                </label>
+                <button onClick={() => void saveVenta()} style={{ background: dc }} className="rounded-card px-4 py-2 font-bold text-white">Guardar</button>
+                {hoyV && <button onClick={() => setEditVenta(false)} className="text-label text-fg-muted hover:text-accent">cancelar</button>}
+              </div>
+              <div className="mt-1 text-right text-label text-fg-muted">Total {mxn((efectivo ?? 0) + (tarjeta ?? 0))}</div>
+            </>
+          )}
+        </Card>
+      )}
 
       {movView === 'capturar' && (<>
       {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
@@ -267,86 +309,70 @@ export default function PublicoContent() {
         <TicketFoto onSaved={load} defaultDate={capDate} onDraftChange={setTicketDraftOpen} tone={dc} />
       </Card>
 
-      {/* ── CIERRE DE HOY ── solo lectura (Poster lo llena); fallback tras "corregir a mano" ── */}
-      <Card>
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-label uppercase tracking-widest" style={{ color: dc }}>Cierre</span>
-            <button onClick={() => setCapDate((d) => addDays(d, -1))} className="px-1 text-fg-muted hover:text-fg" aria-label="Día anterior">◀</button>
-            <button onClick={() => setCapDate(today)} className={`text-secondary ${capDate === today ? 'font-bold text-fg' : 'text-fg-muted'}`}>
-              {capDate === today ? 'hoy' : dayLabel(capDate)}
-            </button>
-            <button onClick={() => setCapDate((d) => addDays(d, +1) > today ? today : addDays(d, +1))} className="px-1 text-fg-muted hover:text-fg" aria-label="Día siguiente">▶</button>
-            {hoyV && <span className={`rounded px-1.5 py-0.5 text-label font-medium ${hoyV.source === 'poster' ? 'bg-accent/15 text-accent' : 'bg-surface-active text-fg-muted'}`} title={hoyV.source === 'poster' ? 'Importado del POS' : 'Capturado a mano'}>{hoyV.source === 'poster' ? 'POS' : 'manual'}</span>}
-          </div>
-          {savedFlash && <span className="text-secondary font-medium text-ok">✓ guardado</span>}
-        </div>
-        {/* Poster llena las ventas solas → esto es SOLO LECTURA. El formulario manual es el fallback (Poster no
-            trajo el día, o quieres corregir), colapsado tras "corregir a mano". Deja de ser el ritual diario. */}
-        {hoyV && !editVenta ? (
-          <div className="flex items-center justify-between gap-2 text-secondary">
-            <span className="text-fg-muted">efectivo <b className="tabular-nums text-fg">{mxn(Number(hoyV.efectivo))}</b> · tarjeta <b className="tabular-nums text-fg">{mxn(Number(hoyV.tarjeta))}</b> · total <b className="tabular-nums text-fg">{mxn(Number(hoyV.efectivo) + Number(hoyV.tarjeta))}</b></span>
-            <button onClick={() => { setEfectivo(Number(hoyV.efectivo) || null); setTarjeta(Number(hoyV.tarjeta) || null); setEditVenta(true) }} className="shrink-0 text-label text-fg-muted underline decoration-dotted hover:text-accent">corregir a mano</button>
-          </div>
-        ) : (
-          <>
-            {!hoyV && <div className="mb-1 text-label text-fg-muted">Sin ventas del POS para este día — captúralas a mano o espera el import.</div>}
-            <div className="flex items-end gap-3">
-              <label className="flex-1">
-                <span className="text-label text-fg-muted">Efectivo</span>
-                <MoneyInput ref={efectivoRef} value={efectivo} onChange={setEfectivo} onKeyDown={(e) => { if (e.key === 'Enter') tarjetaRef.current?.focus() }} placeholder="0" style={numInput} />
-              </label>
-              <label className="flex-1">
-                <span className="text-label text-fg-muted">Tarjeta</span>
-                <MoneyInput ref={tarjetaRef} value={tarjeta} onChange={setTarjeta} onKeyDown={(e) => { if (e.key === 'Enter') void saveVenta() }} placeholder="0" style={numInput} />
-              </label>
-              <button onClick={() => void saveVenta()} className="rounded-card bg-[#c0392b] px-4 py-2 font-bold text-white">Guardar</button>
-              {hoyV && <button onClick={() => setEditVenta(false)} className="text-label text-fg-muted hover:text-accent">cancelar</button>}
-            </div>
-            <div className="mt-1 text-right text-label text-fg-muted">Total {mxn((efectivo ?? 0) + (tarjeta ?? 0))}</div>
-          </>
-        )}
-      </Card>
-
-      {/* ── ＋ COSTO A MANO ── Ocasional (casi todo entra por foto o Poster), COLAPSADO. Oculto si hay borrador. ── */}
+      {/* ── COSTO A MANO ── Card en forma. Ocasional (casi todo entra por foto o Poster), colapsada. Oculto si hay borrador. ── */}
       {!ticketDraftOpen && (
-        <div>
-          <button onClick={() => setCostoManualOpen((o) => !o)} className="text-label text-fg-muted hover:text-accent">{costoManualOpen ? '▲ cerrar costo a mano' : '＋ costo a mano'}</button>
+        <Card>
+          <button onClick={() => setCostoManualOpen((o) => !o)} className="flex w-full items-center gap-3 text-left">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-card border font-bold" style={{ fontSize: 18, color: dc, borderColor: `${dc}66` }}>$</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold text-fg">Costo a mano</span>
+              <span className="block text-label text-fg-muted">gasto sin ticket — mantenimiento, servicios, valet…</span>
+            </span>
+            <span className="shrink-0 text-fg-muted">{costoManualOpen ? '▲' : '＋'}</span>
+          </button>
           {costoManualOpen && (
-          <Card className="mt-1">
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            {/* Mismo juego de 7 que el ticket: SIN Renta condonada (net-cero, no-operativa, sin recibo → su casa es Previstos). */}
-            {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
-              <button key={c.key} onClick={() => pickCat(c.key)} style={chip(cCat === c.key)}>{c.label}</button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <MoneyInput
-              ref={cAmtRef} value={cAmt} onChange={setCAmt}
-              onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }}
-              placeholder="$ monto" style={{ ...numInput, width: 120 }}
-            />
-            <span className="text-label text-fg-muted">desde</span>
-            {ORIGIN_OPTIONS.map((ct) => (
-              <button key={ct.label} onClick={() => setCOrigin(ct.key)} style={chip(cOrigin === ct.key)}>{ct.label}</button>
-            ))}
-            {catDefaults(cCat).defaultKind !== null && (
-              <button
-                onClick={() => setCKind((k) => (k === 'fijo' ? 'variable' : 'fijo'))}
-                className="text-label text-fg-muted underline decoration-dotted"
-                title="fijo/variable (para el punto de equilibrio); tap para cambiar"
-              >{cKind}</button>
-            )}
-            <input
-              value={cNote} onChange={(e) => setCNote(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }}
-              placeholder="nota (opc)" style={{ ...numInput, flex: 1, minWidth: 90, fontSize: 14 }}
-            />
-            <button onClick={() => void addCosto()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
-          </div>
-          </Card>
+            <div className="mt-3 space-y-3 border-t border-border pt-3">
+              <div>
+                <div className="mb-1 text-label uppercase tracking-widest text-fg-muted">Categoría</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {/* Mismo juego que el ticket: SIN Renta condonada (net-cero, no-operativa → su casa es Previstos). */}
+                  {COST_CATEGORIES.filter((c) => c.key !== 'renta_condonada').map((c) => (
+                    <button key={c.key} onClick={() => pickCat(c.key)} style={chip(cCat === c.key)}>{c.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-end gap-4">
+                <label className="block">
+                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Fecha</span>
+                  <input type="date" value={cFecha} max={today} onChange={(e) => setCFecha(e.target.value)} style={{ ...numInput, width: 150 }} />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Monto</span>
+                  <MoneyInput ref={cAmtRef} value={cAmt} onChange={setCAmt} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="$ 0" style={{ ...numInput, width: 140 }} />
+                </label>
+                <div>
+                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Desde</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setCOrigin(ct.key)} style={chip(cOrigin === ct.key)}>{ct.label}</button>))}
+                  </div>
+                </div>
+                {catDefaults(cCat).defaultKind !== null && (
+                  <div>
+                    <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Tipo</span>
+                    <button onClick={() => setCKind((k) => (k === 'fijo' ? 'variable' : 'fijo'))} title="fijo/variable (para el punto de equilibrio)" className="rounded-control border border-border px-3 py-1.5 text-label capitalize text-fg hover:border-accent">{cKind}</button>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-end gap-4">
+                <label className="block">
+                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Proveedor <span className="normal-case text-fg-muted opacity-60">· opc</span></span>
+                  <input value={cProv} onChange={(e) => setCProv(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="ej. Ferretería El Tornillo" style={{ ...numInput, width: 240 }} />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Folio <span className="normal-case text-fg-muted opacity-60">· opc</span></span>
+                  <input value={cFolio} onChange={(e) => setCFolio(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="#" style={{ ...numInput, width: 130 }} />
+                </label>
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-label uppercase tracking-widest text-fg-muted">Nota</span>
+                <input value={cNote} onChange={(e) => setCNote(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addCosto() }} placeholder="ej. Arreglo de las sillas tejidas" style={{ ...numInput }} />
+              </label>
+              <div className="flex justify-end">
+                <button onClick={() => void addCosto()} style={{ background: dc }} className="rounded-card px-5 py-2 font-bold text-white">Guardar costo</button>
+              </div>
+            </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
@@ -725,8 +751,8 @@ function Direccion() {
           <div className="mb-2 flex items-center justify-between">
             <CardHead tone={dc}>Top productos</CardHead>
             <div className="flex gap-1">
-              <button onClick={() => setSortBy('revenue')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'revenue' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>facturación</button>
-              <button onClick={() => setSortBy('units')} className={`rounded px-2 py-0.5 text-label ${sortBy === 'units' ? 'bg-[#c0392b] text-white' : 'text-fg-muted'}`}>unidades</button>
+              <button onClick={() => setSortBy('revenue')} style={sortBy === 'revenue' ? { background: dc } : undefined} className={`rounded px-2 py-0.5 text-label ${sortBy === 'revenue' ? 'text-white' : 'text-fg-muted'}`}>facturación</button>
+              <button onClick={() => setSortBy('units')} style={sortBy === 'units' ? { background: dc } : undefined} className={`rounded px-2 py-0.5 text-label ${sortBy === 'units' ? 'text-white' : 'text-fg-muted'}`}>unidades</button>
             </div>
           </div>
           <div className="space-y-1.5">

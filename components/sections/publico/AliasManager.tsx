@@ -88,7 +88,7 @@ export function AliasManager() {
   }
 
   const total = sup.length + prod.length
-  const fotoChipSmall = (on: boolean): React.CSSProperties => ({ padding: '2px 7px', borderRadius: 999, fontSize: 11, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? '#c0392b' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
+  const fotoChipSmall = (on: boolean): React.CSSProperties => ({ padding: '2px 7px', borderRadius: 999, fontSize: 11, cursor: 'pointer', border: '1px solid', borderColor: on ? 'transparent' : 'var(--color-border, #cbd2e0)', background: on ? 'var(--color-accent)' : 'transparent', color: on ? '#fff' : 'inherit', whiteSpace: 'nowrap' })
 
   // "Sin mapear" = va a inventario pero aún sin ingrediente de Poster (los "solo panel" NO cuentan: es a propósito).
   const isUnmapped = (p: ProdAlias) => p.toca_stock && p.poster_ingredient_id == null

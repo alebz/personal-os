@@ -10,9 +10,9 @@ const NO_KIND: string[] = COST_CATEGORIES.filter((c) => c.defaultKind === null).
 // POST /api/publico/costo — inserta un costo con su ORIGEN (contenedor, o null = "sin caja") y, si aplica,
 // su naturaleza fijo/variable.
 export async function POST(req: NextRequest) {
-  let b: { date?: string; category?: string; cost_kind?: string | null; origin?: string | null; amount?: number; note?: string }
+  let b: { date?: string; category?: string; cost_kind?: string | null; origin?: string | null; amount?: number; note?: string; proveedor?: string; folio?: string }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  if (!b.date) return NextResponse.json({ error: 'date required' }, { status: 400 })
+  if (!b.date || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return NextResponse.json({ error: 'date (YYYY-MM-DD) required' }, { status: 400 })
   if (!b.category || !CATEGORIES.includes(b.category)) return NextResponse.json({ error: 'category inválida' }, { status: 400 })
   if (b.origin != null && !ORIGINS.includes(b.origin)) return NextResponse.json({ error: 'origin inválido' }, { status: 400 })
   const amount = Number(b.amount)
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   const row = {
     scope: 'publico', date: b.date, month: b.date.slice(0, 7),
     category: b.category, cost_kind, origin: b.origin ?? null, amount, note: b.note?.trim() || null,
+    proveedor: b.proveedor?.trim() || null, folio: b.folio?.trim() || null,
   }
   const { data, error } = await supabase.from('publico_costos').insert(row).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
