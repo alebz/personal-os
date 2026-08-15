@@ -30,10 +30,12 @@ export function Card({ emphasis = 'default', tone, pad = 'md', className = '', s
   style?: React.CSSProperties
   children: React.ReactNode
 }) {
+  // dashboard-card + backdrop-blur = superficie OPACA (surface-1, no surface-2 que es 70% transparente) sobre el
+  // sim espacial → legible. Antes usaba bg-surface-2 y el starfield se colaba (bug de fondo de toda la sección).
   if (emphasis === 'hero') {
-    return <div className={`rounded-card ${PAD[pad]} ${className}`} style={{ border: `1px solid ${tone ?? 'var(--color-border-strong)'}44`, background: 'var(--color-surface-1)', ...style }}>{children}</div>
+    return <div className={`dashboard-card rounded-card shadow-lg shadow-black/10 backdrop-blur-xl ${PAD[pad]} ${className}`} style={{ border: `1px solid ${tone ?? 'var(--color-border-strong)'}44`, ...style }}>{children}</div>
   }
-  return <div className={`rounded-card border border-border bg-surface-2 ${PAD[pad]} ${className}`} style={style}>{children}</div>
+  return <div className={`dashboard-card rounded-card border border-border shadow-lg shadow-black/10 backdrop-blur-xl ${PAD[pad]} ${className}`} style={style}>{children}</div>
 }
 
 // CARDHEAD — encabezado de sección (label mayúsculas tracking). `tone` lo pinta de acento (día); sin tone, gris.

@@ -24,6 +24,18 @@ export function TicketsArchive({ tone }: { tone?: string }) {
   const [ed, setEd] = useState<EditState | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sortBy, setSortBy] = useState<'fecha' | 'monto'>('fecha')   // acomodar: por fecha (default) o por monto
+  const [asc, setAsc] = useState(false)                              // default DESC → más reciente arriba
+  const [q, setQ] = useState('')                                     // filtrar por proveedor
+  const [openFilter, setOpenFilter] = useState(false)
+
+  const shown = list
+    .filter((t) => !q.trim() || t.proveedor.toLowerCase().includes(q.trim().toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      const d = sortBy === 'fecha' ? a.fecha.localeCompare(b.fecha) : Number(a.total) - Number(b.total)
+      return asc ? d : -d
+    })
 
   const loadList = useCallback(async () => {
     const j = await fetch('/api/publico/tickets').then((r) => r.json()).catch(() => null)
@@ -89,19 +101,29 @@ export function TicketsArchive({ tone }: { tone?: string }) {
       {flash && <div className="mb-2 rounded-card border border-border bg-surface-1 p-1.5 text-label text-fg-muted">{flash}</div>}
 
       {/* LISTA */}
-      {!sel && (
-        list.length === 0
-          ? <p className="text-secondary italic text-fg-muted">Aún no hay tickets. Captúralos desde la pestaña Captura.</p>
+      {!sel && (<>
+        {/* Barra: filtrar (proveedor) · acomodar (fecha/monto) · dirección */}
+        {list.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-label">
+            <button onClick={() => setOpenFilter((o) => !o)} className={`rounded-control border px-2 py-0.5 ${openFilter || q ? 'border-accent text-accent' : 'border-border text-fg-muted hover:text-accent'}`}>⛃ Filtrar</button>
+            <button onClick={() => setSortBy((s) => (s === 'fecha' ? 'monto' : 'fecha'))} className="rounded-control border border-border px-2 py-0.5 text-fg-muted hover:text-accent">Acomodar: <b className="text-fg">{sortBy === 'fecha' ? 'Fecha' : 'Monto'}</b></button>
+            <button onClick={() => setAsc((a) => !a)} title={asc ? 'Ascendente' : 'Descendente (más reciente/mayor arriba)'} className="rounded-control border border-border px-2 py-0.5 text-fg-muted hover:text-accent">{asc ? '↑' : '↓'}</button>
+            {openFilter && <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="proveedor…" style={{ ...cell }} className="flex-1" />}
+            <span className="ml-auto text-fg-muted">{shown.length}/{list.length}</span>
+          </div>
+        )}
+        {shown.length === 0
+          ? <p className="text-secondary italic text-fg-muted">{list.length === 0 ? 'Aún no hay tickets. Captúralos desde la pestaña Captura.' : 'Ningún ticket coincide con el filtro.'}</p>
           : <div className="space-y-1">
-              {list.map((t) => (
+              {shown.map((t) => (
                 <button key={t.id} onClick={() => void open(t.id)} className="flex w-full items-center gap-2 rounded-control border border-border bg-surface-1 px-2 py-1 text-left text-secondary hover:border-accent">
                   <span className="flex-1 truncate"><b className="text-fg">{t.proveedor}</b> · {dayMonth(t.fecha)}</span>
                   {t.image_path && <span className="text-label text-fg-muted">📎</span>}
                   <span className="tabular-nums text-danger">−{mxn(Number(t.total))}</span>
                 </button>
               ))}
-            </div>
-      )}
+            </div>}
+      </>)}
 
       {/* DETALLE */}
       {sel && !detail && <p className="text-secondary italic text-fg-muted">Cargando…</p>}

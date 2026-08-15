@@ -14,6 +14,7 @@ import {
 import { TicketFoto } from './publico/TicketFoto'
 import { AliasManager } from './publico/AliasManager'
 import { Notas } from './publico/Notas'
+import { Inventario } from './publico/Inventario'
 import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow } from './publico/ui'
 import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
@@ -59,7 +60,7 @@ export default function PublicoContent() {
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
   const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'fondos' | 'notas'>('panel')
-  const [movView, setMovView] = useState<'capturar' | 'historial'>('capturar')   // Movimientos: el acto vs el archivo
+  const [movView, setMovView] = useState<'capturar' | 'historial' | 'inventario'>('capturar')   // Movimientos: el acto vs el archivo vs el conteo
   const [costoManualOpen, setCostoManualOpen] = useState(false)                    // costo a mano = ocasional, colapsado
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
@@ -255,7 +256,10 @@ export default function PublicoContent() {
       <div className="flex gap-1">
         <button onClick={() => setMovView('capturar')} style={chip(movView === 'capturar')}>Capturar</button>
         <button onClick={() => setMovView('historial')} style={chip(movView === 'historial')}>Historial</button>
+        <button onClick={() => setMovView('inventario')} style={chip(movView === 'inventario')}>Inventario</button>
       </div>
+
+      {movView === 'inventario' && <Inventario tone={dc} />}
 
       {movView === 'capturar' && (<>
       {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
