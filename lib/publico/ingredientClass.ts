@@ -57,6 +57,27 @@ export async function getRecipeWeights(now = Date.now()): Promise<RecipeWeights>
       add(Number(p.ingredient_id), side, Number(p.cost) || 1)
     }
   }
+
+  // CADENA DE SEMIELABORADOS (prepacks). Un producto usa el prepack (masa id 25, base blanca id 32) como si fuera
+  // ingrediente, así que el prepack YA quedó clasificado arriba. Propagamos ESA clase a sus SUB-ingredientes
+  // (harina → masa → pizza = comida) proporcional a su costo, y la espejamos al id NEGATIVO con que el prepack
+  // entra en el conteo. Resuelve solos los insumos que solo viven dentro de un semielaborado. Un nivel de
+  // anidación (suficiente: 2 prepacks, ninguno anida en otro).
+  const prepacks = await posterList<{ product_id: string | number; ingredients?: RecipeIng[] }>('menu.getPrepacks')
+  for (const pp of prepacks) {
+    const ppId = Number(pp.product_id)
+    const ppw = w.get(ppId)
+    const tot = ppw ? ppw.food + ppw.bev : 0
+    if (!ppw || tot <= 0) continue
+    w.set(-ppId, { food: ppw.food, bev: ppw.bev, usedIn: ppw.usedIn })   // el prepack se cuenta con id negativo
+    const foodShare = ppw.food / tot, bevShare = ppw.bev / tot
+    for (const ing of pp.ingredients ?? []) {
+      const sp = Number(ing.structure_selfprice) || 1
+      add(Number(ing.ingredient_id), 'food', sp * foodShare)
+      add(Number(ing.ingredient_id), 'bev', sp * bevShare)
+    }
+  }
+
   cache = { at: now, data: w }
   return w
 }
