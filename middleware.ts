@@ -11,22 +11,23 @@ const PUBLIC_PATHS = [
   '/api/publico/poster/cron', // Vercel Cron: se autentica sola via Bearer $CRON_SECRET (Vercel no manda cookie ni x-api-secret). SOLO esta ruta exacta; /import y /status siguen detrás del middleware.
 ]
 
-// Lo ÚNICO que una sesión de scope 'captura' (Andrés) puede tocar: la app de captura + sus APIs. Nada más del OS.
-const CAPTURA_PATHS = [
-  '/captura',
-  '/api/publico/ticket',          // upload-url · extract · confirm
-  '/api/publico/costo',           // gasto a mano (compat / borrado)
-  '/api/publico/poster/catalog',  // catálogo para mapear alias en el confirm
-  '/api/publico/proveedores',     // autocompletar proveedor + sugerir categoría
-  '/api/publico/dia',             // lo capturado hoy + total del día
-  '/api/auth',                    // logout
+// Lo ÚNICO que una sesión de scope 'captura' (Andrés) puede tocar — y CON QUÉ MÉTODO. Mínimo privilegio:
+// una sesión de captura crea y lee, pero NUNCA destruye (los magic links se reenvían, los teléfonos se pierden).
+// Por eso el gate es por (ruta, método), no solo por ruta. /api/auth va aparte: es público (logout no se gatea).
+const CAPTURA_RULES: { prefix: string; methods: string[] }[] = [
+  { prefix: '/captura',                    methods: ['GET'] },          // la app de captura (páginas)
+  { prefix: '/api/publico/ticket',         methods: ['POST'] },         // upload-url · extract · confirm (crear)
+  { prefix: '/api/publico/costo',          methods: ['POST'] },         // gasto a mano: CREAR, nunca borrar (DELETE fuera)
+  { prefix: '/api/publico/poster/catalog', methods: ['GET'] },          // catálogo (lectura)
+  { prefix: '/api/publico/proveedores',    methods: ['GET'] },          // autocompletar (lectura)
+  { prefix: '/api/publico/dia',            methods: ['GET'] },          // lo del día (lectura)
 ]
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
 }
-function isCapturaAllowed(pathname: string): boolean {
-  return CAPTURA_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+function isCapturaAllowed(pathname: string, method: string): boolean {
+  return CAPTURA_RULES.some((r) => (pathname === r.prefix || pathname.startsWith(r.prefix + '/')) && r.methods.includes(method))
 }
 
 export async function middleware(req: NextRequest) {
@@ -47,8 +48,8 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value
   const scope = await getSessionScope(token)
   if (scope) {
-    // Sesión de CAPTURA (Andrés): fuera de su allowlist, se bloquea (API 403, página → /captura).
-    if (scope === 'captura' && !isCapturaAllowed(pathname)) {
+    // Sesión de CAPTURA (Andrés): fuera de su allowlist (ruta+método), se bloquea (API 403, página → /captura).
+    if (scope === 'captura' && !isCapturaAllowed(pathname, req.method)) {
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       return NextResponse.redirect(new URL('/captura', req.url))
     }
