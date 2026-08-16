@@ -40,7 +40,7 @@ export async function GET() {
   const rows = ings.map((i) => {
     const id = Number(i.ingredient_id)
     const w = resolveClass(id, recipe, overrides.get(id))
-    return { id, name: i.ingredient_name, clase: w.source === 'override' ? overrides.get(id)! : null, source: w.source, w: { comida: w.comida, bebida: w.bebida, empaque: w.empaque, sinClas: w.sinClas }, usedIn: w.usedIn, valor: valueById.get(id) ?? 0 }
+    return { id, name: i.ingredient_name, clase: overrides.get(id) ?? null, source: w.source, w: { comida: w.comida, bebida: w.bebida, empaque: w.empaque, sinClas: w.sinClas }, usedIn: w.usedIn, valor: valueById.get(id) ?? 0 }
   }).sort((a, b) => b.valor - a.valor || a.name.localeCompare(b.name, 'es'))
 
   // Composición $ del último conteo por clase.
@@ -48,8 +48,9 @@ export async function GET() {
   for (const r of rows) { comp.comida += r.valor * r.w.comida; comp.bebida += r.valor * r.w.bebida; comp.empaque += r.valor * r.w.empaque; comp.sinClas += r.valor * r.w.sinClas }
   const compTotal = comp.comida + comp.bebida + comp.empaque + comp.sinClas
 
-  const sinClasificar = rows.filter((r) => r.source === 'sin_clasificar')
+  const sinClasificar = rows.filter((r) => r.source === 'sin_clasificar')   // PENDIENTE (no incluye no_aplica)
   const packaging = rows.filter((r) => r.clase === 'empaque')
+  const noAplica = rows.filter((r) => r.clase === 'no_aplica')              // RESUELTO fuera del food cost
 
   return NextResponse.json({
     ingredients: rows,
@@ -58,6 +59,7 @@ export async function GET() {
     lastCount: lastConteo ? { fecha: lastConteo.fecha, total: compTotal } : null,
     sinClasificar: { count: sinClasificar.length, valor: comp.sinClas, items: sinClasificar },
     packaging,
+    noAplica,
   })
 }
 
@@ -75,7 +77,7 @@ export async function PATCH(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, cleared: true })
   }
-  if (!['comida', 'bebida', 'empaque'].includes(b.clase)) return NextResponse.json({ error: 'clase inválida' }, { status: 400 })
+  if (!['comida', 'bebida', 'empaque', 'no_aplica'].includes(b.clase)) return NextResponse.json({ error: 'clase inválida' }, { status: 400 })
   const { error } = await supabase.from('publico_insumo_clase').upsert({ ingredient_id: id, clase: b.clase, updated_at: new Date().toISOString() }, { onConflict: 'ingredient_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true, ingredient_id: id, clase: b.clase })

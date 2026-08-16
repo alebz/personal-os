@@ -6,9 +6,10 @@
 // y correcciones. Lo que ni la receta ni el override alcanzan → SIN CLASIFICAR (cubeta visible, nunca silenciosa).
 import { bucketOf, isBeverage } from './foodClass'
 
-export type ClaseKey = 'comida' | 'bebida' | 'empaque'
-// Vector de pesos por ingrediente: suman 1. sinClas es el residuo cuando no hay ni receta ni override.
-export type IngWeight = { comida: number; bebida: number; empaque: number; sinClas: number; source: 'receta' | 'override' | 'sin_clasificar'; usedIn: number }
+export type ClaseKey = 'comida' | 'bebida' | 'empaque' | 'no_aplica'
+// Vector de pesos por ingrediente: suman 1 (o 0 para no_aplica). sinClas es el residuo cuando no hay ni receta
+// ni override. 'no_aplica' = resuelto pero FUERA del food cost (limpieza/químicos): no pesa en ninguna cubeta.
+export type IngWeight = { comida: number; bebida: number; empaque: number; sinClas: number; source: 'receta' | 'override' | 'sin_clasificar' | 'no_aplica'; usedIn: number }
 
 type Product = { product_id: string | number; menu_category_id?: string | number; type?: string | number; ingredient_id?: string | number; cost?: string | number; hidden?: string }
 type RecipeIng = { ingredient_id: string | number; structure_selfprice?: string | number }
@@ -84,6 +85,10 @@ export async function getRecipeWeights(now = Date.now()): Promise<RecipeWeights>
 
 // Resuelve el vector de un ingrediente: override gana, si no la receta, si no → sin clasificar.
 export function resolveClass(id: number, recipe: RecipeWeights, override: ClaseKey | undefined): IngWeight {
+  if (override === 'no_aplica') {
+    // Resuelto pero fuera del food cost: no pesa en ninguna cubeta (limpieza/químicos).
+    return { comida: 0, bebida: 0, empaque: 0, sinClas: 0, source: 'no_aplica', usedIn: recipe.get(id)?.usedIn ?? 0 }
+  }
   if (override) {
     return { comida: override === 'comida' ? 1 : 0, bebida: override === 'bebida' ? 1 : 0, empaque: override === 'empaque' ? 1 : 0, sinClas: 0, source: 'override', usedIn: recipe.get(id)?.usedIn ?? 0 }
   }

@@ -8,8 +8,8 @@ import { Card, CardHead } from './ui'
 // recetas de Poster; aquí ves la CUBETA "sin clasificar" (visible, con su peso $ y su contenido) para mapear lo
 // que importe, y mantienes la LISTA DE EMPAQUE tú mismo (vasos, servilletas…). Todo lo configurable es corregible.
 
-type Clase = 'comida' | 'bebida' | 'empaque'
-type Item = { id: number; name: string; source: 'receta' | 'override' | 'sin_clasificar'; clase: Clase | null; w: { comida: number; bebida: number; empaque: number; sinClas: number }; usedIn: number; valor: number }
+type Clase = 'comida' | 'bebida' | 'empaque' | 'no_aplica'
+type Item = { id: number; name: string; source: 'receta' | 'override' | 'sin_clasificar' | 'no_aplica'; clase: Clase | null; w: { comida: number; bebida: number; empaque: number; sinClas: number }; usedIn: number; valor: number }
 type Data = {
   ingredients: Item[]
   composition: { comida: number; bebida: number; empaque: number; sinClas: number }
@@ -17,9 +17,10 @@ type Data = {
   lastCount: { fecha: string; total: number } | null
   sinClasificar: { count: number; valor: number; items: Item[] }
   packaging: Item[]
+  noAplica: Item[]
 }
 
-const CLASES: { key: Clase; label: string }[] = [{ key: 'comida', label: 'Comida' }, { key: 'bebida', label: 'Bebida' }, { key: 'empaque', label: 'Empaque' }]
+const CLASES: { key: Clase; label: string }[] = [{ key: 'comida', label: 'Comida' }, { key: 'bebida', label: 'Bebida' }, { key: 'empaque', label: 'Empaque' }, { key: 'no_aplica', label: 'No aplica' }]
 
 export function Clasificar({ tone }: { tone?: string }) {
   const dc = tone ?? 'var(--color-accent)'
@@ -109,6 +110,22 @@ export function Clasificar({ tone }: { tone?: string }) {
           </div>
         )}
       </Card>
+
+      {/* NO APLICA — resuelto pero FUERA del food cost (limpieza, químicos). Sale del conteo de pendientes
+          (la cubeta puede llegar a cero) pero sigue visible aquí, en su propia lista. */}
+      {data.noAplica.length > 0 && (
+        <Card>
+          <CardHead tone={dc}>No aplica · {data.noAplica.length} <span className="font-normal normal-case tracking-normal text-fg-muted">(nunca es food cost — limpieza, químicos)</span></CardHead>
+          <div className="space-y-1.5">
+            {data.noAplica.map((it) => (
+              <div key={it.id} className="flex items-center justify-between gap-2 text-secondary">
+                <span className="min-w-0 flex-1 truncate text-fg">{it.name}</span>
+                <button disabled={busy === it.id} onClick={() => setClase(it.id, null)} className="shrink-0 text-label text-fg-muted underline decoration-dotted hover:text-accent">regresar a la cubeta</button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Clasificados por receta — transparencia. Read-mostly; puedes forzar un override si la receta se equivoca. */}
       <Card>
