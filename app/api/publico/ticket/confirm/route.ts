@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { SESSION_COOKIE, getSessionScope } from '@/lib/auth'
 import { normAlias, stemAlias } from '@/lib/ticketExtract'
 import { todayMX, shiftDays } from '@/lib/posterImport'
 import { COST_CATEGORIES } from '@/lib/publico'
@@ -69,6 +70,9 @@ export async function POST(req: NextRequest) {
   }
   const items = (b.items ?? []).filter((i) => i && i.descripcion != null)
 
+  // SELLO DE ORIGEN — derivado del token firmado, NUNCA del body. Sin cookie (acceso por x-api-secret) = 'full'.
+  const origen = (await getSessionScope(req.cookies.get(SESSION_COOKIE)?.value)) ?? 'full'
+
   const supabase = createServerClient()
 
   // Imagen (evidencia). Vía NUEVA: ya está en Storage (drafts/…) → se MUEVE a su carpeta por fecha (una sola
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest) {
 
   // 1) Cabecera del scan (confirmado).
   const { data: scan, error: scanErr } = await supabase.from('ticket_scans').insert({
-    scope: 'publico', status: 'confirmed', image_path, model: b.model ?? null, raw: b.raw ?? null,
+    scope: 'publico', status: 'confirmed', image_path, model: b.model ?? null, raw: b.raw ?? null, origen,
     proveedor, proveedor_raw: b.proveedor_raw ?? null, fecha: b.fecha,
     subtotal: b.subtotal ?? null, descuento: b.descuento ?? null, impuestos: b.impuestos ?? null, total,
     legibilidad: b.legibilidad ?? null, notas: b.notas ?? null, confirmed_at: new Date().toISOString(),
@@ -115,7 +119,7 @@ export async function POST(req: NextRequest) {
   // note conserva el proveedor (compat Historial); proveedor/folio se guardan en sus columnas (habilita el
   // autocompletar/sugerencia y el folio pedido). Aditivo: no cambia lo que ya se leía.
   const folio = (b.folio ?? '').trim() || null
-  const base = { scope: 'publico', date: b.fecha, month: b.fecha.slice(0, 7), category: b.category, cost_kind, note: proveedor, proveedor, folio, ticket_scan_id: scanId }
+  const base = { scope: 'publico', date: b.fecha, month: b.fecha.slice(0, 7), category: b.category, cost_kind, note: proveedor, proveedor, folio, ticket_scan_id: scanId, origen }
   const costoRows = splits
     ? splits.map((s) => ({ ...base, origin: s.origin, amount: s.amount }))
     : [{ ...base, origin: b.origin ?? null, amount: total }]

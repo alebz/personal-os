@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { SESSION_COOKIE, getSessionScope } from '@/lib/auth'
 import { COST_CATEGORIES, CONTAINERS } from '@/lib/publico'
 
 const CATEGORIES: string[] = COST_CATEGORIES.map((c) => c.key)   // fuente única (incluye comisión y no-comida)
@@ -19,11 +20,14 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: 'monto inválido' }, { status: 400 })
   const cost_kind = NO_KIND.includes(b.category) ? null : (b.cost_kind === 'variable' ? 'variable' : 'fijo')
 
+  // SELLO DE ORIGEN — del token firmado, no del body. Sin cookie (x-api-secret) = 'full'.
+  const origen = (await getSessionScope(req.cookies.get(SESSION_COOKIE)?.value)) ?? 'full'
+
   const supabase = createServerClient()
   const row = {
     scope: 'publico', date: b.date, month: b.date.slice(0, 7),
     category: b.category, cost_kind, origin: b.origin ?? null, amount, note: b.note?.trim() || null,
-    proveedor: b.proveedor?.trim() || null, folio: b.folio?.trim() || null,
+    proveedor: b.proveedor?.trim() || null, folio: b.folio?.trim() || null, origen,
   }
   const { data, error } = await supabase.from('publico_costos').insert(row).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -7,9 +7,9 @@ import { Card, inputCell as cell } from './ui'
 import { COST_CATEGORIES, ORIGIN_OPTIONS, originLabel, catDefaults, type CostCategory } from '@/lib/publico'
 import { dayMonth } from './util'
 
-type TicketRow = { id: string; proveedor: string; fecha: string; total: number; legibilidad: string; image_path: string | null; starred?: boolean }
-type Suelto = { id: string; date: string; category: string; origin: string | null; amount: number; note: string | null; source: string | null }
-type Mov = { kind: 'ticket'; id: string; date: string; label: string; amount: number; t: TicketRow } | { kind: 'suelto'; id: string; date: string; label: string; amount: number; s: Suelto }
+type TicketRow = { id: string; proveedor: string; fecha: string; total: number; legibilidad: string; image_path: string | null; starred?: boolean; origen?: string | null }
+type Suelto = { id: string; date: string; category: string; origin: string | null; amount: number; note: string | null; source: string | null; origen?: string | null }
+type Mov = ({ kind: 'ticket'; id: string; date: string; label: string; amount: number; origen: string | null; t: TicketRow } | { kind: 'suelto'; id: string; date: string; label: string; amount: number; origen: string | null; s: Suelto })
 type Item = { id: string; pos: number; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean }
 type Costo = { id: string; date: string; category: string; origin: string | null; amount: number; cost_kind: string | null }
 type Scan = { id: string; proveedor: string; fecha: string; subtotal: number | null; descuento: number | null; impuestos: number | null; total: number; legibilidad: string; notas: string | null }
@@ -32,6 +32,7 @@ export function TicketsArchive({ tone }: { tone?: string }) {
   const [q, setQ] = useState('')                                     // filtrar por proveedor
   const [openFilter, setOpenFilter] = useState(false)
   const [starOnly, setStarOnly] = useState(false)
+  const [origenFilter, setOrigenFilter] = useState<'todos' | 'captura' | 'full'>('todos')   // ver qué capturó Andrés
   const [limit, setLimit] = useState(40)   // regla de oro del OS: top N + "ver más", nada de scroll interno
 
   async function toggleStar(t: TicketRow) {
@@ -48,12 +49,13 @@ export function TicketsArchive({ tone }: { tone?: string }) {
 
   // Historial = tickets + movimientos SIN ticket (a mano / Poster), unificados y ordenados por fecha.
   const movs: Mov[] = [
-    ...list.map((t): Mov => ({ kind: 'ticket', id: t.id, date: t.fecha, label: t.proveedor, amount: Number(t.total), t })),
-    ...sueltos.map((s): Mov => ({ kind: 'suelto', id: s.id, date: s.date, label: s.note || s.category, amount: Number(s.amount), s })),
+    ...list.map((t): Mov => ({ kind: 'ticket', id: t.id, date: t.fecha, label: t.proveedor, amount: Number(t.total), origen: t.origen ?? null, t })),
+    ...sueltos.map((s): Mov => ({ kind: 'suelto', id: s.id, date: s.date, label: s.note || s.category, amount: Number(s.amount), origen: s.origen ?? null, s })),
   ]
   const shown = movs
     .filter((m) => !q.trim() || m.label.toLowerCase().includes(q.trim().toLowerCase()))
     .filter((m) => !starOnly || (m.kind === 'ticket' && m.t.starred))
+    .filter((m) => origenFilter === 'todos' || (origenFilter === 'captura' ? m.origen === 'captura' : m.origen !== 'captura'))
     .sort((a, b) => {
       const d = sortBy === 'fecha' ? a.date.localeCompare(b.date) : a.amount - b.amount
       return asc ? d : -d
@@ -132,6 +134,7 @@ export function TicketsArchive({ tone }: { tone?: string }) {
             <button onClick={() => setSortBy((s) => (s === 'fecha' ? 'monto' : 'fecha'))} className="rounded-control border border-border px-2 py-0.5 text-fg-muted hover:text-accent">Acomodar: <b className="text-fg">{sortBy === 'fecha' ? 'Fecha' : 'Monto'}</b></button>
             <button onClick={() => setAsc((a) => !a)} title={asc ? 'Ascendente' : 'Descendente (más reciente/mayor arriba)'} className="rounded-control border border-border px-2 py-0.5 text-fg-muted hover:text-accent">{asc ? '↑' : '↓'}</button>
             <button onClick={() => setStarOnly((s) => !s)} title="solo marcados" className={`rounded-control border px-2 py-0.5 ${starOnly ? 'border-warn text-warn' : 'border-border text-fg-muted hover:text-accent'}`}>{starOnly ? '★' : '☆'}</button>
+            <button onClick={() => setOrigenFilter((o) => (o === 'todos' ? 'captura' : o === 'captura' ? 'full' : 'todos'))} title="filtrar por quién capturó" className={`rounded-control border px-2 py-0.5 ${origenFilter !== 'todos' ? 'border-accent text-accent' : 'border-border text-fg-muted hover:text-accent'}`}>Origen: <b className="text-fg">{origenFilter === 'todos' ? 'Todos' : origenFilter === 'captura' ? 'Andrés' : 'Yo'}</b></button>
             {openFilter && <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar (proveedor o nota)…" style={{ ...cell }} className="flex-1" />}
             <span className="ml-auto text-fg-muted">{shown.length}/{movs.length}</span>
           </div>
@@ -144,6 +147,7 @@ export function TicketsArchive({ tone }: { tone?: string }) {
                   <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} className={`shrink-0 px-0.5 ${m.t.starred ? 'text-warn' : 'text-fg-muted/40 hover:text-warn'}`}>{m.t.starred ? '★' : '☆'}</button>
                   <button onClick={() => void open(m.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                     <span className="flex-1 truncate"><b className="text-fg">{m.t.proveedor}</b> · {dayMonth(m.t.fecha)}</span>
+                    {m.origen === 'captura' && <span className="shrink-0 rounded bg-accent/15 px-1 text-label text-accent" title="capturado por Andrés">Andrés</span>}
                     {m.t.image_path && <span className="text-label text-fg-muted"></span>}
                     <span className="tabular-nums text-danger">−{mxn(Number(m.t.total))}</span>
                   </button>
@@ -152,6 +156,7 @@ export function TicketsArchive({ tone }: { tone?: string }) {
                 <div key={m.id} className="flex items-center gap-2 rounded-control border border-dashed border-border bg-surface-1 px-2 py-1 text-secondary">
                   <span className="shrink-0 text-fg-muted" title={m.s.source === 'poster' ? 'Importado de Poster' : 'Capturado a mano'}>{m.s.source === 'poster' ? 'POS' : 'a mano'}</span>
                   <span className="min-w-0 flex-1 truncate"><b className="text-fg">{m.s.note || m.s.category}</b> · {dayMonth(m.s.date)} <span className="text-fg-muted">· {m.s.category}</span></span>
+                  {m.origen === 'captura' && <span className="shrink-0 rounded bg-accent/15 px-1 text-label text-accent" title="capturado por Andrés">Andrés</span>}
                   <span className="tabular-nums text-danger">−{mxn(Number(m.s.amount))}</span>
                   {m.s.source !== 'poster' && <button onClick={() => void delSuelto(m.s)} title="Eliminar" className="shrink-0 text-fg-muted hover:text-danger">✕</button>}
                 </div>
