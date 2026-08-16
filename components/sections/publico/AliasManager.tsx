@@ -4,22 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { mxn } from '@/components/Mxn'
 import { Card, inputCell as cell } from './ui'
 import { type PosterCatalog } from './util'
+import { proposeFactor } from '@/lib/publico/unitFactor'
 
-// Propone el ×factor parseando el peso del NOMBRE y convirtiéndolo a la unidad base del ingrediente de Poster.
-// "500 GR"→0.5 (kg), "907 G"→0.907, "2.27 KG"→2.27, "1 L"→1. Sin peso → 1. Número sin unidad (ambiguo,
-// ej. "MOZZARELLA 2.26") → null: no adivina, se queda sin factor para que lo decidas. Misma lógica que el server.
-function proposeFactorClient(name: string, unit: string | undefined): number | null {
-  const N = (name ?? '').toUpperCase()
-  const m = N.match(/(\d+(?:[.,]\d+)?)\s*(KG|GR|G|ML|LT|L)\b/)
-  if (m) {
-    const v = parseFloat(m[1].replace(',', '.')), u = m[2]
-    if (unit === 'kg') { if (u === 'KG') return v; if (u === 'G' || u === 'GR') return v / 1000 }
-    if (unit === 'l') { if (u === 'L' || u === 'LT') return v; if (u === 'ML') return v / 1000 }
-    return null   // la unidad del nombre no cuadra con la base del ingrediente → que lo revises
-  }
-  if (/\b\d+(?:[.,]\d+)?\b/.test(N)) return null   // número suelto sin unidad → ambiguo
-  return 1
-}
+// Propone el ×factor con PRIORIDAD al CASO A (la unidad de la línea del ticket: kg/g/l/ml → conversión pura contra
+// la base del ingrediente), y solo si es pieza cae al CASO B (parsear el peso del nombre). 'incompatible' (l vs kg)
+// → no se aplica solo, queda sin factor para que el humano lo resuelva con densidad. Misma lógica en el server.
 
 // ── Alias aprendidos del capturador: verlos, editarlos o borrarlos. Una corrección tuya pudo enseñar un
 // error; aquí se arregla. raw_norm (la llave de match) es de solo lectura — para re-mapear, borra y re-aprende. ──
@@ -192,7 +181,8 @@ export function AliasManager() {
                       const fields: Record<string, unknown> = { poster_ingredient_id: id, poster_ingredient_type: ptype }
                       // Factor propuesto SOLO para ingredientes (parsea el peso del nombre → unidad del ingrediente).
                       // Mercancía se stockea por PIEZA: no se auto-propone; el factor lo pones tú (caja→piezas).
-                      if (id != null && kind === 'ing' && a.factor_a_base == null) { const f = proposeFactorClient(a.descripcion, cat?.ingredients.find((i) => i.id === id)?.unit); if (f != null) fields.factor_a_base = f }
+                      // CASO A (unidad de la línea) con prioridad, CASO B (nombre) si es pieza. 'incompatible' → sin factor (lo resuelves tú).
+                      if (id != null && kind === 'ing' && a.factor_a_base == null) { const f = proposeFactor(a.descripcion, a.unidad, cat?.ingredients.find((i) => i.id === id)?.unit); if (typeof f === 'number') fields.factor_a_base = f }
                       void patchAlias('product', a.raw_norm, fields)
                     }} style={{ ...cell, width: 168 }} title="Destino en Poster: INGREDIENTE (insumo de receta) o MERCANCÍA (reventa embotellada). Marca cuál es cuál.">
                       <option value="">Poster: sin mapear</option>
