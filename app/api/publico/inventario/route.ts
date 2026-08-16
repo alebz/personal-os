@@ -82,18 +82,18 @@ export async function GET() {
     .sort((a, b) => (a.minOrder - b.minOrder) || a.name.localeCompare(b.name, 'es'))
     .map(({ id, name, ingredients }) => ({ id, name, ingredients }))
 
-  const { data: last } = await supabase.from('publico_conteos').select('id, fecha').order('fecha', { ascending: false }).limit(1).maybeSingle()
+  const { data: last } = await supabase.from('publico_conteos').select('id, fecha, fase').order('fecha', { ascending: false }).limit(1).maybeSingle()
 
   return NextResponse.json({ storages: groups, lastConteo: last ?? null })
 }
 
 export async function POST(req: NextRequest) {
-  let b: { fecha?: string; nota?: string; lineas?: Array<{ ingredient_id: number; ingredient_name: string; base_unit: string; base_qty: number; unit_cost: number; value: number; raw_counts?: unknown }> }
+  let b: { fecha?: string; nota?: string; fase?: string; lineas?: Array<{ ingredient_id: number; ingredient_name: string; base_unit: string; base_qty: number; unit_cost: number; value: number; raw_counts?: unknown }> }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'JSON inválido' }, { status: 400 }) }
   if (!b.fecha || !Array.isArray(b.lineas) || !b.lineas.length) return NextResponse.json({ error: 'fecha y líneas requeridas' }, { status: 400 })
 
   const supabase = createServerClient()
-  const { data: conteo, error: e1 } = await supabase.from('publico_conteos').insert({ fecha: b.fecha, nota: b.nota ?? null }).select('id').single()
+  const { data: conteo, error: e1 } = await supabase.from('publico_conteos').insert({ fecha: b.fecha, nota: b.nota ?? null, fase: b.fase?.trim() || null }).select('id').single()
   if (e1 || !conteo) return NextResponse.json({ error: e1?.message ?? 'no se creó el conteo' }, { status: 500 })
 
   const rows = b.lineas.map((l) => ({

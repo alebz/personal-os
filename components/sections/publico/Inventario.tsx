@@ -11,7 +11,11 @@ import { Clasificar } from './Clasificar'
 type CountUnit = { label: string; factor: number }
 type Ing = { id: number; name: string; baseUnit: string; unitCost: number; barcode: string | null; countUnits: CountUnit[]; categoria?: string | null; sortOrder?: number }
 type Group = { id: string; name: string; ingredients: Ing[] }
-type Data = { storages: Group[]; lastConteo: { id: string; fecha: string } | null }
+type Data = { storages: Group[]; lastConteo: { id: string; fecha: string; fase?: string | null } | null }
+
+// Día de la semana (CDMX) de una fecha YYYY-MM-DD, para comparar la FASE del ciclo entre conteos sin líos de TZ.
+const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const weekdayOf = (iso: string): string => { const [y, m, d] = iso.split('-').map(Number); return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] }
 
 const BASE = '__base__'
 const num = (v: string) => { const n = Number(v.replace(',', '.')); return Number.isFinite(n) ? n : 0 }
@@ -37,6 +41,7 @@ export function Inventario({ tone }: { tone?: string }) {
   const [counts, setCounts] = useState<Record<number, Record<string, number>>>({})   // ing.id → unitLabel → qty
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
+  const [fase, setFase] = useState(() => weekdayOf(todayMX()))   // fase del ciclo de ESTE conteo (default: día de hoy)
 
   const load = useCallback(async () => {
     const j = await fetch('/api/publico/inventario').then((r) => r.json()).catch(() => null)
@@ -68,7 +73,7 @@ export function Inventario({ tone }: { tone?: string }) {
       })
     if (!lineas.length) { setFlash('No has contado nada aún'); return }
     setSaving(true)
-    const r = await fetch('/api/publico/inventario', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fecha: todayMX(), lineas }) })
+    const r = await fetch('/api/publico/inventario', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fecha: todayMX(), fase, lineas }) })
     setSaving(false)
     if (r.ok) { setFlash(`Conteo guardado · ${lineas.length} insumos · ${mxn(totalValue)}`); setCounts({}); void load() }
     else setFlash('No se pudo guardar')
@@ -85,6 +90,27 @@ export function Inventario({ tone }: { tone?: string }) {
         <span className="text-label text-fg-muted">{data.lastConteo ? `último conteo · ${data.lastConteo.fecha}` : 'sin conteos aún'}</span>
       </div>
 
+      {/* FASE DEL CICLO — lo más importante del food cost real: comparar consumo entre conteos del MISMO momento
+          del ciclo. Si el #1 es domingo-cierre y el #2 lunes-post-entrega, el número no vale. Recuerda y avisa. */}
+      {view === 'contar' && (() => {
+        const today = todayMX(); const prev = data.lastConteo
+        const sameWeekday = prev ? weekdayOf(prev.fecha) === weekdayOf(today) : true
+        return (
+          <Card tone={tone}>
+            <CardHead tone={tone}>Fase del ciclo</CardHead>
+            {prev && <div className="mb-1 text-label text-fg-muted">Anterior: {prev.fecha} · {weekdayOf(prev.fecha)}{prev.fase ? ` · ${prev.fase}` : ''}</div>}
+            <label className="flex flex-wrap items-center gap-2">
+              <span className="text-label text-fg-muted">{prev ? 'Esta fase' : 'Fase'}</span>
+              <input value={fase} onChange={(e) => setFase(e.target.value)} placeholder="ej. domingo cierre" style={{ ...cell, width: 200 }} />
+            </label>
+            {prev
+              ? (sameWeekday
+                  ? <div className="mt-1 text-label text-ok">✓ mismo día del ciclo que el conteo anterior — comparable</div>
+                  : <div className="mt-1 text-label text-warn">⚠ el anterior fue {weekdayOf(prev.fecha)} y hoy es {weekdayOf(today)} — distinta fase del ciclo; el food cost real del periodo NO será comparable. Cuenta en el mismo momento (mismo día, mismo punto vs. la entrega).</div>)
+              : <div className="mt-1 text-label text-fg-muted">Primer conteo (arranque). Anota la fase — el próximo debe contarse en el MISMO momento del ciclo o el consumo no cuadra.</div>}
+          </Card>
+        )
+      })()}
       {view === 'contar' && <Contar data={data} counts={counts} setCount={setCount} baseTotal={baseTotal} tone={tone} />}
       {view === 'organizar' && <Organizar data={data} onReload={load} tone={tone} />}
       {view === 'unidades' && <Unidades ingredients={allIngs} onSaved={load} tone={tone} />}
