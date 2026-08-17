@@ -4,6 +4,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'r
 import { mxn } from '@/components/Mxn'
 import { Card, CardHead, TabBar, inputCell as cell } from './ui'
 import { Clasificar } from './Clasificar'
+import { ConteoHistorial } from './ConteoHistorial'
 
 // INVENTARIO — el conteo físico del domingo, dueño en el OS. Anti-pendejos: cuentas en las unidades que VES
 // (caja/lata/base), el sistema convierte y valúa solo. Dos vistas: CONTAR (el acto) · UNIDADES (definir una vez).
@@ -37,7 +38,7 @@ const todayMX = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Americ
 
 export function Inventario({ tone }: { tone?: string }) {
   const [data, setData] = useState<Data | null>(null)
-  const [view, setView] = useState<'contar' | 'organizar' | 'unidades' | 'clasificar'>('contar')
+  const [view, setView] = useState<'contar' | 'organizar' | 'unidades' | 'clasificar' | 'conteos'>('contar')
   const [counts, setCounts] = useState<Record<number, Record<string, number>>>({})   // ing.id → unitLabel → qty
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
@@ -86,7 +87,7 @@ export function Inventario({ tone }: { tone?: string }) {
     <div className="space-y-2">
       {/* Cabecera: vistas + estado */}
       <div className="flex items-center justify-between">
-        <TabBar value={view} onChange={setView} tabs={[['contar', 'Contar'], ['organizar', 'Organizar'], ['unidades', 'Unidades'], ['clasificar', 'Clasificar']] as const} />
+        <TabBar value={view} onChange={setView} tabs={[['contar', 'Contar'], ['conteos', 'Conteos'], ['organizar', 'Organizar'], ['unidades', 'Unidades'], ['clasificar', 'Clasificar']] as const} />
         <span className="text-label text-fg-muted">{data.lastConteo ? `último conteo · ${data.lastConteo.fecha}` : 'sin conteos aún'}</span>
       </div>
 
@@ -115,6 +116,7 @@ export function Inventario({ tone }: { tone?: string }) {
       {view === 'organizar' && <Organizar data={data} onReload={load} tone={tone} />}
       {view === 'unidades' && <Unidades ingredients={allIngs} onSaved={load} tone={tone} />}
       {view === 'clasificar' && <Clasificar tone={tone} />}
+      {view === 'conteos' && <ConteoHistorial tone={tone} />}
 
       {/* Barra fija de total + guardar (solo al contar) */}
       {view === 'contar' && (
