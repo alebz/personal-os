@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { productUnitCostNet, type PosterProductRaw } from '@/lib/publico/posterProductCost'
 
 export const runtime = 'nodejs'
 export const revalidate = 0
@@ -35,7 +36,7 @@ export async function GET() {
   try {
     const [ings, prods, sups] = await Promise.all([
       poster<{ ingredient_id: number | string; ingredient_name: string; ingredient_unit: string; prime_cost?: number | string }>('menu.getIngredients', token),
-      poster<{ product_id: number | string; product_name: string; unit?: string; hidden?: string; cost?: number | string }>('menu.getProducts', token),
+      poster<{ product_id: number | string; product_name: string; unit?: string; hidden?: string } & PosterProductRaw>('menu.getProducts', token),
       poster<{ supplier_id: number | string; supplier_name: string; delete?: string }>('storage.getSuppliers', token),
     ])
     const data: Catalog = {
@@ -45,7 +46,7 @@ export async function GET() {
       // Mercancía: todos los productos vendibles (el usuario elige el que aplica; su unidad de stock es la pieza).
       merchandise: prods
         .filter((p) => p.hidden !== '1')
-        .map((p) => ({ id: Number(p.product_id), name: p.product_name, unit: p.unit || 'p', unitCost: Number(p.cost || 0) / 100 }))
+        .map((p) => ({ id: Number(p.product_id), name: p.product_name, unit: p.unit || 'p', unitCost: productUnitCostNet(p) }))
         .sort((a, b) => a.name.localeCompare(b.name, 'es')),
       suppliers: sups
         .filter((s) => s.delete !== '1')

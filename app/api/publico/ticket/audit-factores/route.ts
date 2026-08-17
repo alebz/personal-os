@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { magnitudeGuard } from '@/lib/publico/magnitudeGuard'
+import { productUnitCostNet, type PosterProductRaw } from '@/lib/publico/posterProductCost'
 
 export const runtime = 'nodejs'
 
@@ -24,13 +25,13 @@ export async function GET() {
       .select('raw_norm, descripcion, poster_ingredient_id, poster_ingredient_type, factor_a_base, importe_acumulado, cantidad_acumulada, iva_tasa')
       .is('deleted_at', null).not('poster_ingredient_id', 'is', null),
     poster<{ ingredient_id: number | string; ingredient_name: string; ingredient_unit: string; prime_cost?: number | string }>('menu.getIngredients', token),
-    poster<{ product_id: number | string; product_name: string; unit?: string; cost?: number | string }>('menu.getProducts', token),
+    poster<{ product_id: number | string; product_name: string; unit?: string } & PosterProductRaw>('menu.getProducts', token),
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Ingredientes (prime_cost ÷10000) y MERCANCÍA (cost ÷100). El guardián cubre ambos.
+  // Ingredientes (prime_cost ÷10000) y MERCANCÍA (costo neto de base o de variante). El guardián cubre ambos.
   const ingById = new Map(ings.map((i) => [Number(i.ingredient_id), { name: i.ingredient_name, unit: i.ingredient_unit, unitCost: Number(i.prime_cost || 0) / 10_000 }]))
-  const prodById = new Map(prods.map((p) => [Number(p.product_id), { name: p.product_name, unit: p.unit || 'pza', unitCost: Number(p.cost || 0) / 100 }]))
+  const prodById = new Map(prods.map((p) => [Number(p.product_id), { name: p.product_name, unit: p.unit || 'pza', unitCost: productUnitCostNet(p) }]))
 
   const banderas: Array<{ nombre: string; raw_norm: string; unidad: string; factor: number | null; tuCosto: number; posterCosto: number; ratio: number; importeAcum: number; cantAcum: number }> = []
   const sinComparar: Array<{ nombre: string; raw_norm: string; motivo: string }> = []
