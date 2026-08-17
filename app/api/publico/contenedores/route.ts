@@ -18,7 +18,7 @@ type Flows = {
   ingresos: { date: string; origin: string | null; amount: number }[]
   socioMovs: { date: string; metodo: string | null; flow: string; amount: number }[]
   traspasos: { fecha: string; origin: string; destino: string; amount: number }[]
-  propinas: { date: string; monto: number }[]
+  propinas: { date: string; monto: number; efectivo: number; tarjeta: number }[]
   repartos: { fecha: string; contenedor: string; amount: number; kind: string }[]
 }
 
@@ -34,7 +34,10 @@ function flowSince(c: Cont, since: string, f: Flows): number {
   for (const x of f.ingresos) if (x.date > since && x.origin === c) s += Number(x.amount)
   for (const m of f.socioMovs) if (m.date > since && m.metodo === c) s += (m.flow === 'in' ? Number(m.amount) : -Number(m.amount))
   for (const t of f.traspasos) if (t.fecha > since) { if (t.origin === c) s -= Number(t.amount); if (t.destino === c) s += Number(t.amount) }
-  if (c === 'clip') for (const p of f.propinas) if (p.date > since) s += Number(p.monto)
+  // Propina de TARJETA cae a CLIP; la de EFECTIVO cae a la CAJA POS (el personal la deja en la caja). Antes todo
+  // se acreditaba a CLIP, inflándolo y dejando el efectivo fuera del pasivo.
+  if (c === 'clip') for (const p of f.propinas) if (p.date > since) s += Number(p.tarjeta)
+  if (c === 'caja_pos') for (const p of f.propinas) if (p.date > since) s += Number(p.efectivo)
   // El ARRANQUE (reconciliación) NO sale del efectivo: representa propina repartida ANTES del registro, ya
   // reflejada en la realidad del contenedor. Solo los repartos NORMALES bajan el saldo.
   for (const r of f.repartos) if (r.kind !== 'arranque' && r.fecha > since && r.contenedor === c) s -= Number(r.amount)
@@ -47,7 +50,7 @@ async function loadFlows(supabase: ReturnType<typeof createServerClient>): Promi
     supabase.from('publico_costos').select('date, origin, amount'),
     supabase.from('publico_ingresos').select('date, origin, amount'),
     supabase.from('finance_envelopes').select('id').eq('scope', 'publico'),
-    supabase.from('publico_propinas').select('date, monto'),
+    supabase.from('publico_propinas').select('date, monto, efectivo, tarjeta'),
     supabase.from('publico_propina_repartos').select('fecha, contenedor, amount, kind'),
   ])
   const envIds = (env ?? []).map((e) => e.id)

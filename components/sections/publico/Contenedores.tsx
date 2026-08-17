@@ -18,7 +18,7 @@ type Pend = { since: string | null; count: number; total: number; items: { id: s
 type Comision = { id: string; date: string; amount: number; note: string | null }
 type Reparto = { id: string; fecha: string; amount: number; contenedor: ContKey; nota: string | null; kind: string }
 type Nivel = 'verde' | 'amarillo' | 'rojo'
-type Propinas = { acumulado: number; repartido: number; arranque: number; pendiente: number; ultimoReparto: string | null; nivel: Nivel; umbralAmarillo: number; umbralRojo: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
+type Propinas = { acumulado: number; repartido: number; arranque: number; pendiente: number; pendienteEfectivo: number; pendienteTarjeta: number; ultimoReparto: string | null; nivel: Nivel; umbralAmarillo: number; umbralRojo: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
 const NIVEL_COLOR: Record<Nivel, string> = { verde: 'var(--color-fg-muted)', amarillo: 'var(--color-warn, #b45309)', rojo: 'var(--color-danger)' }
 
 const ALERTA_DIAS = 21   // aviso de "hace mucho que no cuadras", análogo al del conteo físico del food cost
@@ -123,6 +123,22 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
     setFlash(`reparto propina · ${LABELS[rep.contenedor]} −${mxn(amount)}`)
     setTimeout(() => setFlash(null), 5000)
     setRep({ ...rep, amount: null, nota: '' }); await load()
+  }
+  // Pagar TODO el pendiente partido por origen: tarjeta desde CLIP, efectivo desde CAJA POS (así cada contenedor
+  // se debita de donde de verdad salió el dinero). Dos repartos de un tap; deja el pendiente en 0.
+  async function pagarTodoPartido() {
+    if (!prop) return
+    const partes: { amount: number; contenedor: ContKey; nota: string }[] = []
+    if (prop.pendienteTarjeta > 0) partes.push({ amount: prop.pendienteTarjeta, contenedor: 'clip', nota: 'Propina tarjeta (desde CLIP)' })
+    if (prop.pendienteEfectivo > 0) partes.push({ amount: prop.pendienteEfectivo, contenedor: 'caja_pos', nota: 'Propina efectivo (desde Caja POS)' })
+    if (!partes.length) return
+    for (const p of partes) {
+      const resp = await fetch('/api/publico/propinas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fecha: rep.fecha, amount: p.amount, contenedor: p.contenedor, nota: p.nota }) })
+      const r = await resp.json().catch(() => ({} as { error?: string }))
+      if (!resp.ok || r.error) { setFlash(`pago partido: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
+    }
+    setFlash(`propina pagada · ${mxn(prop.pendiente)} (tarjeta ${mxn(prop.pendienteTarjeta)} de CLIP + efectivo ${mxn(prop.pendienteEfectivo)} de Caja POS)`)
+    setTimeout(() => setFlash(null), 7000); await load()
   }
   async function revertReparto(id: string) {
     await fetch(`/api/publico/propinas?id=${id}`, { method: 'DELETE' })
@@ -234,7 +250,14 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
                 {prop.porMes.map((m) => <span key={m.month} className="tabular-nums">{m.month.slice(5)}/{m.month.slice(2, 4)} {mxn(m.monto)}</span>)}
               </div>
             )}
-            {/* Registrar reparto: baja el pendiente y saca el dinero del contenedor elegido (CLIP por defecto). */}
+            {/* PAGAR TODO partido por origen: tarjeta desde CLIP, efectivo desde CAJA POS. Un tap = dos repartos. */}
+            {prop.pendiente > 0 && (prop.pendienteTarjeta > 0 || prop.pendienteEfectivo > 0) && (
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-1">
+                <button onClick={() => void pagarTodoPartido()} style={{ background: dc }} className="rounded-control px-3 py-1 font-bold text-white">Pagar todo · {mxn(prop.pendiente)}</button>
+                <span className="text-label text-fg-muted">tarjeta <b className="tabular-nums text-fg">{mxn(prop.pendienteTarjeta)}</b> de CLIP · efectivo <b className="tabular-nums text-fg">{mxn(prop.pendienteEfectivo)}</b> de Caja POS</span>
+              </div>
+            )}
+            {/* Registrar reparto MANUAL (parcial o de un solo contenedor). */}
             <div className="flex flex-wrap items-center gap-1 border-t border-border pt-1">
               <span className="text-fg-muted">repartí</span>
               <MoneyInput value={rep.amount} onChange={(v) => setRep({ ...rep, amount: v })} placeholder="$ monto" style={{ ...cell, width: 84, textAlign: 'right' }} />

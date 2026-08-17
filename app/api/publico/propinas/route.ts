@@ -15,7 +15,7 @@ const round = (n: number) => Math.round(n * 100) / 100
 export async function GET() {
   const supabase = createServerClient()
   const [{ data: props }, { data: repartos }, { data: sync }, cfg] = await Promise.all([
-    supabase.from('publico_propinas').select('date, month, monto, n_tx'),
+    supabase.from('publico_propinas').select('date, month, monto, n_tx, efectivo, tarjeta'),
     supabase.from('publico_propina_repartos').select('id, fecha, amount, contenedor, nota, kind, created_at').order('fecha', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('publico_propina_sync').select('last_success_at, last_import_to, last_error').eq('id', 'default').maybeSingle(),
     supabase.from('publico_config').select('propina_umbral_amarillo, propina_umbral_rojo').eq('id', 1).maybeSingle(),
@@ -26,6 +26,15 @@ export async function GET() {
   const arranque = round(reps.filter((r) => r.kind === 'arranque').reduce((s, r) => s + Number(r.amount), 0))       // reconciliación de arranque
   const pendiente = round(acumulado - repartidoReal - arranque)   // lo que sigues debiendo HOY (propina de esta semana)
   const ultimoReparto = reps.filter((r) => r.kind !== 'arranque').map((r) => r.fecha as string).sort().pop() ?? null
+
+  // Split del pendiente por ORIGEN, para pagar cada parte desde su contenedor: efectivo desde CAJA POS, tarjeta
+  // desde CLIP. El arranque es histórico (todo Clip = tarjeta), así que resta del lado tarjeta.
+  const acumEfectivo = round((props ?? []).reduce((s, p) => s + Number(p.efectivo ?? 0), 0))
+  const acumTarjeta = round((props ?? []).reduce((s, p) => s + Number(p.tarjeta ?? 0), 0))
+  const repEfectivo = round(reps.filter((r) => r.kind !== 'arranque' && r.contenedor === 'caja_pos').reduce((s, r) => s + Number(r.amount), 0))
+  const repTarjeta = round(reps.filter((r) => r.kind !== 'arranque' && r.contenedor !== 'caja_pos').reduce((s, r) => s + Number(r.amount), 0))
+  const pendienteEfectivo = round(acumEfectivo - repEfectivo)
+  const pendienteTarjeta = round(acumTarjeta - arranque - repTarjeta)
 
   const umbralAmarillo = Number((cfg.data as { propina_umbral_amarillo?: number } | null)?.propina_umbral_amarillo ?? 1000)
   const umbralRojo = Number((cfg.data as { propina_umbral_rojo?: number } | null)?.propina_umbral_rojo ?? 2000)
@@ -40,6 +49,7 @@ export async function GET() {
   const porMes = [...porMesMap.values()].filter((m) => m.monto > 0).sort((a, b) => (a.month < b.month ? 1 : -1))
   return NextResponse.json({
     acumulado, repartido: repartidoReal, arranque, pendiente, ultimoReparto,
+    pendienteEfectivo, pendienteTarjeta,
     nivel, umbralAmarillo, umbralRojo, porMes,
     // La lista marca el arranque como RECONCILIACIÓN (no un reparto normal) para no ensuciar el histórico semanal.
     repartos: reps.map((r) => ({ id: r.id, fecha: r.fecha, amount: Number(r.amount), contenedor: r.contenedor, nota: r.nota, kind: r.kind ?? 'reparto' })),

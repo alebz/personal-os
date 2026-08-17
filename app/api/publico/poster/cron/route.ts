@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { runPosterImport, importSupplies } from '@/lib/posterImport'
 import { runClipImport } from '@/lib/clipSettlements'
-import { runClipTipsImport } from '@/lib/clipTips'
+import { runPosterTipsImport } from '@/lib/posterTips'
 import { createServerClient } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
   const to = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
   const from = (() => { const [y, m, d] = to.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d)); t.setUTCDate(t.getUTCDate() - 40); return t.toISOString().slice(0, 10) })()
   const clip = await runClipImport(createServerClient(), from, to).catch((e) => ({ ok: false as const, error: String(e), status: 500 }))
-  // Propinas de tarjeta (Clip /payments): ventana corta (últimos ~10 días) para no hacer 40 llamadas por día.
+  // Propinas desde POSTER (tips_cash + tips_card): ventana corta (últimos ~10 días). Reemplaza a Clip (que solo veía tarjeta).
   const tipsFrom = (() => { const [y, m, d] = to.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d)); t.setUTCDate(t.getUTCDate() - 10); return t.toISOString().slice(0, 10) })()
-  const tips = await runClipTipsImport(createServerClient(), tipsFrom, to).catch((e) => ({ ok: false as const, error: String(e), status: 500 }))
-  return NextResponse.json({ ventas: r, compras: s.ok ? { imported: s.imported, skippedManual: s.skippedManual.length } : { error: s.error }, draftsBarridos: drafts, comisionesClip: clip.ok ? { imported: clip.imported, totalFee: clip.totalFee } : { error: clip.error }, propinasClip: tips.ok ? { imported: tips.imported, totalTip: tips.totalTip } : { error: tips.error } }, { status: r.ok ? 200 : r.status })
+  const tips = await runPosterTipsImport(createServerClient(), tipsFrom, to).catch((e) => ({ ok: false as const, error: String(e), status: 500 }))
+  return NextResponse.json({ ventas: r, compras: s.ok ? { imported: s.imported, skippedManual: s.skippedManual.length } : { error: s.error }, draftsBarridos: drafts, comisionesClip: clip.ok ? { imported: clip.imported, totalFee: clip.totalFee } : { error: clip.error }, propinasPoster: tips.ok ? { imported: tips.imported, total: tips.total } : { error: tips.error } }, { status: r.ok ? 200 : r.status })
 }
