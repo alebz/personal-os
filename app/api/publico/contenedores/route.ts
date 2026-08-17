@@ -27,20 +27,23 @@ type Flows = {
 // TRASPASOS entre contenedores (baja el origen, sube el destino), y PROPINAS de tarjeta (ENTRAN a CLIP —
 // caen ahí junto con la venta, aunque no sean venta) menos sus REPARTOS (SALEN del contenedor que las pagó).
 // Sin esto, CLIP quedaba subestimado y la propina aparecía como "sobrante" al cuadrar.
-function flowSince(c: Cont, since: string, f: Flows): number {
+function flowSince(c: Cont, since: string, today: string, f: Flows): number {
+  // Ventana del saldo ACTUAL: DESPUÉS del cuadre y HASTA HOY. El tope en HOY es clave — un gasto fechado en el
+  // FUTURO (p. ej. una reinversión del 24) aún no salió del contenedor, así que no debe restar del saldo de hoy.
+  const inWin = (d: string) => d > since && d <= today
   let s = 0
-  for (const v of f.ventas) if (v.date > since) s += c === 'caja_pos' ? Number(v.efectivo) : c === 'clip' ? Number(v.tarjeta) : 0
-  for (const x of f.costos) if (x.date > since && x.origin === c) s -= Number(x.amount)
-  for (const x of f.ingresos) if (x.date > since && x.origin === c) s += Number(x.amount)
-  for (const m of f.socioMovs) if (m.date > since && m.metodo === c) s += (m.flow === 'in' ? Number(m.amount) : -Number(m.amount))
-  for (const t of f.traspasos) if (t.fecha > since) { if (t.origin === c) s -= Number(t.amount); if (t.destino === c) s += Number(t.amount) }
+  for (const v of f.ventas) if (inWin(v.date)) s += c === 'caja_pos' ? Number(v.efectivo) : c === 'clip' ? Number(v.tarjeta) : 0
+  for (const x of f.costos) if (inWin(x.date) && x.origin === c) s -= Number(x.amount)
+  for (const x of f.ingresos) if (inWin(x.date) && x.origin === c) s += Number(x.amount)
+  for (const m of f.socioMovs) if (inWin(m.date) && m.metodo === c) s += (m.flow === 'in' ? Number(m.amount) : -Number(m.amount))
+  for (const t of f.traspasos) if (inWin(t.fecha)) { if (t.origin === c) s -= Number(t.amount); if (t.destino === c) s += Number(t.amount) }
   // Propina de TARJETA cae a CLIP; la de EFECTIVO cae a la CAJA POS (el personal la deja en la caja). Antes todo
   // se acreditaba a CLIP, inflándolo y dejando el efectivo fuera del pasivo.
-  if (c === 'clip') for (const p of f.propinas) if (p.date > since) s += Number(p.tarjeta)
-  if (c === 'caja_pos') for (const p of f.propinas) if (p.date > since) s += Number(p.efectivo)
+  if (c === 'clip') for (const p of f.propinas) if (inWin(p.date)) s += Number(p.tarjeta)
+  if (c === 'caja_pos') for (const p of f.propinas) if (inWin(p.date)) s += Number(p.efectivo)
   // El ARRANQUE (reconciliación) NO sale del efectivo: representa propina repartida ANTES del registro, ya
   // reflejada en la realidad del contenedor. Solo los repartos NORMALES bajan el saldo.
-  for (const r of f.repartos) if (r.kind !== 'arranque' && r.fecha > since && r.contenedor === c) s -= Number(r.amount)
+  for (const r of f.repartos) if (r.kind !== 'arranque' && inWin(r.fecha) && r.contenedor === c) s -= Number(r.amount)
   return Math.round(s * 100) / 100
 }
 
@@ -61,7 +64,9 @@ async function loadFlows(supabase: ReturnType<typeof createServerClient>): Promi
   return { ventas: ventas ?? [], costos: costos ?? [], ingresos: ingresos ?? [], socioMovs: socioMovs ?? [], traspasos: traspasos ?? [], propinas: propinas ?? [], repartos: repartos ?? [] }
 }
 
-const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+// Día NATURAL CDMX (no la fecha local del servidor: Vercel corre en UTC y a las 6 PM CDMX ya es el día siguiente
+// UTC → el cuadre se fechaba en el FUTURO, rompiendo "días sin cuadrar" y el filtro fecha> de flowSince).
+const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
 const daysBetween = (a: string, b: string) => Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
 
 async function latestSnaps(supabase: ReturnType<typeof createServerClient>) {
@@ -95,7 +100,7 @@ export async function GET() {
     const historial = [...cuadres, ...trasp].sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
     const snap = snaps.get(c)
     if (!snap) return { contenedor: c, label: LABEL[c], procedencia: PROCEDENCIA[c], needsBaseline: true, balance: null, desde: null, diasSinCuadrar: null, historial }
-    const balance = Math.round((snap.saldo + flowSince(c, snap.fecha, flows)) * 100) / 100
+    const balance = Math.round((snap.saldo + flowSince(c, snap.fecha, today, flows)) * 100) / 100
     return { contenedor: c, label: LABEL[c], procedencia: PROCEDENCIA[c], needsBaseline: false, balance, desde: snap.fecha, diasSinCuadrar: daysBetween(snap.fecha, today), historial }
   })
   const total = contenedores.every((x) => x.balance != null) ? Math.round(contenedores.reduce((s, x) => s + (x.balance ?? 0), 0) * 100) / 100 : null
@@ -124,7 +129,7 @@ export async function POST(req: NextRequest) {
   }
 
   const flows = await loadFlows(supabase)
-  const shown = Math.round((snap.saldo + flowSince(c, snap.fecha, flows)) * 100) / 100
+  const shown = Math.round((snap.saldo + flowSince(c, snap.fecha, today, flows)) * 100) / 100
   const { delta, adjustment } = computeCuadre(contado, shown, LABEL[c])
   const nota = adjustment ? `${adjustment.label} ${delta > 0 ? '+' : ''}${delta} (esperaba ${shown}, conté ${contado})` : 'Cuadre sin diferencia'
   const { error } = await supabase.from('publico_contenedor_saldos').insert({ contenedor: c, saldo: contado, fecha: today, esperado: shown, nota })
