@@ -19,15 +19,18 @@ export async function GET() {
   if (!token) return NextResponse.json({ error: 'POSTER_TOKEN no configurado' }, { status: 400 })
   const supabase = createServerClient()
 
-  const [{ data: aliases, error }, ings] = await Promise.all([
+  const [{ data: aliases, error }, ings, prods] = await Promise.all([
     supabase.from('ticket_product_aliases')
       .select('raw_norm, descripcion, poster_ingredient_id, poster_ingredient_type, factor_a_base, importe_acumulado, cantidad_acumulada, iva_tasa')
       .is('deleted_at', null).not('poster_ingredient_id', 'is', null),
     poster<{ ingredient_id: number | string; ingredient_name: string; ingredient_unit: string; prime_cost?: number | string }>('menu.getIngredients', token),
+    poster<{ product_id: number | string; product_name: string; unit?: string; cost?: number | string }>('menu.getProducts', token),
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Ingredientes (prime_cost ÷10000) y MERCANCÍA (cost ÷100). El guardián cubre ambos.
   const ingById = new Map(ings.map((i) => [Number(i.ingredient_id), { name: i.ingredient_name, unit: i.ingredient_unit, unitCost: Number(i.prime_cost || 0) / 10_000 }]))
+  const prodById = new Map(prods.map((p) => [Number(p.product_id), { name: p.product_name, unit: p.unit || 'pza', unitCost: Number(p.cost || 0) / 100 }]))
 
   const banderas: Array<{ nombre: string; raw_norm: string; unidad: string; factor: number | null; tuCosto: number; posterCosto: number; ratio: number; importeAcum: number; cantAcum: number }> = []
   const sinComparar: Array<{ nombre: string; raw_norm: string; motivo: string }> = []
@@ -37,10 +40,10 @@ export async function GET() {
     revisados++
     const id = Number(a.poster_ingredient_id)
     const nombre = a.descripcion || a.raw_norm
-    const ing = ingById.get(id)
-    // Mercancía (type 1) o ingrediente no hallado: su costo no vive en getIngredients → no hay contra qué comparar.
-    if (!ing) { sinComparar.push({ nombre, raw_norm: a.raw_norm, motivo: a.poster_ingredient_type === 1 ? 'mercancía (sin prime_cost de ingrediente)' : 'ingrediente no encontrado en Poster' }); continue }
-    if (!(ing.unitCost > 0)) { sinComparar.push({ nombre, raw_norm: a.raw_norm, motivo: 'sin prime_cost en Poster' }); continue }
+    // type 1 = mercancía (product cost) · 10 = ingrediente (prime_cost). Prefiere por tipo, con respaldo al otro.
+    const ing = (a.poster_ingredient_type === 1 ? prodById.get(id) : ingById.get(id)) ?? ingById.get(id) ?? prodById.get(id)
+    if (!ing) { sinComparar.push({ nombre, raw_norm: a.raw_norm, motivo: 'id no encontrado en Poster (ingrediente ni producto)' }); continue }
+    if (!(ing.unitCost > 0)) { sinComparar.push({ nombre, raw_norm: a.raw_norm, motivo: 'sin costo cargado en Poster' }); continue }
     if (a.factor_a_base == null) { sinComparar.push({ nombre, raw_norm: a.raw_norm, motivo: 'sin factor a base aún' }); continue }
     const cant = Number(a.cantidad_acumulada || 0)
     const imp = Number(a.importe_acumulado || 0)

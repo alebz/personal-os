@@ -14,6 +14,6 @@ export const dayMonth = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDat
 export const monthName = (ym: string) => { const [y, m] = ym.split('-').map(Number); return `${new Date(y, m - 1, 1).toLocaleDateString('es-MX', { month: 'long' })} ${y}` }
 
 export type PosterIngredient = { id: number; name: string; unit: string; unitCost?: number }   // unitCost = prime_cost ÷ 10000 (pesos/unidad base)
-export type PosterMerch = { id: number; name: string; unit: string }   // mercancía de reventa (menu.getProducts)
+export type PosterMerch = { id: number; name: string; unit: string; unitCost?: number }   // reventa (menu.getProducts); unitCost = cost ÷ 100 (pesos/pieza)
 export type PosterSupplier = { id: number; name: string }
 export type PosterCatalog = { ingredients: PosterIngredient[]; merchandise: PosterMerch[]; suppliers: PosterSupplier[] }

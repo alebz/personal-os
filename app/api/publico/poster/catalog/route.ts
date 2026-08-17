@@ -10,7 +10,8 @@ export const revalidate = 0
 //     ingrediente OCULTO que no sale en getIngredients, así que la única puerta es el PRODUCTO: type=1 + product_id.
 // unitCost = prime_cost ÷ 10000 (pesos por unidad base). Lo usa el guardián de orden de magnitud al capturar.
 type Ingredient = { id: number; name: string; unit: string; unitCost: number }
-type Merch = { id: number; name: string; unit: string }
+// unitCost = cost ÷ 100 (pesos por pieza). Igual que ingredientes, lo usa el guardián de orden de magnitud.
+type Merch = { id: number; name: string; unit: string; unitCost: number }
 type Supplier = { id: number; name: string }
 type Catalog = { ingredients: Ingredient[]; merchandise: Merch[]; suppliers: Supplier[] }
 
@@ -34,7 +35,7 @@ export async function GET() {
   try {
     const [ings, prods, sups] = await Promise.all([
       poster<{ ingredient_id: number | string; ingredient_name: string; ingredient_unit: string; prime_cost?: number | string }>('menu.getIngredients', token),
-      poster<{ product_id: number | string; product_name: string; unit?: string; hidden?: string }>('menu.getProducts', token),
+      poster<{ product_id: number | string; product_name: string; unit?: string; hidden?: string; cost?: number | string }>('menu.getProducts', token),
       poster<{ supplier_id: number | string; supplier_name: string; delete?: string }>('storage.getSuppliers', token),
     ])
     const data: Catalog = {
@@ -44,7 +45,7 @@ export async function GET() {
       // Mercancía: todos los productos vendibles (el usuario elige el que aplica; su unidad de stock es la pieza).
       merchandise: prods
         .filter((p) => p.hidden !== '1')
-        .map((p) => ({ id: Number(p.product_id), name: p.product_name, unit: p.unit || 'p' }))
+        .map((p) => ({ id: Number(p.product_id), name: p.product_name, unit: p.unit || 'p', unitCost: Number(p.cost || 0) / 100 }))
         .sort((a, b) => a.name.localeCompare(b.name, 'es')),
       suppliers: sups
         .filter((s) => s.delete !== '1')

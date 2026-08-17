@@ -428,6 +428,9 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
             </button>
             {showPoster && (() => {
               const ingById = new Map((cat2?.ingredients ?? []).map((i) => [i.id, i]))
+              // Mercancía (reventa, type 1): se valúa por el cost del producto (÷100). El guardián la cubre igual
+              // que a los ingredientes — si un mapeo cae aquí, su unitCost es pesos/pieza.
+              const merchById = new Map((cat2?.merchandise ?? []).map((m) => [m.id, m]))
               const supMapped = d.posterSupplierId != null ? cat2?.suppliers.find((s) => s.id === d.posterSupplierId) : null
               // Neto POR LÍNEA con la tasa de ESA línea (0% alimentos vs 16% bebidas/limpieza). Un ÷1.16 global
               // subestimaría la comida. Sin tasa definida → no adivinar: neto=null y se marca.
@@ -439,7 +442,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                 if (it.es_descuento) { panelOnly.push({ it, reason: 'descuento' }); continue }
                 const mapped = it.tocaStock !== false && it.posterIngredientId != null
                 if (mapped) {
-                  const ing = ingById.get(it.posterIngredientId!)
+                  const ing = ingById.get(it.posterIngredientId!) ?? merchById.get(it.posterIngredientId!)
                   const num = it.cantidad != null && it.factorABase != null ? it.cantidad * it.factorABase : null
                   const net = neto(it.importe, it.ivaTasa)
                   if (it.ivaTasa == null) ivaSinDefinir++
