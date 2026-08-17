@@ -141,27 +141,41 @@ export function TicketsArchive({ tone }: { tone?: string }) {
         )}
         {shown.length === 0
           ? <p className="text-secondary italic text-fg-muted">{movs.length === 0 ? 'Aún no hay movimientos.' : 'Ninguno coincide con el filtro.'}</p>
-          : <div className="space-y-1">
-              {shown.slice(0, limit).map((m) => m.kind === 'ticket' ? (
-                <div key={m.id} className="flex items-center gap-1 rounded-control border border-border bg-surface-1 px-1.5 py-1 text-secondary hover:border-accent">
-                  <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} className={`shrink-0 px-0.5 ${m.t.starred ? 'text-warn' : 'text-fg-muted/40 hover:text-warn'}`}>{m.t.starred ? '★' : '☆'}</button>
-                  <button onClick={() => void open(m.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                    <span className="flex-1 truncate"><b className="text-fg">{m.t.proveedor}</b> · {dayMonth(m.t.fecha)}</span>
+          // Renglones en UNA card con divisor sutil (no cajas anidadas). El TIPO se dice con ETIQUETA, no con el
+          // borde. Chevron ▸ solo en lo abrible (tickets → detalle); × solo en lo borrable inline (movimiento a mano).
+          // Columnas alineadas: [★] [▸] fecha · tipo · concepto · categoría · monto · [×].
+          : <div className="divide-y divide-border/60">
+              {shown.slice(0, limit).map((m) => {
+                const isTicket = m.kind === 'ticket'
+                const fecha = isTicket ? m.t.fecha : m.s.date
+                const concepto = isTicket ? m.t.proveedor : (m.s.note || m.s.category)
+                const categoria = isTicket ? '' : m.s.category
+                const monto = isTicket ? Number(m.t.total) : Number(m.s.amount)
+                const tipo = isTicket ? 'Ticket' : (m.s.source === 'poster' ? 'POS' : 'A mano')
+                const abrible = isTicket
+                const borrable = !isTicket && m.s.source !== 'poster'
+                return (
+                  <div key={m.id} className="flex items-center gap-2 py-1.5 text-secondary">
+                    {isTicket
+                      ? <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} className={`w-4 shrink-0 ${m.t.starred ? 'text-warn' : 'text-fg-muted/40 hover:text-warn'}`}>{m.t.starred ? '★' : '☆'}</button>
+                      : <span className="w-4 shrink-0" />}
+                    {abrible
+                      ? <button onClick={() => void open(m.id)} className="w-4 shrink-0 text-fg-muted hover:text-accent" title="ver detalle">▸</button>
+                      : <span className="w-4 shrink-0" />}
+                    <span className="w-12 shrink-0 tabular-nums text-fg-muted">{dayMonth(fecha)}</span>
+                    <span className="shrink-0 rounded bg-surface-active px-1 text-label text-fg-muted" title={isTicket ? 'ticket capturado por foto' : m.s.source === 'poster' ? 'importado de Poster' : 'capturado a mano'}>{tipo}</span>
+                    {isTicket && m.t.image_path && <span className="shrink-0 text-label text-fg-muted" title="con foto">▣</span>}
+                    <button onClick={abrible ? () => void open(m.id) : undefined} className={`min-w-0 flex-1 truncate text-left font-medium text-fg ${abrible ? 'hover:text-accent' : 'cursor-default'}`}>{concepto}</button>
                     {m.origen === 'captura' && <span className="shrink-0 rounded bg-accent/15 px-1 text-label text-accent" title="capturado por Andrés">Andrés</span>}
-                    {m.t.image_path && <span className="text-label text-fg-muted"></span>}
-                    <span className="tabular-nums text-danger">−{mxn(Number(m.t.total))}</span>
-                  </button>
-                </div>
-              ) : (
-                <div key={m.id} className="flex items-center gap-2 rounded-control border border-dashed border-border bg-surface-1 px-2 py-1 text-secondary">
-                  <span className="shrink-0 text-fg-muted" title={m.s.source === 'poster' ? 'Importado de Poster' : 'Capturado a mano'}>{m.s.source === 'poster' ? 'POS' : 'a mano'}</span>
-                  <span className="min-w-0 flex-1 truncate"><b className="text-fg">{m.s.note || m.s.category}</b> · {dayMonth(m.s.date)} <span className="text-fg-muted">· {m.s.category}</span></span>
-                  {m.origen === 'captura' && <span className="shrink-0 rounded bg-accent/15 px-1 text-label text-accent" title="capturado por Andrés">Andrés</span>}
-                  <span className="tabular-nums text-danger">−{mxn(Number(m.s.amount))}</span>
-                  {m.s.source !== 'poster' && <button onClick={() => void delSuelto(m.s)} title="Eliminar" className="shrink-0 text-fg-muted hover:text-danger">✕</button>}
-                </div>
-              ))}
-              {shown.length > limit && <button onClick={() => setLimit((l) => l + 40)} className="w-full rounded-control border border-dashed border-border px-2 py-1 text-label text-fg-muted hover:text-accent">ver {shown.length - limit} más</button>}
+                    <span className="hidden w-20 shrink-0 truncate text-right text-label text-fg-muted sm:block">{categoria}</span>
+                    <span className="w-20 shrink-0 text-right tabular-nums text-danger">−{mxn(monto)}</span>
+                    {borrable
+                      ? <button onClick={() => void delSuelto(m.s)} title="Eliminar" className="w-4 shrink-0 text-fg-muted hover:text-danger">✕</button>
+                      : <span className="w-4 shrink-0" />}
+                  </div>
+                )
+              })}
+              {shown.length > limit && <button onClick={() => setLimit((l) => l + 40)} className="mt-1 w-full py-1 text-label text-fg-muted hover:text-accent">ver {shown.length - limit} más</button>}
             </div>}
       </>)}
 
