@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { productUnitCostNet, type PosterProductRaw } from '@/lib/publico/posterProductCost'
 
 export const runtime = 'nodejs'
 
@@ -22,6 +23,11 @@ type Leftover = { ingredient_id: number | string }
 type Storage = { storage_id: number | string; storage_name: string }
 type CountUnit = { label: string; factor: number }
 type Prepack = { product_id: string; product_name: string; cost: string | number }
+// Producto de REVENTA (mercancía embotellada): se cuenta como pieza. type 3 = mercancía de Poster; el resto
+// (platillos con receta) NO se cuenta. La categoría "Drinks en envase" (menu_category_id 2) recoge además una
+// que quedó como type 2 con receta (Topochico), así que se incluye por type 3 O por esa categoría.
+type PosterProd = { product_id: string | number; product_name: string; unit?: string; hidden?: string; type?: string | number; menu_category_id?: string | number; category_name?: string; barcode?: string } & PosterProductRaw
+const REVENTA_CAT_ID = '2'   // "Drinks en envase" — categoría de reventa embotellada
 // PREPARADOS (prepacks de Poster: salsa blanca, masas) — item propio, no sus crudos. Poster no expone su unidad
 // de salida, así que la mapeamos: masa en BOLAS, salsa blanca en LITROS. Sus ids van NEGATIVOS para no chocar
 // con los ingredient_id (existe un ingrediente 25 distinto del prepack 25).
@@ -30,10 +36,11 @@ const PREPACK_UNIT: Record<string, string> = { '25': 'bola', '32': 'l' }
 export async function GET() {
   const supabase = createServerClient()
 
-  const [ings, storages, prepacks, savedUnits] = await Promise.all([
+  const [ings, storages, prepacks, prods, savedUnits] = await Promise.all([
     poster<PosterIng>('menu.getIngredients'),
     poster<Storage>('storage.getStorages'),
     poster<Prepack>('menu.getPrepacks'),
+    poster<PosterProd>('menu.getProducts'),
     supabase.from('publico_insumo_unidades').select('ingredient_id, count_units, categoria, sort_order').then((r) => r.data ?? []),
   ])
   const unitsById = new Map<string, CountUnit[]>(), catById = new Map<string, string>(), orderById = new Map<string, number>()
@@ -68,6 +75,19 @@ export async function GET() {
     rows.push({
       group: catById.get(pid) ?? 'Preparados', order: orderById.get(pid) ?? 0,
       item: { id: -Number(p.product_id), name: p.product_name, baseUnit: PREPACK_UNIT[String(p.product_id)] ?? 'pza', unitCost: Number(p.cost || 0) / 100, barcode: null, countUnits: unitsById.get(pid) ?? [], categoria: catById.get(pid) ?? null, sortOrder: orderById.get(pid) ?? 0 },
+    })
+  }
+  // REVENTA (mercancía embotellada): se cuenta como pieza, con su costo neto (base o variante). id NEGATIVO como
+  // los prepacks — product_id es único en Poster, así que no choca ni con ingredientes ni con prepacks (que no son
+  // de esta categoría). El costo puede estar en $0 si aún no lo cargaste en Poster; se cuenta igual (valor 0).
+  for (const p of prods) {
+    if (p.hidden === '1') continue
+    const esReventa = String(p.type) === '3' || String(p.menu_category_id) === REVENTA_CAT_ID
+    if (!esReventa) continue
+    const pid = String(-Number(p.product_id))
+    rows.push({
+      group: catById.get(pid) ?? p.category_name ?? 'Reventa', order: orderById.get(pid) ?? 0,
+      item: { id: -Number(p.product_id), name: p.product_name, baseUnit: p.unit || 'pza', unitCost: productUnitCostNet(p), barcode: p.barcode || null, countUnits: unitsById.get(pid) ?? [], categoria: catById.get(pid) ?? null, sortOrder: orderById.get(pid) ?? 0 },
     })
   }
 
