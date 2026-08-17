@@ -23,11 +23,13 @@ type Leftover = { ingredient_id: number | string }
 type Storage = { storage_id: number | string; storage_name: string }
 type CountUnit = { label: string; factor: number }
 type Prepack = { product_id: string; product_name: string; cost: string | number }
-// Producto de REVENTA (mercancía embotellada): se cuenta como pieza. type 3 = mercancía de Poster; el resto
-// (platillos con receta) NO se cuenta. La categoría "Drinks en envase" (menu_category_id 2) recoge además una
-// que quedó como type 2 con receta (Topochico), así que se incluye por type 3 O por esa categoría.
-type PosterProd = { product_id: string | number; product_name: string; unit?: string; hidden?: string; type?: string | number; menu_category_id?: string | number; category_name?: string; barcode?: string } & PosterProductRaw
-const REVENTA_CAT_ID = '2'   // "Drinks en envase" — categoría de reventa embotellada
+// Producto de REVENTA (mercancía embotellada): se cuenta como PIEZA porque su existencia física es un stock
+// oculto que NO sale en menu.getIngredients. La marca es type === 3 (mercancía de Poster). Todo type 2 se hace
+// de una RECETA, así que NO se cuenta el producto — se cuentan sus ingredientes (ya en la lista). Esto resuelve
+// también los ítems DUALES (se venden solos Y entran en recetas, p. ej. Heineken en la Michi-lada): se montan
+// como un producto type-2 cuya receta es una unidad de un ingrediente, y ese INGREDIENTE es el único stock que
+// se cuenta una vez — sin doble conteo entre el producto y el ingrediente.
+type PosterProd = { product_id: string | number; product_name: string; unit?: string; hidden?: string; type?: string | number; category_name?: string; barcode?: string } & PosterProductRaw
 // PREPARADOS (prepacks de Poster: salsa blanca, masas) — item propio, no sus crudos. Poster no expone su unidad
 // de salida, así que la mapeamos: masa en BOLAS, salsa blanca en LITROS. Sus ids van NEGATIVOS para no chocar
 // con los ingredient_id (existe un ingrediente 25 distinto del prepack 25).
@@ -82,8 +84,7 @@ export async function GET() {
   // de esta categoría). El costo puede estar en $0 si aún no lo cargaste en Poster; se cuenta igual (valor 0).
   for (const p of prods) {
     if (p.hidden === '1') continue
-    const esReventa = String(p.type) === '3' || String(p.menu_category_id) === REVENTA_CAT_ID
-    if (!esReventa) continue
+    if (String(p.type) !== '3') continue   // solo reventa pura (stock oculto); type 2 se cuenta por sus ingredientes
     const pid = String(-Number(p.product_id))
     rows.push({
       group: catById.get(pid) ?? p.category_name ?? 'Reventa', order: orderById.get(pid) ?? 0,
