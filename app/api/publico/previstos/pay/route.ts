@@ -9,10 +9,17 @@ export const runtime = 'nodejs'
 // crea un publico_costos REAL (pega en contenedor + utilidad) y guarda la ref en publico_previsto_pagos para
 // poder revertir. Idempotente por (previsto_id, ocurrencia): si ya está pagada, no duplica.
 export async function POST(req: NextRequest) {
-  let b: { previsto_id?: string; ocurrencia?: string; amount?: number }
+  let b: { previsto_id?: string; ocurrencia?: string; amount?: number; fecha?: string }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   if (!b.previsto_id || !b.ocurrencia || !/^\d{4}-\d{2}-\d{2}$/.test(b.ocurrencia)) return NextResponse.json({ error: 'previsto_id y ocurrencia (YYYY-MM-DD) requeridos' }, { status: 400 })
   const supabase = createServerClient()
+
+  // FECHA DEL COSTO = cuándo SE MOVIÓ LA LANA (hoy, al marcar pagado), NO el VENCIMIENTO de la ocurrencia. Antes
+  // heredaba b.ocurrencia: pagar por adelantado un previsto que vence el 24 creaba un costo fechado en el FUTURO
+  // que descuadraba los contenedores. La ocurrencia sigue identificando QUÉ mes se saldó (idempotencia), no la
+  // fecha del gasto. Se acepta una fecha explícita (back-date) por si registras un pago viejo; default = hoy CDMX.
+  const todayMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+  const pagadoEl = b.fecha && /^\d{4}-\d{2}-\d{2}$/.test(b.fecha) ? b.fecha : todayMX
 
   const { data: p } = await supabase.from('publico_previstos').select('concepto, categoria, origin, amount').eq('id', b.previsto_id).maybeSingle()
   if (!p) return NextResponse.json({ error: 'previsto no existe' }, { status: 404 })
@@ -25,7 +32,7 @@ export async function POST(req: NextRequest) {
   const efectivo = override ?? Number(p.amount)
   const cost_kind = OPERATING_CATEGORIES.includes(p.categoria) ? (catDefaults(p.categoria as CostCategory).defaultKind ?? 'fijo') : null
   const { data: costo, error: cErr } = await supabase.from('publico_costos').insert({
-    scope: 'publico', date: b.ocurrencia, month: b.ocurrencia.slice(0, 7),
+    scope: 'publico', date: pagadoEl, month: pagadoEl.slice(0, 7),
     category: p.categoria, cost_kind, origin: p.origin ?? null, amount: efectivo, note: p.concepto,
   }).select('id').single()
   if (cErr) return NextResponse.json({ error: cErr.message }, { status: 500 })
