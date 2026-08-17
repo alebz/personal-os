@@ -6,6 +6,10 @@ import { MoneyInput } from '@/components/MoneyInput'
 import { Card, inputCell as cell } from './ui'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, type CostCategory, type OriginKey } from '@/lib/publico'
 import { localDate, addDays, type PosterCatalog } from './util'
+import { magnitudeGuard, type MagWarn } from '@/lib/publico/magnitudeGuard'
+
+// Costo POR UNIDAD BASE: montos chicos (p.ej. $0.05/g) que mxn redondearía a $0 — aquí conservan decimales.
+const perUnit = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2 })
 
 // ── Captura por FOTO del ticket: la IA PROPONE un borrador, tú corriges y CONFIRMAS, y hasta entonces se
 // guarda el gasto (roll-up de 1 línea en publico_costos + detalle itemizado). Tus correcciones enseñan a
@@ -428,7 +432,7 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
               // Neto POR LÍNEA con la tasa de ESA línea (0% alimentos vs 16% bebidas/limpieza). Un ÷1.16 global
               // subestimaría la comida. Sin tasa definida → no adivinar: neto=null y se marca.
               const neto = (importe: number, tasa: number | null | undefined) => (tasa == null ? null : importe / (1 + tasa))
-              const toStock: { it: FotoItem; name: string; num: number | null; unit: string; net: number | null; tasa: number | null | undefined }[] = []
+              const toStock: { it: FotoItem; name: string; num: number | null; unit: string; net: number | null; tasa: number | null | undefined; warn: MagWarn }[] = []
               const panelOnly: { it: FotoItem; reason: string }[] = []
               let ivaSinDefinir = 0
               for (const it of d.items) {
@@ -439,7 +443,11 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                   const num = it.cantidad != null && it.factorABase != null ? it.cantidad * it.factorABase : null
                   const net = neto(it.importe, it.ivaTasa)
                   if (it.ivaTasa == null) ivaSinDefinir++
-                  toStock.push({ it, name: ing?.name ?? `id ${it.posterIngredientId}`, num, unit: ing?.unit ?? '?', net, tasa: it.ivaTasa })
+                  // Guardián de orden de magnitud: costo unitario derivado (neto ÷ unidad base) vs prime_cost de Poster.
+                  // AVISA, nunca bloquea ni corrige. Sin prime_cost o sin derivado calculable → null (no se marca).
+                  const derivadoUnit = num && num > 0 && net != null ? net / num : null
+                  const warn = magnitudeGuard(derivadoUnit, ing?.unitCost)
+                  toStock.push({ it, name: ing?.name ?? `id ${it.posterIngredientId}`, num, unit: ing?.unit ?? '?', net, tasa: it.ivaTasa, warn })
                 } else {
                   panelOnly.push({ it, reason: it.tocaStock === false ? 'no toca stock' : 'sin mapear' })
                 }
@@ -458,15 +466,23 @@ export function TicketFoto({ onSaved, defaultDate, onDraftChange, tone }: { onSa
                       <div className="mb-1 flex items-center justify-between text-fg-muted"><span>Van a inventario ({toStock.length})</span><span className="normal-case">neto sin IVA →</span></div>
                       <div className="space-y-0.5 font-mono">
                         {toStock.map((r, k) => (
-                          <div key={k} className="flex items-center justify-between gap-2">
-                            <span className="truncate">{r.name}</span>
-                            <span className="shrink-0 tabular-nums">
-                              {r.num != null ? `${r.num} ${r.unit}` : <span className="text-warn">falta factor</span>}
-                              {' · '}
-                              {r.net != null
-                                ? <><b>{mxn(r.net)}</b> <span className="text-fg-muted">{r.tasa === 0 ? '(0%)' : `(−${Math.round((r.tasa ?? 0) * 100)}%)`}</span></>
-                                : <span className="text-warn">IVA sin definir · {mxn(r.it.importe)}</span>}
-                            </span>
+                          <div key={k}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate">{r.warn && <span className="text-danger">⚠ </span>}{r.name}</span>
+                              <span className="shrink-0 tabular-nums">
+                                {r.num != null ? `${r.num} ${r.unit}` : <span className="text-warn">falta factor</span>}
+                                {' · '}
+                                {r.net != null
+                                  ? <><b>{mxn(r.net)}</b> <span className="text-fg-muted">{r.tasa === 0 ? '(0%)' : `(−${Math.round((r.tasa ?? 0) * 100)}%)`}</span></>
+                                  : <span className="text-warn">IVA sin definir · {mxn(r.it.importe)}</span>}
+                              </span>
+                            </div>
+                            {/* Guardián de orden de magnitud: los DOS números para que juzgues cuál está mal. Nunca corrige. */}
+                            {r.warn && (
+                              <div className="mt-0.5 rounded-card border border-danger/40 bg-danger/10 px-2 py-1 text-danger">
+                                ⚠ ~{Math.round(r.warn.ratio).toLocaleString('en-US')}× de diferencia — tu costo <b>{perUnit(r.warn.derivado)}/{r.unit}</b> vs Poster <b>{perUnit(r.warn.poster)}/{r.unit}</b>. Revisa cantidad, factor o precio — no se corrige solo.
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
