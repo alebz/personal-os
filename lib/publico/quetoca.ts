@@ -49,15 +49,40 @@ export type QueTocaInput = {
   deltaVentasPct?: number | null                         // vs mes anterior, mismo tramo
   ticketHistorico?: number | null
   diasOperados?: number | null
+  // Señales que existen desde Fase 5.5 (opcionales → no rompen pruebas viejas)
+  segundoConteo?: { ultimaFecha: string; fase: string | null }   // hay EXACTAMENTE 1 conteo → el 2º desbloquea el food cost real
+  comprasSinContenedor?: { n: number; monto: number }            // compras con contenedor sin asignar → saldos inflados (Tier 2, dinero)
+  sinClasificar?: { n: number; valor: number }                   // insumos sin clase que pesan en el conteo (Tier 2)
   // Estado manual por señal (posponer / bloquear)
   estados?: Record<string, Estado>
+  // Ventanas de tiempo calibrables (ver DOS HORIZONTES abajo). Todas opcionales → caen al default.
+  config?: QueTocaConfig
+}
+
+// DOS HORIZONTES, deliberadamente distintos (no es un accidente de dos constantes sin comparar):
+//
+//   • PLANEACIÓN — la card "Gastos previstos" muestra el MES entero (todas las ocurrencias impagas, vencidas
+//     marcadas). Horizonte ancho: "esto es lo que debes este mes". Es para VER y planear. No es un día-contador
+//     configurable: es estructuralmente "el mes en curso".
+//
+//   • ACTUAR YA — este narrador ("qué toca") solo sube un previsto a Tier 1 cuando vence a ≤ diasAccionPrevisto
+//     (o ya venció → Tier 0). Horizonte angosto: "hazlo ya". El número NO se elige por estética sino por EL
+//     TIEMPO QUE ALEX NECESITA PARA ACTUAR sobre un pago; por eso es calibrable desde publico_config.
+//
+// Consecuencia esperada y correcta: la nómina del domingo puede verse en la card (planeación) y NO en "qué toca"
+// hasta que entre en la ventana de acción. Divergen a propósito.
+export type QueTocaConfig = {
+  diasAccionPrevisto?: number  // ACTUAR YA: un previsto entra a "qué toca" a ≤ estos días de vencer. Default 3.
+  diasCuadre?: number          // días sin cuadrar un contenedor antes de avisar. Default 7.
+  diasStale?: number           // una Tier-0 no-mía más vieja que esto deja de tapizar el #1. Default 7.
 }
 
 export type QueTocaOutput = { acciones: Candidato[]; enEspera: Candidato[]; linea: string }
 
-const STALE_DIAS = 7          // una Tier-0 no-dinero más vieja que esto deja de tapizar el #1
-const CUADRE_DIAS = 7         // días sin cuadrar antes de avisar
-const VENCE_PRONTO = 3        // "vence pronto" = dentro de estos días
+// Defaults de las ventanas calibrables. Se sobreescriben por inp.config (que el endpoint lee de publico_config).
+const STALE_DIAS_DEFAULT = 7          // anti-tapiz
+const CUADRE_DIAS_DEFAULT = 7         // días sin cuadrar antes de avisar
+const VENCE_PRONTO_DEFAULT = 3        // "actuar ya" para previstos
 
 // ── helpers puros ────────────────────────────────────────────────────────────
 function diasEntre(desde: string, hasta: string): number {
@@ -80,6 +105,11 @@ export function buildQueToca(inp: QueTocaInput): QueTocaOutput {
   const domingo = esDomingo(hoy)
   const estados = inp.estados ?? {}
   const cands: Candidato[] = []
+
+  // Ventanas calibrables (default si no vienen de publico_config). Ver "DOS HORIZONTES" arriba.
+  const VENCE_PRONTO = inp.config?.diasAccionPrevisto ?? VENCE_PRONTO_DEFAULT
+  const CUADRE_DIAS = inp.config?.diasCuadre ?? CUADRE_DIAS_DEFAULT
+  const STALE_DIAS = inp.config?.diasStale ?? STALE_DIAS_DEFAULT
 
   // Previstos semanales que vencen alrededor de hoy — en domingo se funden en el ritual.
   const semanalesDelRitual = new Set<string>()
@@ -139,6 +169,17 @@ export function buildQueToca(inp: QueTocaInput): QueTocaOutput {
   if (inp.foodcost.countAlert) {
     const edad = inp.foodcost.daysSinceCount ?? 0
     cands.push({ clave: 'conteo', tier: 0, texto: `Conteo físico vencido hace ${edad}d — el food cost real está a ciegas`, edadDias: edad, esDinero: false })
+  } else if (inp.segundoConteo) {
+    // Hay UN conteo (el arranque): el 2º cierra el 1er periodo y desbloquea el food cost real. Cadencia = semanal,
+    // MISMO día y misma fase del ciclo que el anterior (si no, el consumo entre conteos no es comparable).
+    const uf = inp.segundoConteo.ultimaFecha
+    const dow = NOMBRE_DOW[new Date(uf + 'T00:00:00Z').getUTCDay()]
+    const next = new Date(Date.parse(uf + 'T00:00:00Z') + 7 * 86_400_000).toISOString().slice(0, 10)
+    const d = diasEntre(hoy, next)
+    // "misma fase" solo aporta si nombra algo distinto al día de la semana (si fase == dow es redundante).
+    const fase = inp.segundoConteo.fase && inp.segundoConteo.fase.toLowerCase() !== dow.toLowerCase() ? `, misma fase (${inp.segundoConteo.fase})` : ''
+    cands.push({ clave: 'segundo-conteo', tier: 1, vence: next, esDinero: false, accionablePorMi: true,
+      texto: `2º conteo ${d <= 0 ? 'ya toca' : `el ${dow} (en ${d}d)`}${fase} — cierra tu 1er periodo y desbloquea el food cost real` })
   } else if (!inp.foodcost.anyReliable) {
     // Sin conteo que ancle el periodo (pero sin alerta dura): ceguera suave.
     cands.push({ clave: 'foodcost-ceguera', tier: 2, texto: 'Food cost sin periodo confiable — falta un conteo que lo ancle', esDinero: false })
@@ -151,6 +192,19 @@ export function buildQueToca(inp: QueTocaInput): QueTocaOutput {
     } else if (c.diasSinCuadrar != null && c.diasSinCuadrar >= CUADRE_DIAS) {
       cands.push({ clave: `cuadre:${c.label}`, tier: 2, texto: `${c.label} sin cuadrar hace ${c.diasSinCuadrar}d`, edadDias: c.diasSinCuadrar, esDinero: false })
     }
+  }
+
+  // ── COMPRAS SIN CONTENEDOR ASIGNADO (Tier 2, dinero): mientras no las asignes, los saldos están inflados ──
+  if (inp.comprasSinContenedor && inp.comprasSinContenedor.n > 0) {
+    const { n, monto } = inp.comprasSinContenedor
+    cands.push({ clave: 'sin-contenedor', tier: 2, esDinero: true, monto,
+      texto: `${n} compra${n === 1 ? '' : 's'} sin contenedor (${pesos(monto)}) — asígnalas o tus saldos quedan inflados por esa cantidad` })
+  }
+  // ── CUBETA SIN CLASIFICAR (Tier 2): insumos sin clase que sí pesan en el conteo → contaminan el food cost ──
+  if (inp.sinClasificar && inp.sinClasificar.n > 0) {
+    const { n, valor } = inp.sinClasificar
+    cands.push({ clave: 'sin-clasificar', tier: 2, esDinero: false,
+      texto: `${n} insumo${n === 1 ? '' : 's'} sin clasificar${valor > 0 ? ` (${pesos(valor)} en el conteo)` : ''} — mapea los que pesen` })
   }
 
   // ── HIGIENE DIARIA ──

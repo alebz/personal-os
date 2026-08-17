@@ -12,6 +12,7 @@ import {
   type CostCategory, type OriginKey, type CostKind,
 } from '@/lib/publico'
 import { TicketFoto } from './publico/TicketFoto'
+import { QueToca } from './publico/QueToca'
 import { AliasManager } from './publico/AliasManager'
 import { Notas } from './publico/Notas'
 import { Inventario } from './publico/Inventario'
@@ -506,17 +507,9 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
       {/* Alerta + qué toca (1/3). Contenido: Fase 5. */}
       <Card emphasis="hero" tone={dc} pad="none" className="px-3 py-3 lg:col-span-2">
         <Head>Alerta · qué toca</Head>
-        {/* Domingo = cierre de semana: nómina y propina se pagan el MISMO día → UN solo ritual, no dos avisos. */}
-        {new Date().getDay() === 0 && (propinaPendiente > 0 || prevTotals.pendiente > 0 || prevTotals.vencido > 0)
-          ? (
-            <div className="rounded-card border p-2 text-secondary" style={{ borderColor: `${dc}66` }}>
-              <div className="font-bold" style={{ color: dc }}>Domingo · cierre de semana</div>
-              <div className="mt-1 text-fg-muted">Un solo ritual: <b className="text-fg">paga nómina</b>{(prevTotals.pendiente + prevTotals.vencido) > 0 && <> — <span className="tabular-nums">{mxn(prevTotals.pendiente + prevTotals.vencido)}</span> de previstos</>} y <b className="text-fg">reparte propina</b>{propinaPendiente > 0 && <> — <span className="tabular-nums">{mxn(propinaPendiente)}</span></>}.</div>
-            </div>
-          )
-          : propinaPendiente > 0
-            ? <div className="text-secondary text-fg-muted">propina por repartir: <b className="tabular-nums text-fg">{mxn(propinaPendiente)}</b> <span className="italic">(se reparte el domingo, con la nómina)</span></div>
-            : placeholder('Fase 5', 'lo que bloquea y las 2-3 acciones del día.')}
+        {/* Motor: lib/publico/quetoca.ts vía /api/publico/quetoca. El ritual del domingo (propina + nómina en una
+            sola tarjeta) y el anti-tapiz viven en el motor, no aquí — esto es solo la presentación. */}
+        <QueToca tone={dc} />
       </Card>
 
       {/* Fila de dos iguales: gastos previstos (Fase 2) · contenedores (Fase 3). */}

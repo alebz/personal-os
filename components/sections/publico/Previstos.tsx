@@ -98,6 +98,10 @@ export function Previstos({ month, onFaltan, onFixed, onRentaCond, onTotals, onC
 
   // PENDIENTES siempre visibles (accionables): las ocurrencias IMPAGAS del mes. occItems ya viene ordenado por
   // fecha asc → los VENCIDOS (fecha < hoy) quedan primero, luego los que vienen. Los PAGADOS van al archivo.
+  // HORIZONTE DE PLANEACIÓN (deliberado): esta card muestra el MES entero — "esto es lo que debes este mes". Es
+  // MÁS ancho que el horizonte de "actuar ya" del narrador "qué toca" (≤ dias_accion_previsto, calibrable en
+  // publico_config). Que la nómina del domingo salga aquí y aún no en "qué toca" es esperado, no un bug. Ver el
+  // bloque "DOS HORIZONTES" en lib/publico/quetoca.ts.
   const pendientes = occItems.filter((it) => !it.paid)
   const pagados = occItems.filter((it) => it.paid)
 
