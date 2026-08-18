@@ -29,6 +29,7 @@ export const XP_ICON: Record<string, string> = {
   sudoku: '/themes/xp/icons/sudoku.png',   // generado (SVG rejilla)
   wmp: '/themes/xp/icons/wmp.png',         // Windows Media Player 9 (orbe play)
   poolsuite: '/themes/xp/icons/poolsuite.png',   // marcador a poolsuite.net (su favicon real)
+  publico: '/themes/xp/icons/publico.png',   // Público Gourmet — el gato de la marca
 }
 
 // href de sección → nombre de ícono
@@ -38,7 +39,7 @@ export const SECTION_ICON: Record<string, string> = {
   '/habits': 'habitos',
   '/contactos': 'contactos',
   '/uptown': 'uptown',
-  '/publico': 'panel',   // Público Gourmet — ícono PLACEHOLDER (reusa panel); un ícono propio de restaurante es polish futuro
+  '/publico': 'publico',   // Público Gourmet — plato + cubiertos
   '/brain': 'cerebro',
 }
 

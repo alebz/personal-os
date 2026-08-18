@@ -23,6 +23,7 @@ import { Contenedores } from './publico/Contenedores'
 import { localDate, addDays, dayLabel, dayMonth, monthName } from './publico/util'
 import { dayColor, crtDayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
+import PublicoMoney from '@/components/xp/PublicoMoney'
 
 // Los 3 contenedores como cuentas para aportar/retirar de socios → captura el ORIGEN (metodo) desde el
 // día 1, para que F5 (cuadre) pueda conciliar de dónde entró/salió cada aportación/distribución.
@@ -48,7 +49,14 @@ function shiftMonthDate(dateStr: string, d: number): string {
   return `${ny}-${String(nm + 1).padStart(2, '0')}-${String(nd).padStart(2, '0')}`
 }
 
+// Bajo XP, Público se re-presenta como MSN Money 2003 (misma familia que Finanzas/Uptown). Arcade = intacto.
 export default function PublicoContent() {
+  const { shell } = useOSSettings()
+  if (shell === 'xp') return <PublicoMoney />
+  return <PublicoArcade />
+}
+
+function PublicoArcade() {
   const { crt } = useOSSettings()
   const dc = crtDayColor(dayColor(new Date()), crt)   // color del día → headers de sección en el mismo idioma que Panel/Dirección
   const today = localDate()

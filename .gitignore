@@ -44,3 +44,4 @@ next-env.d.ts
 
 # fotos de tickets reales para pruebas (no versionar)
 tickets_test/
+.cc-reports/

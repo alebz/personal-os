@@ -189,6 +189,13 @@ export default function XPDesktop({ sections }: { sections: OSSection[] }) {
       const w = 340, h = Math.min(lh - 48, 600)
       return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href], w, h, x: Math.max(8, lw - w - 12), y: 10, openSound: 'msnOnline' })
     }
+    if (s.href === '/publico') {
+      // Público es un dashboard denso (libretas lado a lado, gráficas): abre ANCHO por default para que
+      // el lado-a-lado aparezca sin que el usuario tenga que estirar la ventana. Se clampa a la pantalla.
+      const lw = window.innerWidth / scale, lh = window.innerHeight / scale
+      const w = Math.min(1040, Math.max(760, lw - 24)), h = Math.min(640, lh - 40)
+      return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href], w, h })
+    }
     return openWindow(s.href, s.label, s.content, { resizable: true, icon: SECTION_ICON[s.href] })
   }
   // Cruzando arcade→XP desde una sección: abre su ventana equivalente UNA vez al montar. Contactos →

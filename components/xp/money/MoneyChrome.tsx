@@ -126,7 +126,7 @@ export function MarketRail() {
 
 // CHROME — cabecera Money + tabs de folder + [riel | contenido]. Compartido Finanzas/Uptown.
 // `modal` se pinta como overlay absoluto sobre TODA la ventana (raíz relative), como el EditModal del arcade.
-export function MoneyChrome({ brand = 'Money', tabs, active, onTab, right, children, modal }: {
+export function MoneyChrome({ brand = 'Money', tabs, active, onTab, right, children, modal, rail }: {
   brand?: string
   tabs: { id: string; label: string }[]
   active: string
@@ -134,6 +134,7 @@ export function MoneyChrome({ brand = 'Money', tabs, active, onTab, right, child
   right?: React.ReactNode
   children: React.ReactNode
   modal?: React.ReactNode
+  rail?: React.ReactNode   // riel izquierdo persistente. Default = MarketRail (Finanzas/Uptown); Público pasa el suyo.
 }) {
   return (
     <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'inherit', fontSize: 11, color: MONEY.ink }}>
@@ -162,7 +163,7 @@ export function MoneyChrome({ brand = 'Money', tabs, active, onTab, right, child
       {/* Cuerpo: riel de mercado + contenido */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <div style={{ flexShrink: 0, width: 172, borderRight: `1px solid ${MONEY.rule}`, background: MONEY.railBg, overflowY: 'auto' }}>
-          <MarketRail />
+          {rail ?? <MarketRail />}
         </div>
         <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '11px 13px', background: '#fbfcfe' }}>
           {children}
