@@ -7,6 +7,8 @@ import PublicoNotas from './publico/PublicoNotas'
 import PublicoMovimientos from './publico/PublicoMovimientos'
 import PublicoRail from './publico/PublicoRail'
 import PublicoPanel from './publico/PublicoPanel'
+import PublicoDireccion from './publico/PublicoDireccion'
+import PublicoStatusBar from './publico/PublicoStatusBar'
 
 // PÚBLICO bajo XP = MSN MONEY 2003 (misma familia que Finanzas y Uptown). Rama shell==='xp' de PublicoContent.
 // PASO 1: esqueleto — abre, navega entre tabs de folder, y cada tab declara qué va a llevar y en qué ola se
@@ -58,8 +60,8 @@ function Placeholder({ tab }: { tab: string }) {
 export default function PublicoMoney() {
   const [tab, setTab] = useState('panel')
   return (
-    <MoneyChrome brand="Money · Público" tabs={TABS} active={tab} onTab={setTab} right={<>Público Gourmet · {todayLabel()}</>} rail={<PublicoRail />}>
-      {tab === 'panel' ? <PublicoPanel /> : tab === 'fondos' ? <PublicoFondos /> : tab === 'notas' ? <PublicoNotas /> : tab === 'movimientos' ? <PublicoMovimientos /> : <Placeholder tab={tab} />}
+    <MoneyChrome brand="Money · Público" tabs={TABS} active={tab} onTab={setTab} right={<>Público Gourmet · {todayLabel()}</>} rail={<PublicoRail />} statusBar={<PublicoStatusBar />}>
+      {tab === 'panel' ? <PublicoPanel /> : tab === 'fondos' ? <PublicoFondos /> : tab === 'notas' ? <PublicoNotas /> : tab === 'movimientos' ? <PublicoMovimientos /> : tab === 'direccion' ? <PublicoDireccion /> : <Placeholder tab={tab} />}
     </MoneyChrome>
   )
 }
