@@ -8,6 +8,7 @@ import PublicoMovimientos from './publico/PublicoMovimientos'
 import PublicoRail from './publico/PublicoRail'
 import PublicoPanel from './publico/PublicoPanel'
 import PublicoDireccion from './publico/PublicoDireccion'
+import PublicoInventario from './publico/PublicoInventario'
 import PublicoStatusBar from './publico/PublicoStatusBar'
 
 // PÚBLICO bajo XP = MSN MONEY 2003 (misma familia que Finanzas y Uptown). Rama shell==='xp' de PublicoContent.
@@ -61,7 +62,7 @@ export default function PublicoMoney() {
   const [tab, setTab] = useState('panel')
   return (
     <MoneyChrome brand="Money · Público" tabs={TABS} active={tab} onTab={setTab} right={<>Público Gourmet · {todayLabel()}</>} rail={<PublicoRail />} statusBar={<PublicoStatusBar />}>
-      {tab === 'panel' ? <PublicoPanel /> : tab === 'fondos' ? <PublicoFondos /> : tab === 'notas' ? <PublicoNotas /> : tab === 'movimientos' ? <PublicoMovimientos /> : tab === 'direccion' ? <PublicoDireccion /> : <Placeholder tab={tab} />}
+      {tab === 'panel' ? <PublicoPanel /> : tab === 'fondos' ? <PublicoFondos /> : tab === 'notas' ? <PublicoNotas /> : tab === 'movimientos' ? <PublicoMovimientos /> : tab === 'direccion' ? <PublicoDireccion /> : tab === 'inventario' ? <PublicoInventario /> : <Placeholder tab={tab} />}
     </MoneyChrome>
   )
 }

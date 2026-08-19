@@ -21,7 +21,7 @@ export const fmtDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDate
 export const cellInput: React.CSSProperties = { border: `1px solid ${MONEY.rule}`, borderRadius: 3, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit', outline: 'none' }
 
 // Panel = cabecera MoneyBar + cuerpo blanco con borde. El tratamiento de sección para TODAS las tabs.
-export function Section({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+export function Section({ title, right, children }: { title: React.ReactNode; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <MoneyBar right={right}>{title}</MoneyBar>
