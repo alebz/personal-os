@@ -8,6 +8,7 @@ import PublicoMovimientos from './publico/PublicoMovimientos'
 import PublicoRail from './publico/PublicoRail'
 import PublicoPanel from './publico/PublicoPanel'
 import PublicoDireccion from './publico/PublicoDireccion'
+import PublicoFoodCost from './publico/PublicoFoodCost'
 import PublicoInventario from './publico/PublicoInventario'
 import PublicoStatusBar from './publico/PublicoStatusBar'
 
@@ -62,7 +63,7 @@ export default function PublicoMoney() {
   const [tab, setTab] = useState('panel')
   return (
     <MoneyChrome brand="Money · Público" tabs={TABS} active={tab} onTab={setTab} right={<>Público Gourmet · {todayLabel()}</>} rail={<PublicoRail />} statusBar={<PublicoStatusBar />}>
-      {tab === 'panel' ? <PublicoPanel /> : tab === 'fondos' ? <PublicoFondos /> : tab === 'notas' ? <PublicoNotas /> : tab === 'movimientos' ? <PublicoMovimientos /> : tab === 'direccion' ? <PublicoDireccion /> : tab === 'inventario' ? <PublicoInventario /> : <Placeholder tab={tab} />}
+      {tab === 'panel' ? <PublicoPanel /> : tab === 'fondos' ? <PublicoFondos /> : tab === 'notas' ? <PublicoNotas /> : tab === 'movimientos' ? <PublicoMovimientos /> : tab === 'direccion' ? <><PublicoDireccion /><div style={{ marginTop: 8 }}><PublicoFoodCost /></div></> : tab === 'inventario' ? <PublicoInventario /> : <Placeholder tab={tab} />}
     </MoneyChrome>
   )
 }
