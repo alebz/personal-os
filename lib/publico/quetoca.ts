@@ -46,7 +46,8 @@ export type QueTocaInput = {
   // Informativo (solo para la línea)
   ventasAyer?: number | null
   mejorDelDow?: { dia: string; monto: number } | null   // récord histórico de ese día de la semana
-  deltaVentasPct?: number | null                         // vs mes anterior, mismo tramo
+  deltaVentasPct?: number | null                         // vs las N semanas previas (ventana rodante)
+  deltaVentasSemanas?: number                             // tamaño de la ventana comparativa (para la etiqueta)
   ticketHistorico?: number | null
   diasOperados?: number | null
   // Señales que existen desde Fase 5.5 (opcionales → no rompen pruebas viejas)
@@ -256,10 +257,11 @@ function componerLinea(inp: QueTocaInput): string {
   if (inp.ventasAyer != null && inp.mejorDelDow && inp.ventasAyer >= inp.mejorDelDow.monto) {
     return `Ayer cerraste en ${pesos(inp.ventasAyer)} — tu mejor ${inp.mejorDelDow.dia}.`
   }
-  // COMPARATIVO: vs mes anterior, mismo tramo
+  // COMPARATIVO: ventana rodante vs las N semanas previas (no mes-a-mes; evita el artefacto de fin de semana)
   if (inp.deltaVentasPct != null && Number.isFinite(inp.deltaVentasPct)) {
     const p = Math.round(inp.deltaVentasPct)
-    if (p !== 0) return `Vas ${p > 0 ? '▲' : '▼'}${Math.abs(p)}% en ventas vs el mes pasado, mismo tramo.`
+    const sem = inp.deltaVentasSemanas ?? 4
+    if (p !== 0) return `Vas ${p > 0 ? '▲' : '▼'}${Math.abs(p)}% en ventas vs las ${sem} semanas previas.`
   }
   // ESTADO: el pulso tranquilo del histórico
   if (inp.diasOperados != null && inp.ticketHistorico != null) {

@@ -36,7 +36,7 @@ test('día normal: conteo viejo NO tapiza el #1; línea es comparativo (no repit
   assert.notEqual(r.acciones[0].clave, 'conteo', 'el conteo atorado no debe ser el #1')
   assert.equal(r.acciones.at(-1)!.clave, 'conteo', 'el conteo atorado va al fondo')
   // Línea = Tier 3, disjunta de las acciones.
-  assert.match(r.linea, /vs el mes pasado/)
+  assert.match(r.linea, /vs las 4 semanas previas/)
   assert.ok(!r.acciones.some((a) => a.texto === r.linea), 'la línea no repite ninguna acción')
 })
 

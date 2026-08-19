@@ -4,7 +4,7 @@ import { createServerClient } from '@/lib/supabase'
 import { buildQueToca, NOMBRE_DOW, type QueTocaInput, type Estado } from '@/lib/publico/quetoca'
 import { currentDue } from '@/lib/previstos'
 import { getRecipeWeights, resolveClass, type ClaseKey } from '@/lib/publico/ingredientClass'
-import { deltaVentas } from '@/lib/publico/comparativo'
+import { deltaVentas, SEMANAS_COMPARATIVO } from '@/lib/publico/comparativo'
 
 export const runtime = 'nodejs'
 
@@ -102,11 +102,9 @@ export async function GET() {
   let mejor = 0, mejorDate: string | null = null
   for (const v of ventas) if (dowOf(v.date) === ayerDow) { const t = dia(v); if (t > mejor) { mejor = t; mejorDate = v.date } }
   const mejorDelDow = mejorDate ? { dia: NOMBRE_DOW[ayerDow], monto: round(mejor) } : null
-  // Delta comparativo — MISMA fuente que el Panel (lib/publico/comparativo). Mismo tramo mes-a-mes; no diverge.
-  const mesA = hoy.slice(0, 7)
-  const [yA, mA] = mesA.split('-').map(Number)
-  const prevMes = `${mA === 1 ? yA - 1 : yA}-${String(mA === 1 ? 12 : mA - 1).padStart(2, '0')}`
-  const deltaVentasPct = deltaVentas(ventas, mesA, prevMes, hoy)?.pct ?? null
+  // Delta comparativo — MISMA fuente que el Panel (lib/publico/comparativo). Ventana rodante de N semanas
+  // (inmune al artefacto de calendario de un negocio de fin de semana); no diverge del Panel.
+  const deltaVentasPct = deltaVentas(ventas, hoy)?.pct ?? null
 
   // ── HIGIENE: import del POS al día (la última venta debe ser ≥ ayer) ──
   const ultimaVenta = ventas.map((v) => v.date).sort().pop() ?? null
@@ -130,7 +128,7 @@ export async function GET() {
     previstos, contenedores,
     foodcost: { countAlert, daysSinceCount, anyReliable },
     segundoConteo, comprasSinContenedor, sinClasificar,
-    ventasAyer, mejorDelDow, deltaVentasPct,
+    ventasAyer, mejorDelDow, deltaVentasPct, deltaVentasSemanas: SEMANAS_COMPARATIVO,
     estados, config,
   }
   return NextResponse.json(buildQueToca(input))

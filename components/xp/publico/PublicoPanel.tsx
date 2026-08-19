@@ -5,7 +5,7 @@ import { MONEY } from '../money/MoneyChrome'
 import { Section, pesos, pesosCent, cellInput } from './kit'
 import { OPERATING_CATEGORIES, catDefaults, type CostCategory } from '@/lib/publico'
 import { occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
-import { deltaVentas, cutoffDia } from '@/lib/publico/comparativo'
+import { ventanaRodante, ventanaMes, sumaRango, etiquetaVentana, findesOperados } from '@/lib/publico/comparativo'
 
 // PANEL de Público bajo XP (Money) — portada/dashboard. Métricas del mes (POS) + utilidad operativa + PUNTO
 // DE EQUILIBRIO EN DÍAS (cuándo cubriste tus fijos, no un "%" sobre barra llena) + resumen de caja. Qué toca
@@ -46,6 +46,7 @@ export default function PublicoPanel() {
   const [month, setMonth] = useState(curMonth())
   const [cur, setCur] = useState<Raw | null>(null)
   const [prev, setPrev] = useState<Raw | null>(null)
+  const [pp, setPp] = useState<Raw | null>(null)   // mes -2: la ventana rodante previa (4 sem atrás) alcanza hasta aquí
   const [fc, setFc] = useState<number | null>(null)
   const [tp, setTp] = useState<number | null>(null)
   const [vp, setVp] = useState<number | null>(null)
@@ -57,15 +58,21 @@ export default function PublicoPanel() {
   const [faltan, setFaltan] = useState(0)
   const [totalCaja, setTotalCaja] = useState<number | null>(null)
   const [prevTot, setPrevTot] = useState<{ pendiente: number; vencido: number } | null>(null)
+  // Nota de "cambió el método, no el negocio" — se muestra UNA vez (el delta se movió ~▲26%→▲47% por el método).
+  const [notaMetodo, setNotaMetodo] = useState(false)
+  useEffect(() => { try { setNotaMetodo(!localStorage.getItem('publico_cmp_metodo_v1')) } catch {} }, [])
+  const cerrarNota = () => { try { localStorage.setItem('publico_cmp_metodo_v1', '1') } catch {} ; setNotaMetodo(false) }
 
   const isCur = month === curMonth()
   const prevMonth = shiftMonth(month, -1)
+  const prevPrevMonth = shiftMonth(month, -2)
 
   useEffect(() => {
     const [y, mm] = month.split('-').map(Number)
     const mTo = `${month}-${String(new Date(y, mm, 0).getDate()).padStart(2, '0')}`
     fetch(`/api/publico?month=${month}`).then((r) => r.json()).then((j) => setCur({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [] })).catch(() => {})
     fetch(`/api/publico?month=${prevMonth}`).then((r) => r.json()).then((j) => setPrev({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [] })).catch(() => {})
+    fetch(`/api/publico?month=${prevPrevMonth}`).then((r) => r.json()).then((j) => setPp({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [] })).catch(() => {})
     fetch('/api/publico/foodcost').then((r) => r.json()).then((j) => setFc(j.theoreticalByMonth?.find((x: { month: string }) => x.month === month)?.theoreticalPct ?? null)).catch(() => {})
     fetch(`/api/publico/poster/metrics?from=${month}-01&to=${mTo}`).then((r) => r.json()).then((j) => { if (j.error) return; setDiasOp(j.daysOperated); setTp(j.ticketPromedio); setVp(j.guestsPromedio > 0 ? j.ticketPromedio / j.guestsPromedio : null) }).catch(() => {})
     fetch('/api/publico/config').then((r) => r.json()).then((j) => { if (j.clip_rate != null) setClipRate(Number(j.clip_rate)) }).catch(() => {})
@@ -83,7 +90,7 @@ export default function PublicoPanel() {
       setPrevTot({ pendiente, vencido }); setFaltan(falt)
     }).catch(() => {})
     if (month === curMonth()) fetch('/api/publico/contenedores').then((r) => r.json()).then((j) => setTotalCaja(j.total ?? null)).catch(() => {})
-  }, [month, prevMonth])
+  }, [month, prevMonth, prevPrevMonth])
 
   // Totales de DISPLAY = mes completo (para el mes en curso eso ES el mes-a-la-fecha).
   const ventasMes = sumV(cur?.ventas ?? [])
@@ -98,16 +105,27 @@ export default function PublicoPanel() {
   const comEf = ventasMes > 0 ? (tarjetaMes / ventasMes) * clipRate : 0
   const margin = fc != null ? 1 - fc / 100 - comEf : null
 
-  // DELTA mismo-tramo — una sola fuente (comparativo.ts) para ventas; gastos/utilidad con el MISMO corte.
-  const cutoff = cutoffDia(month, todayISO())
-  const parcial = cutoff != null
-  const dv = cur && prev ? deltaVentas([...cur.ventas, ...prev.ventas], month, prevMonth, todayISO()) : null
-  const costTramo = (cs: Costo[], mo: string) => cs.filter((c) => c.date.slice(0, 7) === mo && isOper(c) && (cutoff == null || Number(c.date.slice(8, 10)) <= cutoff)).reduce((s, c) => s + Number(c.amount), 0)
-  const gCur = costTramo(cur?.costos ?? [], month), gPrev = costTramo(prev?.costos ?? [], prevMonth)
+  // DELTA — fuente única (comparativo.ts). Mes EN CURSO → ventana RODANTE de 4 semanas (28d = 4 de cada día de
+  // semana en ambos lados → el artefacto de fin de semana es imposible por aritmética, no mitigado). Mes CERRADO
+  // → mes completo vs mes anterior, ANOTADO con el conteo de findes operados (ahí un mes de 5 viernes vs 4 aún
+  // difiere ~14% por calendario; el conteo deja distinguir calendario de desempeño). Ventas/gastos/utilidad, la
+  // MISMA ventana. Cruza meses, por eso el fetch baja 3 meses.
+  const ventasRodante = [...(cur?.ventas ?? []), ...(prev?.ventas ?? []), ...(pp?.ventas ?? [])]
+  const costosRodante = [...(cur?.costos ?? []), ...(prev?.costos ?? []), ...(pp?.costos ?? [])]
+  const venVal = (v: Venta) => Number(v.efectivo) + Number(v.tarjeta)
+  const win = isCur ? ventanaRodante(todayISO()) : ventanaMes(month, prevMonth)
+  const curV = sumaRango(ventasRodante, win.desde, win.hasta, venVal)
+  const prevV = sumaRango(ventasRodante, win.prevDesde, win.prevHasta, venVal)
+  const dVenta = prevV > 0 ? ((curV - prevV) / prevV) * 100 : null
+  const gCur = sumaRango(costosRodante.filter(isOper), win.desde, win.hasta, (c) => Number(c.amount))
+  const gPrev = sumaRango(costosRodante.filter(isOper), win.prevDesde, win.prevHasta, (c) => Number(c.amount))
   const dGasto = gPrev > 0 ? ((gCur - gPrev) / gPrev) * 100 : null
-  const uPrev = (dv?.prev ?? 0) - gPrev
-  const dUtil = dv && uPrev !== 0 ? (((dv.cur - gCur) - uPrev) / Math.abs(uPrev)) * 100 : null
-  const cmpLabel = `vs ${monthName(prevMonth)} · ${parcial ? 'mismo tramo' : 'mes completo'}`
+  const uPrev = prevV - gPrev
+  const dUtil = uPrev !== 0 && (curV > 0 || prevV > 0) ? (((curV - gCur) - uPrev) / Math.abs(uPrev)) * 100 : null
+  const hayDelta = dVenta != null
+  const findesCur = win.tipo === 'mes' ? findesOperados(ventasRodante, month) : 0
+  const findesPrev = win.tipo === 'mes' ? findesOperados(ventasRodante, prevMonth) : 0
+  const cmpLabel = etiquetaVentana(win)
   const badge = (pct: number | null, goodUp: boolean) => {
     if (pct == null) return null
     const up = pct >= 0, good = up === goodUp
@@ -123,9 +141,23 @@ export default function PublicoPanel() {
           <button onClick={() => setMonth((m) => (shiftMonth(m, 1) > curMonth() ? curMonth() : shiftMonth(m, 1)))} style={{ ...link, color: '#cfe0f8' }}>▶</button>
         </span>
       }>
-        {(dv || dGasto != null) && <div style={{ padding: '3px 9px', borderTop: `1px solid ${MONEY.rule}`, background: '#f3f7fd', fontSize: 9, color: '#8a93a8' }}>▲▼ {cmpLabel}</div>}
+        {notaMetodo && (
+          <div style={{ padding: '5px 9px', borderTop: `1px solid ${MONEY.rule}`, background: '#fff8e6', fontSize: 9.5, color: '#7a5b12', display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ flex: 1 }}><b>Cambió el método de comparación</b>, no el negocio. Antes era mes-a-mes por día del mes (un artefacto de calendario en un negocio de fin de semana); ahora es <b>ventana rodante de 4 semanas</b>. Por eso el número se movió (~▲26% → ▲47%) sin que pasara nada real.</span>
+            <button onClick={cerrarNota} style={{ ...link, color: '#7a5b12', fontWeight: 700, flexShrink: 0 }}>entendido ✕</button>
+          </div>
+        )}
+        {hayDelta && (
+          <div style={{ padding: '4px 9px', borderTop: `1px solid ${MONEY.rule}`, background: '#f3f7fd', fontSize: 9.5, color: '#5a6a86', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '1px 8px' }}>
+            <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, color: MONEY.blue }}>{win.tipo === 'rodante' ? 'Momio' : 'Comparativo'} · {cmpLabel}</span>
+            <span>ventas <b style={{ color: MONEY.ink, fontVariantNumeric: 'tabular-nums' }}>{pesos(curV)}</b> vs <b style={{ fontVariantNumeric: 'tabular-nums' }}>{pesos(prevV)}</b></span>
+            {win.tipo === 'rodante'
+              ? <span style={{ color: '#a9b4c6', fontStyle: 'italic' }}>los ▲▼ comparan esta ventana, no el total del mes</span>
+              : <span style={{ color: findesCur !== findesPrev ? '#b45309' : '#a9b4c6' }}>findes operados: <b>{findesCur}</b> vs <b>{findesPrev}</b>{findesCur !== findesPrev ? ' — parte de la diferencia es calendario, no desempeño' : ''}</span>}
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
-          <MetricCell name="Ventas del mes · POS" value={pesos(ventasMes)} big delta={badge(dv?.pct ?? null, true)} />
+          <MetricCell name="Ventas del mes · POS" value={pesos(ventasMes)} big delta={badge(dVenta, true)} />
           <MetricCell name="Gastos del mes · poster+manual" value={`−${pesos(costosOper)}`} big hint="incompleto hasta cerrar" delta={badge(dGasto, false)} />
           <MetricCell name="Food cost teórico · POS" value={fc != null ? `${fc.toFixed(1)}%` : '…'} hint="consumo de recetas · no gastos÷ventas" />
           <MetricCell name="Ticket promedio · POS" value={tp != null ? pesos(tp) : '…'} hint="por recibo · no por persona" />
