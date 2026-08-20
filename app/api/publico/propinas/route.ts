@@ -40,16 +40,21 @@ export async function GET() {
   const umbralRojo = Number((cfg.data as { propina_umbral_rojo?: number } | null)?.propina_umbral_rojo ?? 2000)
   const nivel = pendiente >= umbralRojo ? 'rojo' : pendiente >= umbralAmarillo ? 'amarillo' : 'verde'
 
-  const porMesMap = new Map<string, { month: string; monto: number; n: number }>()
+  const porMesMap = new Map<string, { month: string; monto: number; n: number; efectivo: number; tarjeta: number }>()
   for (const p of props ?? []) {
-    const cur = porMesMap.get(p.month as string) ?? { month: p.month as string, monto: 0, n: 0 }
+    const cur = porMesMap.get(p.month as string) ?? { month: p.month as string, monto: 0, n: 0, efectivo: 0, tarjeta: 0 }
     cur.monto = round(cur.monto + Number(p.monto)); cur.n += Number(p.n_tx)
+    cur.efectivo = round(cur.efectivo + Number(p.efectivo ?? 0)); cur.tarjeta = round(cur.tarjeta + Number(p.tarjeta ?? 0))
     porMesMap.set(p.month as string, cur)
   }
   const porMes = [...porMesMap.values()].filter((m) => m.monto > 0).sort((a, b) => (a.month < b.month ? 1 : -1))
   return NextResponse.json({
     acumulado, repartido: repartidoReal, arranque, pendiente, ultimoReparto,
     pendienteEfectivo, pendienteTarjeta,
+    // Los 3 números de la propina: BRUTO (efectivo+tarjeta) · COMISIÓN de la de tarjeta (costo del negocio, aparte)
+    // · ENTREGA (= bruto; hoy se entrega el bruto, la comisión NO se descuenta al personal). histEfectivo/Tarjeta
+    // = acumulado desde junio. comisionTasaEfectiva = 3.60% × IVA. El cliente calcula comisión = tarjeta × tasa.
+    histEfectivo: acumEfectivo, histTarjeta: acumTarjeta, comisionTasaEfectiva: 0.036 * 1.16,
     nivel, umbralAmarillo, umbralRojo, porMes,
     // La lista marca el arranque como RECONCILIACIÓN (no un reparto normal) para no ensuciar el histórico semanal.
     repartos: reps.map((r) => ({ id: r.id, fecha: r.fecha, amount: Number(r.amount), contenedor: r.contenedor, nota: r.nota, kind: r.kind ?? 'reparto' })),

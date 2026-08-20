@@ -20,7 +20,7 @@ type Pend = { since: string | null; count: number; total: number; items: { id: s
 type Comision = { id: string; date: string; amount: number; note: string | null }
 type RepartoT = { id: string; fecha: string; amount: number; contenedor: ContKey; nota: string | null; kind: string }
 type Nivel = 'verde' | 'amarillo' | 'rojo'
-type Propinas = { acumulado: number; repartido: number; arranque: number; pendiente: number; pendienteEfectivo: number; pendienteTarjeta: number; ultimoReparto: string | null; nivel: Nivel; umbralAmarillo: number; umbralRojo: number; porMes: { month: string; monto: number; n: number }[]; repartos: RepartoT[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
+type Propinas = { acumulado: number; repartido: number; arranque: number; pendiente: number; pendienteEfectivo: number; pendienteTarjeta: number; ultimoReparto: string | null; nivel: Nivel; umbralAmarillo: number; umbralRojo: number; porMes: { month: string; monto: number; n: number; efectivo: number; tarjeta: number }[]; histEfectivo: number; histTarjeta: number; comisionTasaEfectiva: number; repartos: RepartoT[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
 
 const NIVEL_COLOR: Record<Nivel, string> = { verde: '#5a6a86', amarillo: '#b45309', rojo: MONEY.down }
 const ALERTA_DIAS = 21
@@ -172,6 +172,37 @@ export default function PublicoContenedores() {
 
         {/* Propinas (pasivo) */}
         <div>
+          {/* LOS 3 NÚMEROS — siempre visibles. ① bruto (del cliente) · ② comisión de la de TARJETA (costo que
+              absorbe el negocio, aparte) · ③ entrega al personal = BRUTO (hoy se entrega el bruto; la comisión
+              NO se le resta). El efectivo no paga comisión: ahí ① = ③. */}
+          {prop && (() => {
+            const M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+            const mes = prop.porMes[0]
+            const mEf = mes?.efectivo ?? 0, mTj = mes?.tarjeta ?? 0, mBruto = mEf + mTj, mCom = mTj * prop.comisionTasaEfectiva
+            const hEf = prop.histEfectivo, hTj = prop.histTarjeta, hBruto = hEf + hTj, hCom = hTj * prop.comisionTasaEfectiva
+            const mesLbl = mes ? M[Number(mes.month.slice(5, 7)) - 1] : '—'
+            const col: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+            const row = (label: React.ReactNode, m: number, h: number, opts?: { neg?: boolean; strong?: boolean; color?: string }) => (<>
+              <span style={{ color: opts?.strong ? MONEY.ink : '#5a6a86', fontWeight: opts?.strong ? 600 : 400 }}>{label}</span>
+              <span style={{ ...col, color: opts?.color ?? MONEY.ink, fontWeight: opts?.strong ? 700 : 400 }}>{opts?.neg ? '−' : ''}{pesosCent(m)}</span>
+              <span style={{ ...col, color: opts?.color ?? '#8a93a8', fontWeight: opts?.strong ? 700 : 400 }}>{opts?.neg ? '−' : ''}{pesosCent(h)}</span>
+            </>)
+            return (
+              <div style={{ border: `1px solid ${MONEY.rule}`, background: '#f7faff', padding: '6px 8px', marginBottom: 6, fontSize: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: MONEY.blue, marginBottom: 4 }}>
+                  <span>Propinas · los 3 números</span>
+                  <span style={{ fontWeight: 400, color: '#8a93a8', fontSize: 9.5 }}>{mesLbl} · histórico jun→</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', columnGap: 14, rowGap: 2, alignItems: 'baseline' }}>
+                  {row(<>① Bruto · efectivo <span style={{ opacity: 0.7 }}>(no paga comisión)</span></>, mEf, hEf)}
+                  {row(<>① Bruto · tarjeta</>, mTj, hTj)}
+                  {row(<>② Comisión de tarjeta <span style={{ opacity: 0.7 }}>(la absorbe el negocio, aparte)</span></>, mCom, hCom, { neg: true, color: MONEY.down })}
+                  {row(<>③ Entregas al personal <span style={{ opacity: 0.7, fontWeight: 400 }}>(= bruto)</span></>, mBruto, hBruto, { strong: true })}
+                </div>
+                <div style={{ marginTop: 4, color: '#8a93a8' }}>Hoy entregas el <b>bruto</b> completo. La comisión de tarjeta (②) es un costo del negocio — <b>NO</b> se le resta al personal, por eso ③ = ①. El efectivo nunca paga comisión.</div>
+              </div>
+            )
+          })()}
           <button onClick={() => setPropOpen((o) => !o)} style={{ ...link, color: prop && prop.pendiente > 0 ? NIVEL_COLOR[prop.nivel] : '#5a6a86' }}>{propOpen ? '▲ cerrar propinas' : `propinas por repartir${prop && prop.pendiente > 0 ? ` (${pesosCent(prop.pendiente)} pendiente)` : ''}`}</button>
           {propOpen && prop && (
             <div style={{ marginTop: 4, border: `1px solid ${MONEY.rule}`, background: '#fff', padding: '6px 7px', display: 'flex', flexDirection: 'column', gap: 5 }}>

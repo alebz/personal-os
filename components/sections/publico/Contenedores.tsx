@@ -18,7 +18,7 @@ type Pend = { since: string | null; count: number; total: number; items: { id: s
 type Comision = { id: string; date: string; amount: number; note: string | null }
 type Reparto = { id: string; fecha: string; amount: number; contenedor: ContKey; nota: string | null; kind: string }
 type Nivel = 'verde' | 'amarillo' | 'rojo'
-type Propinas = { acumulado: number; repartido: number; arranque: number; pendiente: number; pendienteEfectivo: number; pendienteTarjeta: number; ultimoReparto: string | null; nivel: Nivel; umbralAmarillo: number; umbralRojo: number; porMes: { month: string; monto: number; n: number }[]; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
+type Propinas = { acumulado: number; repartido: number; arranque: number; pendiente: number; pendienteEfectivo: number; pendienteTarjeta: number; ultimoReparto: string | null; nivel: Nivel; umbralAmarillo: number; umbralRojo: number; porMes: { month: string; monto: number; n: number; efectivo: number; tarjeta: number }[]; histEfectivo: number; histTarjeta: number; comisionTasaEfectiva: number; repartos: Reparto[]; sync: { last_success_at: string | null; last_error: string | null; last_import_to: string | null } | null }
 const NIVEL_COLOR: Record<Nivel, string> = { verde: 'var(--color-fg-muted)', amarillo: 'var(--color-warn, #b45309)', rojo: 'var(--color-danger)' }
 
 const ALERTA_DIAS = 21   // aviso de "hace mucho que no cuadras", análogo al del conteo físico del food cost
@@ -221,6 +221,32 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
       {/* Propinas de tarjeta: caen a CLIP pero son del personal (PASIVO). Su PROPIO ledger, desamarrado del
           cuadre: pendiente = Σ propina caída − Σ repartos (incluido el arranque). Anclado a tu último reparto. */}
       <div>
+        {/* LOS 3 NÚMEROS — siempre visibles. ① bruto · ② comisión de TARJETA (costo del negocio, aparte) ·
+            ③ entrega = BRUTO (hoy se entrega el bruto; la comisión NO se le resta). Efectivo: ① = ③. */}
+        {prop && (() => {
+          const M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+          const mes = prop.porMes[0]
+          const mEf = mes?.efectivo ?? 0, mTj = mes?.tarjeta ?? 0, mBruto = mEf + mTj, mCom = mTj * prop.comisionTasaEfectiva
+          const hEf = prop.histEfectivo, hTj = prop.histTarjeta, hBruto = hEf + hTj, hCom = hTj * prop.comisionTasaEfectiva
+          const mesLbl = mes ? M[Number(mes.month.slice(5, 7)) - 1] : '—'
+          const row = (label: React.ReactNode, m: number, h: number, o?: { neg?: boolean; strong?: boolean; danger?: boolean }) => (<>
+            <span className={o?.strong ? 'text-fg font-medium' : 'text-fg-muted'}>{label}</span>
+            <span className={`text-right tabular-nums ${o?.danger ? 'text-danger' : o?.strong ? 'text-fg font-bold' : 'text-fg'}`}>{o?.neg ? '−' : ''}{mxn(m)}</span>
+            <span className={`text-right tabular-nums ${o?.danger ? 'text-danger' : o?.strong ? 'text-fg font-bold' : 'text-fg-muted'}`}>{o?.neg ? '−' : ''}{mxn(h)}</span>
+          </>)
+          return (
+            <div className="mb-2 rounded-card border border-border bg-surface-1 p-2 text-label">
+              <div className="mb-1 flex justify-between font-bold" style={{ color: dc }}><span>Propinas · los 3 números</span><span className="font-normal text-fg-muted">{mesLbl} · histórico jun→</span></div>
+              <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-3 gap-y-0.5">
+                {row(<>① Bruto · efectivo <span className="opacity-70">(no paga comisión)</span></>, mEf, hEf)}
+                {row(<>① Bruto · tarjeta</>, mTj, hTj)}
+                {row(<>② Comisión de tarjeta <span className="opacity-70">(la absorbe el negocio, aparte)</span></>, mCom, hCom, { neg: true, danger: true })}
+                {row(<>③ Entregas al personal <span className="font-normal opacity-70">(= bruto)</span></>, mBruto, hBruto, { strong: true })}
+              </div>
+              <div className="mt-1 text-fg-muted">Hoy entregas el <b>bruto</b> completo. La comisión de tarjeta (②) es un costo del negocio — <b>NO</b> se le resta al personal, por eso ③ = ①. El efectivo nunca paga comisión.</div>
+            </div>
+          )
+        })()}
         <button onClick={() => setPropOpen((o) => !o)} className="text-label hover:text-accent" style={{ color: prop && prop.pendiente > 0 ? NIVEL_COLOR[prop.nivel] : undefined }}>
           {propOpen ? '▲ cerrar propinas' : `propinas por repartir${prop && prop.pendiente > 0 ? ` (${mxn(prop.pendiente)} pendiente)` : ''}`}
         </button>
