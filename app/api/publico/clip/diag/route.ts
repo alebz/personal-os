@@ -32,11 +32,18 @@ export async function GET(req: NextRequest) {
   }
   const ep = (req.nextUrl.searchParams.get('ep') ?? 'settlements').replace(/[^a-z0-9/_-]/gi, '')
   const isPayments = ep.includes('payments')
+  const isDetail = ep.includes('/')   // p.ej. 'payments/PaFV2ZN7' o 'settlements/<id>' → detalle, sin params de ventana
   const sp = new URLSearchParams(req.nextUrl.searchParams); sp.delete('ep')
-  if (isPayments) {
-    // Auth Authorization + datetimes ISO + limit, como lib/clipTips.ts (el /payments que sí funciona).
-    sp.set('from', toISO(sp.get('from') ?? `${shiftDays(todayMX(), -80)}`))
-    sp.set('to', toISO(sp.get('to') ?? todayMX()))
+  if (isDetail) {
+    // Detalle por id: sin from/to/limit; solo el auth correcto por familia de endpoint.
+  } else if (isPayments) {
+    // Auth Authorization + datetimes ISO + limit, como lib/clipTips.ts. BUG CORREGIDO (#7): una fecha sin hora
+    // en `to` NO puede expandirse al MISMO instante que `from` (ventana de ancho cero → parece vacío cuando no lo
+    // está). El día natural MX de la fecha D es [D 06:00Z, D+1 06:00Z): `from` abre en D, `to` CIERRA en D+1.
+    const rawFrom = sp.get('from') ?? shiftDays(todayMX(), -80)
+    const rawTo = sp.get('to') ?? todayMX()
+    sp.set('from', toISO(rawFrom))
+    sp.set('to', /^\d{4}-\d{2}-\d{2}$/.test(rawTo) ? toISO(shiftDays(rawTo, 1)) : rawTo)
     if (!sp.has('limit')) sp.set('limit', '100')
   } else {
     // /settlements: x-api-key + fechas.
