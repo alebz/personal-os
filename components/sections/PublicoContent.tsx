@@ -551,12 +551,12 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
               <div className="mt-1 space-y-3">
                 {/* Desglose del margen: se ve de dónde sale, con la TASA de Clip editable inline (se guarda en config). */}
                 <div className="flex flex-wrap items-baseline gap-x-1 text-label text-fg-muted">
-                  <span>margen <b className="tabular-nums" style={{ color: dc }}>{(margin * 100).toFixed(1)}%</b> = 1 − food cost {fc!.toFixed(1)}% − comisión <b className="tabular-nums">{(comEfectiva * 100).toFixed(1)}%</b></span>
+                  <span>margen <b className="tabular-nums" style={{ color: dc }}>{(margin * 100).toFixed(1)}%</b> = 1 − food cost {fc!.toFixed(1)}% − comisión <b className="tabular-nums">{(comEfectiva * 100).toFixed(1)}%</b> <i className="opacity-80">estimada · tasa tecleada</i></span>
                   <span className="opacity-70">(tarjeta {ventasMes > 0 ? Math.round((tarjetaMes / ventasMes) * 100) : 0}% × tasa Clip
                     <input value={rateEd ?? (clipRate * 100).toFixed(2)} onChange={(e) => setRateEd(e.target.value)}
                       onBlur={() => { const v = parseFloat(rateEd ?? ''); setRateEd(null); if (Number.isFinite(v) && Math.abs(v / 100 - clipRate) > 1e-6) { setClipRate(v / 100); void fetch('/api/publico/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clip_rate: v }) }) } }}
                       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                      inputMode="decimal" title="tasa de comisión de Clip (editable) — pon tu tasa real del settlement"
+                      inputMode="decimal" title="tasa de comisión de Clip (editable) — pon tu tasa real del estado de cuenta de Clip (la API no reporta el fee para tu cuenta)"
                       style={{ width: 44, margin: '0 3px', padding: '1px 4px', fontSize: 12, borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-surface-base, #fff)', color: 'inherit', textAlign: 'right' }} />%)</span>
                 </div>
                 {beRow('Operativo', fixed, 'con la renta que le condonas')}
