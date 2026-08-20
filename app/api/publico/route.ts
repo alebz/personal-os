@@ -9,10 +9,13 @@ export async function GET(req: NextRequest) {
   const today = req.nextUrl.searchParams.get('today') ?? new Date().toISOString().slice(0, 10)
   const supabase = createServerClient()
 
-  const [ventasRes, costosRes, ingresosRes] = await Promise.all([
+  const [ventasRes, costosRes, ingresosRes, propRes] = await Promise.all([
     supabase.from('publico_ventas').select('*').eq('scope', 'publico').eq('month', month).order('date'),
     supabase.from('publico_costos').select('*').eq('scope', 'publico').eq('month', month).order('date'),
     supabase.from('publico_ingresos').select('*').eq('scope', 'publico').eq('month', month).order('date'),
+    // Propina de TARJETA del mes: la comisión de Clip se cobra sobre venta + propina de tarjeta (la propina va
+    // completa al personal, pero la comisión de procesarla la absorbe el negocio). La necesita el comEf del margen.
+    supabase.from('publico_propinas').select('tarjeta').eq('scope', 'publico').eq('month', month),
   ])
   if (ventasRes.error) return NextResponse.json({ error: ventasRes.error.message }, { status: 500 })
   if (costosRes.error) return NextResponse.json({ error: costosRes.error.message }, { status: 500 })
@@ -20,5 +23,6 @@ export async function GET(req: NextRequest) {
 
   const ventas = ventasRes.data ?? []
   const hoy = ventas.find((v: { date: string }) => v.date === today) ?? null
-  return NextResponse.json({ ventas, costos: costosRes.data ?? [], ingresos: ingresosRes.data ?? [], hoy })
+  const propinaTarjeta = (propRes.data ?? []).reduce((s: number, p: { tarjeta?: number | string }) => s + Number(p.tarjeta ?? 0), 0)
+  return NextResponse.json({ ventas, costos: costosRes.data ?? [], ingresos: ingresosRes.data ?? [], hoy, propinaTarjeta })
 }

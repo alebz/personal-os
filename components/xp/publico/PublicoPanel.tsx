@@ -6,6 +6,7 @@ import { Section, pesos, pesosCent, cellInput } from './kit'
 import { OPERATING_CATEGORIES, catDefaults, type CostCategory } from '@/lib/publico'
 import { occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
 import { ventanaRodante, ventanaMes, sumaRango, etiquetaVentana, findesOperados } from '@/lib/publico/comparativo'
+import { comisionEfectiva } from '@/lib/publico/comision'
 
 // PANEL de Público bajo XP (Money) — portada/dashboard. Métricas del mes (POS) + utilidad operativa + PUNTO
 // DE EQUILIBRIO EN DÍAS (cuándo cubriste tus fijos, no un "%" sobre barra llena) + resumen de caja. Qué toca
@@ -23,7 +24,7 @@ const link: React.CSSProperties = { border: 0, background: 'none', cursor: 'poin
 
 type Venta = { date: string; efectivo: number; tarjeta: number }
 type Costo = { date: string; category: string; amount: number }
-type Raw = { ventas: Venta[]; costos: Costo[]; ingresos: { amount: number }[] }
+type Raw = { ventas: Venta[]; costos: Costo[]; ingresos: { amount: number }[]; propinaTarjeta: number }
 type Prev = { archived: boolean; categoria: CostCategory; amount: number; frecuencia: Frecuencia; anchor_date: string; ocurrencias: number | null }
 
 const sumV = (vs: Venta[]) => vs.reduce((s, v) => s + Number(v.efectivo) + Number(v.tarjeta), 0)
@@ -70,9 +71,9 @@ export default function PublicoPanel() {
   useEffect(() => {
     const [y, mm] = month.split('-').map(Number)
     const mTo = `${month}-${String(new Date(y, mm, 0).getDate()).padStart(2, '0')}`
-    fetch(`/api/publico?month=${month}`).then((r) => r.json()).then((j) => setCur({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [] })).catch(() => {})
-    fetch(`/api/publico?month=${prevMonth}`).then((r) => r.json()).then((j) => setPrev({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [] })).catch(() => {})
-    fetch(`/api/publico?month=${prevPrevMonth}`).then((r) => r.json()).then((j) => setPp({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [] })).catch(() => {})
+    fetch(`/api/publico?month=${month}`).then((r) => r.json()).then((j) => setCur({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [], propinaTarjeta: Number(j.propinaTarjeta ?? 0) })).catch(() => {})
+    fetch(`/api/publico?month=${prevMonth}`).then((r) => r.json()).then((j) => setPrev({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [], propinaTarjeta: Number(j.propinaTarjeta ?? 0) })).catch(() => {})
+    fetch(`/api/publico?month=${prevPrevMonth}`).then((r) => r.json()).then((j) => setPp({ ventas: j.ventas ?? [], costos: j.costos ?? [], ingresos: j.ingresos ?? [], propinaTarjeta: Number(j.propinaTarjeta ?? 0) })).catch(() => {})
     fetch('/api/publico/foodcost').then((r) => r.json()).then((j) => setFc(j.theoreticalByMonth?.find((x: { month: string }) => x.month === month)?.theoreticalPct ?? null)).catch(() => {})
     fetch(`/api/publico/poster/metrics?from=${month}-01&to=${mTo}`).then((r) => r.json()).then((j) => { if (j.error) return; setDiasOp(j.daysOperated); setTp(j.ticketPromedio); setVp(j.guestsPromedio > 0 ? j.ticketPromedio / j.guestsPromedio : null) }).catch(() => {})
     fetch('/api/publico/config').then((r) => r.json()).then((j) => { if (j.clip_rate != null) setClipRate(Number(j.clip_rate)) }).catch(() => {})
@@ -102,7 +103,8 @@ export default function PublicoPanel() {
   const utilidadOper = ventasMes - costosOper
   const utilidadTotal = utilidadOper + otros - renta
   const vd = diasOp != null && diasOp > 0 ? ventasMes / diasOp : null
-  const comEf = ventasMes > 0 ? (tarjetaMes / ventasMes) * clipRate : 0
+  const propinaTarjetaMes = cur?.propinaTarjeta ?? 0
+  const comEf = comisionEfectiva({ ventas: ventasMes, tarjeta: tarjetaMes, propinaTarjeta: propinaTarjetaMes, tasaBase: clipRate })
   const margin = fc != null ? 1 - fc / 100 - comEf : null
 
   // DELTA — fuente única (comparativo.ts). Mes EN CURSO → ventana RODANTE de 4 semanas (28d = 4 de cada día de
@@ -193,7 +195,7 @@ export default function PublicoPanel() {
               : margin <= 0 ? <div style={{ fontSize: 10, fontStyle: 'italic', color: '#b45309' }}>Food cost + comisión ≥ 100% — no hay margen.</div>
                 : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ fontSize: 9.5, color: '#8a93a8' }}>margen <b style={{ color: MONEY.blue }}>{(margin * 100).toFixed(1)}%</b> = 1 − food cost {fc!.toFixed(1)}% − comisión <b>{(comEf * 100).toFixed(1)}%</b> <span style={{ opacity: 0.8 }}>(<i>estimada · tasa tecleada</i> · tarjeta {ventasMes > 0 ? Math.round((tarjetaMes / ventasMes) * 100) : 0}% × Clip <input value={rateEd ?? (clipRate * 100).toFixed(2)} onChange={(e) => setRateEd(e.target.value)} onBlur={() => { const v = parseFloat(rateEd ?? ''); setRateEd(null); if (Number.isFinite(v) && Math.abs(v / 100 - clipRate) > 1e-6) { setClipRate(v / 100); void fetch('/api/publico/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clip_rate: v }) }) } }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} inputMode="decimal" style={{ ...cellInput, width: 38, padding: '0 3px', textAlign: 'right', fontSize: 10 }} />%)</span></div>
+                    <div style={{ fontSize: 9.5, color: '#8a93a8' }}>margen <b style={{ color: MONEY.blue }}>{(margin * 100).toFixed(1)}%</b> = 1 − food cost {fc!.toFixed(1)}% − comisión <b>{(comEf * 100).toFixed(1)}%</b> <span style={{ opacity: 0.8 }}>(venta+propina tarjeta {ventasMes > 0 ? Math.round(((tarjetaMes + propinaTarjetaMes) / ventasMes) * 100) : 0}% × <input value={rateEd ?? (clipRate * 100).toFixed(2)} onChange={(e) => setRateEd(e.target.value)} onBlur={() => { const v = parseFloat(rateEd ?? ''); setRateEd(null); if (Number.isFinite(v) && Math.abs(v / 100 - clipRate) > 1e-6) { setClipRate(v / 100); void fetch('/api/publico/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clip_rate: v }) }) } }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} inputMode="decimal" style={{ ...cellInput, width: 38, padding: '0 3px', textAlign: 'right', fontSize: 10 }} />% + IVA · <i>medido en recibo 19-ago</i>)</span></div>
                     <BreakevenDays label="Operativo" fijos={fixed} margin={margin} ventasDiarias={cur?.ventas ?? []} month={month} isCur={isCur} sub="con la renta que le condonas" />
                     {rentaCond > 0
                       ? <BreakevenDays label="De pie solo" fijos={fixed + rentaCond} margin={margin} ventasDiarias={cur?.ventas ?? []} month={month} isCur={isCur} sub={`+ renta ${pesos(rentaCond)} · cuándo paga su propia renta`} />

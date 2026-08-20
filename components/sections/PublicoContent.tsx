@@ -22,6 +22,7 @@ import { Previstos } from './publico/Previstos'
 import { Contenedores } from './publico/Contenedores'
 import { localDate, addDays, dayLabel, dayMonth, monthName } from './publico/util'
 import { ventanaRodante, ventanaMes, sumaRango, etiquetaVentana, findesOperados } from '@/lib/publico/comparativo'
+import { comisionEfectiva } from '@/lib/publico/comision'
 import { dayColor, crtDayColor } from '@/lib/weekdayColors'
 import { useOSSettings } from '@/components/OSSettingsContext'
 import PublicoMoney from '@/components/xp/PublicoMoney'
@@ -69,6 +70,7 @@ function PublicoArcade() {
   const [cmpV, setCmpV] = useState<Venta[]>([])   // ventas diarias de 3 meses → comparativo por ventana rodante (fuente única)
   const [cmpC, setCmpC] = useState<Costo[]>([])   // costos diarios de 3 meses → delta de gastos sobre la misma ventana
   const [ventas, setVentas] = useState<Venta[]>([])
+  const [propTarjMes, setPropTarjMes] = useState(0)   // propina de tarjeta del mes → base de la comisión de Clip
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
   const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'fondos' | 'notas'>('panel')
@@ -124,6 +126,7 @@ function PublicoArcade() {
     if (pp && typeof pp.pendiente === 'number') setPropPend({ pendiente: pp.pendiente, nivel: pp.nivel })
     if (!r) return
     setVentas(r.ventas ?? [])
+    setPropTarjMes(Number(r.propinaTarjeta ?? 0))
     setCostos(r.costos ?? [])
     setIngresos(r.ingresos ?? [])
     const hoy: Venta | null = r.ventas?.find((v: Venta) => v.date === capDate) ?? null
@@ -294,7 +297,7 @@ function PublicoArcade() {
       </>)}
 
       {tab === 'panel' && (
-        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} cmpVentas={cmpV} cmpCostos={cmpC} ventasDiarias={ventas} propinaPendiente={propPend?.pendiente ?? 0} onCostChange={load} />
+        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} propinaTarjetaMes={propTarjMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} cmpVentas={cmpV} cmpCostos={cmpC} ventasDiarias={ventas} propinaPendiente={propPend?.pendiente ?? 0} onCostChange={load} />
       )}
 
       {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
@@ -360,8 +363,8 @@ function PublicoArcade() {
 // marca su PROCEDENCIA (POS vs manual). Estética arcade: UNA rejilla con divisiones de 1px en el color del
 // día (monocolor, hard steps, sin degradados). El punto de equilibrio es placeholder → llega en Fase 2 con
 // los gastos fijos/nómina (previstos); pintarlo ahora sería una barra basada en nada. Debe caber sin scroll. ──
-function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, cmpVentas, cmpCostos, ventasDiarias, propinaPendiente, onCostChange }: {
-  month: string; ventasMes: number; tarjetaMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; cmpVentas: Venta[]; cmpCostos: Costo[]; ventasDiarias: Venta[]; propinaPendiente: number; onCostChange: () => void
+function Panel({ month, ventasMes, tarjetaMes, propinaTarjetaMes, costosOper, utilidadOper, otrosIngresosMes, rentaCondonadaMes, utilidadTotal, reinversionMes, cmpVentas, cmpCostos, ventasDiarias, propinaPendiente, onCostChange }: {
+  month: string; ventasMes: number; tarjetaMes: number; propinaTarjetaMes: number; costosOper: number; utilidadOper: number; otrosIngresosMes: number; rentaCondonadaMes: number; utilidadTotal: number; reinversionMes: number; cmpVentas: Venta[]; cmpCostos: Costo[]; ventasDiarias: Venta[]; propinaPendiente: number; onCostChange: () => void
 }) {
   const { crt } = useOSSettings()
   const [faltan, setFaltan] = useState(0)   // previstos operativos impagos del mes → "provisional · faltan $X"
@@ -382,7 +385,7 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
   const vd = diasOp != null && diasOp > 0 ? ventasMes / diasOp : null   // venta/día = las MISMAS ventas del mes ÷ días operados
   // Comisión EFECTIVA sobre ventas = proporción de ventas con tarjeta × tasa de Clip. Escala con el mix real:
   // si un mes vendes más en efectivo, baja sola. Entra al MARGEN del punto de equilibrio (como el food cost).
-  const comEfectiva = ventasMes > 0 ? (tarjetaMes / ventasMes) * clipRate : 0
+  const comEfectiva = comisionEfectiva({ ventas: ventasMes, tarjeta: tarjetaMes, propinaTarjeta: propinaTarjetaMes, tasaBase: clipRate })
   const isCurrentMonth = month === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }).slice(0, 7)   // el mes en curso siempre tiene compras por capturar
   useEffect(() => {
     let alive = true
@@ -551,13 +554,13 @@ function Panel({ month, ventasMes, tarjetaMes, costosOper, utilidadOper, otrosIn
               <div className="mt-1 space-y-3">
                 {/* Desglose del margen: se ve de dónde sale, con la TASA de Clip editable inline (se guarda en config). */}
                 <div className="flex flex-wrap items-baseline gap-x-1 text-label text-fg-muted">
-                  <span>margen <b className="tabular-nums" style={{ color: dc }}>{(margin * 100).toFixed(1)}%</b> = 1 − food cost {fc!.toFixed(1)}% − comisión <b className="tabular-nums">{(comEfectiva * 100).toFixed(1)}%</b> <i className="opacity-80">estimada · tasa tecleada</i></span>
-                  <span className="opacity-70">(tarjeta {ventasMes > 0 ? Math.round((tarjetaMes / ventasMes) * 100) : 0}% × tasa Clip
+                  <span>margen <b className="tabular-nums" style={{ color: dc }}>{(margin * 100).toFixed(1)}%</b> = 1 − food cost {fc!.toFixed(1)}% − comisión <b className="tabular-nums">{(comEfectiva * 100).toFixed(1)}%</b> <i className="opacity-80">medido · recibo 19-ago</i></span>
+                  <span className="opacity-70">(venta+propina tarjeta {ventasMes > 0 ? Math.round(((tarjetaMes + propinaTarjetaMes) / ventasMes) * 100) : 0}% × tasa
                     <input value={rateEd ?? (clipRate * 100).toFixed(2)} onChange={(e) => setRateEd(e.target.value)}
                       onBlur={() => { const v = parseFloat(rateEd ?? ''); setRateEd(null); if (Number.isFinite(v) && Math.abs(v / 100 - clipRate) > 1e-6) { setClipRate(v / 100); void fetch('/api/publico/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clip_rate: v }) }) } }}
                       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                       inputMode="decimal" title="tasa de comisión de Clip (editable) — pon tu tasa real del estado de cuenta de Clip (la API no reporta el fee para tu cuenta)"
-                      style={{ width: 44, margin: '0 3px', padding: '1px 4px', fontSize: 12, borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-surface-base, #fff)', color: 'inherit', textAlign: 'right' }} />%)</span>
+                      style={{ width: 44, margin: '0 3px', padding: '1px 4px', fontSize: 12, borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-surface-base, #fff)', color: 'inherit', textAlign: 'right' }} />% + IVA)</span>
                 </div>
                 {beRow('Operativo', fixed, 'con la renta que le condonas')}
                 {rentaCond > 0

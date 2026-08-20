@@ -5,6 +5,7 @@ import { MONEY } from '../money/MoneyChrome'
 import { pesos } from './kit'
 import { occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
 import { catDefaults, type CostCategory } from '@/lib/publico'
+import { comisionEfectiva } from '@/lib/publico/comision'
 
 // RIEL de Público (reemplaza el de mercado de MSN Money). Cromo PERSISTENTE — visible en todas las tabs, así
 // que solo lleva cosas útiles esté donde esté: QUÉ TOCA (ticker, motor quetoca.ts) + dos gráficas que se leen
@@ -56,7 +57,7 @@ export default function PublicoRail() {
       const fixedMonthly = ((pv?.previstos ?? []) as Prev[]).filter((p) => !p.archived && catDefaults(p.categoria).defaultKind === 'fijo').reduce((s, p) => s + occurrencesInMonth(p.anchor_date, p.frecuencia, p.ocurrencias, m).length * Number(p.amount), 0)
       const fc = (fcd?.theoreticalByMonth as { month: string; theoreticalPct: number }[] | undefined)?.find((x) => x.month === m)?.theoreticalPct ?? null
       const clipRate = cfg?.clip_rate != null ? Number(cfg.clip_rate) : 0.036
-      const comEf = ventasMes > 0 ? (tarjetaMes / ventasMes) * clipRate : 0
+      const comEf = comisionEfectiva({ ventas: ventasMes, tarjeta: tarjetaMes, propinaTarjeta: Number(cur?.propinaTarjeta ?? 0), tasaBase: clipRate })
       if (fc != null && fixedMonthly > 0) {
         const margin = 1 - fc / 100 - comEf
         if (margin > 0) {
