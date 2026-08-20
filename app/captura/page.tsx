@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { TicketFoto } from '@/components/sections/publico/TicketFoto'
+import CorteCaja from '@/components/sections/publico/CorteCaja'
 import { mxn } from '@/components/Mxn'
 
 // /captura — la app aislada de Andrés: la versión MÓVIL del tab Capturar. UN solo capturador (foto del ticket
@@ -43,6 +44,11 @@ export default function CapturaPage() {
       {/* UN capturador: foto del ticket o registro a mano, ambos con renglones. */}
       <section className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl">
         <TicketFoto defaultDate={today()} onSaved={refresh} />
+      </section>
+
+      {/* CORTE DE CAJA — con cuánto dispone Andrés para comprar (efectivo en mano + total con CLIP), y el ritual de cierre diario. */}
+      <section className="rounded-card border border-border bg-surface-1 p-3 shadow-lg shadow-black/10 backdrop-blur-xl">
+        <CorteCaja />
       </section>
 
       {/* HOY — lo capturado del día + el total, bien visible. Se refresca al confirmar. */}

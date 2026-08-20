@@ -21,6 +21,7 @@ const CAPTURA_RULES: { prefix: string; methods: string[] }[] = [
   { prefix: '/api/publico/poster/catalog', methods: ['GET'] },          // catálogo (lectura)
   { prefix: '/api/publico/proveedores',    methods: ['GET'] },          // autocompletar (lectura)
   { prefix: '/api/publico/dia',            methods: ['GET'] },          // lo del día (lectura)
+  { prefix: '/api/publico/contenedores',   methods: ['GET', 'POST'] },  // corte de caja: leer saldos + cuadrar (crear snapshot, nunca borrar)
 ]
 
 function isPublic(pathname: string): boolean {
