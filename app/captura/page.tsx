@@ -22,11 +22,22 @@ export default function CapturaPage() {
   }, [])
   useEffect(() => { refresh() }, [refresh])
 
+  // SALIDA (escape hatch): borra la sesión y manda a /login. Es la puerta de recuperación desde ADENTRO — sin
+  // ella, una sesión de captura queda atrapada aquí (la raíz rebota a /captura y en PWA no hay barra para teclear
+  // /login). Cerrar sesión borra la cookie 'captura'; en /login el dueño entra con su contraseña y recupera 'full'.
+  async function salir() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* igual navegamos */ }
+    window.location.href = '/login'
+  }
+
   return (
     <main className="mx-auto min-h-dvh max-w-lg space-y-3 px-3 py-4 text-fg">
-      <header className="px-1">
-        <h1 className="text-lg font-bold text-fg">Público · Captura</h1>
-        <p className="text-label text-fg-muted">Toma la foto del ticket (o regístralo a mano), revisa cantidades y precios, confirma — y tira el ticket.</p>
+      <header className="flex items-start justify-between gap-2 px-1">
+        <div>
+          <h1 className="text-lg font-bold text-fg">Público · Captura</h1>
+          <p className="text-label text-fg-muted">Toma la foto del ticket (o regístralo a mano), revisa cantidades y precios, confirma — y tira el ticket.</p>
+        </div>
+        <button onClick={() => void salir()} className="shrink-0 rounded-control border border-border px-2 py-1 text-label text-fg-muted transition-colors hover:text-fg" title="Cerrar sesión y volver a la pantalla de acceso">salir</button>
       </header>
 
       {/* UN capturador: foto del ticket o registro a mano, ambos con renglones. */}
