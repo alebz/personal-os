@@ -15,7 +15,7 @@ export function ProveedorPicker({ value, onChange, cell, width = 150, warn = fal
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
 
-  const load = useCallback(async () => { const j = await fetch('/api/publico/proveedores').then((r) => r.json()).catch(() => null); if (j?.proveedores) setProvs(j.proveedores) }, [])
+  const load = useCallback(async () => { const j = await fetch('/api/publico/proveedores').then((r) => r.json()).catch(() => null); if (j?.proveedores) setProvs([...j.proveedores].sort((a: Prov, b: Prov) => a.nombre.localeCompare(b.nombre, 'es'))) }, [])
   useEffect(() => { void load() }, [load])
 
   async function create() {

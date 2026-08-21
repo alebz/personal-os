@@ -7,7 +7,7 @@ import { Card, inputCell as cell } from './ui'
 import { COST_CATEGORIES, ORIGIN_OPTIONS, originLabel, catDefaults, type CostCategory } from '@/lib/publico'
 import { dayMonth } from './util'
 
-type TicketRow = { id: string; proveedor: string; fecha: string; total: number; legibilidad: string; image_path: string | null; starred?: boolean; origen?: string | null }
+type TicketRow = { id: string; proveedor: string; fecha: string; total: number; legibilidad: string; image_path: string | null; starred?: boolean; origen?: string | null; model?: string | null }
 type Suelto = { id: string; date: string; category: string; origin: string | null; amount: number; note: string | null; source: string | null; origen?: string | null }
 type Mov = ({ kind: 'ticket'; id: string; date: string; label: string; amount: number; origen: string | null; t: TicketRow } | { kind: 'suelto'; id: string; date: string; label: string; amount: number; origen: string | null; s: Suelto })
 type Item = { id: string; pos: number; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean }
@@ -151,7 +151,7 @@ export function TicketsArchive({ tone }: { tone?: string }) {
                 const concepto = isTicket ? m.t.proveedor : (m.s.note || m.s.category)
                 const categoria = isTicket ? '' : m.s.category
                 const monto = isTicket ? Number(m.t.total) : Number(m.s.amount)
-                const tipo = isTicket ? 'Ticket' : (m.s.source === 'poster' ? 'POS' : 'A mano')
+                const tipo = isTicket ? (m.t.model === 'cfdi' ? 'Factura' : 'Ticket') : (m.s.source === 'poster' ? 'POS' : 'A mano')
                 const abrible = isTicket
                 const borrable = !isTicket && m.s.source !== 'poster'
                 return (
@@ -159,7 +159,7 @@ export function TicketsArchive({ tone }: { tone?: string }) {
                     {/* TIPO = ancla: columna fija. Ticket ABRE (chip + chevron, clic → detalle); POS/A mano son planos. */}
                     <div className="w-[72px] shrink-0">
                       {abrible
-                        ? <button onClick={() => void open(m.id)} title="ver detalle" className="inline-flex items-center gap-0.5 rounded bg-surface-active px-1 text-label text-fg-muted hover:text-accent">Ticket <span className="opacity-60">▸</span></button>
+                        ? <button onClick={() => void open(m.id)} title="ver detalle" className="inline-flex items-center gap-0.5 rounded bg-surface-active px-1 text-label text-fg-muted hover:text-accent">{tipo} <span className="opacity-60">▸</span></button>
                         : <span className="rounded bg-surface-active px-1 text-label text-fg-muted" title={m.s.source === 'poster' ? 'importado de Poster' : 'capturado a mano'}>{tipo}</span>}
                     </div>
                     <span className="w-12 shrink-0 tabular-nums text-fg-muted">{dayMonth(fecha)}</span>

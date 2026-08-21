@@ -9,7 +9,7 @@ import { Section, cellInput, pesosCent, fmtDate } from './kit'
 // Poster) unificados, con filtrar/acomodar/★/origen, detalle (foto + líneas + costos generados) y edición
 // (líneas + origen simple/mixto, recalcula costos). Montos con centavos (renglones y costos se reconcilian).
 
-type TicketRow = { id: string; proveedor: string; fecha: string; total: number; legibilidad: string; image_path: string | null; starred?: boolean; origen?: string | null }
+type TicketRow = { id: string; proveedor: string; fecha: string; total: number; legibilidad: string; image_path: string | null; starred?: boolean; origen?: string | null; model?: string | null }
 type Suelto = { id: string; date: string; category: string; origin: string | null; amount: number; note: string | null; source: string | null; origen?: string | null }
 type Mov = ({ kind: 'ticket'; id: string; date: string; label: string; amount: number; origen: string | null; t: TicketRow } | { kind: 'suelto'; id: string; date: string; label: string; amount: number; origen: string | null; s: Suelto })
 type Item = { id: string; pos: number; descripcion: string; descripcion_raw: string | null; cantidad: number | null; unidad: string | null; precio_unitario: number | null; importe: number; es_descuento: boolean }
@@ -107,14 +107,14 @@ export default function PublicoHistorial() {
                   const concepto = isTicket ? m.t.proveedor : (m.s.note || m.s.category)
                   const categoria = isTicket ? '' : m.s.category
                   const monto = isTicket ? Number(m.t.total) : Number(m.s.amount)
-                  const tipo = isTicket ? 'Ticket' : (m.s.source === 'poster' ? 'POS' : 'A mano')
+                  const tipo = isTicket ? (m.t.model === 'cfdi' ? 'Factura' : 'Ticket') : (m.s.source === 'poster' ? 'POS' : 'A mano')
                   const borrable = !isTicket && m.s.source !== 'poster'
                   return (
                     <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderTop: '1px solid #eef2f8', fontSize: 10.5 }}>
                       {/* TIPO = ancla: columna fija. Ticket ABRE (chip + chevron, clic → detalle); POS/A mano son planos. */}
                       <span style={{ width: 60, flexShrink: 0 }}>
                         {isTicket
-                          ? <button onClick={() => void open(m.id)} title="ver detalle" style={{ ...link, display: 'inline-flex', alignItems: 'center', gap: 2, borderRadius: 2, padding: '0 4px', background: '#eef3fb', color: '#5a6a86', fontSize: 9 }}>Ticket <span style={{ opacity: 0.6 }}>▸</span></button>
+                          ? <button onClick={() => void open(m.id)} title="ver detalle" style={{ ...link, display: 'inline-flex', alignItems: 'center', gap: 2, borderRadius: 2, padding: '0 4px', background: '#eef3fb', color: '#5a6a86', fontSize: 9 }}>{tipo} <span style={{ opacity: 0.6 }}>▸</span></button>
                           : <span style={{ borderRadius: 2, padding: '0 4px', background: '#eef3fb', color: '#5a6a86', fontSize: 9 }} title={m.s.source === 'poster' ? 'importado de Poster' : 'a mano'}>{tipo}</span>}
                       </span>
                       <span style={{ width: 46, flexShrink: 0, color: '#8a93a8', fontVariantNumeric: 'tabular-nums' }}>{fmtDate(fecha)}</span>

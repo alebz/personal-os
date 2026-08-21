@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { SESSION_COOKIE, getSessionScope } from '@/lib/auth'
-import { normAlias, stemAlias } from '@/lib/ticketExtract'
 import { todayMX, shiftDays } from '@/lib/posterImport'
+import { capturarTicket } from '@/lib/publico/capturarTicket'
 import { COST_CATEGORIES } from '@/lib/publico'
 
 export const runtime = 'nodejs'
@@ -93,102 +93,17 @@ export async function POST(req: NextRequest) {
     }
   } catch { /* evidencia es best-effort */ }
 
-  // 1) Cabecera del scan (confirmado).
-  const { data: scan, error: scanErr } = await supabase.from('ticket_scans').insert({
-    scope: 'publico', status: 'confirmed', image_path, model: b.model ?? null, raw: b.raw ?? null, origen,
-    proveedor, proveedor_raw: b.proveedor_raw ?? null, fecha: b.fecha,
-    subtotal: b.subtotal ?? null, descuento: b.descuento ?? null, impuestos: b.impuestos ?? null, total,
-    legibilidad: b.legibilidad ?? null, notas: b.notas ?? null, confirmed_at: new Date().toISOString(),
-  }).select('id').single()
-  if (scanErr) return NextResponse.json({ error: scanErr.message }, { status: 500 })
-  const scanId = scan.id as string
-
-  // 2) Líneas itemizadas.
-  if (items.length) {
-    const rows = items.map((i, pos) => ({
-      scan_id: scanId, pos, codigo: i.codigo ?? null,
-      descripcion: (i.descripcion ?? '').trim(), descripcion_raw: i.descripcion_raw ?? null,
-      cantidad: i.cantidad ?? null, unidad: i.unidad ?? null, precio_unitario: i.precio_unitario ?? null,
-      importe: Number(i.importe ?? 0), es_descuento: !!i.es_descuento,
-    }))
-    const { error: itErr } = await supabase.from('ticket_items').insert(rows)
-    if (itErr) return NextResponse.json({ error: itErr.message }, { status: 500 })
-  }
-
-  // 3) Roll-up en publico_costos: una fila por contenedor si hay pago mixto, si no una sola (el P&L suma amount).
-  // note conserva el proveedor (compat Historial); proveedor/folio se guardan en sus columnas (habilita el
-  // autocompletar/sugerencia y el folio pedido). Aditivo: no cambia lo que ya se leía.
-  const folio = (b.folio ?? '').trim() || null
-  const base = { scope: 'publico', date: b.fecha, month: b.fecha.slice(0, 7), category: b.category, cost_kind, note: proveedor, proveedor, folio, ticket_scan_id: scanId, origen }
-  const costoRows = splits
-    ? splits.map((s) => ({ ...base, origin: s.origin, amount: s.amount }))
-    : [{ ...base, origin: b.origin ?? null, amount: total }]
-  const { data: costos, error: costErr } = await supabase.from('publico_costos').insert(costoRows).select('id')
-  if (costErr) return NextResponse.json({ error: costErr.message }, { status: 500 })
-
-  // 4) CATÁLOGO: registra CADA línea como alias (raw_norm → descripción), aunque no la corrijas, para poder
-  // mapearla a Poster. Colapsa por raw_norm (3 líneas idénticas de mozzarella = 1 fila) sumando el importe;
-  // `veces` cuenta TICKETS distintos (esa ida a Costco es 1 compra, no 3), para saber qué tan seguido lo
-  // compras — el volumen ya lo lleva importe_acumulado. NO pisa lo ya aprendido: el nombre canónico, la
-  // categoría, la unidad y el mapeo a Poster solo se escriben si esta vez los corregiste o si la fila es nueva.
-  const now = new Date().toISOString()
-
-  // Proveedor: también se registra siempre (mismo hueco: sin fila no se puede mapear el proveedor a Poster).
-  const provRaw = b.proveedor_raw ? normAlias(b.proveedor_raw) : normAlias(proveedor)
-  if (provRaw) {
-    const { data: existSup } = await supabase.from('ticket_supplier_aliases').select('proveedor').eq('raw_norm', provRaw).maybeSingle()
-    const renamedSup = !!b.proveedor_raw && normAlias(b.proveedor_raw) !== normAlias(proveedor)
-    await supabase.from('ticket_supplier_aliases').upsert(
-      { raw_norm: provRaw, proveedor: renamedSup || !existSup ? proveedor : existSup.proveedor, deleted_at: null, updated_at: now },
-      { onConflict: 'raw_norm' },
-    )
-  }
-
-  // Productos: agrupa las líneas de ESTE ticket por raw_norm.
-  type Group = { raw_norm: string; stem: string; canonical: string; renamed: boolean; categoria: string | null; unidad: string | null; sum: number; qty: number; iva: number | null }
-  const groups = new Map<string, Group>()
-  for (const i of items) {
-    if (i.es_descuento) continue
-    const canonical = (i.descripcion ?? '').trim()
-    const rawText = (i.descripcion_raw ?? i.descripcion ?? '').trim()
-    const key = normAlias(rawText)
-    if (!key || !canonical) continue
-    const g = groups.get(key) ?? { raw_norm: key, stem: stemAlias(rawText), canonical, renamed: normAlias(rawText) !== normAlias(canonical), categoria: b.category ?? null, unidad: i.unidad ?? null, sum: 0, qty: 0, iva: i.ivaTasa ?? null }
-    g.sum += Number(i.importe ?? 0)
-    g.qty += Number(i.cantidad ?? 0)
-    if (g.iva == null && i.ivaTasa != null) g.iva = i.ivaTasa
-    groups.set(key, g)
-  }
-
-  let productos = 0
-  if (groups.size) {
-    const keys = [...groups.keys()]
-    const { data: existing } = await supabase.from('ticket_product_aliases')
-      .select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces, cantidad_acumulada, iva_tasa').in('raw_norm', keys)
-    const prev = new Map((existing ?? []).map((r) => [r.raw_norm, r]))
-    const rows = [...groups.values()].map((g) => {
-      const e = prev.get(g.raw_norm)
-      return {
-        raw_norm: g.raw_norm,
-        raw_stem: g.stem,   // el stem (sin número) se guarda siempre; habilita consolidar si luego marcas peso_variable
-        deleted_at: null,   // re-comprar un producto resucita su fila si estaba soft-borrada
-        // nombre/categoría/unidad: si ya existían, se conservan salvo que ESTA vez los hayas corregido.
-        descripcion: g.renamed || !e ? g.canonical : e.descripcion,
-        categoria: e?.categoria ?? g.categoria,
-        unidad: e?.unidad ?? g.unidad,
-        // IVA de la línea: lo hereda el alias si aún no lo tenía (no pisa el que ya definiste).
-        iva_tasa: e?.iva_tasa ?? g.iva,
-        // acumulados: siempre suman (no pisan). El mapeo a Poster no va en el payload → queda intacto.
-        importe_acumulado: Number(e?.importe_acumulado ?? 0) + g.sum,
-        cantidad_acumulada: Number(e?.cantidad_acumulada ?? 0) + g.qty,   // para precio/unidad = importe_acum / cant_acum
-        veces: Number(e?.veces ?? 0) + 1,   // +1 por TICKET (ya colapsado por raw_norm), no por línea
-        updated_at: now,
-      }
+  // Escritura del gasto (scan + líneas + roll-up + aprendizaje de alias) — pipeline compartido con /facturas.
+  try {
+    const { scanId, costoIds, productos } = await capturarTicket(supabase, {
+      proveedor, proveedor_raw: b.proveedor_raw ?? null, fecha: b.fecha,
+      subtotal: b.subtotal ?? null, descuento: b.descuento ?? null, impuestos: b.impuestos ?? null, total,
+      legibilidad: b.legibilidad ?? null, notas: b.notas ?? null,
+      category: b.category, cost_kind, origin: b.origin ?? null, splits, folio: b.folio ?? null,
+      items, image_path, model: b.model ?? null, raw: b.raw ?? null, origen,
     })
-    const { error: aliasErr } = await supabase.from('ticket_product_aliases').upsert(rows, { onConflict: 'raw_norm' })
-    if (aliasErr) return NextResponse.json({ error: aliasErr.message }, { status: 500 })
-    productos = rows.length
+    return NextResponse.json({ ok: true, scanId, costoIds, learned: { productos } })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
-
-  return NextResponse.json({ ok: true, scanId, costoIds: (costos ?? []).map((c) => c.id), learned: { productos } })
 }

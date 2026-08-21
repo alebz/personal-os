@@ -10,7 +10,7 @@ export async function GET() {
     const supabase = createServerClient()
     const [tk, sl] = await Promise.all([
       supabase.from('ticket_scans')
-        .select('id, proveedor, fecha, total, legibilidad, image_path, confirmed_at, starred, origen')
+        .select('id, proveedor, fecha, total, legibilidad, image_path, confirmed_at, starred, origen, model')
         .eq('scope', 'publico').eq('status', 'confirmed')
         .order('fecha', { ascending: false }).order('confirmed_at', { ascending: false }),
       // Movimientos SIN ticket (capturados a mano o importados de Poster) — para que Historial no los esconda.

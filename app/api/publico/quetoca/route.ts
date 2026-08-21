@@ -93,6 +93,10 @@ export async function GET() {
   }
   const sinClasificar = scN > 0 ? { n: scN, valor: round(scVal) } : undefined
 
+  // ── FACTURAS pendientes (CFDI en bandeja sin capturar) ──
+  const { data: facturasP } = await supabase.from('publico_facturas').select('total').eq('status', 'pendiente')
+  const facturasPendientes = (facturasP?.length ?? 0) > 0 ? { n: facturasP!.length, monto: round((facturasP ?? []).reduce((s, f) => s + Number(f.total ?? 0), 0)) } : undefined
+
   // ── LÍNEA (Tier 3): hechos baratos de publico_ventas ──
   const ventas = (ventasR.data ?? []) as Array<{ date: string; efectivo: number; tarjeta: number }>
   const dia = (v: { efectivo: number; tarjeta: number }) => Number(v.efectivo) + Number(v.tarjeta)
@@ -127,7 +131,7 @@ export async function GET() {
     propina: { pendiente, nivel, ultimoReparto },
     previstos, contenedores,
     foodcost: { countAlert, daysSinceCount, anyReliable },
-    segundoConteo, comprasSinContenedor, sinClasificar,
+    segundoConteo, comprasSinContenedor, sinClasificar, facturasPendientes,
     ventasAyer, mejorDelDow, deltaVentasPct, deltaVentasSemanas: SEMANAS_COMPARATIVO,
     estados, config,
   }
