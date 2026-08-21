@@ -20,21 +20,23 @@ export async function GET(req: NextRequest) {
   if (!includeArchived) query = query.eq('activo', true)
   const [{ data: provs, error }, { data: costos }] = await Promise.all([
     query,
-    supabase.from('publico_costos').select('proveedor, category, date, amount').eq('scope', 'publico').not('proveedor', 'is', null),
+    supabase.from('publico_costos').select('proveedor, category, date, amount, ticket_scan_id').eq('scope', 'publico').not('proveedor', 'is', null),
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // STATS por proveedor, DERIVADAS del historial (para el vistazo en la lista): # movimientos, total, total del mes,
-  // última compra y cadencia. Y la categoría MÁS USADA — no un campo fijo (Costco es multi-categoría; se clasifica
-  // por línea), solo SUGERENCIA al capturador. Todo agregado en una pasada.
-  type Agg = { count: number; total: number; mesActual: number; last: string | null; fechas: Set<string>; cats: Map<string, number> }
+  // STATS por proveedor, DERIVADAS del historial (para el vistazo en la lista): # COMPRAS (eventos: tickets
+  // distintos + cada movimiento a mano como 1 — un pago mixto genera 2 costos pero es UNA compra), total, total
+  // del mes, última compra y cadencia. Y la categoría MÁS USADA — no un campo fijo (Costco es multi-categoría; se
+  // clasifica por línea), solo SUGERENCIA al capturador. Todo agregado en una pasada.
+  type Agg = { tickets: Set<string>; sinTicket: number; total: number; mesActual: number; last: string | null; fechas: Set<string>; cats: Map<string, number> }
   const agg = new Map<string, Agg>()
   const mes = monthMX()
   for (const c of costos ?? []) {
     const k = (c.proveedor ?? '').trim().toLowerCase(); if (!k) continue
-    const a = agg.get(k) ?? { count: 0, total: 0, mesActual: 0, last: null, fechas: new Set<string>(), cats: new Map<string, number>() }
+    const a = agg.get(k) ?? { tickets: new Set<string>(), sinTicket: 0, total: 0, mesActual: 0, last: null, fechas: new Set<string>(), cats: new Map<string, number>() }
     const amt = Number(c.amount), d = c.date as string
-    a.count++; a.total += amt; if (d.slice(0, 7) === mes) a.mesActual += amt
+    if (c.ticket_scan_id) a.tickets.add(String(c.ticket_scan_id)); else a.sinTicket++
+    a.total += amt; if (d.slice(0, 7) === mes) a.mesActual += amt
     if (!a.last || d > a.last) a.last = d
     a.fechas.add(d); a.cats.set(c.category, (a.cats.get(c.category) ?? 0) + 1)
     agg.set(k, a)
@@ -47,7 +49,7 @@ export async function GET(req: NextRequest) {
   const r2 = (n: number) => Math.round(n * 100) / 100
 
   const proveedores = (provs ?? [])
-    .map((p) => { const a = agg.get(p.nombre.trim().toLowerCase()); return { ...p, categoria: topCat(a), count: a?.count ?? 0, total: r2(a?.total ?? 0), mesActual: r2(a?.mesActual ?? 0), ultimaFecha: a?.last ?? null, cadenciaDias: cadencia(a) } })
+    .map((p) => { const a = agg.get(p.nombre.trim().toLowerCase()); return { ...p, categoria: topCat(a), count: (a ? a.tickets.size + a.sinTicket : 0), total: r2(a?.total ?? 0), mesActual: r2(a?.mesActual ?? 0), ultimaFecha: a?.last ?? null, cadenciaDias: cadencia(a) } })
     .sort((a, b) => (a.sort_order - b.sort_order) || (b.count - a.count) || a.nombre.localeCompare(b.nombre, 'es'))
 
   return NextResponse.json({ proveedores })

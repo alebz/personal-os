@@ -36,5 +36,8 @@ export async function GET(req: NextRequest) {
     cadenciaDias = Math.round(sum / (fechas.length - 1))
   }
 
-  return NextResponse.json({ proveedor, compras, stats: { total, count: compras.length, mesActual, ultimaFecha, cadenciaDias } })
+  // # compras = eventos: tickets distintos + cada movimiento a mano (un pago mixto = 2 costos pero 1 compra).
+  const ticketsSet = new Set(compras.filter((c) => c.ticketScanId).map((c) => c.ticketScanId))
+  const count = ticketsSet.size + compras.filter((c) => !c.ticketScanId).length
+  return NextResponse.json({ proveedor, compras, stats: { total, count, mesActual, ultimaFecha, cadenciaDias } })
 }
