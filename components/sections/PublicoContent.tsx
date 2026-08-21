@@ -75,10 +75,10 @@ function PublicoArcade() {
   const [propTarjMes, setPropTarjMes] = useState(0)   // propina de tarjeta del mes → base de la comisión de Clip
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
-  const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'libretas'>('panel')
+  const [tab, setTab] = useState<'panel' | 'tickets' | 'inventario' | 'analisis' | 'libretas'>('panel')
   const [libView, setLibView] = useState<'notas' | 'proveedores' | 'fondos'>('notas')   // Libretas: notas · proveedores · fondos
   const [provReloadKey, setProvReloadKey] = useState(0)   // bump → recarga la libreta tras asignar cabos sueltos
-  const [movView, setMovView] = useState<'capturar' | 'historial' | 'inventario' | 'cierre'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
+  const [movView, setMovView] = useState<'capturar' | 'historial'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
   const { funds: socioFunds, handlers: socioHandlers } = useCajaFuerte('publico', month)
@@ -216,18 +216,51 @@ function PublicoArcade() {
             <button onClick={() => { if (month < currentMonth) setCapDate((d) => { const n = shiftMonthDate(d, 1); return n > today ? today : n }) }} disabled={month >= currentMonth} className="px-1 text-fg-muted hover:text-fg disabled:opacity-30" aria-label="Mes siguiente">›</button>
           </div>
         </div>
-        <TabBar value={tab} onChange={setTab} rounded="rounded-full" pill tabs={[['panel', 'Panel'], ['movimientos', 'Movimientos'], ['direccion', 'Dirección'], ['libretas', 'Libretas']] as const} />
+        <TabBar value={tab} onChange={setTab} rounded="rounded-full" pill tabs={[['panel', 'Panel'], ['tickets', 'Tickets'], ['inventario', 'Inventario'], ['analisis', 'Análisis'], ['libretas', 'Libretas']] as const} />
       </header>
 
 
-      {tab === 'movimientos' && (<>
-      {/* MOVIMIENTOS = una familia: CAPTURAR (el acto de registrar) · HISTORIAL (el registro). */}
-      <TabBar value={movView} onChange={setMovView} tabs={[['capturar', 'Capturar'], ['historial', 'Historial'], ['inventario', 'Inventario'], ['cierre', 'Cierre']] as const} />
+      {tab === 'tickets' && (<>
+      {/* TICKETS = capturar (el acto de registrar) · historial (el registro). */}
+      <TabBar value={movView} onChange={setMovView} tabs={[['capturar', 'Capturar'], ['historial', 'Historial']] as const} />
 
-      {movView === 'inventario' && <Inventario tone={dc} />}
+      {movView === 'capturar' && (<>
+      {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
+      <Card>
+        <TicketFoto onSaved={load} defaultDate={capDate} tone={dc} />
+      </Card>
+      <Card>
+        <CardHead tone={dc}>{capDate === today ? 'Hoy' : dayLabel(capDate)}</CardHead>
+        {costosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos este día.</p>}
+        <div className="space-y-1">
+          {costosHoy.map((c) => (
+            <div key={c.id} className="group flex items-center gap-2 text-secondary">
+              <span className="w-24 text-fg-muted">{catDefaults(c.category).label}</span>
+              <span className="flex-1 truncate">{c.note || <span className="text-fg-muted">—</span>} <span className="text-fg-muted">· {c.source === 'poster' ? 'Poster · contenedor sin asignar' : originLabel(c.origin)}</span></span>
+              <span className="tabular-nums text-danger">−{mxn(Number(c.amount))}</span>
+              <button onClick={() => void delCosto(c.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
+            </div>
+          ))}
+        </div>
+      </Card>
+      </>)}
 
-      {/* ── CIERRE = CUADRE del POS (fuera de Capturar). Las ventas entran solas de Poster; esto es para corregir/cuadrar un día. ── */}
-      {movView === 'cierre' && (
+      {movView === 'historial' && (<>
+      {/* HISTORIAL = el archivo de tickets (ver, editar, borrar) + el gestor de alias (mantenimiento). */}
+      <TicketsArchive tone={dc} />
+      <AliasManager />
+      </>)}
+      </>)}
+
+      {/* INVENTARIO — pendiente de rehacer como CATÁLOGO maestro del OS (una lista de todo: ingredientes +
+          consumibles + menaje, con ficha por cosa; Contar y Conteos aparte). Por ahora el componente actual. */}
+      {tab === 'inventario' && <Inventario tone={dc} />}
+
+      {tab === 'panel' && (<>
+        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} propinaTarjetaMes={propTarjMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} cmpVentas={cmpV} cmpCostos={cmpC} ventasDiarias={ventas} propinaPendiente={propPend?.pendiente ?? 0} onCostChange={load} />
+
+        {/* ── CIERRE del POS — vive en Panel (con contenedores es el ritual de "cerrar el día"). Las ventas entran
+            solas de Poster; esto es para corregir/cuadrar un día. ── */}
         <Card>
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -264,47 +297,9 @@ function PublicoArcade() {
             </>
           )}
         </Card>
-      )}
-
-      {movView === 'capturar' && (<>
-      {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
-      <Card>
-        <TicketFoto onSaved={load} defaultDate={capDate} tone={dc} />
-      </Card>
-
-      {/* El alta manual se fusionó con la foto: TicketFoto trae "Registrar a mano" (mismo borrador, con renglones). */}
-
-      {/* ── HOY: lo capturado (solo lo OPERATIVO diario: costos. Otros ingresos vive en Fondos) ── */}
-      <Card>
-        <CardHead tone={dc}>{capDate === today ? 'Hoy' : dayLabel(capDate)}</CardHead>
-        {costosHoy.length === 0 && <p className="text-secondary italic text-fg-muted">Sin costos este día.</p>}
-        <div className="space-y-1">
-          {costosHoy.map((c) => (
-            <div key={c.id} className="group flex items-center gap-2 text-secondary">
-              <span className="w-24 text-fg-muted">{catDefaults(c.category).label}</span>
-              <span className="flex-1 truncate">{c.note || <span className="text-fg-muted">—</span>} <span className="text-fg-muted">· {c.source === 'poster' ? 'Poster · contenedor sin asignar' : originLabel(c.origin)}</span></span>
-              <span className="tabular-nums text-danger">−{mxn(Number(c.amount))}</span>
-              <button onClick={() => void delCosto(c.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
-            </div>
-          ))}
-        </div>
-      </Card>
       </>)}
 
-      {movView === 'historial' && (<>
-      {/* ── HISTORIAL = el archivo de tickets (ver, editar, borrar) — sin cambios de funcionalidad ── */}
-      <TicketsArchive tone={dc} />
-      {/* Gestor de alias = MANTENIMIENTO del mapeo aprendido de los tickets (proveedor/insumo → Poster). Vive
-          CON el archivo, no en el acto diario: es limpieza del registro, casi nunca. Ya es un desplegable. */}
-      <AliasManager />
-      </>)}
-      </>)}
-
-      {tab === 'panel' && (
-        <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} propinaTarjetaMes={propTarjMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} cmpVentas={cmpV} cmpCostos={cmpC} ventasDiarias={ventas} propinaPendiente={propPend?.pendiente ?? 0} onCostChange={load} />
-      )}
-
-      {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
+      {tab === 'analisis' && (<><Direccion /><FoodCostPanel /></>)}
 
       {/* LIBRETAS — sección de referencia con tres libretas: Notas (operativas), Proveedores (la libreta canónica
           con fichas + historial de compras) y Fondos (socios · reparto · otros ingresos). */}

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { MONEY } from '../money/MoneyChrome'
 import { Section, pesosCent } from './kit'
 import PublicoHistorial from './PublicoHistorial'
-import PublicoCierre from './PublicoCierre'
 import PublicoCaptura from './PublicoCaptura'
 import PublicoAlias from './PublicoAlias'
 import { localDate } from '../../sections/publico/util'
@@ -14,8 +13,8 @@ import { catDefaults, originLabel, type CostCategory, type OriginKey } from '@/l
 // + guardián de magnitud/fecha + lista para Poster) reusa la máquina de estados de TicketFoto (arcade), reskin
 // al kit Money. Bajo Captura vive "Hoy · lo capturado"; bajo Historial vive el gestor de Alias aprendidos.
 
-type Sub = 'captura' | 'historial' | 'cierre'
-const SUBS: { id: Sub; label: string }[] = [{ id: 'captura', label: 'Capturar' }, { id: 'historial', label: 'Historial' }, { id: 'cierre', label: 'Cierre' }]
+type Sub = 'captura' | 'historial'
+const SUBS: { id: Sub; label: string }[] = [{ id: 'captura', label: 'Capturar' }, { id: 'historial', label: 'Historial' }]
 const MX = 'America/Mexico_City'
 const todayMX = () => new Date().toLocaleDateString('en-CA', { timeZone: MX })
 
@@ -70,7 +69,6 @@ export default function PublicoMovimientos() {
         })}
       </div>
       {sub === 'historial' && <><PublicoHistorial /><PublicoAlias /></>}
-      {sub === 'cierre' && <PublicoCierre />}
       {sub === 'captura' && (<>
         <div style={{ border: `1px solid ${MONEY.rule}`, background: '#fff' }}>
           <PublicoCaptura defaultDate={localDate()} onSaved={() => setReloadKey((k) => k + 1)} />

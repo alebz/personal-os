@@ -7,6 +7,7 @@ import { OPERATING_CATEGORIES, catDefaults, type CostCategory } from '@/lib/publ
 import { occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
 import { ventanaRodante, ventanaMes, sumaRango, etiquetaVentana, findesOperados } from '@/lib/publico/comparativo'
 import { comisionEfectiva } from '@/lib/publico/comision'
+import PublicoCierre from './PublicoCierre'
 
 // PANEL de Público bajo XP (Money) — portada/dashboard. Métricas del mes (POS) + utilidad operativa + PUNTO
 // DE EQUILIBRIO EN DÍAS (cuándo cubriste tus fijos, no un "%" sobre barra llena) + resumen de caja. Qué toca
@@ -212,6 +213,9 @@ export default function PublicoPanel() {
           {!isCur && <span style={{ fontStyle: 'italic', color: '#8a93a8' }}>Los saldos de caja son de hoy — vuelve a este mes para verlos.</span>}
         </div>
       </Section>
+
+      {/* CIERRE del POS — vive en Panel (con contenedores = el ritual de cerrar el día). */}
+      <PublicoCierre />
     </div>
   )
 }

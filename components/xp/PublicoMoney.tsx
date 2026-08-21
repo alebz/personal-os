@@ -21,17 +21,17 @@ const todayLabel = () => { const d = new Date(); return `${d.getDate()} de ${MON
 
 const TABS = [
   { id: 'panel', label: 'Panel' },
-  { id: 'movimientos', label: 'Movimientos' },
-  { id: 'direccion', label: 'Dirección' },
-  { id: 'libretas', label: 'Libretas' },
+  { id: 'tickets', label: 'Tickets' },
   { id: 'inventario', label: 'Inventario' },
+  { id: 'analisis', label: 'Análisis' },
+  { id: 'libretas', label: 'Libretas' },
 ]
 
 // Qué llevará cada tab (paridad con el arcade) y en qué ola se construye. Visible mientras es esqueleto.
 const PLAN: Record<string, { ola: number; items: string[] }> = {
   panel: { ola: 2, items: ['Métricas del mes (ventas, gastos, food cost, ticket promedio)', 'Utilidad operativa + punto de equilibrio (rediseñado a DÍAS)', 'Contenedores (saldos de hoy)', '(Qué toca vive en el riel — no se duplica aquí)'] },
-  movimientos: { ola: 1, items: ['Captura por foto (IA propone → confirmas) + guardián de magnitud', 'Registrar a mano', 'Historial de tickets (filtrar, expandir, editar, borrar, ★)', 'Cierre del POS por día'] },
-  direccion: { ola: 2, items: ['Food cost teórico por categoría', 'Top productos', 'Horas pico y día de la semana', 'Guardián de recibos de madrugada'] },
+  tickets: { ola: 1, items: ['Captura por foto (IA propone → confirmas) + guardián de magnitud', 'Registrar a mano', 'Historial de tickets (filtrar, expandir, editar, borrar, ★)'] },
+  analisis: { ola: 2, items: ['Food cost teórico por categoría', 'Top productos', 'Horas pico y día de la semana', 'Guardián de recibos de madrugada'] },
   libretas: { ola: 1, items: ['Notas operativas (texto plano: RFC, cuentas, teléfonos)', 'Proveedores (libreta canónica: fichas, contacto, notas, historial de compras, fusión)', 'Fondos (socios, reparto, otros ingresos, contenedores, propinas)'] },
   inventario: { ola: 3, items: ['Conteo físico (por unidades + factor, total en vivo)', 'Historial de conteos', 'Unidades de conteo', 'Clasificar insumos (comida/bebida/empaque)'] },
 }
@@ -60,7 +60,7 @@ export default function PublicoMoney() {
   const [tab, setTab] = useState('panel')
   return (
     <MoneyChrome brand="Money · Público" tabs={TABS} active={tab} onTab={setTab} right={<>Público Gourmet · {todayLabel()}</>} rail={<PublicoRail />} statusBar={<PublicoStatusBar />}>
-      {tab === 'panel' ? <PublicoPanel /> : tab === 'libretas' ? <PublicoLibretas /> : tab === 'movimientos' ? <PublicoMovimientos /> : tab === 'direccion' ? <><PublicoDireccion /><div style={{ marginTop: 8 }}><PublicoFoodCost /></div></> : tab === 'inventario' ? <PublicoInventario /> : <Placeholder tab={tab} />}
+      {tab === 'panel' ? <PublicoPanel /> : tab === 'libretas' ? <PublicoLibretas /> : tab === 'tickets' ? <PublicoMovimientos /> : tab === 'analisis' ? <><PublicoDireccion /><div style={{ marginTop: 8 }}><PublicoFoodCost /></div></> : tab === 'inventario' ? <PublicoInventario /> : <Placeholder tab={tab} />}
     </MoneyChrome>
   )
 }
