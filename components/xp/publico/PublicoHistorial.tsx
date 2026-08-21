@@ -111,22 +111,24 @@ export default function PublicoHistorial() {
                   const borrable = !isTicket && m.s.source !== 'poster'
                   return (
                     <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderTop: '1px solid #eef2f8', fontSize: 10.5 }}>
-                      {isTicket
-                        ? <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} style={{ ...link, width: 14, color: m.t.starred ? '#e0a400' : '#c2cbdb' }}>{m.t.starred ? '★' : '☆'}</button>
-                        : <span style={{ width: 14, flexShrink: 0 }} />}
-                      {isTicket
-                        ? <button onClick={() => void open(m.id)} style={{ ...link, width: 12, color: '#8a93a8' }} title="ver detalle">▸</button>
-                        : <span style={{ width: 12, flexShrink: 0 }} />}
+                      {/* TIPO = ancla: columna fija. Ticket ABRE (chip + chevron, clic → detalle); POS/A mano son planos. */}
+                      <span style={{ width: 60, flexShrink: 0 }}>
+                        {isTicket
+                          ? <button onClick={() => void open(m.id)} title="ver detalle" style={{ ...link, display: 'inline-flex', alignItems: 'center', gap: 2, borderRadius: 2, padding: '0 4px', background: '#eef3fb', color: '#5a6a86', fontSize: 9 }}>Ticket <span style={{ opacity: 0.6 }}>▸</span></button>
+                          : <span style={{ borderRadius: 2, padding: '0 4px', background: '#eef3fb', color: '#5a6a86', fontSize: 9 }} title={m.s.source === 'poster' ? 'importado de Poster' : 'a mano'}>{tipo}</span>}
+                      </span>
                       <span style={{ width: 46, flexShrink: 0, color: '#8a93a8', fontVariantNumeric: 'tabular-nums' }}>{fmtDate(fecha)}</span>
-                      <span style={{ flexShrink: 0, borderRadius: 2, padding: '0 4px', background: '#eef3fb', color: '#5a6a86', fontSize: 9 }} title={isTicket ? 'ticket por foto' : m.s.source === 'poster' ? 'importado de Poster' : 'a mano'}>{tipo}</span>
-                      {isTicket && m.t.image_path && <span style={{ flexShrink: 0, color: '#8a93a8' }} title="con foto">▣</span>}
                       <button onClick={isTicket ? () => void open(m.id) : undefined} style={{ ...link, flex: 1, minWidth: 0, textAlign: 'left', color: MONEY.ink, fontWeight: 600, cursor: isTicket ? 'pointer' : 'default', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{concepto}</button>
+                      {isTicket && m.t.image_path && <span style={{ flexShrink: 0, borderRadius: 2, padding: '0 3px', background: '#eef3fb', color: '#8a93a8', fontSize: 8.5 }} title="con foto">foto</span>}
                       {m.origen === 'captura' && <span style={{ flexShrink: 0, borderRadius: 2, padding: '0 4px', background: '#dbeafe', color: MONEY.blue, fontSize: 9 }} title="capturado por Andrés">Andrés</span>}
                       <span style={{ width: 76, flexShrink: 0, textAlign: 'right', color: '#8a93a8', fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{categoria}</span>
                       <span style={{ width: 84, flexShrink: 0, textAlign: 'right', color: MONEY.down, fontVariantNumeric: 'tabular-nums' }}>−{pesosCent(monto)}</span>
-                      {borrable
-                        ? <button onClick={() => void delSuelto(m.s)} title="Eliminar" style={{ ...link, width: 14, color: '#c2cbdb' }}>✕</button>
-                        : <span style={{ width: 14, flexShrink: 0 }} />}
+                      {/* ACCIÓN según tipo, siempre al final: ticket → marcar (☆/★); a mano → borrar (✕); POS → nada. */}
+                      {isTicket
+                        ? <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} style={{ ...link, width: 14, color: m.t.starred ? '#e0a400' : '#c2cbdb' }}>{m.t.starred ? '★' : '☆'}</button>
+                        : borrable
+                          ? <button onClick={() => void delSuelto(m.s)} title="Eliminar" style={{ ...link, width: 14, color: '#c2cbdb' }}>✕</button>
+                          : <span style={{ width: 14, flexShrink: 0 }} />}
                     </div>
                   )
                 })}

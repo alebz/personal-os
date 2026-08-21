@@ -141,9 +141,9 @@ export function TicketsArchive({ tone }: { tone?: string }) {
         )}
         {shown.length === 0
           ? <p className="text-secondary italic text-fg-muted">{movs.length === 0 ? 'Aún no hay movimientos.' : 'Ninguno coincide con el filtro.'}</p>
-          // Renglones en UNA card con divisor sutil (no cajas anidadas). El TIPO se dice con ETIQUETA, no con el
-          // borde. Chevron ▸ solo en lo abrible (tickets → detalle); × solo en lo borrable inline (movimiento a mano).
-          // Columnas alineadas: [★] [▸] fecha · tipo · concepto · categoría · monto · [×].
+          // Renglones en UNA card con divisor sutil (no cajas anidadas). TYPE-FIRST: el tipo ES el ancla (columna
+          // fija — Ticket abre con chevron ▸; POS/A mano planos). UNA acción al final según tipo: ticket → marcar
+          // (☆/★), a mano → borrar (✕), POS → nada. Columnas: [tipo] fecha · concepto 📷 · categoría · monto · [acción].
           : <div className="divide-y divide-border/60">
               {shown.slice(0, limit).map((m) => {
                 const isTicket = m.kind === 'ticket'
@@ -156,22 +156,24 @@ export function TicketsArchive({ tone }: { tone?: string }) {
                 const borrable = !isTicket && m.s.source !== 'poster'
                 return (
                   <div key={m.id} className="flex items-center gap-2 py-1.5 text-secondary">
-                    {isTicket
-                      ? <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} className={`w-4 shrink-0 ${m.t.starred ? 'text-warn' : 'text-fg-muted/40 hover:text-warn'}`}>{m.t.starred ? '★' : '☆'}</button>
-                      : <span className="w-4 shrink-0" />}
-                    {abrible
-                      ? <button onClick={() => void open(m.id)} className="w-4 shrink-0 text-fg-muted hover:text-accent" title="ver detalle">▸</button>
-                      : <span className="w-4 shrink-0" />}
+                    {/* TIPO = ancla: columna fija. Ticket ABRE (chip + chevron, clic → detalle); POS/A mano son planos. */}
+                    <div className="w-[72px] shrink-0">
+                      {abrible
+                        ? <button onClick={() => void open(m.id)} title="ver detalle" className="inline-flex items-center gap-0.5 rounded bg-surface-active px-1 text-label text-fg-muted hover:text-accent">Ticket <span className="opacity-60">▸</span></button>
+                        : <span className="rounded bg-surface-active px-1 text-label text-fg-muted" title={m.s.source === 'poster' ? 'importado de Poster' : 'capturado a mano'}>{tipo}</span>}
+                    </div>
                     <span className="w-12 shrink-0 tabular-nums text-fg-muted">{dayMonth(fecha)}</span>
-                    <span className="shrink-0 rounded bg-surface-active px-1 text-label text-fg-muted" title={isTicket ? 'ticket capturado por foto' : m.s.source === 'poster' ? 'importado de Poster' : 'capturado a mano'}>{tipo}</span>
-                    {isTicket && m.t.image_path && <span className="shrink-0 text-label text-fg-muted" title="con foto">▣</span>}
                     <button onClick={abrible ? () => void open(m.id) : undefined} className={`min-w-0 flex-1 truncate text-left font-medium text-fg ${abrible ? 'hover:text-accent' : 'cursor-default'}`}>{concepto}</button>
+                    {isTicket && m.t.image_path && <span className="shrink-0 text-label text-fg-muted/60" title="con foto">📷</span>}
                     {m.origen === 'captura' && <span className="shrink-0 rounded bg-accent/15 px-1 text-label text-accent" title="capturado por Andrés">Andrés</span>}
                     <span className="hidden w-20 shrink-0 truncate text-right text-label text-fg-muted sm:block">{categoria}</span>
                     <span className="w-20 shrink-0 text-right tabular-nums text-danger">−{mxn(monto)}</span>
-                    {borrable
-                      ? <button onClick={() => void delSuelto(m.s)} title="Eliminar" className="w-4 shrink-0 text-fg-muted hover:text-danger">✕</button>
-                      : <span className="w-4 shrink-0" />}
+                    {/* ACCIÓN según tipo, siempre al final: ticket → marcar (☆/★); a mano → borrar (✕); POS → nada. */}
+                    {isTicket
+                      ? <button onClick={() => void toggleStar(m.t)} title={m.t.starred ? 'Quitar marcador' : 'Marcar'} className={`w-4 shrink-0 ${m.t.starred ? 'text-warn' : 'text-fg-muted/40 hover:text-warn'}`}>{m.t.starred ? '★' : '☆'}</button>
+                      : borrable
+                        ? <button onClick={() => void delSuelto(m.s)} title="Eliminar" className="w-4 shrink-0 text-fg-muted hover:text-danger">✕</button>
+                        : <span className="w-4 shrink-0" />}
                   </div>
                 )
               })}
