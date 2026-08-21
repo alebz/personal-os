@@ -21,8 +21,10 @@ export async function POST(req: NextRequest) {
   const todayMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
   const pagadoEl = b.fecha && /^\d{4}-\d{2}-\d{2}$/.test(b.fecha) ? b.fecha : todayMX
 
-  const { data: p } = await supabase.from('publico_previstos').select('concepto, categoria, origin, amount').eq('id', b.previsto_id).maybeSingle()
+  // Trae el proveedor ligado (anti-pendejos: el costo que nazca de aquí NO debe quedar huérfano).
+  const { data: p } = await supabase.from('publico_previstos').select('concepto, categoria, origin, amount, proveedor_id, publico_proveedores(nombre)').eq('id', b.previsto_id).maybeSingle()
   if (!p) return NextResponse.json({ error: 'previsto no existe' }, { status: 404 })
+  const proveedor = (p.publico_proveedores as { nombre?: string } | null)?.nombre ?? null
   const { data: exists } = await supabase.from('publico_previsto_pagos').select('id').eq('previsto_id', b.previsto_id).eq('ocurrencia', b.ocurrencia).maybeSingle()
   if (exists) return NextResponse.json({ ok: true, already: true })   // idempotente
 
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
   const cost_kind = OPERATING_CATEGORIES.includes(p.categoria) ? (catDefaults(p.categoria as CostCategory).defaultKind ?? 'fijo') : null
   const { data: costo, error: cErr } = await supabase.from('publico_costos').insert({
     scope: 'publico', date: pagadoEl, month: pagadoEl.slice(0, 7),
-    category: p.categoria, cost_kind, origin: p.origin ?? null, amount: efectivo, note: p.concepto,
+    category: p.categoria, cost_kind, origin: p.origin ?? null, amount: efectivo, note: p.concepto, proveedor,
   }).select('id').single()
   if (cErr) return NextResponse.json({ error: cErr.message }, { status: 500 })
 
