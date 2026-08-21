@@ -15,6 +15,7 @@ import { TicketFoto } from './publico/TicketFoto'
 import { QueToca } from './publico/QueToca'
 import { AliasManager } from './publico/AliasManager'
 import { ProveedoresManager } from './publico/ProveedoresManager'
+import { ProveedoresHuerfanos } from './publico/ProveedoresHuerfanos'
 import { Notas } from './publico/Notas'
 import { Inventario } from './publico/Inventario'
 import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow, TabBar } from './publico/ui'
@@ -76,6 +77,7 @@ function PublicoArcade() {
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
   const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'libretas'>('panel')
   const [libView, setLibView] = useState<'notas' | 'proveedores' | 'fondos'>('notas')   // Libretas: notas · proveedores · fondos
+  const [provReloadKey, setProvReloadKey] = useState(0)   // bump → recarga la libreta tras asignar cabos sueltos
   const [movView, setMovView] = useState<'capturar' | 'historial' | 'inventario' | 'cierre'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
@@ -311,7 +313,10 @@ function PublicoArcade() {
 
         {libView === 'notas' && <Notas tone={dc} />}
 
-        {libView === 'proveedores' && <ProveedoresManager />}
+        {libView === 'proveedores' && (<>
+          <ProveedoresHuerfanos onChanged={() => setProvReloadKey((k) => k + 1)} />
+          <ProveedoresManager key={provReloadKey} />
+        </>)}
 
         {libView === 'fondos' && (<div className="space-y-3">
           <Socios funds={socioFunds} handlers={socioHandlers} />
