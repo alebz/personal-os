@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { runPosterImport, importSupplies } from '@/lib/posterImport'
+import { runPosterImport } from '@/lib/posterImport'
 import { runClipImport } from '@/lib/clipSettlements'
 import { runPosterTipsImport } from '@/lib/posterTips'
 import { createServerClient } from '@/lib/supabase'
@@ -46,9 +46,9 @@ export async function GET(req: NextRequest) {
   const r = await runPosterImport(14)
   await recordHealth(supabase, 'ventas', r.ok, r.ok ? r.imported : 0, r.ok ? null : r.error)
 
-  // Compras de Poster: las nuevas entran solas (idempotente, anti-dup por supply_id, respeta lo manual).
-  const s = await importSupplies({ commit: true })
-  await recordHealth(supabase, 'compras', s.ok, s.ok ? s.imported : 0, s.ok ? null : s.error)
+  // COMPRAS de Poster: RETIRADO. Todas las compras se capturan por la app (/captura, ticket foto o a mano). El
+  // import de storage.getSupplies se apagó (evita doble conteo con lo que la app empuja a Poster, el ruido de
+  // "Poster #N" y los nombres sin unificar). Las filas históricas source='poster' se conservan; no entran nuevas.
 
   const drafts = await sweepDraftTickets()   // limpia fotos de ticket subidas y nunca confirmadas
   await recordHealth(supabase, 'sweep', !('error' in drafts), 'deleted' in drafts ? drafts.deleted : 0, 'error' in drafts ? drafts.error : null)
@@ -68,10 +68,9 @@ export async function GET(req: NextRequest) {
   // Status HTTP = 500 si CUALQUIER paso de dinero ERRÓ (no si trajo cero — eso es legítimo a veces y lo cachea la
   // barra de estado como "verde pero vacío"). Así la alerta de cron-fallido de Vercel se dispara ante errores reales,
   // ya no solo ante los de ventas.
-  const anyError = !r.ok || !s.ok || !clip.ok || !tips.ok
+  const anyError = !r.ok || !clip.ok || !tips.ok
   return NextResponse.json({
     ventas: r,
-    compras: s.ok ? { imported: s.imported, skippedManual: s.skippedManual.length } : { error: s.error },
     draftsBarridos: drafts,
     comisionesClip: clip.ok ? { imported: clip.imported, totalFee: clip.totalFee } : { error: clip.error },
     propinasPoster: tips.ok ? { imported: tips.imported, total: tips.total } : { error: tips.error },

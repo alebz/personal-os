@@ -17,7 +17,10 @@ type State = 'unknown' | 'ok' | 'empty' | 'stale' | 'error'
 // Feeds que DEBEN traer datos con cadencia → "verde pero vacío" es alerta. 'clip' NO está: para esta cuenta,
 // settlements SIEMPRE vacío es lo NORMAL (Clip es el banco, no dispersa a una cuenta externa). Marcarlo ámbar
 // sería una falsa alarma permanente, que entrena a ignorar TODAS las alertas.
-const EMPTY_DAYS: Record<string, number> = { propinas: 7, compras: 14 }   // sin entrada = no se alerta por vacío
+const EMPTY_DAYS: Record<string, number> = { propinas: 7 }   // sin entrada = no se alerta por vacío
+// Pasos RETIRADOS: ya no corren, así que su fila de salud quedó congelada. Se filtran del readout para que no
+// salten como 'stale' (rojo) para siempre. 'compras' se retiró: las compras se capturan por la app, no por Poster.
+const RETIRED = new Set<string>(['compras'])
 const STALE_H = 36
 const SEV: Record<State, number> = { unknown: 0, ok: 0, empty: 1, stale: 2, error: 3 }
 const hoursSince = (iso: string | null, now: number) => iso ? (now - new Date(iso).getTime()) / 3600000 : Infinity
@@ -41,7 +44,8 @@ export async function GET() {
   // Sin tabla (migración no corrida aún) o sin filas → 'unknown', NUNCA 'ok'. No repetir "verde sobre datos que
   // no existen" en la propia alerta: la ausencia de datos de salud no es salud buena.
   if (error || !data?.length) return NextResponse.json({ worst: 'unknown', problemas: [], steps: [], note: error ? 'tabla de salud no disponible' : 'sin datos de salud aún' })
-  const rows = data as Row[]
+  const rows = (data as Row[]).filter((r) => !RETIRED.has(r.step))   // pasos retirados no cuentan para la salud
+  if (!rows.length) return NextResponse.json({ worst: 'unknown', problemas: [], steps: [], note: 'sin datos de salud aún' })
   const now = Date.now()
   const steps = rows.map((r) => ({ step: r.step, ...stateOf(r, now), last_success_at: r.last_success_at, last_nonempty_at: r.last_nonempty_at, last_import_count: r.last_import_count }))
   // worst honesto: la peor gravedad real (empty/stale/error); si no hay ninguna, 'unknown' solo si TODOS están en
