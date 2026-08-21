@@ -24,17 +24,22 @@ export default function CorteCaja() {
   const [data, setData] = useState<Data | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [opening, setOpening] = useState(false)
   const [counts, setCounts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
 
-  const refresh = useCallback(() => {
-    fetch('/api/publico/contenedores')
+  const refresh = useCallback((fromPoster = false) => {
+    return fetch(`/api/publico/contenedores${fromPoster ? '?refresh=1' : ''}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j: Data) => { setData(j); setErr(null) })
       .catch(() => setErr('No se pudo cargar el corte.'))
   }, [])
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { void refresh() }, [refresh])
+
+  // Al PEDIR el corte: primero actualiza ventas desde Poster, LUEGO abre el conteo — así el "esperado" ya trae la
+  // venta de hoy y no salen diferencias fantasma. La confirmación en el server vuelve a jalar (garantía).
+  async function openCorte() { setOpening(true); await refresh(true); setOpening(false); setOpen(true) }
 
   const byKey = (c: Cont) => data?.contenedores.find((x) => x.contenedor === c) ?? null
   const sum = (keys: Cont[]) => {
@@ -110,8 +115,8 @@ export default function CorteCaja() {
       </div>
 
       {!open ? (
-        <button onClick={() => setOpen(true)} className="w-full rounded-card border border-border py-2.5 text-secondary text-fg-muted transition-colors hover:border-accent/60 hover:text-fg">
-          Contar y cerrar el día
+        <button onClick={() => void openCorte()} disabled={opening} className="w-full rounded-card border border-border py-2.5 text-secondary text-fg-muted transition-colors hover:border-accent/60 hover:text-fg disabled:opacity-60">
+          {opening ? 'Actualizando ventas del día…' : 'Contar y cerrar el día'}
         </button>
       ) : (
         <div className="space-y-2 rounded-card border border-border bg-surface-2 p-2.5">

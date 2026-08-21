@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { computeCuadre } from '@/lib/cuadre'
+import { runPosterImport } from '@/lib/posterImport'
 
 export const runtime = 'nodejs'
 
@@ -78,8 +79,11 @@ async function latestSnaps(supabase: ReturnType<typeof createServerClient>) {
 
 // GET → por contenedor: saldo mostrado, procedencia, desde cuándo no cuadras, y el HISTORIAL (cuadres +
 // traspasos, distinguibles). Sin snapshot aún → needsBaseline. Devuelve también el TOTAL del negocio.
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = createServerClient()
+  // ?refresh=1 → jala ventas de Poster ANTES de leer los saldos (para que el corte muestre el esperado ya con la
+  // venta de hoy; sin esto el efectivo aún no fetcheado sale como "diferencia" fantasma). Idempotente, ventana corta.
+  if (req.nextUrl.searchParams.get('refresh') === '1') await runPosterImport(3).catch(() => {})
   const [flows, snaps, { data: allSnaps }, { data: traspasos }] = await Promise.all([
     loadFlows(supabase), latestSnaps(supabase),
     supabase.from('publico_contenedor_saldos').select('contenedor, saldo, fecha, esperado, nota, created_at').order('fecha', { ascending: false }).order('created_at', { ascending: false }),
@@ -128,6 +132,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, baseline: true })
   }
 
+  // GARANTÍA anti-fantasma: jala ventas de Poster ANTES de calcular lo esperado, así el delta registrado nunca
+  // arrastra la venta del día sin fetchear. Idempotente; si Poster falla, el corte sigue con lo que haya.
+  await runPosterImport(3).catch(() => {})
   const flows = await loadFlows(supabase)
   const shown = Math.round((snap.saldo + flowSince(c, snap.fecha, today, flows)) * 100) / 100
   const { delta, adjustment } = computeCuadre(contado, shown, LABEL[c])
