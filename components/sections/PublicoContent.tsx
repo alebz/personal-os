@@ -14,6 +14,7 @@ import {
 import { TicketFoto } from './publico/TicketFoto'
 import { QueToca } from './publico/QueToca'
 import { AliasManager } from './publico/AliasManager'
+import { ProveedoresManager } from './publico/ProveedoresManager'
 import { Notas } from './publico/Notas'
 import { Inventario } from './publico/Inventario'
 import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow, TabBar } from './publico/ui'
@@ -73,7 +74,8 @@ function PublicoArcade() {
   const [propTarjMes, setPropTarjMes] = useState(0)   // propina de tarjeta del mes → base de la comisión de Clip
   const [costos, setCostos] = useState<Costo[]>([])
   const [ingresos, setIngresos] = useState<Ingreso[]>([])
-  const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'fondos' | 'notas'>('panel')
+  const [tab, setTab] = useState<'panel' | 'movimientos' | 'direccion' | 'libretas'>('panel')
+  const [libView, setLibView] = useState<'notas' | 'proveedores' | 'fondos'>('notas')   // Libretas: notas · proveedores · fondos
   const [movView, setMovView] = useState<'capturar' | 'historial' | 'inventario' | 'cierre'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
@@ -212,7 +214,7 @@ function PublicoArcade() {
             <button onClick={() => { if (month < currentMonth) setCapDate((d) => { const n = shiftMonthDate(d, 1); return n > today ? today : n }) }} disabled={month >= currentMonth} className="px-1 text-fg-muted hover:text-fg disabled:opacity-30" aria-label="Mes siguiente">›</button>
           </div>
         </div>
-        <TabBar value={tab} onChange={setTab} rounded="rounded-full" pill tabs={[['panel', 'Panel'], ['movimientos', 'Movimientos'], ['direccion', 'Dirección'], ['fondos', 'Fondos'], ['notas', 'Notas']] as const} />
+        <TabBar value={tab} onChange={setTab} rounded="rounded-full" pill tabs={[['panel', 'Panel'], ['movimientos', 'Movimientos'], ['direccion', 'Dirección'], ['libretas', 'Libretas']] as const} />
       </header>
 
 
@@ -302,39 +304,47 @@ function PublicoArcade() {
 
       {tab === 'direccion' && (<><Direccion /><FoodCostPanel /></>)}
 
-      {tab === 'fondos' && (<div className="space-y-3">
-        <Socios funds={socioFunds} handlers={socioHandlers} />
-        {/* Reparto | Otros ingresos lado a lado (colapsan a 1 col en móvil). */}
-        <BentoRow>
-        <Reparto splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
-        {/* OTROS INGRESOS (no-POS: subarriendo, etc.) — vive en Fondos, no en Captura: es un evento raro, no
-            parte del ritual diario. Suma a la utilidad, nunca a las ventas (food cost intacto). */}
-        <Card>
-          <CardHead tone={dc}>Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS · {monthName(month)})</span></CardHead>
-          <div className="flex flex-wrap items-center gap-2">
-            <input value={iConcepto} onChange={(e) => setIConcepto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }} />
-            <MoneyInput ref={iAmtRef} value={iAmt} onChange={setIAmt} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="$ monto" style={{ ...numInput, width: 120 }} />
-            <span className="text-label text-fg-muted">a</span>
-            {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setIOrigin(ct.key)} style={chip(iOrigin === ct.key)}>{ct.label}</button>))}
-            <button onClick={() => void addIngreso()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
-          </div>
-          <div className="mt-1 text-label text-fg-muted">Suman a la utilidad, nunca a las ventas. El subarriendo que cubre la renta va con origen <b>Sin caja</b>.</div>
-          {ingresos.length > 0 && (
-            <div className="mt-2 space-y-1 border-t border-border pt-2">
-              {ingresos.map((i) => (
-                <div key={i.id} className="group flex items-center gap-2 text-secondary">
-                  <span className="flex-1 truncate">{dayMonth(i.date)} · {i.concepto} <span className="text-fg-muted">· {originLabel(i.origin)}</span></span>
-                  <span className="tabular-nums text-ok">+{mxn(Number(i.amount))}</span>
-                  <button onClick={() => void delIngreso(i.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-        </BentoRow>
-      </div>)}
+      {/* LIBRETAS — sección de referencia con tres libretas: Notas (operativas), Proveedores (la libreta canónica
+          con fichas + historial de compras) y Fondos (socios · reparto · otros ingresos). */}
+      {tab === 'libretas' && (<div className="space-y-3">
+        <TabBar value={libView} onChange={setLibView} tabs={[['notas', 'Notas'], ['proveedores', 'Proveedores'], ['fondos', 'Fondos']] as const} />
 
-      {tab === 'notas' && <Notas tone={dc} />}
+        {libView === 'notas' && <Notas tone={dc} />}
+
+        {libView === 'proveedores' && <ProveedoresManager />}
+
+        {libView === 'fondos' && (<div className="space-y-3">
+          <Socios funds={socioFunds} handlers={socioHandlers} />
+          {/* Reparto | Otros ingresos lado a lado (colapsan a 1 col en móvil). */}
+          <BentoRow>
+          <Reparto splitAlex={splitAlex} onSplit={saveSplit} utilidadOper={utilidadOper} />
+          {/* OTROS INGRESOS (no-POS: subarriendo, etc.) — vive en Fondos, no en Captura: es un evento raro, no
+              parte del ritual diario. Suma a la utilidad, nunca a las ventas (food cost intacto). */}
+          <Card>
+            <CardHead tone={dc}>Otros ingresos <span className="font-normal normal-case tracking-normal">(no-POS · {monthName(month)})</span></CardHead>
+            <div className="flex flex-wrap items-center gap-2">
+              <input value={iConcepto} onChange={(e) => setIConcepto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="Concepto (ej. Subarriendo Ameno)" style={{ ...numInput, flex: 1, minWidth: 160, fontSize: 14 }} />
+              <MoneyInput ref={iAmtRef} value={iAmt} onChange={setIAmt} onKeyDown={(e) => { if (e.key === 'Enter') void addIngreso() }} placeholder="$ monto" style={{ ...numInput, width: 120 }} />
+              <span className="text-label text-fg-muted">a</span>
+              {ORIGIN_OPTIONS.map((ct) => (<button key={ct.label} onClick={() => setIOrigin(ct.key)} style={chip(iOrigin === ct.key)}>{ct.label}</button>))}
+              <button onClick={() => void addIngreso()} className="rounded-card border border-border px-3 py-2 font-medium">Agregar</button>
+            </div>
+            <div className="mt-1 text-label text-fg-muted">Suman a la utilidad, nunca a las ventas. El subarriendo que cubre la renta va con origen <b>Sin caja</b>.</div>
+            {ingresos.length > 0 && (
+              <div className="mt-2 space-y-1 border-t border-border pt-2">
+                {ingresos.map((i) => (
+                  <div key={i.id} className="group flex items-center gap-2 text-secondary">
+                    <span className="flex-1 truncate">{dayMonth(i.date)} · {i.concepto} <span className="text-fg-muted">· {originLabel(i.origin)}</span></span>
+                    <span className="tabular-nums text-ok">+{mxn(Number(i.amount))}</span>
+                    <button onClick={() => void delIngreso(i.id)} className="opacity-0 transition-opacity group-hover:opacity-100 text-fg-muted hover:text-danger" aria-label="Borrar">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+          </BentoRow>
+        </div>)}
+      </div>)}
 
       {/* ── FRANJA DE ESTADO (al FONDO, siempre visible en toda sección): sync del POS + propina por repartir
           (pasivo vivo) + import manual. Pie de página de utilidad, no compite con el contenido de arriba. ── */}
