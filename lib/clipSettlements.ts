@@ -72,7 +72,7 @@ export async function importClipSettlements(supabase: SupabaseClient, opts: { fr
   for (const r of rows) {
     const { error } = await supabase.from('publico_costos').upsert({
       scope: 'publico', date: r.date, month: r.date.slice(0, 7), category: 'comision', cost_kind: 'variable',
-      origin: 'clip', amount: r.fee, note: `Comisión Clip · ${r.n} tx · settlement ${r.id}`, clip_settlement_id: r.id,
+      origin: 'clip', amount: r.fee, note: `Comisión Clip · ${r.n} tx · settlement ${r.id}`, clip_settlement_id: r.id, proveedor: 'Clip',
     }, { onConflict: 'scope,clip_settlement_id' })
     if (!error) imported++
   }

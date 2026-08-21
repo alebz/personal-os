@@ -101,7 +101,7 @@ export function Contenedores({ dc, month }: { dc: string; month: string }) {
   async function registrarComision() {
     const amount = com.amount
     if (amount == null || !Number.isFinite(amount) || amount <= 0) return
-    const resp = await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: com.fecha, category: 'comision', cost_kind: 'variable', origin: 'clip', amount, note: com.nota?.trim() || 'Comisión Clip' }) })
+    const resp = await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: com.fecha, category: 'comision', cost_kind: 'variable', origin: 'clip', amount, note: com.nota?.trim() || 'Comisión Clip', proveedor: 'Clip' }) })
     const r = await resp.json().catch(() => ({} as { error?: string }))
     if (!resp.ok || r.error) { setFlash(`comisión: no se pudo — ${r.error ?? resp.status}`); setTimeout(() => setFlash(null), 6000); return }
     setFlash(`comisión Clip · CLIP −${mxn(amount)}`)

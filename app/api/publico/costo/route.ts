@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
   if (b.origin != null && !ORIGINS.includes(b.origin)) return NextResponse.json({ error: 'origin inválido' }, { status: 400 })
   const amount = Number(b.amount)
   if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: 'monto inválido' }, { status: 400 })
+  // ANTI-PENDEJOS: todo gasto lleva beneficiario. Sin proveedor no se guarda.
+  if (!b.proveedor || !b.proveedor.trim()) return NextResponse.json({ error: 'proveedor requerido (todo gasto lleva beneficiario)' }, { status: 400 })
   const cost_kind = NO_KIND.includes(b.category) ? null : (b.cost_kind === 'variable' ? 'variable' : 'fijo')
 
   // SELLO DE ORIGEN — del token firmado, no del body. Sin cookie (x-api-secret) = 'full'.

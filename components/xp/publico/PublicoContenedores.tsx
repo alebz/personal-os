@@ -91,7 +91,7 @@ export default function PublicoContenedores() {
   async function revertTraspaso(id: string) { await fetch(`/api/publico/contenedores/traspaso?id=${id}`, { method: 'DELETE' }); say('traspaso revertido', 4000); await load() }
   async function registrarComision() {
     const amount = com.amount; if (amount == null || !Number.isFinite(amount) || amount <= 0) return
-    const resp = await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: com.fecha, category: 'comision', cost_kind: 'variable', origin: 'clip', amount, note: com.nota?.trim() || 'Comisión Clip' }) })
+    const resp = await fetch('/api/publico/costo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: com.fecha, category: 'comision', cost_kind: 'variable', origin: 'clip', amount, note: com.nota?.trim() || 'Comisión Clip', proveedor: 'Clip' }) })
     const r = await resp.json().catch(() => ({} as { error?: string }))
     if (!resp.ok || r.error) return say(`comisión: no se pudo — ${r.error ?? resp.status}`, 6000)
     say(`comisión Clip · CLIP −${pesosCent(amount)}`); setComOpen(false); setCom({ ...com, amount: null, nota: '' }); await load()
