@@ -18,6 +18,7 @@ import { ProveedoresManager } from './publico/ProveedoresManager'
 import { ProveedoresHuerfanos } from './publico/ProveedoresHuerfanos'
 import { Notas } from './publico/Notas'
 import { Inventario } from './publico/Inventario'
+import { Catalogo } from './publico/Catalogo'
 import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow, TabBar } from './publico/ui'
 import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
@@ -78,6 +79,7 @@ function PublicoArcade() {
   const [tab, setTab] = useState<'panel' | 'tickets' | 'inventario' | 'analisis' | 'libretas'>('panel')
   const [libView, setLibView] = useState<'notas' | 'proveedores' | 'fondos'>('notas')   // Libretas: notas · proveedores · fondos
   const [provReloadKey, setProvReloadKey] = useState(0)   // bump → recarga la libreta tras asignar cabos sueltos
+  const [invView, setInvView] = useState<'catalogo' | 'contar'>('catalogo')   // Inventario: catálogo maestro · contar (viejo, hasta Fase C)
   const [movView, setMovView] = useState<'capturar' | 'historial'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
@@ -252,9 +254,14 @@ function PublicoArcade() {
       </>)}
       </>)}
 
-      {/* INVENTARIO — pendiente de rehacer como CATÁLOGO maestro del OS (una lista de todo: ingredientes +
-          consumibles + menaje, con ficha por cosa; Contar y Conteos aparte). Por ahora el componente actual. */}
-      {tab === 'inventario' && <Inventario tone={dc} />}
+      {/* INVENTARIO = CATÁLOGO maestro (la lista de todo, con ficha por cosa) + Contar. "Contar" todavía usa el
+          componente viejo (con sus tabs Organizar/Unidades/Clasificar) hasta que la Fase C lo reconstruya sobre
+          el catálogo y los quite. */}
+      {tab === 'inventario' && (<>
+        <TabBar value={invView} onChange={setInvView} tabs={[['catalogo', 'Catálogo'], ['contar', 'Contar']] as const} />
+        {invView === 'catalogo' && <Catalogo tone={dc} />}
+        {invView === 'contar' && <Inventario tone={dc} />}
+      </>)}
 
       {tab === 'panel' && (<>
         <Panel month={month} ventasMes={ventasMes} tarjetaMes={tarjetaMes} propinaTarjetaMes={propTarjMes} costosOper={costosOper} utilidadOper={utilidadOper} otrosIngresosMes={otrosIngresosMes} rentaCondonadaMes={rentaCondonadaMes} utilidadTotal={utilidadTotal} reinversionMes={reinversionMes} cmpVentas={cmpV} cmpCostos={cmpC} ventasDiarias={ventas} propinaPendiente={propPend?.pendiente ?? 0} onCostChange={load} />
