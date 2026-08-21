@@ -5,6 +5,7 @@ import { MONEY, MoneyAmount, MoneyBtn } from '../money/MoneyChrome'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, originLabel, OPERATING_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
 import { nthOccurrence, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
 import { localDate, dayMonth, dayLabel } from '@/components/sections/publico/util'
+import { ProveedorPicker } from '@/components/sections/publico/ProveedorPicker'
 import { Section, Check, cellInput, pesos, pesosCent } from './kit'
 
 // GASTOS PREVISTOS de Público bajo XP (Money). Port fiel del arcade: ocurrencias MATERIALIZADAS del mes;
@@ -196,22 +197,24 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId }: { prev: Prev[];
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual')
   const [anchor, setAnchor] = useState(localDate())
   const [ocur, setOcur] = useState('')
+  const [provId, setProvId] = useState<string | null>(null)   // anti-pendejos: proveedor obligatorio
   async function add() {
-    const a = amount; if (!concepto.trim() || a == null || a <= 0 || !cat) return
-    await fetch('/api/publico/previstos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ concepto: concepto.trim(), categoria: cat, origin, amount: a, frecuencia, anchor_date: anchor, ocurrencias: ocur ? Number(ocur) : null }) })
-    setConcepto(''); setCat(''); setOrigin(null); setAmount(null); setOcur(''); onAdd()
+    const a = amount; if (!concepto.trim() || a == null || a <= 0 || !cat || !provId) return
+    await fetch('/api/publico/previstos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ concepto: concepto.trim(), categoria: cat, origin, amount: a, frecuencia, anchor_date: anchor, ocurrencias: ocur ? Number(ocur) : null, proveedor_id: provId }) })
+    setConcepto(''); setCat(''); setOrigin(null); setAmount(null); setOcur(''); setProvId(null); onAdd()
   }
   return (
     <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, border: `1px solid ${MONEY.rule}`, background: '#f5f9ff', padding: '6px 7px' }}>
         <input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="concepto (ej. Suscripción Poster)" style={{ ...cellInput, flex: 1, minWidth: 140 }} />
+        <ProveedorPicker value={provId} onChange={(id) => setProvId(id)} cell={cellInput} warn />
         <select value={cat} onChange={(e) => { const c = e.target.value as CostCategory | ''; setCat(c); setOrigin(c ? catDefaults(c).defaultOrigin : null) }} style={{ ...sel, width: 108, color: cat ? MONEY.ink : '#b45309' }}><option value="">categoría…</option>{COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
         <select value={origin ?? ''} onChange={(e) => setOrigin((e.target.value || null) as OriginKey)} style={{ ...sel, width: 96 }}>{ORIGIN_OPTIONS.map((o) => <option key={o.label} value={o.key ?? ''}>{o.label}</option>)}</select>
         <MoneyAmount value={amount} onChange={setAmount} placeholder="$" style={{ width: 78, textAlign: 'right' }} />
         <select value={frecuencia} onChange={(e) => setFrecuencia(e.target.value as Frecuencia)} style={{ ...sel, width: 96 }}>{FRECS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
         <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9.5, color: '#8a93a8' }}>1er vence<input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} style={cellInput} /></label>
         <input value={ocur} onChange={(e) => setOcur(e.target.value)} inputMode="numeric" placeholder="N de M" title="cuántos pagos en total; vacío = perpetuo" style={{ ...cellInput, width: 72, textAlign: 'right' }} />
-        <MoneyBtn onClick={() => void add()} disabled={!cat || !concepto.trim() || !amount}>Agregar</MoneyBtn>
+        <MoneyBtn onClick={() => void add()} disabled={!cat || !concepto.trim() || !amount || !provId}>Agregar</MoneyBtn>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {prev.map((p) => (

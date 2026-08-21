@@ -6,6 +6,7 @@ import { MoneyInput } from '@/components/MoneyInput'
 import { COST_CATEGORIES, catDefaults, ORIGIN_OPTIONS, originLabel, OPERATING_CATEGORIES, type CostCategory, type OriginKey } from '@/lib/publico'
 import { nthOccurrence, occurrencesInMonth, type Frecuencia } from '@/lib/previstos'
 import { Card, inputCell as cell } from './ui'
+import { ProveedorPicker } from './ProveedorPicker'
 import { localDate, dayMonth, dayLabel } from './util'
 
 const FRECS: { key: Frecuencia; label: string }[] = [
@@ -274,11 +275,12 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual')
   const [anchor, setAnchor] = useState(localDate())
   const [ocur, setOcur] = useState('')
+  const [provId, setProvId] = useState<string | null>(null)   // anti-pendejos: proveedor obligatorio
 
   async function add() {
-    const a = amount; if (!concepto.trim() || a == null || a <= 0 || !cat) return   // categoría obligatoria
-    await fetch('/api/publico/previstos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ concepto: concepto.trim(), categoria: cat, origin, amount: a, frecuencia, anchor_date: anchor, ocurrencias: ocur ? Number(ocur) : null }) })
-    setConcepto(''); setCat(''); setOrigin(null); setAmount(null); setOcur(''); onAdd()
+    const a = amount; if (!concepto.trim() || a == null || a <= 0 || !cat || !provId) return   // categoría + proveedor obligatorios
+    await fetch('/api/publico/previstos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ concepto: concepto.trim(), categoria: cat, origin, amount: a, frecuencia, anchor_date: anchor, ocurrencias: ocur ? Number(ocur) : null, proveedor_id: provId }) })
+    setConcepto(''); setCat(''); setOrigin(null); setAmount(null); setOcur(''); setProvId(null); onAdd()
   }
 
   return (
@@ -286,6 +288,7 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
       {/* Alta */}
       <Card pad="sm" className="flex flex-wrap items-center gap-1">
         <input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="concepto (ej. Suscripción Poster)" style={{ ...cell, flex: 1, minWidth: 140 }} />
+        <ProveedorPicker value={provId} onChange={(id) => setProvId(id)} cell={cell} warn />
         <select value={cat} onChange={(e) => { const c = e.target.value as CostCategory | ''; setCat(c); setOrigin(c ? catDefaults(c).defaultOrigin : null) }} style={{ ...cell, width: 110, ...(cat ? {} : { color: 'var(--color-warn, #b45309)' }) }}>
           <option value="">categoría…</option>
           {COST_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
@@ -295,7 +298,7 @@ function Manage({ prev, onAdd, onPatch, onDel, onDrop, dragId, cell }: {
         <select value={frecuencia} onChange={(e) => setFrecuencia(e.target.value as Frecuencia)} style={{ ...cell, width: 100 }}>{FRECS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
         <label className="flex items-center gap-1 text-label text-fg-muted">1er vence<input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} style={cell} /></label>
         <input value={ocur} onChange={(e) => setOcur(e.target.value)} inputMode="numeric" placeholder="N de M (opc)" title="cuántos pagos en total; vacío = perpetuo" style={{ ...cell, width: 90, textAlign: 'right' }} />
-        <button onClick={() => void add()} disabled={!cat} className="rounded-card border border-border px-3 py-1 font-medium disabled:opacity-40" title={cat ? '' : 'elige una categoría primero'}>Agregar</button>
+        <button onClick={() => void add()} disabled={!cat || !provId} className="rounded-card border border-border px-3 py-1 font-medium disabled:opacity-40" title={!cat ? 'elige una categoría primero' : !provId ? 'elige un proveedor (todo gasto lleva beneficiario)' : ''}>Agregar</button>
       </Card>
       {/* Lista editable + arrastre */}
       <div className="space-y-1">

@@ -17,7 +17,7 @@ const FRECS = ['semanal', 'quincenal', 'mensual', 'bimestral']
 export async function GET() {
   const supabase = createServerClient()
   const [{ data: previstos }, { data: pagos }, { data: charges }, { data: cards }, { data: confirms }] = await Promise.all([
-    supabase.from('publico_previstos').select('id, concepto, categoria, origin, amount, frecuencia, anchor_date, ocurrencias, sort_order, archived').order('sort_order', { ascending: true }),
+    supabase.from('publico_previstos').select('id, concepto, categoria, origin, amount, frecuencia, anchor_date, ocurrencias, sort_order, archived, proveedor_id, publico_proveedores(nombre)').order('sort_order', { ascending: true }),
     supabase.from('publico_previsto_pagos').select('previsto_id, ocurrencia, costo_id, amount'),
     supabase.from('finance_card_charges').select('id, card_id, name, amount, meses, start_month, ended_month').eq('attribution', 'publico').eq('archived', false),
     supabase.from('finance_cards').select('id, name, due_day'),
@@ -31,15 +31,18 @@ export async function GET() {
     meses: ch.meses as number, start_month: ch.start_month as string, ended_month: ch.ended_month as string | null,
     due_day: dueByCard.get(ch.card_id) ?? 1, confirmed: confByCharge.get(ch.id) ?? [],
   }))
-  return NextResponse.json({ previstos: previstos ?? [], pagos: pagos ?? [], derivados })
+  const previstosOut = (previstos ?? []).map((p) => ({ ...p, proveedor: (p.publico_proveedores as { nombre?: string } | null)?.nombre ?? null }))
+  return NextResponse.json({ previstos: previstosOut, pagos: pagos ?? [], derivados })
 }
 
 // POST /api/publico/previstos — crea una definición. origin se precarga del default de la categoría si no viene.
 export async function POST(req: NextRequest) {
-  let b: { concepto?: string; categoria?: string; origin?: string | null; amount?: number; frecuencia?: string; anchor_date?: string; ocurrencias?: number | null }
+  let b: { concepto?: string; categoria?: string; origin?: string | null; amount?: number; frecuencia?: string; anchor_date?: string; ocurrencias?: number | null; proveedor_id?: string }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const concepto = (b.concepto ?? '').trim()
   if (!concepto) return NextResponse.json({ error: 'concepto requerido' }, { status: 400 })
+  // ANTI-PENDEJOS: todo gasto lleva beneficiario. Sin proveedor no se crea el previsto.
+  if (!b.proveedor_id) return NextResponse.json({ error: 'proveedor requerido (todo gasto lleva beneficiario)' }, { status: 400 })
   if (!b.categoria || !CATS.includes(b.categoria)) return NextResponse.json({ error: 'categoria inválida' }, { status: 400 })
   const amount = Number(b.amount)
   if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: 'amount inválido (>0)' }, { status: 400 })
@@ -52,7 +55,7 @@ export async function POST(req: NextRequest) {
   const { data: last } = await supabase.from('publico_previstos').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle()
   const sort_order = (last?.sort_order ?? -1) + 1
   const { data, error } = await supabase.from('publico_previstos').insert({
-    scope: 'publico', concepto, categoria: b.categoria, origin: origin as OriginKey, amount, frecuencia: b.frecuencia, anchor_date: b.anchor_date, ocurrencias, sort_order,
+    scope: 'publico', concepto, categoria: b.categoria, origin: origin as OriginKey, amount, frecuencia: b.frecuencia, anchor_date: b.anchor_date, ocurrencias, sort_order, proveedor_id: b.proveedor_id,
   }).select('id').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true, id: data.id })
