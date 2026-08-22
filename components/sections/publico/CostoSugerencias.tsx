@@ -57,7 +57,25 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
     await load()
   }
 
+  // OBVIO = el nombre del producto aparece COMPLETO en la compra y el rendimiento no es opinión: o la factura
+  // declara la presentación ("6/1.5 LT", "250 ml") o el factor ya se decidió antes. Eso no necesita tu ojo.
+  const esObvio = (s: Sug) => s.confianza === 'alta' && s.score >= 1 && factorDe(s) != null
   const visibles = sugs.filter((s) => !descartados.has(s.catalogoId))
+  const obvios = visibles.filter(esObvio)
+
+  async function ligarObvios() {
+    setBusy('lote'); setFlash(null)
+    let n = 0
+    for (const s of obvios) {
+      const r = await fetch('/api/publico/catalogo/sugerencias', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ catalogoId: s.catalogoId, rawNorm: s.rawNorm, factor: factorDe(s) }),
+      })
+      if (r.ok) n++
+    }
+    setBusy(null); setFlash(`${n} producto${n === 1 ? '' : 's'} con costo. Los que quedan necesitan tu ojo.`)
+    await load()
+  }
   const grupos = [
     ['alta', 'Coinciden bien', 'el nombre del producto aparece completo en la compra'],
     ['revisar', 'Por revisar', 'solo coincide a medias — confirma que sea el mismo producto'],
@@ -69,7 +87,25 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
         <h2 className="text-label uppercase tracking-widest" style={{ color: tone ?? 'var(--color-fg-muted)' }}>Ponerle precio al inventario</h2>
         {resumen && <span className="text-label text-fg-muted">{resumen.sinCosto} sin costo · {resumen.comprasLibres} compras sin usar</span>}
       </div>
+      <p className="mb-2 text-label text-fg-muted">
+        Une el producto que <b className="text-fg">cuentas en tu inventario</b> (izquierda) con
+        <b className="text-fg"> cómo lo nombra la factura</b> (derecha). Al ligarlos, el precio que pagaste se
+        vuelve el costo de ese producto — y las próximas facturas lo actualizan solas.
+      </p>
       {flash && <Card pad="sm" className="mb-2 text-label text-ok">✓ {flash}</Card>}
+
+      {!loading && obvios.length > 0 && (
+        <Card pad="sm" className="mb-2 flex flex-wrap items-center gap-2 text-label">
+          <span className="text-fg-muted">
+            <b className="text-fg">{obvios.length}</b> no necesitan tu criterio: el nombre coincide completo y la
+            factura ya declara la presentación.
+          </span>
+          <button onClick={() => void ligarObvios()} disabled={busy != null}
+            className="rounded-card border border-accent px-3 py-0.5 font-bold text-accent hover:bg-accent/10 disabled:opacity-40">
+            {busy === 'lote' ? 'ligando…' : `Ligar los ${obvios.length}`}
+          </button>
+        </Card>
+      )}
 
       {loading && <p className="text-secondary italic text-fg-muted">Cargando…</p>}
       {!loading && !visibles.length && <p className="text-secondary italic text-ok">✓ No hay nada más que emparejar por ahora.</p>}
@@ -94,9 +130,9 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
                     return (
                       <div key={s.catalogoId} className="py-1.5 text-label">
                         <div className="flex flex-wrap items-baseline gap-x-2">
-                          <span className="font-medium text-fg">{s.nombre}</span>
-                          <span className="text-fg-muted">←</span>
-                          <span className="min-w-0 flex-1 truncate text-fg-muted" title={s.descripcion}>{s.descripcion}</span>
+                          <span className="font-medium text-fg" title="el producto que cuentas en tu inventario">{s.nombre}</span>
+                          <span className="text-fg-muted">es lo mismo que</span>
+                          <span className="min-w-0 flex-1 truncate text-fg-muted" title={`como lo nombra la factura: ${s.descripcion}`}>{s.descripcion}</span>
                           <span className="text-fg-muted">{s.veces}× comprado · {mxn(s.importe)}</span>
                         </div>
                         {/* De dónde sale el factor, en palabras. Sin esto "1 pz = 9 L" parece decir que una
