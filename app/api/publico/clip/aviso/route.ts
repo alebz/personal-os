@@ -26,6 +26,16 @@ export async function POST(req: NextRequest) {
   if (!aviso) return NextResponse.json({ ok: true, ignorado: 'no es un aviso de movimiento' })
 
   const supabase = createServerClient()
+
+  // DEDUPE POR REFERENCIA antes que por correo. El aviso llega al correo personal y se reenvía a Público: el
+  // mismo movimiento puede entrar por el reenvío manual y por el automático, con un email_msg_id distinto cada
+  // uno. El folio de Clip es el mismo en todas las copias, así que es la llave real (los depósitos recibidos no
+  // lo traen — esos caen al dedupe por correo del upsert de abajo).
+  if (aviso.referencia) {
+    const { data: ya } = await supabase.from('publico_clip_movimientos').select('id').eq('referencia', aviso.referencia).maybeSingle()
+    if (ya) return NextResponse.json({ ok: true, duplicado: true, por: 'referencia' })
+  }
+
   const { data: mov, error } = await supabase.from('publico_clip_movimientos').upsert({
     email_msg_id: b.emailMsgId ?? null, referencia: aviso.referencia, tipo: aviso.tipo, es_gasto: aviso.esGasto,
     monto: aviso.monto, fecha: aviso.fecha, contraparte: aviso.contraparte, descripcion: aviso.descripcion,
