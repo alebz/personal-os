@@ -1,5 +1,6 @@
 import type { createServerClient } from '@/lib/supabase'
 import { normAlias, stemAlias } from '@/lib/ticketExtract'
+import { esInventario } from '@/lib/publico'
 
 // PIPELINE de captura de un gasto (compartido). Escribe: scan (cabecera) + líneas itemizadas + roll-up en
 // publico_costos (P&L) + aprende los alias (proveedor + productos, acumulando importe/cantidad/veces). ÚNICA
@@ -102,7 +103,7 @@ export async function capturarTicket(supabase: Supa, input: CapturaInput): Promi
   let productos = 0
   if (groups.size) {
     const keys = [...groups.keys()]
-    const { data: existing } = await supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces, cantidad_acumulada, iva_tasa').in('raw_norm', keys)
+    const { data: existing } = await supabase.from('ticket_product_aliases').select('raw_norm, descripcion, categoria, unidad, importe_acumulado, veces, cantidad_acumulada, iva_tasa, toca_stock').in('raw_norm', keys)
     const prev = new Map((existing ?? []).map((r) => [r.raw_norm, r]))
     const rows = [...groups.values()].map((g) => {
       const e = prev.get(g.raw_norm)
@@ -110,6 +111,9 @@ export async function capturarTicket(supabase: Supa, input: CapturaInput): Promi
         raw_norm: g.raw_norm, raw_stem: g.stem, deleted_at: null,
         descripcion: g.renamed || !e ? g.canonical : e.descripcion,
         categoria: e?.categoria ?? g.categoria, unidad: e?.unidad ?? g.unidad, iva_tasa: e?.iva_tasa ?? g.iva,
+        // ¿Entra al conteo? Solo si la compra es mercancía (insumo/empaque/suministros). En una fila que YA
+        // existe se respeta lo que hayas decidido a mano; solo las nuevas heredan el default de su categoría.
+        toca_stock: e ? e.toca_stock : esInventario(category),
         importe_acumulado: Number(e?.importe_acumulado ?? 0) + g.sum,
         cantidad_acumulada: Number(e?.cantidad_acumulada ?? 0) + g.qty,
         veces: Number(e?.veces ?? 0) + 1, updated_at: now,

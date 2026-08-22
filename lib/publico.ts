@@ -58,3 +58,9 @@ export const SALES_CONTAINER: Record<'efectivo' | 'tarjeta', ContainerKey> = {
 // Reinversión y renta_condonada NO cuentan (uso de utilidad / net-cero). Estas 6 restan la utilidad operativa;
 // solo nómina y gasto_fijo (defaultKind='fijo') pesan además en el punto de equilibrio.
 export const OPERATING_CATEGORIES: CostCategory[] = ['insumo', 'nomina', 'gasto_fijo', 'mantenimiento', 'empaque', 'suministros', 'comision']
+
+// Las ÚNICAS categorías cuyas compras son mercancía que se cuenta en el inventario. Lo demás son servicios
+// (nómina, comisión, mantenimiento, fijos) o bienes durables (reinversión: un mason jar no se cuenta para el
+// food cost). Sin esta distinción, comprarle equipo a Gastroart metía charolas y tapetes al conteo.
+export const INVENTORY_CATEGORIES: CostCategory[] = ['insumo', 'empaque', 'suministros']
+export const esInventario = (k: string) => (INVENTORY_CATEGORIES as string[]).includes(k)
