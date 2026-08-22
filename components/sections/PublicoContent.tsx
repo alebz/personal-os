@@ -19,6 +19,7 @@ import { ProveedoresHuerfanos } from './publico/ProveedoresHuerfanos'
 import { Notas } from './publico/Notas'
 import { Inventario } from './publico/Inventario'
 import { Catalogo } from './publico/Catalogo'
+import { CostoSugerencias } from './publico/CostoSugerencias'
 import { Facturas } from './publico/Facturas'
 import { ClipMovimientos } from './publico/ClipMovimientos'
 import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow, TabBar } from './publico/ui'
@@ -265,7 +266,10 @@ function PublicoArcade() {
           el catálogo y los quite. */}
       {tab === 'inventario' && (<>
         <TabBar value={invView} onChange={setInvView} tabs={[['catalogo', 'Catálogo'], ['contar', 'Contar']] as const} />
-        {invView === 'catalogo' && <Catalogo tone={dc} />}
+        {invView === 'catalogo' && (<>
+          <CostoSugerencias tone={dc} />
+          <Catalogo tone={dc} />
+        </>)}
         {invView === 'contar' && <Inventario tone={dc} />}
       </>)}
 
