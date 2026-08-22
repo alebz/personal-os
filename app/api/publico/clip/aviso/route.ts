@@ -34,6 +34,15 @@ export async function POST(req: NextRequest) {
   if (aviso.referencia) {
     const { data: ya } = await supabase.from('publico_clip_movimientos').select('id').eq('referencia', aviso.referencia).maybeSingle()
     if (ya) return NextResponse.json({ ok: true, duplicado: true, por: 'referencia' })
+  } else {
+    // Los depósitos recibidos no traen folio. Como el MISMO aviso puede entrar por dos copias (el original y el
+    // reenviado, cada una con su email_msg_id), sin esta guarda se contarían dos veces. Monto + día + emisor
+    // identifican el movimiento con seguridad suficiente: dos depósitos idénticos del mismo emisor el mismo día
+    // son indistinguibles incluso para un humano.
+    const { data: ya } = await supabase.from('publico_clip_movimientos').select('id')
+      .eq('monto', aviso.monto).eq('fecha', aviso.fecha).eq('tipo', aviso.tipo)
+      .eq('contraparte', aviso.contraparte ?? '').maybeSingle()
+    if (ya) return NextResponse.json({ ok: true, duplicado: true, por: 'monto+fecha+contraparte' })
   }
 
   const { data: mov, error } = await supabase.from('publico_clip_movimientos').upsert({
