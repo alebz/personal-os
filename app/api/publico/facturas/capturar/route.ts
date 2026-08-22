@@ -30,9 +30,15 @@ export async function POST(req: NextRequest) {
   if (b.origin != null && !ORIGINS.includes(b.origin)) return NextResponse.json({ error: 'origin inválido' }, { status: 400 })
 
   const supabase = createServerClient()
-  const { data: f } = await supabase.from('publico_facturas').select('uuid, fecha, subtotal, total, emisor_nombre, conceptos, status, xml').eq('uuid', b.uuid).maybeSingle()
+  const { data: f } = await supabase.from('publico_facturas').select('uuid, fecha, subtotal, total, emisor_nombre, conceptos, status, estado_pago, fecha_pago, pago_origin').eq('uuid', b.uuid).maybeSingle()
   if (!f) return NextResponse.json({ error: 'factura no encontrada' }, { status: 404 })
   if (f.status === 'capturada') return NextResponse.json({ ok: true, already: true })
+  // Una factura a crédito sin liquidar NO es gasto: es un pasivo. Cobrarla ahora sacaría de la caja dinero que
+  // sigue ahí. Primero se marca pagada (con su fecha real) y entonces se captura.
+  if (f.estado_pago === 'por_pagar') return NextResponse.json({ error: 'esta factura aún no se paga — márcala como pagada primero (con la fecha en que salió el dinero)' }, { status: 409 })
+
+  // El gasto ocurre cuando SALE el dinero. Para las de crédito eso es fecha_pago; para las de contado, la factura.
+  const fechaGasto = (f.fecha_pago as string | null) ?? (f.fecha as string)
 
   const conceptos = (f.conceptos as Concepto[] | null) ?? []
   const items = conceptos.map((c) => ({ descripcion: (c.descripcion ?? '').trim(), cantidad: c.cantidad ?? null, unidad: c.unidad ?? null, precio_unitario: c.valorUnitario ?? null, importe: Number(c.importe ?? 0) }))
@@ -41,9 +47,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const { scanId, productos, ligado } = await capturarTicket(supabase, {
-      proveedor, proveedor_raw: b.proveedorRaw ?? f.emisor_nombre ?? null, fecha: f.fecha as string,
+      proveedor, proveedor_raw: b.proveedorRaw ?? f.emisor_nombre ?? null, fecha: fechaGasto,
       subtotal: f.subtotal != null ? Number(f.subtotal) : null, impuestos: f.total != null && f.subtotal != null ? Number(f.total) - Number(f.subtotal) : null,
-      total: Number(f.total ?? 0), notas: 'Factura CFDI', category: b.category, cost_kind, origin: b.origin ?? null,
+      total: Number(f.total ?? 0), notas: 'Factura CFDI', category: b.category, cost_kind, origin: b.origin ?? (f.pago_origin as string | null) ?? null,
       items, model: 'cfdi', raw: null, origen, ligarA: b.ligarA ?? null,
     })
     await supabase.from('publico_facturas').update({ status: 'capturada', ticket_scan_id: scanId }).eq('uuid', b.uuid)

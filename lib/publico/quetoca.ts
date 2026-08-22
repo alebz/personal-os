@@ -55,6 +55,7 @@ export type QueTocaInput = {
   comprasSinContenedor?: { n: number; monto: number }            // compras con contenedor sin asignar → saldos inflados (Tier 2, dinero)
   sinClasificar?: { n: number; valor: number }                   // insumos sin clase que pesan en el conteo (Tier 2)
   facturasPendientes?: { n: number; monto: number }              // CFDI en bandeja sin capturar → gasto incompleto (Tier 1, dinero)
+  facturasPorPagar?: { n: number; monto: number }                // facturas a crédito sin liquidar → lo que DEBES (Tier 1, dinero)
   // Estado manual por señal (posponer / bloquear)
   estados?: Record<string, Estado>
   // Ventanas de tiempo calibrables (ver DOS HORIZONTES abajo). Todas opcionales → caen al default.
@@ -208,6 +209,13 @@ export function buildQueToca(inp: QueTocaInput): QueTocaOutput {
     // vence=hoy → sube al frente del Tier 1 (están EN LA BANDEJA listas; capturarlas es de hoy). Es solo orden.
     cands.push({ clave: 'facturas', tier: 1, esDinero: true, monto, vence: inp.hoy,
       texto: `${n} factura${n === 1 ? '' : 's'} sin capturar${monto > 0 ? ` (${pesos(monto)})` : ''} — captúralas: traen el costo exacto` })
+  }
+  // ── LO QUE DEBES (Tier 1, dinero): facturas a crédito sin liquidar. No es gasto todavía, pero es plata
+  // comprometida que no aparece en ningún saldo — si no la ves, tu caja se siente más grande de lo que es. ──
+  if (inp.facturasPorPagar && inp.facturasPorPagar.n > 0) {
+    const { n, monto } = inp.facturasPorPagar
+    cands.push({ clave: 'facturas-por-pagar', tier: 1, esDinero: true, monto,
+      texto: `debes ${pesos(monto)} en ${n} factura${n === 1 ? '' : 's'} sin pagar — dinero comprometido que aún no sale de tu caja` })
   }
   // ── CUBETA SIN CLASIFICAR (Tier 2): insumos sin clase que sí pesan en el conteo → contaminan el food cost ──
   if (inp.sinClasificar && inp.sinClasificar.n > 0) {

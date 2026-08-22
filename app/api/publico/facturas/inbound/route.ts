@@ -23,11 +23,31 @@ export async function POST(req: NextRequest) {
   if (!cfdi.uuid) return NextResponse.json({ error: 'CFDI sin UUID (¿no es un XML timbrado?)' }, { status: 422 })
 
   const supabase = createServerClient()
+
+  // ── COMPLEMENTO DE PAGO ('P') ─────────────────────────────────────────────────────────────────────────
+  // No es una compra: avisa que una factura a crédito YA se liquidó. Entra por otro camino — marca pagadas las
+  // facturas que refiere y NO se guarda como factura (si no, sería una fantasma de $0 inflando la bandeja).
+  if (cfdi.tipo === 'P') {
+    const marcadas: string[] = []
+    for (const u of cfdi.pagaUuids) {
+      const { data } = await supabase.from('publico_facturas')
+        .update({ estado_pago: 'pagada', fecha_pago: cfdi.fecha, pago_nota: 'complemento de pago del proveedor' })
+        .eq('uuid', u).eq('estado_pago', 'por_pagar').select('uuid')
+      if (data?.length) marcadas.push(u)
+    }
+    return NextResponse.json({ ok: true, tipo: 'complemento de pago', refiere: cfdi.pagaUuids.length, marcadasPagadas: marcadas.length })
+  }
+
+  // El CFDI dice si el gasto YA se hizo: PUE = pago en una exhibición (ya pagaste, la factura llega después);
+  // PPD = pago diferido (compra a crédito, la factura llega ANTES del pago) → nace debiendo.
+  const estadoPago = cfdi.metodoPago === 'PPD' ? 'por_pagar' : 'pagada'
+
   // Idempotente: si ya existe ese UUID, no re-insertamos (ignoreDuplicates).
   const { error } = await supabase.from('publico_facturas').upsert({
     uuid: cfdi.uuid, serie: cfdi.serie, folio: cfdi.folio, fecha: cfdi.fecha,
     emisor_rfc: cfdi.emisorRfc, emisor_nombre: cfdi.emisorNombre, receptor_rfc: cfdi.receptorRfc,
     subtotal: cfdi.subtotal, total: cfdi.total, conceptos: cfdi.conceptos, xml, email_msg_id: b.emailMsgId ?? null,
+    metodo_pago: cfdi.metodoPago, forma_pago: cfdi.formaPago, estado_pago: estadoPago,
   }, { onConflict: 'uuid', ignoreDuplicates: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -44,8 +64,10 @@ type Concepto = { descripcion?: string; cantidad?: number; unidad?: string | nul
 
 async function autoConciliar(supabase: ReturnType<typeof createServerClient>, uuid: string) {
   const { data: f } = await supabase.from('publico_facturas')
-    .select('uuid, fecha, total, subtotal, emisor_nombre, conceptos, status, ticket_scan_id, xml').eq('uuid', uuid).maybeSingle()
+    .select('uuid, fecha, total, subtotal, emisor_nombre, conceptos, status, estado_pago, ticket_scan_id, xml').eq('uuid', uuid).maybeSingle()
   if (!f || f.status !== 'pendiente' || f.ticket_scan_id) return null
+  // Una factura POR PAGAR no es gasto todavía: no hay dinero que conciliar. Espera en "Debes" hasta que se pague.
+  if (f.estado_pago === 'por_pagar') return null
 
   const ctx = await cargarContexto(supabase)
   const match = buscarMatch({ uuid: f.uuid as string, fecha: f.fecha as string, total: Number(f.total ?? 0), emisor_nombre: f.emisor_nombre as string | null }, ctx.movs, ctx.aliases, null)

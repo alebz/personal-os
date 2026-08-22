@@ -3,7 +3,7 @@
 // librería de XML: es plano y conocido. Saca emisor (proveedor), conceptos (líneas con importe REAL) y el UUID.
 
 export type Concepto = { descripcion: string; cantidad: number; unidad: string | null; claveUnidad: string | null; valorUnitario: number; importe: number }
-export type CFDI = { uuid: string | null; serie: string | null; folio: string | null; fecha: string | null; emisorRfc: string | null; emisorNombre: string | null; receptorRfc: string | null; subtotal: number | null; total: number | null; formaPago: string | null; metodoPago: string | null; conceptos: Concepto[] }
+export type CFDI = { uuid: string | null; serie: string | null; folio: string | null; fecha: string | null; emisorRfc: string | null; emisorNombre: string | null; receptorRfc: string | null; subtotal: number | null; total: number | null; formaPago: string | null; metodoPago: string | null; tipo: string | null; pagaUuids: string[]; conceptos: Concepto[] }
 
 // Catálogo SAT c_FormaPago → etiqueta + contenedor SUGERIDO. Transferencia/débito/cheque → CLIP (el banco);
 // efectivo → caja chica; tarjeta de crédito / por definir → sin sugerencia (lo decides tú). No fuerza: sugiere.
@@ -55,10 +55,17 @@ export function parseCFDI(xml: string): CFDI {
       valorUnitario: Number(a.ValorUnitario ?? 0), importe: Number(a.Importe ?? 0),
     })
   }
+  // COMPLEMENTO DE PAGO (TipoDeComprobante 'P'): no es una compra, es el AVISO de que una factura a crédito ya se
+  // liquidó. No lleva importes propios (Total=0) y cada DoctoRelacionado apunta al UUID de la factura que paga.
+  // Sin esto, un complemento entraría a la bandeja como factura fantasma de $0.
+  const pagaUuids = [...xml.matchAll(/<(?:[\w]+:)?DoctoRelacionado\b[^>]*?>/gi)]
+    .map((m) => attrsOf(m[0]).IdDocumento).filter((u): u is string => !!u)
+
   return {
     uuid: tfd.UUID ?? null, serie: comp.Serie ?? null, folio: comp.Folio ?? null, fecha: (comp.Fecha ?? '').slice(0, 10) || null,
     emisorRfc: emisor.Rfc ?? null, emisorNombre: emisor.Nombre ? decode(emisor.Nombre) : null, receptorRfc: receptor.Rfc ?? null,
     subtotal: comp.SubTotal ? Number(comp.SubTotal) : null, total: comp.Total ? Number(comp.Total) : null,
-    formaPago: comp.FormaPago ?? null, metodoPago: comp.MetodoPago ?? null, conceptos,
+    formaPago: comp.FormaPago ?? null, metodoPago: comp.MetodoPago ?? null,
+    tipo: comp.TipoDeComprobante ?? null, pagaUuids, conceptos,
   }
 }

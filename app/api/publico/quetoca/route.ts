@@ -93,9 +93,13 @@ export async function GET() {
   }
   const sinClasificar = scN > 0 ? { n: scN, valor: round(scVal) } : undefined
 
-  // ── FACTURAS pendientes (CFDI en bandeja sin capturar) ──
-  const { data: facturasP } = await supabase.from('publico_facturas').select('total').eq('status', 'pendiente')
-  const facturasPendientes = (facturasP?.length ?? 0) > 0 ? { n: facturasP!.length, monto: round((facturasP ?? []).reduce((s, f) => s + Number(f.total ?? 0), 0)) } : undefined
+  // ── FACTURAS: las que faltan capturar (ya pagadas) vs las que DEBES (a crédito, sin liquidar) ──
+  const { data: facturasP } = await supabase.from('publico_facturas').select('total, estado_pago').eq('status', 'pendiente')
+  const porCapturar = (facturasP ?? []).filter((f) => f.estado_pago !== 'por_pagar')
+  const debiendo = (facturasP ?? []).filter((f) => f.estado_pago === 'por_pagar')
+  const suma = (rows: Array<{ total: number | null }>) => round(rows.reduce((s, f) => s + Number(f.total ?? 0), 0))
+  const facturasPendientes = porCapturar.length > 0 ? { n: porCapturar.length, monto: suma(porCapturar) } : undefined
+  const facturasPorPagar = debiendo.length > 0 ? { n: debiendo.length, monto: suma(debiendo) } : undefined
 
   // ── LÍNEA (Tier 3): hechos baratos de publico_ventas ──
   const ventas = (ventasR.data ?? []) as Array<{ date: string; efectivo: number; tarjeta: number }>
@@ -131,7 +135,7 @@ export async function GET() {
     propina: { pendiente, nivel, ultimoReparto },
     previstos, contenedores,
     foodcost: { countAlert, daysSinceCount, anyReliable },
-    segundoConteo, comprasSinContenedor, sinClasificar, facturasPendientes,
+    segundoConteo, comprasSinContenedor, sinClasificar, facturasPendientes, facturasPorPagar,
     ventasAyer, mejorDelDow, deltaVentasPct, deltaVentasSemanas: SEMANAS_COMPARATIVO,
     estados, config,
   }
