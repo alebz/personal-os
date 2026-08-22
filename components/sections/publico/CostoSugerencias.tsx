@@ -17,6 +17,7 @@ type Sug = {
   rawNorm: string; descripcion: string; unidadCompra: string | null
   veces: number; importe: number; cantidad: number
   factor: number | null; factorDeducido: boolean
+  pack: { n: number; medida: number; unidad: string } | null
   costo: number | null; costoSinFactor: number | null
   score: number; confianza: 'alta' | 'revisar'
 }
@@ -98,8 +99,15 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
                           <span className="min-w-0 flex-1 truncate text-fg-muted" title={s.descripcion}>{s.descripcion}</span>
                           <span className="text-fg-muted">{s.veces}× comprado · {mxn(s.importe)}</span>
                         </div>
+                        {/* De dónde sale el factor, en palabras. Sin esto "1 pz = 9 L" parece decir que una
+                            BOTELLA trae 9 litros, cuando lo que trae 9 litros es la rejilla que compras. */}
+                        <div className="mt-0.5 text-fg-muted">
+                          pagas <b className="text-fg">{mxn(sinConvertir)}</b> por {s.unidadCompra?.toLowerCase() ?? 'unidad'}
+                          {s.pack && <> · cada {s.unidadCompra?.toLowerCase() ?? 'unidad'} trae <b className="text-fg">{s.pack.n} × {s.pack.medida} {s.pack.unidad}</b>
+                            {costo != null && <> = <b className="text-fg">{mxn(s.importe / s.cantidad / s.pack.n)}</b> cada {s.pack.unidad.startsWith('L') || s.pack.unidad.startsWith('ML') ? 'botella' : 'pieza'}</>}</>}
+                        </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <span className="text-fg-muted">1 {s.unidadCompra?.toLowerCase() ?? 'compra'} =</span>
+                          <span className="text-fg-muted">1 {s.unidadCompra?.toLowerCase() ?? 'compra'} rinde</span>
                           <input
                             value={factores[s.catalogoId] ?? ''} inputMode="decimal"
                             onChange={(e) => setFactores((m) => ({ ...m, [s.catalogoId]: e.target.value }))}
@@ -112,13 +120,13 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
                           {costo != null
                             ? <b className="text-fg">{mxn(costo)} / {s.unidadBase ?? 'unidad'}</b>
                             : <span className="text-danger">sin costo calculable</span>}
-                          {veces > 1.5 && <span className="text-warn" title="si lo ligaras sin factor, el costo quedaría así de bajo">sin factor diría {mxn(sinConvertir)}</span>}
+                          {veces > 1.5 && <span className="text-warn" title="sin convertir, el sistema creería que una unidad de compra es una unidad base">sin convertir diría {mxn(sinConvertir)}/{s.unidadBase ?? 'u'} — {veces.toFixed(0)}× menos</span>}
                           {f == null && s.unidadBase && <span className="text-warn">⚠ pon el factor o el costo queda en la unidad de compra</span>}
                           <button onClick={() => void aceptar(s)} disabled={busy === s.catalogoId || costo == null}
                             className="rounded-card border border-accent px-3 py-0.5 font-bold text-accent hover:bg-accent/10 disabled:opacity-40">
                             {busy === s.catalogoId ? 'ligando…' : 'Ligar'}
                           </button>
-                          <button onClick={() => setDescartados((d) => new Set(d).add(s.catalogoId))} className="text-fg-muted hover:text-danger" title="no es el mismo producto">no es</button>
+                          <button onClick={() => setDescartados((d) => new Set(d).add(s.catalogoId))} className="text-fg-muted hover:text-danger" title="descarta este par: no son el mismo producto">no es el mismo</button>
                         </div>
                       </div>
                     )

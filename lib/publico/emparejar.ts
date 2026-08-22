@@ -21,6 +21,7 @@ export type Sugerencia = {
   factorDeducido: boolean          // true = salió de la medida en el nombre; false = ya venía guardado
   costo: number | null             // $ por unidad base, con el factor aplicado
   costoSinFactor: number | null    // lo que saldría SIN convertir — para que se vea el tamaño del error
+  pack: { n: number; medida: number; unidad: string } | null   // "6/1.5 LT" → la rejilla trae 6 de 1.5 LT
   score: number
   confianza: 'alta' | 'revisar'   // 'revisar' = solo la mitad del nombre coincide; es una corazonada, no un hallazgo
 }
@@ -51,6 +52,15 @@ const MEDIDA = /(\d+(?:[.,]\d+)?)\s*(ml|mls|l|lt|lts|litros?|g|gr|grs|gramos?|kg
 // PAQUETE: "6/1.5 LT" = seis botellas de 1.5 L · "24/355 ML" = veinticuatro latas. Sin esto, el agua mineral
 // quedaba en $98/l cuando vale $16/l (se tomaba 1.5 como si la compra fuera UNA botella).
 const PACK = /(\d+)\s*\/\s*(\d+(?:[.,]\d+)?)\s*(ml|mls|l|lt|lts|g|gr|grs|kg|kgs)\b/i
+
+/** El paquete que declara el nombre, para poder EXPLICAR el factor en vez de solo escupirlo. */
+export function packDe(descripcion: string): { n: number; medida: number; unidad: string } | null {
+  const m = descripcion.match(PACK)
+  if (!m) return null
+  const n = Number(m[1]), medida = Number(m[2].replace(',', '.'))
+  if (!Number.isFinite(n) || !Number.isFinite(medida) || n <= 1 || medida <= 0) return null
+  return { n, medida, unidad: m[3].toUpperCase() }
+}
 const BASE_LITRO = new Set(['L', 'LT', 'LTS', 'LITRO', 'LITROS'])
 const BASE_KILO = new Set(['KG', 'KGS', 'KILO', 'KILOS'])
 
@@ -132,6 +142,7 @@ export function sugerirPares(catalogo: FilaCatalogo[], aliases: FilaAlias[]): Su
         factor, factorDeducido: a.factor_a_base == null && deducido != null,
         costo: costoPorBase(Number(a.importe_acumulado), Number(a.cantidad_acumulada), factor),
         costoSinFactor: costoPorBase(Number(a.importe_acumulado), Number(a.cantidad_acumulada), null),
+        pack: packDe(a.descripcion),
         score: Math.round(score * 100) / 100,
         confianza: score >= 0.66 ? 'alta' : 'revisar',
       })
