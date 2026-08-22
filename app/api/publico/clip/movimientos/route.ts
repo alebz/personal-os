@@ -33,14 +33,20 @@ const compartenNombre = (x: string, y: string) => tokens(x).some((a) => tokens(y
 
 export async function GET() {
   const supabase = createServerClient()
-  const [movs, costos, tickets, previstos, pagos, facturas] = await Promise.all([
+  const [movs, costos, tickets, previstos, pagos, facturas, cfg] = await Promise.all([
     supabase.from('publico_clip_movimientos').select('*').order('fecha', { ascending: false }),
     supabase.from('publico_costos').select('id, date, amount').eq('scope', 'publico'),
     supabase.from('ticket_scans').select('id, fecha, total').eq('scope', 'publico').eq('status', 'confirmed'),
     supabase.from('publico_previstos').select('id, concepto, categoria, amount, frecuencia, anchor_date, ocurrencias, origin, archived').eq('scope', 'publico'),
     supabase.from('publico_previsto_pagos').select('previsto_id, ocurrencia'),
     supabase.from('publico_facturas').select('uuid, fecha, total, emisor_nombre, status, estado_pago'),
+    supabase.from('publico_config').select('clip_desde').eq('id', 1).maybeSingle(),
   ])
+
+  // CORTE: la cuenta de Clip es más vieja que Público (hay movimientos desde 2024, varios ni del restaurante).
+  // Lo anterior al corte se conserva y se puede ver, pero no cuenta como pendiente: no hay nada que conciliar
+  // contra unos libros que en ese entonces no existían.
+  const desde = (cfg.data?.clip_desde as string | null) ?? '2026-07-01'
 
   const libro = [
     ...(costos.data ?? []).map((c) => ({ date: c.date as string, amt: Number(c.amount) })),
@@ -55,6 +61,7 @@ export async function GET() {
   const items = (movs.data ?? []).map((m) => {
     const monto = Number(m.monto), fecha = m.fecha as string
     if (!m.es_gasto || m.estado !== 'pendiente') return { ...m, sugerencia: null as unknown }
+    if (fecha < desde) return { ...m, sugerencia: { tipo: 'previo' } }
 
     const enLibros = libro.some((c) => Math.abs(c.amt - monto) < 1 && dias(c.date, fecha) <= VENTANA_DIAS)
     if (enLibros) return { ...m, sugerencia: { tipo: 'en_libros' } }
@@ -82,12 +89,14 @@ export async function GET() {
     return { ...m, sugerencia: { tipo: 'nuevo' } }
   })
 
-  const pend = items.filter((i) => i.es_gasto && i.estado === 'pendiente')
+  const pend = items.filter((i) => i.es_gasto && i.estado === 'pendiente' && (i.fecha as string) >= desde)
   const cuenta = (t: string) => pend.filter((i) => (i.sugerencia as { tipo?: string } | null)?.tipo === t).length
   const suma = (t: string) => Math.round(pend.filter((i) => (i.sugerencia as { tipo?: string } | null)?.tipo === t).reduce((s, i) => s + Number(i.monto), 0) * 100) / 100
   return NextResponse.json({
     movimientos: items,
+    desde,
     resumen: {
+      previos: items.filter((i) => (i.sugerencia as { tipo?: string } | null)?.tipo === 'previo').length,
       enLibros: cuenta('en_libros'),
       previstos: { n: cuenta('previsto'), monto: suma('previsto') },
       nuevos: { n: cuenta('nuevo'), monto: suma('nuevo') },

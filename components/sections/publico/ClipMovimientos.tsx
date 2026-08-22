@@ -12,7 +12,7 @@ import { dayMonth } from './util'
 // tu cuenta y tu contabilidad. Tres montones: lo que ya cuadra, lo que es un previsto esperando marcarse, y lo
 // que de plano no está registrado. La pantalla existe para vaciar los dos últimos.
 
-type Sug = { tipo: 'en_libros' } | { tipo: 'nuevo' }
+type Sug = { tipo: 'en_libros' } | { tipo: 'nuevo' } | { tipo: 'previo' }
   | { tipo: 'previsto'; previstoId: string; concepto: string; ocurrencia: string; categoria: string }
   | { tipo: 'pago_factura'; uuid: string; emisor: string | null; fechaFactura: string; capturada: boolean }
 type Mov = {
@@ -24,7 +24,8 @@ type Mov = {
 
 export function ClipMovimientos({ tone }: { tone?: string }) {
   const [movs, setMovs] = useState<Mov[]>([])
-  const [resumen, setResumen] = useState<{ enLibros: number; previstos: { n: number; monto: number }; nuevos: { n: number; monto: number } } | null>(null)
+  const [resumen, setResumen] = useState<{ previos: number; enLibros: number; previstos: { n: number; monto: number }; nuevos: { n: number; monto: number } } | null>(null)
+  const [desde, setDesde] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [abierto, setAbierto] = useState<string | null>(null)
   const [provId, setProvId] = useState<string | null>(null)
@@ -39,7 +40,7 @@ export function ClipMovimientos({ tone }: { tone?: string }) {
     setLoading(true)
     try {
       const j = await fetch('/api/publico/clip/movimientos').then((r) => r.json())
-      setMovs(j.movimientos ?? []); setResumen(j.resumen ?? null)
+      setMovs(j.movimientos ?? []); setResumen(j.resumen ?? null); setDesde(j.desde ?? null)
     } finally { setLoading(false) }
   }, [])
   useEffect(() => { void load() }, [load])
@@ -76,7 +77,7 @@ export function ClipMovimientos({ tone }: { tone?: string }) {
   }
 
   const pendientes = movs.filter((m) => m.es_gasto && m.estado === 'pendiente')
-  const accionables = pendientes.filter((m) => m.sugerencia?.tipo !== 'en_libros')
+  const accionables = pendientes.filter((m) => m.sugerencia?.tipo !== 'en_libros' && m.sugerencia?.tipo !== 'previo')
   const lista = verTodo ? movs : accionables
 
   return (
@@ -91,6 +92,7 @@ export function ClipMovimientos({ tone }: { tone?: string }) {
           <span className="text-fg-muted">✓ <b className="text-ok">{resumen.enLibros}</b> ya en libros</span>
           {resumen.previstos.n > 0 && <span className="text-fg-muted"><b className="text-accent">{resumen.previstos.n}</b> son previstos sin marcar ({mxn(resumen.previstos.monto)})</span>}
           {resumen.nuevos.n > 0 && <span className="text-fg-muted"><b className="text-danger">{resumen.nuevos.n}</b> sin registrar ({mxn(resumen.nuevos.monto)})</span>}
+          {resumen.previos > 0 && <span className="text-fg-muted opacity-70" title="tu cuenta de Clip es más vieja que Público: contra esos meses no hay libros que conciliar">{resumen.previos} anteriores al corte{desde ? ` (${dayMonth(desde)})` : ''}, fuera de cuenta</span>}
         </div>
       )}
       {flash && <Card pad="sm" className="mb-2 text-label text-fg-muted">{flash}</Card>}
@@ -113,6 +115,7 @@ export function ClipMovimientos({ tone }: { tone?: string }) {
                   {s?.tipo === 'nuevo' && <span className="shrink-0 rounded bg-danger/15 px-1 text-label text-danger" title="no hay ningún costo ni ticket por este monto en estos días">sin registrar</span>}
                   {s?.tipo === 'pago_factura' && <span className="shrink-0 rounded bg-ok/15 px-1 text-label text-ok" title="es el pago de una factura a crédito que ya está en los libros">pago de factura</span>}
                   {s?.tipo === 'en_libros' && <span className="shrink-0 text-label text-ok" title="ya hay un costo o ticket que corresponde">✓</span>}
+                  {s?.tipo === 'previo' && <span className="shrink-0 text-label text-fg-muted opacity-70" title="anterior al corte: en esa época Público no llevaba libros">previo</span>}
                   {m.estado === 'ligado' && <span className="shrink-0 text-label text-ok">registrado</span>}
                   {m.estado === 'ignorado' && <span className="shrink-0 text-label text-fg-muted">ignorado</span>}
                   <span className={`w-20 shrink-0 text-right tabular-nums ${m.es_gasto ? 'text-danger' : 'text-ok'}`}>{m.es_gasto ? '−' : '+'}{mxn(Number(m.monto))}</span>
