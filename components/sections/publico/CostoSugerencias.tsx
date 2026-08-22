@@ -12,6 +12,11 @@ import { Card, inputCell as cell } from './ui'
 // el aceite en $185/l cuando vale $740/l. Por eso se muestra el costo final ANTES de aceptar, y al lado lo que
 // diría sin convertir — para que un error de 4× se vea a simple vista en vez de esconderse en el food cost.
 
+type Audit = {
+  tipo: 'contradice' | 'sospechoso'; catalogoId: string; nombre: string; unidadBase: string | null
+  rawNorm: string; descripcion: string; unidadCompra: string | null
+  guardado: number | null; declarado: number | null; costoActual: number | null; costoCorregido: number | null
+}
 type Sug = {
   catalogoId: string; nombre: string; unidadBase: string | null
   rawNorm: string; descripcion: string; unidadCompra: string | null
@@ -24,6 +29,8 @@ type Sug = {
 
 export function CostoSugerencias({ tone }: { tone?: string }) {
   const [sugs, setSugs] = useState<Sug[]>([])
+  const [audit, setAudit] = useState<Audit[]>([])
+  const [arreglo, setArreglo] = useState<Record<string, string>>({})
   const [resumen, setResumen] = useState<{ sinCosto: number; comprasLibres: number; alta: number; revisar: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [factores, setFactores] = useState<Record<string, string>>({})   // catalogoId → factor editado
@@ -35,7 +42,7 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
     setLoading(true)
     try {
       const j = await fetch('/api/publico/catalogo/sugerencias').then((r) => r.json())
-      setSugs(j.sugerencias ?? []); setResumen(j.resumen ?? null)
+      setSugs(j.sugerencias ?? []); setResumen(j.resumen ?? null); setAudit(j.auditoria ?? [])
       setFactores(Object.fromEntries((j.sugerencias ?? []).map((s: Sug) => [s.catalogoId, s.factor != null ? String(s.factor) : ''])))
     } finally { setLoading(false) }
   }, [])
@@ -60,6 +67,19 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
   // OBVIO = el nombre del producto aparece COMPLETO en la compra y el rendimiento no es opinión: o la factura
   // declara la presentación ("6/1.5 LT", "250 ml") o el factor ya se decidió antes. Eso no necesita tu ojo.
   const esObvio = (s: Sug) => s.confianza === 'alta' && s.score >= 1 && factorDe(s) != null
+  async function corregir(a: Audit, factor: number) {
+    setBusy(a.catalogoId); setFlash(null)
+    const r = await fetch('/api/publico/catalogo/sugerencias', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ catalogoId: a.catalogoId, rawNorm: a.rawNorm, factor }),
+    })
+    setBusy(null)
+    if (!r.ok) { setFlash('No se pudo corregir.'); return }
+    const j = await r.json()
+    setFlash(`${a.nombre} · ${mxn(Number(j.costo))} por ${a.unidadBase ?? 'unidad'}`)
+    await load()
+  }
+
   const visibles = sugs.filter((s) => !descartados.has(s.catalogoId))
   const obvios = visibles.filter(esObvio)
 
@@ -104,6 +124,39 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
             className="rounded-card border border-accent px-3 py-0.5 font-bold text-accent hover:bg-accent/10 disabled:opacity-40">
             {busy === 'lote' ? 'ligando…' : `Ligar los ${obvios.length}`}
           </button>
+        </Card>
+      )}
+
+      {/* AUDITORÍA — costos que YA están puestos y no se sostienen. Un factor se guarda una vez y después nadie
+          lo vuelve a mirar, así que un "no sé" que quedó en 1 se vuelve un dato bueno para siempre. */}
+      {!loading && audit.length > 0 && (
+        <Card pad="sm" className="mb-2 border-warn/40 bg-warn/5">
+          <div className="text-label text-fg">Costos que no se sostienen <span className="text-fg-muted">· ya están puestos, pero el rendimiento no cuadra</span></div>
+          <div className="mt-1 divide-y divide-border/60">
+            {audit.map((a) => (
+              <div key={a.catalogoId} className="flex flex-wrap items-center gap-2 py-1 text-label">
+                <span className="font-medium text-fg">{a.nombre}</span>
+                {a.tipo === 'contradice'
+                  ? <span className="text-fg-muted">guardaste <b className="text-fg">×{a.guardado}</b> pero &quot;{a.descripcion.slice(0, 30)}&quot; declara <b className="text-fg">×{a.declarado}</b></span>
+                  : <span className="text-fg-muted">compras por {a.unidadCompra?.toLowerCase()} y cuentas en {a.unidadBase}, con factor <b className="text-fg">1</b> — ¿de verdad {a.unidadCompra?.toLowerCase()} pesa 1 {a.unidadBase}?</span>}
+                <span className="text-fg-muted">hoy vale <b className="text-fg">{a.costoActual != null ? mxn(a.costoActual) : '—'}/{a.unidadBase}</b></span>
+                {a.tipo === 'contradice' && a.costoCorregido != null && (
+                  <button onClick={() => void corregir(a, a.declarado!)} disabled={busy != null}
+                    className="rounded-card border border-accent px-2 py-0.5 font-bold text-accent hover:bg-accent/10 disabled:opacity-40">
+                    usar ×{a.declarado} → {mxn(a.costoCorregido)}
+                  </button>
+                )}
+                {a.tipo === 'sospechoso' && (<>
+                  <input value={arreglo[a.catalogoId] ?? ''} inputMode="decimal" placeholder="rinde…"
+                    onChange={(e) => setArreglo((m) => ({ ...m, [a.catalogoId]: e.target.value }))}
+                    style={{ ...cell, width: 70 }} title={`cuántos ${a.unidadBase} trae un ${a.unidadCompra?.toLowerCase()}`} />
+                  <button onClick={() => { const v = Number(arreglo[a.catalogoId]); if (v > 0) void corregir(a, v) }}
+                    disabled={busy != null || !(Number(arreglo[a.catalogoId]) > 0)}
+                    className="rounded-card border border-accent px-2 py-0.5 font-bold text-accent hover:bg-accent/10 disabled:opacity-40">corregir</button>
+                </>)}
+              </div>
+            ))}
+          </div>
         </Card>
       )}
 

@@ -54,6 +54,21 @@ const MEDIDA = /(\d+(?:[.,]\d+)?)\s*(ml|mls|l|lt|lts|litros?|g|gr|grs|gramos?|kg
 const PACK = /(\d+)\s*\/\s*(\d+(?:[.,]\d+)?)\s*(ml|mls|l|lt|lts|g|gr|grs|kg|kgs)\b/i
 
 /** El paquete que declara el nombre, para poder EXPLICAR el factor en vez de solo escupirlo. */
+/** El rendimiento que declara un paquete del nombre, en la unidad base. null si el nombre no declara paquete. */
+function factorDePack(descripcion: string, unidadBase: string | null): number | null {
+  const p = packDe(descripcion)
+  if (!p) return null
+  const base = (unidadBase ?? '').trim().toUpperCase()
+  const esLitro = BASE_LITRO.has(base), esKilo = BASE_KILO.has(base)
+  // Base por PIEZA: un 24-pack rinde 24 piezas.
+  if (!esLitro && !esKilo) return p.n
+  const total = p.n * p.medida
+  if (esLitro) { if (p.unidad.startsWith('ML')) return total / 1000; if (p.unidad.startsWith('L')) return total; return null }
+  if (p.unidad.startsWith('KG')) return total
+  if (p.unidad.startsWith('G')) return total / 1000
+  return null
+}
+
 export function packDe(descripcion: string): { n: number; medida: number; unidad: string } | null {
   const m = descripcion.match(PACK)
   if (!m) return null
@@ -82,8 +97,29 @@ const canon = (u: string | null | undefined) => CANON[(u ?? '').trim().toUpperCa
  * Devuelve null si la base es por pieza (ahí una compra es una pieza y no hay nada que convertir) o si el
  * nombre no dice la medida — en esos casos el factor lo pones tú.
  */
+/**
+ * El factor Y DE DÓNDE SALIÓ. La procedencia importa tanto como el número: un factor que el proveedor declaró
+ * en el documento ("24/355 ML") es un hecho; uno inferido de que las unidades se llaman igual es una suposición
+ * razonable. Sin distinguirlos, una suposición débil termina contradiciendo un dato duro — que fue justo el bug:
+ * el Heineken se compra por "1 PZA" que trae 24 latas, así que la igualdad de unidades decía 1 y el paquete
+ * decía 24. Gana siempre lo que el documento DECLARA.
+ */
+export function factorConFuente(descripcion: string, unidadBase: string | null, unidadCompra?: string | null): { factor: number | null; fuente: 'pack' | 'medida' | 'unidad' | null } {
+  const f = factorSugerido(descripcion, unidadBase, unidadCompra)
+  if (f == null) return { factor: null, fuente: null }
+  if (packDe(descripcion)) return { factor: f, fuente: 'pack' }
+  const cb = canon(unidadBase), cc = canon(unidadCompra)
+  if (cb && cc && (cb === cc || (cb === 'kg' && cc === 'g') || (cb === 'l' && cc === 'ml') || (cb === 'g' && cc === 'kg') || (cb === 'ml' && cc === 'l'))) return { factor: f, fuente: 'unidad' }
+  return { factor: f, fuente: 'medida' }
+}
+
 export function factorSugerido(descripcion: string, unidadBase: string | null, unidadCompra?: string | null): number | null {
-  // 1) ¿La factura ya cobra en la unidad que cuentas? Entonces el factor es 1 y no hay nada que adivinar.
+  // ORDEN DE AUTORIDAD. 1) El PAQUETE declarado en el nombre gana sobre todo: "1 PZA" que dice "24/355 ML" son
+  // 24 piezas, aunque la unidad de compra se llame igual que la unidad base.
+  const packPrimero = factorDePack(descripcion, unidadBase)
+  if (packPrimero != null) return packPrimero
+
+  // 2) ¿La factura ya cobra en la unidad que cuentas? Entonces el factor es 1 y no hay nada que adivinar.
   const cb = canon(unidadBase), cc = canon(unidadCompra)
   if (cb && cc) {
     if (cb === cc) return 1
@@ -95,24 +131,7 @@ export function factorSugerido(descripcion: string, unidadBase: string | null, u
 
   const base = (unidadBase ?? '').trim().toUpperCase()
   const esLitro = BASE_LITRO.has(base), esKilo = BASE_KILO.has(base)
-  const pack = descripcion.match(PACK)
-
-  // Base por PIEZA: lo único convertible es el tamaño del paquete (un 24-pack son 24 piezas, no una).
-  if (!esLitro && !esKilo) {
-    if (!pack) return null
-    const n = Number(pack[1])
-    return Number.isFinite(n) && n > 1 ? n : null
-  }
-
-  // Base por volumen/peso: un paquete son N × M unidades, no M.
-  if (pack) {
-    const n = Number(pack[1]), m = Number(pack[2].replace(',', '.')), u = pack[3].toUpperCase()
-    if (Number.isFinite(n) && Number.isFinite(m) && n > 0 && m > 0) {
-      const total = n * m
-      if (esLitro) { if (u.startsWith('ML')) return total / 1000; if (u.startsWith('L')) return total }
-      else { if (u.startsWith('KG')) return total; if (u.startsWith('G')) return total / 1000 }
-    }
-  }
+  if (!esLitro && !esKilo) return null
 
   // La última medida del nombre: el tamaño suele ir al final ("Aceite ... 250 ml").
   const todas = [...descripcion.matchAll(MEDIDA)]
