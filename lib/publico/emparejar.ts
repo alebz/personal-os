@@ -64,13 +64,35 @@ export function packDe(descripcion: string): { n: number; medida: number; unidad
 const BASE_LITRO = new Set(['L', 'LT', 'LTS', 'LITRO', 'LITROS'])
 const BASE_KILO = new Set(['KG', 'KGS', 'KILO', 'KILOS'])
 
+// La UNIDAD de la factura es la señal más confiable que existe, y es la que ignoraba: si el CFDI cobra
+// "1.322 KILOGRAMO × $460" y tú cuentas en kg, el costo por kilo ya está dado — no hay nada que deducir del
+// nombre ni que preguntarle a nadie. Se canoniza para que KILOGRAMO/KG/KILO sean lo mismo.
+const CANON: Record<string, string> = {
+  KG: 'kg', KGS: 'kg', KILO: 'kg', KILOS: 'kg', KILOGRAMO: 'kg', KILOGRAMOS: 'kg',
+  G: 'g', GR: 'g', GRS: 'g', GRAMO: 'g', GRAMOS: 'g',
+  L: 'l', LT: 'l', LTS: 'l', LITRO: 'l', LITROS: 'l',
+  ML: 'ml', MLS: 'ml', MILILITRO: 'ml', MILILITROS: 'ml',
+  PZA: 'pza', PZ: 'pza', PIEZA: 'pza', PIEZAS: 'pza', P: 'pza', U: 'pza', UNIDAD: 'pza', UNIDADES: 'pza',
+}
+const canon = (u: string | null | undefined) => CANON[(u ?? '').trim().toUpperCase()] ?? null
+
 /**
  * Cuántas unidades base trae UNA unidad de compra, deducido de la medida en el nombre.
  * "Aceite aroma Trufa Negra 250 ml" con base `l` → 0.25. "KS PIMIENTA 400G" con base `kg` → 0.4.
  * Devuelve null si la base es por pieza (ahí una compra es una pieza y no hay nada que convertir) o si el
  * nombre no dice la medida — en esos casos el factor lo pones tú.
  */
-export function factorSugerido(descripcion: string, unidadBase: string | null): number | null {
+export function factorSugerido(descripcion: string, unidadBase: string | null, unidadCompra?: string | null): number | null {
+  // 1) ¿La factura ya cobra en la unidad que cuentas? Entonces el factor es 1 y no hay nada que adivinar.
+  const cb = canon(unidadBase), cc = canon(unidadCompra)
+  if (cb && cc) {
+    if (cb === cc) return 1
+    if (cb === 'kg' && cc === 'g') return 0.001
+    if (cb === 'l' && cc === 'ml') return 0.001
+    if (cb === 'g' && cc === 'kg') return 1000
+    if (cb === 'ml' && cc === 'l') return 1000
+  }
+
   const base = (unidadBase ?? '').trim().toUpperCase()
   const esLitro = BASE_LITRO.has(base), esKilo = BASE_KILO.has(base)
   const pack = descripcion.match(PACK)
@@ -133,7 +155,7 @@ export function sugerirPares(catalogo: FilaCatalogo[], aliases: FilaAlias[]): Su
     for (const a of libres) {
       const score = parecido(c.nombre, a.descripcion)
       if (score < MIN_SCORE) continue
-      const deducido = factorSugerido(a.descripcion, c.unidad_base)
+      const deducido = factorSugerido(a.descripcion, c.unidad_base, a.unidad)
       const factor = a.factor_a_base != null ? Number(a.factor_a_base) : deducido
       cands.push({
         catalogoId: c.id, nombre: c.nombre, unidadBase: c.unidad_base,
