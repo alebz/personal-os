@@ -20,6 +20,7 @@ import { Notas } from './publico/Notas'
 import { Inventario } from './publico/Inventario'
 import { Catalogo } from './publico/Catalogo'
 import { Facturas } from './publico/Facturas'
+import { ClipMovimientos } from './publico/ClipMovimientos'
 import { Card, CardHead, Metric as KitMetric, srcTag, StatBar, BentoRow, TabBar } from './publico/ui'
 import { TicketsArchive } from './publico/TicketsArchive'
 import { Previstos } from './publico/Previstos'
@@ -81,7 +82,7 @@ function PublicoArcade() {
   const [libView, setLibView] = useState<'notas' | 'proveedores' | 'fondos'>('notas')   // Libretas: notas · proveedores · fondos
   const [provReloadKey, setProvReloadKey] = useState(0)   // bump → recarga la libreta tras asignar cabos sueltos
   const [invView, setInvView] = useState<'catalogo' | 'contar'>('catalogo')   // Inventario: catálogo maestro · contar (viejo, hasta Fase C)
-  const [movView, setMovView] = useState<'capturar' | 'facturas' | 'historial'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
+  const [movView, setMovView] = useState<'capturar' | 'facturas' | 'clip' | 'historial'>('capturar')   // Movimientos: capturar · archivo · conteo · cierre (cuadre del POS)
 
   // Socios (F2): libretas Alex/Andrés = fondos scope 'publico' reusados. % de reparto en config aparte.
   const { funds: socioFunds, handlers: socioHandlers } = useCajaFuerte('publico', month)
@@ -225,7 +226,7 @@ function PublicoArcade() {
 
       {tab === 'tickets' && (<>
       {/* TICKETS = capturar (el acto de registrar) · historial (el registro). */}
-      <TabBar value={movView} onChange={setMovView} tabs={[['capturar', 'Capturar'], ['facturas', 'Facturas'], ['historial', 'Historial']] as const} />
+      <TabBar value={movView} onChange={setMovView} tabs={[['capturar', 'Capturar'], ['facturas', 'Facturas'], ['clip', 'Clip'], ['historial', 'Historial']] as const} />
 
       {movView === 'capturar' && (<>
       {/* ── FOTO DEL TICKET = ACCIÓN PRIMARIA (lo que haces a diario) ── */}
@@ -249,6 +250,8 @@ function PublicoArcade() {
       </>)}
 
       {movView === 'facturas' && <Facturas tone={dc} />}
+
+      {movView === 'clip' && <ClipMovimientos tone={dc} />}
 
       {movView === 'historial' && (<>
       {/* HISTORIAL = el archivo de tickets (ver, editar, borrar) + el gestor de alias (mantenimiento). */}
