@@ -17,8 +17,11 @@ type Concepto = { descripcion?: string; cantidad?: number; unidad?: string | nul
 // (scan + líneas + roll-up + aprende alias con costo real) vía el pipeline compartido. Reconcilia el proveedor:
 // el body trae el proveedor CANÓNICO (elegido en el picker); el nombre fiscal del CFDI va como proveedor_raw.
 // Sin guardián de fecha (las facturas son fechas reales, el backlog es viejo a propósito). Idempotente por status.
+//
+// `ligarA` (id de un publico_costos) = el gasto YA estaba en los libros: en vez de crear otro, el scan se cuelga
+// de ese movimiento. Es lo que evita el doble conteo cuando la compra ya entró por Poster o por foto.
 export async function POST(req: NextRequest) {
-  let b: { uuid?: string; proveedor?: string; proveedorRaw?: string | null; category?: string; origin?: string | null }
+  let b: { uuid?: string; proveedor?: string; proveedorRaw?: string | null; category?: string; origin?: string | null; ligarA?: string | null }
   try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const proveedor = (b.proveedor ?? '').trim()
   if (!b.uuid) return NextResponse.json({ error: 'uuid requerido' }, { status: 400 })
@@ -37,14 +40,14 @@ export async function POST(req: NextRequest) {
   const origen = (await getSessionScope(req.cookies.get(SESSION_COOKIE)?.value)) ?? 'full'
 
   try {
-    const { scanId, productos } = await capturarTicket(supabase, {
+    const { scanId, productos, ligado } = await capturarTicket(supabase, {
       proveedor, proveedor_raw: b.proveedorRaw ?? f.emisor_nombre ?? null, fecha: f.fecha as string,
       subtotal: f.subtotal != null ? Number(f.subtotal) : null, impuestos: f.total != null && f.subtotal != null ? Number(f.total) - Number(f.subtotal) : null,
       total: Number(f.total ?? 0), notas: 'Factura CFDI', category: b.category, cost_kind, origin: b.origin ?? null,
-      items, model: 'cfdi', raw: null, origen,
+      items, model: 'cfdi', raw: null, origen, ligarA: b.ligarA ?? null,
     })
     await supabase.from('publico_facturas').update({ status: 'capturada', ticket_scan_id: scanId }).eq('uuid', b.uuid)
-    return NextResponse.json({ ok: true, scanId, productos })
+    return NextResponse.json({ ok: true, scanId, productos, ligado })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
