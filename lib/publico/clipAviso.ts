@@ -31,17 +31,31 @@ const MESES: Record<string, number> = {
 
 // El cuerpo viene como pseudo-tabla de pipes ("| Establecimiento: | MISC FRUTILANDIA |"). Se limpian los pipes
 // y los ### de encabezado para poder buscar por etiqueta sin pelearse con el formato.
-const limpiar = (s: string) => s.replace(/\|/g, ' ').replace(/#+/g, ' ').replace(/[ \t]+/g, ' ')
+const limpiar = (s: string) => s.replace(/\r/g, '').replace(/\|/g, ' ').replace(/#+/g, ' ').replace(/[ \t]+/g, ' ')
 
-// Valor que sigue a una etiqueta, en la misma línea o en la siguiente (el formato varía entre avisos).
+// Las etiquetas del aviso, para saber cuándo lo que sigue ya es OTRO campo y no el valor que buscamos.
+const OTRA_ETIQUETA = /^(Destinatario|Emisor|Cuenta del|Hora y fecha|Tipo|Descripci[oó]n|Comisi[oó]n|No\. de|Fecha:|Establecimiento|M[ée]todo de pago|Resumen|MONTO|Detalles)/i
+
+/**
+ * Valor que sigue a una etiqueta. El formato cambia según cómo llegue el correo:
+ *   · original de Clip → tabla en una línea:  "| Destinatario | holbeer nueva |"
+ *   · REENVIADO        → Gmail rompe la tabla: la etiqueta queda sola y el valor cae 1-3 renglones abajo,
+ *                        con líneas vacías en medio ("No. de referencia" · "" · "6527593").
+ * Por eso se busca hacia adelante el primer renglón con contenido, y se corta si resulta ser otra etiqueta
+ * (campo vacío) para no robarle el valor al campo siguiente.
+ */
 function trasEtiqueta(lineas: string[], etiqueta: RegExp): string | null {
   for (let i = 0; i < lineas.length; i++) {
     const m = lineas[i].match(etiqueta)
     if (!m) continue
     const resto = lineas[i].slice(m.index! + m[0].length).trim()
     if (resto) return resto
-    const sig = (lineas[i + 1] ?? '').trim()
-    if (sig) return sig
+    for (let k = i + 1; k < Math.min(lineas.length, i + 4); k++) {
+      const s = lineas[k].trim()
+      if (!s) continue
+      return OTRA_ETIQUETA.test(s) ? null : s
+    }
+    return null
   }
   return null
 }
