@@ -48,23 +48,25 @@ function trasEtiqueta(lineas: string[], etiqueta: RegExp): string | null {
 
 const aNumero = (s: string) => Number(s.replace(/[$,\s]/g, ''))
 
-/** Fecha del movimiento en hora de México. `emailISO` = cuándo llegó el correo (ancla del año). */
+/**
+ * Fecha del movimiento en hora de México. El CUERPO manda: es el único que sabe cuándo ocurrió el movimiento.
+ * `emailISO` solo aporta el AÑO, que el aviso nunca trae ("Agosto 21 - 10:10 am").
+ *
+ * No se puede anclar al día del correo: un aviso REENVIADO A MANO llega semanas después del movimiento (así
+ * entró el backlog de Público), y fecharlo con el reenvío pondría compras de julio en agosto.
+ */
 function resolverFecha(cuerpo: string, emailISO: string): string {
-  // El correo llega en UTC; el aviso habla en hora de México. Convertir primero evita que un movimiento de la
+  // El correo viene en UTC; el aviso habla en hora de México. Convertir primero evita que un movimiento de la
   // tarde caiga en el día siguiente.
   const mx = new Date(emailISO).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
   const m = cuerpo.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{1,2})/i)
-  if (!m) return mx
+  if (!m) return mx   // sin día en el cuerpo, el correo es lo único que hay
   const mes = MESES[m[1].toLowerCase()], dia = Number(m[2])
-  const [ay, am, ad] = mx.split('-').map(Number)
-  // El año no viene en el aviso: se prueba el del correo y, si el día cae muy adelante (aviso de diciembre que
-  // llega en enero), se retrocede uno.
-  let anio = ay
-  if (mes === 12 && am === 1) anio = ay - 1
-  const cand = `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
-  // Si el cuerpo y el correo discrepan por más de 2 días, el correo manda (el cuerpo pudo no parsearse bien).
-  const dif = Math.abs(new Date(`${cand}T12:00:00Z`).getTime() - new Date(`${ay}-${String(am).padStart(2, '0')}-${String(ad).padStart(2, '0')}T12:00:00Z`).getTime()) / 86400000
-  return dif <= 2 ? cand : mx
+  const [ay] = mx.split('-').map(Number)
+  const arma = (a: number) => `${a}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+  // El año del correo, salvo que eso pusiera el movimiento DESPUÉS del aviso (imposible): entonces es del año
+  // pasado — el caso del aviso de diciembre que se reenvía en enero.
+  return arma(ay) > mx ? arma(ay - 1) : arma(ay)
 }
 
 /** Parsea el texto plano de un aviso de Clip. Devuelve null si no es uno (o no se pudo leer el monto). */
