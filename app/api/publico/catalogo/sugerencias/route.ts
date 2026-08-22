@@ -9,13 +9,16 @@ export const runtime = 'nodejs'
 // llega por esa liga, así que sin ella un producto se queda sin precio aunque la factura ya lo traiga.
 export async function GET() {
   const supabase = createServerClient()
-  const [cat, al] = await Promise.all([
+  const [cat, al, desc] = await Promise.all([
     supabase.from('publico_catalogo').select('id, nombre, unidad_base, costo, cuenta_stock, alias_raw_norm, poster_ingredient_id, activo'),
     supabase.from('ticket_product_aliases').select('raw_norm, descripcion, unidad, factor_a_base, importe_acumulado, cantidad_acumulada, veces, toca_stock').is('deleted_at', null),
+    supabase.from('publico_catalogo_descartes').select('catalogo_id, raw_norm'),
   ])
   const catalogo = (cat.data ?? []) as FilaCatalogo[]
   const aliases = (al.data ?? []) as FilaAlias[]
-  const sugerencias = sugerirPares(catalogo, aliases)
+  // Un "no son lo mismo" ya dado no se vuelve a proponer. Es una decisión tuya, no un estado de la pantalla.
+  const descartados = new Set((desc.data ?? []).map((d) => `${d.catalogo_id}|${d.raw_norm}`))
+  const sugerencias = sugerirPares(catalogo, aliases).filter((s) => !descartados.has(`${s.catalogoId}|${s.rawNorm}`))
 
   // ── AUDITORÍA: costos que YA están puestos pero no se sostienen ─────────────────────────────────────────
   // El factor se guarda una vez y de ahí en adelante nadie lo vuelve a mirar, así que un valor puesto a la
@@ -41,6 +44,13 @@ export async function GET() {
       auditoria.push({ tipo: 'contradice', catalogoId: c.id, nombre: c.nombre, unidadBase: c.unidad_base,
         rawNorm: a.raw_norm, descripcion: a.descripcion, unidadCompra: a.unidad,
         guardado, declarado, costoActual: costoCon(guardado), costoCorregido: costoCon(declarado) })
+    } else if (guardado != null && (guardado > 100 || (costoCon(guardado) ?? 1) < 1)) {
+      // IMPLAUSIBLE: una unidad de compra que rinde más de 100 kg/l, o un costo por debajo de $1. Casi siempre
+      // es un punto decimal perdido — "907" donde iba "0.907" deja el tomate en 16 centavos el kilo.
+      auditoria.push({ tipo: 'implausible', catalogoId: c.id, nombre: c.nombre, unidadBase: c.unidad_base,
+        rawNorm: a.raw_norm, descripcion: a.descripcion, unidadCompra: a.unidad,
+        guardado, declarado: guardado > 100 ? guardado / 1000 : null,
+        costoActual: costoCon(guardado), costoCorregido: guardado > 100 ? costoCon(guardado / 1000) : null })
     } else if (guardado === 1 && declarado == null && ['kg', 'l'].includes((c.unidad_base ?? '').toLowerCase())) {
       auditoria.push({ tipo: 'sospechoso', catalogoId: c.id, nombre: c.nombre, unidadBase: c.unidad_base,
         rawNorm: a.raw_norm, descripcion: a.descripcion, unidadCompra: a.unidad,
@@ -60,9 +70,21 @@ export async function GET() {
       revisar: sugerencias.filter((s) => s.confianza === 'revisar').length,
       sinFactor: sugerencias.filter((s) => s.factor == null && s.unidadBase != null).length,
       contradicen: auditoria.filter((a) => a.tipo === 'contradice').length,
+      implausibles: auditoria.filter((a) => a.tipo === 'implausible').length,
       sospechosos: auditoria.filter((a) => a.tipo === 'sospechoso').length,
     },
   })
+}
+
+// DELETE — "no son lo mismo". Se guarda para no volver a proponer ese par nunca.
+export async function DELETE(req: NextRequest) {
+  let b: { catalogoId?: string; rawNorm?: string }
+  try { b = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  if (!b.catalogoId || !b.rawNorm) return NextResponse.json({ error: 'catalogoId y rawNorm requeridos' }, { status: 400 })
+  const supabase = createServerClient()
+  const { error } = await supabase.from('publico_catalogo_descartes').upsert({ catalogo_id: b.catalogoId, raw_norm: b.rawNorm }, { onConflict: 'catalogo_id,raw_norm' })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }
 
 // PATCH — corregir el rendimiento de un producto YA ligado. Es el par del bloque de auditoría: el factor se

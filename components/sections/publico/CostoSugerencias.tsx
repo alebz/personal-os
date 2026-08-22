@@ -13,7 +13,7 @@ import { Card, inputCell as cell } from './ui'
 // diría sin convertir — para que un error de 4× se vea a simple vista en vez de esconderse en el food cost.
 
 type Audit = {
-  tipo: 'contradice' | 'sospechoso'; catalogoId: string; nombre: string; unidadBase: string | null
+  tipo: 'contradice' | 'sospechoso' | 'implausible'; catalogoId: string; nombre: string; unidadBase: string | null
   rawNorm: string; descripcion: string; unidadCompra: string | null
   guardado: number | null; declarado: number | null; costoActual: number | null; costoCorregido: number | null
 }
@@ -67,6 +67,15 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
   // OBVIO = el nombre del producto aparece COMPLETO en la compra y el rendimiento no es opinión: o la factura
   // declara la presentación ("6/1.5 LT", "250 ml") o el factor ya se decidió antes. Eso no necesita tu ojo.
   const esObvio = (s: Sug) => s.confianza === 'alta' && s.score >= 1 && factorDe(s) != null
+  // El descarte se GUARDA. Antes vivía en memoria y al salir de la sección los pares rechazados reaparecían.
+  async function descartar(s: Sug) {
+    setDescartados((d) => new Set(d).add(s.catalogoId))   // optimista: desaparece ya
+    await fetch('/api/publico/catalogo/sugerencias', {
+      method: 'DELETE', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ catalogoId: s.catalogoId, rawNorm: s.rawNorm }),
+    }).catch(() => setFlash('No se pudo guardar el descarte — recarga y vuelve a intentar.'))
+  }
+
   async function corregir(a: Audit, factor: number) {
     setBusy(a.catalogoId); setFlash(null)
     const r = await fetch('/api/publico/catalogo/sugerencias', {
@@ -136,17 +145,17 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
             {audit.map((a) => (
               <div key={a.catalogoId} className="flex flex-wrap items-center gap-2 py-1 text-label">
                 <span className="font-medium text-fg">{a.nombre}</span>
-                {a.tipo === 'contradice'
-                  ? <span className="text-fg-muted">guardaste <b className="text-fg">×{a.guardado}</b> pero &quot;{a.descripcion.slice(0, 30)}&quot; declara <b className="text-fg">×{a.declarado}</b></span>
-                  : <span className="text-fg-muted">compras por {a.unidadCompra?.toLowerCase()} y cuentas en {a.unidadBase}, con factor <b className="text-fg">1</b> — ¿de verdad {a.unidadCompra?.toLowerCase()} pesa 1 {a.unidadBase}?</span>}
+                {a.tipo === 'contradice' && <span className="text-fg-muted">guardaste <b className="text-fg">×{a.guardado}</b> pero &quot;{a.descripcion.slice(0, 30)}&quot; declara <b className="text-fg">×{a.declarado}</b></span>}
+                {a.tipo === 'implausible' && <span className="text-danger">un {a.unidadCompra?.toLowerCase()} rendiría <b>{a.guardado} {a.unidadBase}</b> — ¿punto decimal perdido?</span>}
+                {a.tipo === 'sospechoso' && <span className="text-fg-muted">compras por {a.unidadCompra?.toLowerCase()} y cuentas en {a.unidadBase}, con factor <b className="text-fg">1</b> — ¿de verdad {a.unidadCompra?.toLowerCase()} pesa 1 {a.unidadBase}?</span>}
                 <span className="text-fg-muted">hoy vale <b className="text-fg">{a.costoActual != null ? mxn(a.costoActual) : '—'}/{a.unidadBase}</b></span>
-                {a.tipo === 'contradice' && a.costoCorregido != null && (
+                {(a.tipo === 'contradice' || a.tipo === 'implausible') && a.costoCorregido != null && a.declarado != null && (
                   <button onClick={() => void corregir(a, a.declarado!)} disabled={busy != null}
                     className="rounded-card border border-accent px-2 py-0.5 font-bold text-accent hover:bg-accent/10 disabled:opacity-40">
                     usar ×{a.declarado} → {mxn(a.costoCorregido)}
                   </button>
                 )}
-                {a.tipo === 'sospechoso' && (<>
+                {(a.tipo === 'sospechoso' || a.tipo === 'implausible') && (<>
                   <input value={arreglo[a.catalogoId] ?? ''} inputMode="decimal" placeholder="rinde…"
                     onChange={(e) => setArreglo((m) => ({ ...m, [a.catalogoId]: e.target.value }))}
                     style={{ ...cell, width: 70 }} title={`cuántos ${a.unidadBase} trae un ${a.unidadCompra?.toLowerCase()}`} />
@@ -215,7 +224,7 @@ export function CostoSugerencias({ tone }: { tone?: string }) {
                             className="rounded-card border border-accent px-3 py-0.5 font-bold text-accent hover:bg-accent/10 disabled:opacity-40">
                             {busy === s.catalogoId ? 'ligando…' : 'Ligar'}
                           </button>
-                          <button onClick={() => setDescartados((d) => new Set(d).add(s.catalogoId))} className="text-fg-muted hover:text-danger" title="descarta este par: no son el mismo producto">no es el mismo</button>
+                          <button onClick={() => void descartar(s)} disabled={busy != null} className="text-fg-muted hover:text-danger" title="descarta este par para siempre: no son el mismo producto">no es el mismo</button>
                         </div>
                       </div>
                     )
