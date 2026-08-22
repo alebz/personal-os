@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   '/api/telegram/webhook', // verified via x-telegram-bot-api-secret-token
   '/api/publico/poster/cron', // Vercel Cron: se autentica sola via Bearer $CRON_SECRET (Vercel no manda cookie ni x-api-secret). SOLO esta ruta exacta; /import y /status siguen detrás del middleware.
   '/api/publico/facturas/inbound', // Apps Script del Gmail de Público: self-auth via Bearer $FACTURA_INBOUND_SECRET.
+  '/api/publico/clip/aviso', // Mismo Apps Script (avisos de movimientos de Clip): self-auth con el mismo Bearer.
 ]
 
 // Lo ÚNICO que una sesión de scope 'captura' (Andrés) puede tocar — y CON QUÉ MÉTODO. Mínimo privilegio:
