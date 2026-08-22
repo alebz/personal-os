@@ -69,18 +69,34 @@ const aNumero = (s: string) => Number(s.replace(/[$,\s]/g, ''))
  * No se puede anclar al día del correo: un aviso REENVIADO A MANO llega semanas después del movimiento (así
  * entró el backlog de Público), y fecharlo con el reenvío pondría compras de julio en agosto.
  */
+const MES_DIA = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{1,2})\b/i
+
+// ¿Existe de verdad ese día en ese mes? Descarta 31 de febrero y cosas peores.
+function fechaReal(y: number, m: number, d: number): boolean {
+  if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return false
+  const t = new Date(Date.UTC(y, m - 1, d))
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d
+}
+
 function resolverFecha(cuerpo: string, emailISO: string): string {
   // El correo viene en UTC; el aviso habla en hora de México. Convertir primero evita que un movimiento de la
   // tarde caiga en el día siguiente.
   const mx = new Date(emailISO).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
-  const m = cuerpo.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{1,2})/i)
-  if (!m) return mx   // sin día en el cuerpo, el correo es lo único que hay
+  // Se busca PRIMERO junto a la etiqueta de fecha. Barrer el correo entero engancha meses que aparecen en otro
+  // lado (pies de página, promociones) y el número que sigue no es un día — así salió un "2026-03-00".
+  const zona = cuerpo.match(/(?:Hora y fecha|Fecha:)[\s\S]{0,80}/i)?.[0]
+  const m = zona?.match(MES_DIA) ?? cuerpo.match(MES_DIA)
+  if (!m) return mx   // sin día legible, el correo es lo único que hay
+
   const mes = MESES[m[1].toLowerCase()], dia = Number(m[2])
   const [ay] = mx.split('-').map(Number)
+  // Si lo leído no es una fecha real, NO se inventa: manda el correo. Antes esto llegaba crudo a la base y
+  // reventaba el insert con 500, dejando el aviso sin guardar.
+  if (!fechaReal(ay, mes, dia)) return mx
   const arma = (a: number) => `${a}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
   // El año del correo, salvo que eso pusiera el movimiento DESPUÉS del aviso (imposible): entonces es del año
   // pasado — el caso del aviso de diciembre que se reenvía en enero.
-  return arma(ay) > mx ? arma(ay - 1) : arma(ay)
+  return arma(ay) > mx ? (fechaReal(ay - 1, mes, dia) ? arma(ay - 1) : mx) : arma(ay)
 }
 
 /** Parsea el texto plano de un aviso de Clip. Devuelve null si no es uno (o no se pudo leer el monto). */
